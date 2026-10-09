@@ -234,3 +234,43 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 - Confirmar en el MEF real los notebooks que solo se probaron con el simulador: Nacional, Municipalidad (25 regiones) y los dos de PIM.
 - Si se necesita el PIM municipal de las 25 regiones, se puede crear la variante copiando el catálogo de `DEV_Funcion_Municipalidad.ipynb`.
 - La opción de meses sueltos ("1, 3, 5") se eliminó al unificar con `MES_INICIO`/`MES_FIN`. Se puede volver a agregar.
+
+---
+
+## 12. Proyecto Exportaciones (Infotrade · PROMPERÚ)
+
+**Notebook:** `EXP_Infotrade_Exportaciones.ipynb`, con 3 bloques: instalación, **selectores** (ipywidgets) y descarga.
+**Fuente:** `https://infotrade.promperu.gob.pe/reporte-exportaciones` (datos de SUNAT). La web exige una consulta de 6 meses como máximo.
+
+### Carpetas de Drive
+- Datos: `1JJqcvUomccL-dCCNm5yovl-9TN5laKYi`
+- Control y LOG: `1gAO8-UjTV2bmBwMPgONBAYeVfpwXSWCY`
+
+### API descubierta con F12 → Network
+Todas las llamadas son `POST` con JSON a `https://infotrade.promperu.gob.pe/wss/api/…`. **No usan token ni sesión de usuario**, solo cookies del sitio (`TS01…`, el firewall).
+
+| Paso | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| 1 | `Comunes/ObtenerParametroConcurrenciaReporteActual` | `{"headers":{"Accept":"application/json"}}` | `vResult.CODIGO = CantidadActualDescarga`, `VALOR` |
+| 2 | `Reportes/Exportaciones` | filtros + `NumeroPagina: 1` | `RptData` (una página), `TotalRegistros`, `Totales`, `TotalesPagina` |
+| 3 | `Reportes/ExportacionesExcel` | filtros (sin `NumeroPagina`) | `RptData` con **todas** las filas del período (JSON; la web arma el Excel en el navegador) |
+| 4 | `Comunes/ActualizarConcurrenciaDescarga` | `{"Tipo":1,"PerfilUsuario":"PERFIL_USUARIO_EXTERNO"}` y luego `Tipo: 2` | `{"vResult":1}` |
+| 5 | `user/RegistrarAuditoria` | `UsuarioAuditoria`, `Evento` ("CONSULTAR" / "EXPORTAR EXCEL"), `Json` (filtros como texto)… | registro de actividad (opcional) |
+
+**Filtros (cuerpo):**
+- `FechaInicio` y `FechaFin` con formato `dd-mm-aaaa`.
+- `Departamento`: nombre de la región **con tildes** ("Áncash"; "Lima Metropolitana" aparece dos veces en la web, pero es el mismo valor).
+- `Tipo` = **Sector** de la web (No Tradicional / Tradicional / Sin clasificación).
+- `Sector` = **Subsector** de la web (MADERAS Y PAPELES…).
+- `Mercado`, `Partida` y `Empresa`: texto; un valor vacío equivale a "Todos".
+- Campos `DescripcionProducto*` y `Condicion*` vacíos.
+
+**Campos de `RptData`:** `FechaEmbarque, Ruc, RazonSocial, Departamento, CodigoPartida, Partida (descripción arancelaria), DescripcionComercial, PaisDestino, Monto (FOB USD), PesoNeto, PesoBruto, Cantidad, TipoSector (Sector), Sector (Subsector)`.
+
+### Funcionamiento del notebook
+- **Cortes:** semestres Ene–Jun y Jul–Dic, desde el inicio elegido hasta "Disponible hasta" (el mes que indica la web).
+- **Selectores:** Regiones (selección múltiple, las 25 por defecto), Sector y Subsector (una opción a la vez), Partida, Empresa y Usuario (para la auditoría).
+- **Un CSV por región y semestre:** `EXP <año>-S<n> - <Región> - Sector … - Subsector ….csv`. RUC y partida se guardan como texto, para conservar los ceros.
+- **Control acumulado:** `CONTROL Exportaciones - Sector … - Subsector ….csv`. Compara filas contra `TotalRegistros` y la suma de FOB, pesos y cantidad contra `Totales`; también revisa la región que traen los datos. Resultado: `ESTADO` OK o REVISAR.
+- **Reanudación:** al volver a ejecutar el Bloque 3 se saltan los cortes **completos** con control OK y archivo en Drive. Los semestres incompletos y los que quedaron en REVISAR o con error se vuelven a descargar.
+- Probado solo con simulador (API y Drive falsos). **Falta la primera prueba con el sitio real.**
