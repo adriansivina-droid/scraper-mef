@@ -20,6 +20,10 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 
 ## 2. Inventario de scrapers
 
+**Estructura del repositorio:**
+- `FISCAL/`: scrapers del MEF (este documento, los notebooks y `docs/`).
+- `EXPORT/`: proyecto de exportaciones de Infotrade (notebook y su `.md`).
+
 | Notebook | Dato | Nivel de gobierno | Regiones | Ruta de consulta |
 |---|---|---|---|---|
 | `MEF_DEV_Funcion_GobiernoRegional_LOR_SMN_UCA_(1).ipynb` | Devengado mensual | R: Gobiernos Regionales | Loreto, San Martín, Ucayali | Depto (Meta) → Función |
@@ -30,7 +34,7 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 | `PIM_Funcion_Municipalidad_LOR_SMN_UCA.ipynb` | PIM anual | M: Municipalidades | LOR, SMN, UCA | Depto → Función → Municipalidad |
 
 Para abrir cualquiera en Colab:
-`https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/<NOMBRE>.ipynb`
+`https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/FISCAL/<NOMBRE>.ipynb`
 En el caso del Regional, los paréntesis del nombre van codificados como `%28` y `%29`.
 
 **Estado de las pruebas:**
@@ -146,7 +150,7 @@ Todos tienen **dos bloques**. No hay celda de diagnóstico: el usuario pidió el
 
 ## 6. Archivos de CONTROL
 
-Diccionario de columnas listo para Drive/Sheets: `docs/Diccionario_Controles_MEF.xlsx`. Tiene una hoja por control: DEV LOR-SMN-UCA, PIM Función y PIM Municipalidad.
+Diccionario de columnas listo para Drive/Sheets: `FISCAL/docs/Diccionario_Controles_MEF.xlsx`. Tiene una hoja por control: DEV LOR-SMN-UCA, PIM Función y PIM Municipalidad.
 
 ### 6.1 Devengado (Regional, Nacional, Municipalidad)
 `CONTROL <nivel> <AÑO>[ - Meses XX-YY][ - LOR - SMN - UCA].csv`
@@ -239,4 +243,4 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 
 ## 12. Proyecto Exportaciones (Infotrade · PROMPERÚ)
 
-Es un proyecto aparte, con su propio documento de contexto: **`exportaciones_scraper_infotrade.md`**. Allí están la API descubierta, el notebook `EXP_Infotrade_Exportaciones.ipynb`, las carpetas de Drive, el control y los pendientes.
+Es un proyecto aparte, con su propio documento de contexto: **`EXPORT/exportaciones_scraper_infotrade.md`**. Allí están la API descubierta, el notebook `EXPORT/EXP_Infotrade_Exportaciones.ipynb`, las carpetas de Drive, el control y los pendientes.

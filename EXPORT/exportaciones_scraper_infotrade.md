@@ -1,6 +1,6 @@
 # Scraper de Exportaciones · Infotrade (PROMPERÚ) · Contexto del proyecto
 
-Documento de traspaso de este proyecto, para retomarlo sin perder contexto, sea una persona o una sesión nueva de un asistente. Es **independiente** de los scrapers del MEF, que se describen en `CONTEXTO_PROYECTO.md`. Última actualización: **09/10/2026**.
+Documento de traspaso de este proyecto, para retomarlo sin perder contexto, sea una persona o una sesión nueva de un asistente. Es **independiente** de los scrapers del MEF, que se describen en `FISCAL/CONTEXTO_PROYECTO.md`. Última actualización: **09/10/2026**.
 
 ---
 
@@ -13,10 +13,10 @@ Descargar el detalle de **exportaciones del Perú** (datos de SUNAT) desde Infot
 - La tabla que muestra la web es **incompleta** (paginada); la información completa se obtiene con **"Exportar a Excel"**.
 - **Restricción de la web:** cada consulta abarca **6 meses como máximo**.
 
-**Repositorio:** `adriansivina-droid/scraper-mef` · **Notebook:** `EXP_Infotrade_Exportaciones.ipynb`
+**Repositorio:** `adriansivina-droid/scraper-mef` · **Notebook:** `EXPORT/EXP_Infotrade_Exportaciones.ipynb`
 
 Abrir en Colab:
-https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/EXP_Infotrade_Exportaciones.ipynb
+https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/EXPORT/EXP_Infotrade_Exportaciones.ipynb
 
 **Estado:** probado solo con un simulador (API y Drive falsos). **Falta la primera prueba con el sitio real.** Conviene empezar con una región y un rango corto.
 
@@ -226,7 +226,7 @@ Una fila por **año × semestre × región**:
 
 ## 8. Flujo de trabajo con GitHub
 
-Es el mismo que el de los scrapers del MEF (ver `CONTEXTO_PROYECTO.md` §9):
+Es el mismo que el de los scrapers del MEF (ver `FISCAL/CONTEXTO_PROYECTO.md` §9):
 - se trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`;
 - se abre un PR y se fusiona a `main`;
 - antes de editar, siempre se parte de `origin/main`;
