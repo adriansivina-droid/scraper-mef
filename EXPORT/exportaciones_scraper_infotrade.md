@@ -216,7 +216,7 @@ Una fila por **año × semestre × región**:
 
 ## 7. Supuestos y pendientes
 
-1. **Primera prueba real pendiente.** Sugerencia: una región, por ejemplo Loreto, en 2025-2026, y comparar con lo que muestra la web.
+1. **Primera prueba real hecha** (09/10/2026, una región). **Siguiente:** probar con 2–3 regiones y Sector/Subsector "Todos", y medir cuánto tarda cada corte para planificar la descarga desde 2005.
 2. **Confirmado** (prueba real): no hace falta iniciar sesión, y `Partida` acepta el código de 10 dígitos.
 3. **Supuesto:** "Todos" en Sector y Subsector se envía como `""`, igual que en Mercado y Región. Si con "Todos" el control da 0 filas donde debería haber datos, capturar el Payload de la web con Sector o Subsector en "Todos" y ajustar `filtros()`.
 4. **Supuesto:** el formato de `Empresa` (RUC o razón social) no se ha confirmado.
