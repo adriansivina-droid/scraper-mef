@@ -146,6 +146,8 @@ Todos tienen **dos bloques**. No hay celda de diagnóstico: el usuario pidió el
 
 ## 6. Archivos de CONTROL
 
+Diccionario de columnas listo para Drive/Sheets: `docs/Diccionario_Controles_MEF.xlsx`. Tiene una hoja por control: DEV LOR-SMN-UCA, PIM Función y PIM Municipalidad.
+
 ### 6.1 Devengado (Regional, Nacional, Municipalidad)
 `CONTROL <nivel> <AÑO>[ - Meses XX-YY][ - LOR - SMN - UCA].csv`
 
