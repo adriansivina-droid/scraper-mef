@@ -166,7 +166,9 @@ En la API los nombres están **cruzados** respecto a la web: `Tipo` corresponde 
 7. Muestra un resumen con los cortes OK, los que hay que revisar y los que tuvieron error, y genera un LOG de errores.
 
 **Nombres de archivo:**
-- Datos: `EXP <año>-S<1|2> - <Región> - Sector <…> - Subsector <…>[ - Partida …][ - Empresa …].csv`
+- Datos: `<partida> - <AAAAMM>-<AAAAMM> - <Región>.csv`, con `TODAS` si no hay partida. Ejemplo: `4412310000 - 202601-202606 - Loreto.csv`.
+  - El nombre **no incluye Sector ni Subsector**: dos corridas con la misma partida (o `TODAS`), el mismo período y la misma región, pero con otros filtros, se reemplazan entre sí en la carpeta. Para filtros distintos conviene usar otra carpeta.
+  - Un semestre incompleto (p. ej. `202607-202607`) se **reemplaza** al volver a descargarse con más meses (`202607-202608`): el notebook borra la versión parcial anterior.
 - Control: `CONTROL Exportaciones - Sector <…> - Subsector <…>.csv` (uno por combinación de filtros; se acumula entre corridas).
 - LOG: `LOG Exportaciones <fecha> - Sector <…> - Subsector <…>.csv`
 
