@@ -13,7 +13,7 @@ Descargar el detalle de **exportaciones del Perú** (datos de SUNAT) desde Infot
 - La tabla que muestra la web es **incompleta** (paginada); la información completa se obtiene con **"Exportar a Excel"**.
 - **Restricción de la web:** cada consulta abarca **6 meses como máximo**.
 
-**Repositorio:** `adriansivina-droid/scraper-mef` · **Notebook:** `EXPORT/EXP_Infotrade_Exportaciones.ipynb`
+**Repositorio:** `adriansivina-droid/scraper-mef` · **Notebooks:** `EXPORT/EXP_Infotrade_Exportaciones.ipynb` (descarga) y `EXPORT/EXP_Selector_Partidas.ipynb` (diccionario de partidas, §7)
 
 Abrir en Colab:
 https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/EXPORT/EXP_Infotrade_Exportaciones.ipynb
@@ -89,7 +89,7 @@ El notebook la usa como **referencia para el control**: `TotalRegistros` y `Tota
 |---|---|---|
 | `FechaInicio`, `FechaFin` | Rango (máximo 6 meses) | `dd-mm-aaaa`; el fin es el último día del mes |
 | `Departamento` | **Región** | Nombre con tildes, tal cual en la web ("Áncash", "Apurímac", "San Martín"…). `""` = Todas |
-| `Tipo` | **Sector** de la web | `No Tradicional`, `Tradicional`, `Sin clasificación`; `""` = Todos (supuesto, ver §7) |
+| `Tipo` | **Sector** de la web | `No Tradicional`, `Tradicional`, `Sin clasificación`; `""` = Todos (supuesto, ver §8) |
 | `Sector` | **Subsector** de la web | ver §3.5; `""` = Todos (supuesto) |
 | `Mercado` | País de destino | `""` = Todos |
 | `Partida` | Partida arancelaria (texto libre) | p. ej. `4418990000`; `""` = todas |
@@ -216,18 +216,80 @@ Una fila por **año × semestre × región**:
 
 ---
 
-## 7. Supuestos y pendientes
+## 7. Diccionario de partidas arancelarias (`EXPORT/arancel/`)
+
+Las subpartidas nacionales de SUNAT cambian con cada nueva versión del Arancel de Aduanas (aprox. cada 5 años, al ritmo de la enmienda del Sistema Armonizado). El diccionario dice qué partidas se pueden usar en un periodo y cuáles forman una serie comparable.
+
+**Formato del código:** 10 dígitos sin puntos (`4412310000`). `CODIGO_SUNAT` guarda la forma con puntos (`4412.31.00.00`).
+
+| Versión | Norma | Rige desde | Subpartidas |
+|---|---|---|---|
+| 2002 | D.S. 239-2001-EF | 01/01/2002 | 7 002 |
+| 2007 | D.S. 017-2007-EF | 01/04/2007 (ene–mar 2007 rige el 2002) | 7 397 |
+| 2012 | D.S. 238-2011-EF | 01/01/2012 | 7 566 |
+| 2017 | D.S. 342-2016-EF | 01/01/2017 | 7 805 |
+| 2022 | D.S. 404-2021-EF | 01/01/2022 (vigente) | 8 021 |
+
+El conteo incluye códigos creados por modificaciones dentro de una misma versión (p. ej. `2608000010/90` en 2017).
+
+**Fuentes** (entregadas por el usuario; sunat.gob.pe está bloqueado desde el entorno de Claude):
+- los Aranceles 2002, 2007, 2012, 2017 y 2022 convertidos a markdown (el de 2007 está dañado y no se usa);
+- las correlaciones teóricas de SUNAT 2002-2007, 2007-2012, 2012-2017 y 2017-2022 (https://www.sunat.gob.pe/orientacionaduanera/aranceles/correlaciones.html). La de 2017-2022 incluye la hoja `REVISADO`, que añade 37 pares sobre todo de textiles y vidrio; esos pares se suman a la tabla.
+
+**Archivos:**
+
+| Archivo | Contenido |
+|---|---|
+| `diccionario_partidas.csv` | Una fila por código (10 060 en total) |
+| `diccionario_partidas.xlsx` | Hojas `LEEME`, `VERSIONES` e `INDICE`, una hoja por capítulo (`Cap 01`…`Cap 98`) y `CORRELACIONES` |
+| `correlaciones_sunat.csv` | Pares origen→destino con `TIPO`: SIN CAMBIO, RECODIFICADA 1:1, DIVIDIDA 1:N, FUSIONADA N:1 o N:M |
+| `versiones_arancel.csv` | Normas y vigencias |
+| `construir_diccionario.py`, `construir_excel.py`, `parse_arancel.py` | Scripts para regenerar los archivos. Necesitan `corr/` (correlaciones descomprimidas) y `arancel_src/` (los md) junto al script |
+
+**Columnas clave del diccionario:**
+- `V2002…V2022`: 1 si el código existe en esa versión.
+- `C02_07…C17_22`: 1 si el código pasa a la versión siguiente **1 a 1 consigo mismo**, es decir, sin dividirse, fusionarse ni recodificarse. Queda vacío si el código no existe en ambas versiones.
+- `SERIE_ESTABLE`: el tramo más largo en que la serie es comparable. `TRAMOS` lista todos los tramos, porque un código puede desaparecer y volver a usarse (p. ej. `8471300000`: `2002 | 2007-2022`).
+- `ESTADO`: uno de estos valores:
+  - `ESTABLE 2002-HOY` (4 812 códigos)
+  - `ESTABLE DESDE AAAA`
+  - `NUEVA 2022`
+  - `DESCONTINUADA (ÚLTIMA AAAA)`
+- `MISMA_DESCRIPCION`: SI o NO. NO significa que cambió la redacción (similitud menor a 85 %) aunque la correlación sea 1 a 1. Conviene revisar esos casos (158).
+- `EQUIV_ANTERIORES` / `EQUIV_SIGUIENTES`: los códigos con los que hay que empalmar la serie cuando no hay continuidad. Ejemplo: `0101101000` (2002–2007) → `0101210000` (2012–hoy).
+- Descripciones:
+  - `DESCRIPCION`: el texto de la subpartida.
+  - `DESCRIPCION_COMPLETA`: la jerarquía, del tipo "partida > nivel > subpartida".
+  - `DESC_2002…DESC_2022`: el texto de cada versión.
+  - Los textos de 2002 y 2017 vienen de PDF convertidos a texto y pueden traer errores de OCR. Los de 2007, 2012 y 2022 vienen de las tablas de correlación y son más limpios.
+
+**Notebook `EXPORT/EXP_Selector_Partidas.ipynb`** (3 bloques):
+1. Lee el CSV desde GitHub (raw); no hay que subir nada.
+2. Ofrece estos selectores: año inicio, año fin, capítulos (varios), texto o código a buscar, incluir parciales, guardar en Drive.
+3. Calcula las versiones del Arancel que rigen en el periodo y clasifica cada código:
+   - **HABILITADA**: existe en todas esas versiones con continuidad 1 a 1, así que la serie es comparable en todo el periodo.
+   - **PARCIAL**: existe solo en parte del periodo; hay que usar las columnas `EQUIV_*` para empalmar.
+   - **Deshabilitada**: no existe en el periodo y no se muestra.
+
+   Guarda `PARTIDAS - AAAA-AAAA - CAP ….csv` en la carpeta de CONTROL (`1gAO8…`).
+
+Ejemplos (2005–2025 = las 5 versiones): hay 4 812 partidas habilitadas. `4412310000` aparece como PARCIAL en 2005–2025, porque no existe en 2002 (viene de `4412130000`), y como HABILITADA en 2012–2025.
+
+---
+
+## 8. Supuestos y pendientes
 
 1. **Primera prueba real hecha** (09/10/2026, una región). **Siguiente:** probar con 2–3 regiones y Sector/Subsector "Todos", y medir cuánto tarda cada corte para planificar la descarga desde 2005.
 2. **Confirmado** (prueba real): no hace falta iniciar sesión, y `Partida` acepta el código de 10 dígitos.
 3. **Supuesto:** "Todos" en Sector y Subsector se envía como `""`, igual que en Mercado y Región. Si con "Todos" el control da 0 filas donde debería haber datos, capturar el Payload de la web con Sector o Subsector en "Todos" y ajustar `filtros()`.
 4. **Supuesto:** el formato de `Empresa` (RUC o razón social) no se ha confirmado.
 5. **Concurrencia:** el notebook consulta `CantidadActualDescarga` pero no espera según su valor, porque se desconoce el máximo permitido. Si la web empieza a rechazar descargas, agregar una espera mientras `VALOR` esté por encima del límite.
-6. **Idea:** unir los CSV por año o en un solo archivo para el BI. Power BI también puede leer la carpeta completa.
+6. **Diccionario de partidas:** falta confirmar la fecha de vigencia del Arancel 2002 (se asume 01/01/2002). Cuando SUNAT publique un Arancel nuevo, agregar su correlación y volver a ejecutar `construir_diccionario.py`.
+7. **Idea:** unir los CSV por año o en un solo archivo para el BI. Power BI también puede leer la carpeta completa.
 
 ---
 
-## 8. Flujo de trabajo con GitHub
+## 9. Flujo de trabajo con GitHub
 
 Es el mismo que el de los scrapers del MEF (ver `FISCAL/CONTEXTO_PROYECTO.md` §9):
 - se trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`;
