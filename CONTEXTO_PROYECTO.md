@@ -46,7 +46,7 @@ En el caso del Regional, los paréntesis del nombre van codificados como `%28` y
 | DEV Gobierno Regional | `18Ohcjmg6FojhNwbCHUHX3MEOxhokZA9b` | `1v2fa0FKJFi_0l1uGECJjYw8TvHPCDTbo` |
 | DEV Gobierno Nacional | `1B7Z4_4Bop8WK33YvFZ8pX-xCQBmaTHnk` | `1v2fa0FKJFi_0l1uGECJjYw8TvHPCDTbo` |
 | DEV Municipalidad (25 regiones) | `1lBfLL3Uwpk9adiB8uKHBfu0guazFiqJR` | `1v2fa0FKJFi_0l1uGECJjYw8TvHPCDTbo` |
-| DEV Municipalidad LOR-SMN-UCA | — (**descarga un zip**, no usa Drive) | — (va dentro del zip) |
+| DEV Municipalidad LOR-SMN-UCA | `1T3_NF_Uk5-uEbUSqey0LTszBkfwVwfwi` | `1JbX5Of3fkGvN2rLuHgt5hVtsUDMlPB2s` |
 | PIM Función (E/M/R) | `1Vu6zpHljX_178x0ZDTbtE9BL2b0pS0uh` | `1lHTsdrjZgCmJDOh_kbHhhG1-eJDQg2jz` |
 | PIM Municipalidad | `1gnXMhMyfiKz_Hy-LIrR3lhPXqXgcysxx` | `1vIywq5uTfzu5Uw9xo9CIisg3aF7hfZ6m` |
 
@@ -193,7 +193,7 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 ## 8. Cómo hacer cambios frecuentes
 
 - **Cambiar una carpeta de Drive:** reemplazar el ID en `DRIVE_FOLDER_ID` o `DRIVE_FOLDER_CONTROL_ID`, en el Bloque 2.
-- **Descargar un zip en lugar de subir a Drive:** `SUBIR_A_DRIVE = False`, IDs en `""`, `DESCARGA_FINAL = "zip"`. Ver `DEV_Funcion_Municipalidad_LOR_SMN_UCA.ipynb`.
+- **Descargar un zip en lugar de subir a Drive:** `SUBIR_A_DRIVE = False`, IDs en `""`, `DESCARGA_FINAL = "zip"`. **No es confiable:** `files.download()` de Colab puede fallar sin aviso (descarga bloqueada por el navegador o por cookies de terceros). Se probó en Municipalidad LOR-SMN-UCA, no descargaba y se volvió a Drive.
 - **Agregar o quitar regiones:** editar la lista `departamentos` (y `SUFIJO_REGIONES` si existe).
 - **Crear un scraper para otro nivel:** copiar el notebook más parecido y cambiar `NIVEL_GOBIERNO`, `NIVEL_ETIQUETA`, `NIVEL_CORTO` y `PARAMS_NIVEL` (`{"37": "M"}` solo para municipalidades).
 - **Cambiar el monto extraído:** en los municipales, `COLUMNA_VALOR` (`-3` Devengado, `-7` PIM). En los demás está fijo en `Pagina`.
@@ -223,7 +223,7 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
    - los errores ya no se ocultan;
    - se eliminaron las 625 consultas fijas;
    - hay un CSV por mes.
-7. **Municipalidad LOR-SMN-UCA**, con salida en zip, sin Drive.
+7. **Municipalidad LOR-SMN-UCA**: se probó la salida en zip, pero el zip no se descargaba y se volvió a Drive (carpetas propias).
 8. En todos se conservan las **filas en 0** que lista el MEF.
 9. Nuevos **PIM Función** y **PIM Municipalidad** (LOR-SMN-UCA), anuales, con control. Se quitó la fecha de corte.
 
