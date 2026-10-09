@@ -18,7 +18,7 @@ Descargar el detalle de **exportaciones del Perú** (datos de SUNAT) desde Infot
 Abrir en Colab:
 https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/EXPORT/EXP_Infotrade_Exportaciones.ipynb
 
-**Estado:** probado solo con un simulador (API y Drive falsos). **Falta la primera prueba con el sitio real.** Conviene empezar con una región y un rango corto.
+**Estado:** primera prueba real el 09/10/2026 (Loreto, No Tradicional / MADERAS Y PAPELES, partida 4412310000, ene–jul 2026). Funcionó sin contraseña y con los filtros aplicados. Se detectó y corrigió la fila de TOTAL (ver §3.1); con la corrección, filas y totales cuadran al centavo con la web. Falta probar con varias regiones y con "Todos".
 
 ---
 
@@ -54,7 +54,7 @@ https://infotrade.promperu.gob.pe/wss/api/<ruta>
 | 4 | `Comunes/ActualizarConcurrenciaDescarga` | `{"Tipo":2,"PerfilUsuario":"PERFIL_USUARIO_EXTERNO"}` | `{"vResult":1}` |
 | 5 | `user/RegistrarAuditoria` | ver 3.4 | — |
 
-`ExportacionesExcel` responde **JSON** con todas las filas; la web arma el Excel en el navegador. Un subsector durante 6 meses pesó unos 12 MB, con 24 714 filas.
+`ExportacionesExcel` responde **JSON** con todas las filas; la web arma el Excel en el navegador. **Atención:** `RptData` trae al final **una fila de TOTAL**, con fecha, RUC, empresa y partida vacías y las sumas en Monto, pesos y cantidad. El notebook la descarta; si no, duplica los montos y cuenta una fila de más. Un subsector durante 6 meses pesó unos 12 MB, con 24 714 filas.
 
 ### 3.2 Consulta paginada (botón "Consultar")
 
@@ -217,10 +217,11 @@ Una fila por **año × semestre × región**:
 ## 7. Supuestos y pendientes
 
 1. **Primera prueba real pendiente.** Sugerencia: una región, por ejemplo Loreto, en 2025-2026, y comparar con lo que muestra la web.
-2. **Supuesto:** "Todos" en Sector y Subsector se envía como `""`, igual que en Mercado y Región. Si con "Todos" el control da 0 filas donde debería haber datos, capturar el Payload de la web con Sector o Subsector en "Todos" y ajustar `filtros()`.
-3. **Supuesto:** el formato de `Partida` y `Empresa` cuando se llenan. Se confirmó una partida de 10 dígitos; el formato de Empresa (RUC o razón social) no se ha confirmado.
-4. **Concurrencia:** el notebook consulta `CantidadActualDescarga` pero no espera según su valor, porque se desconoce el máximo permitido. Si la web empieza a rechazar descargas, agregar una espera mientras `VALOR` esté por encima del límite.
-5. **Idea:** unir los CSV por año o en un solo archivo para el BI. Power BI también puede leer la carpeta completa.
+2. **Confirmado** (prueba real): no hace falta iniciar sesión, y `Partida` acepta el código de 10 dígitos.
+3. **Supuesto:** "Todos" en Sector y Subsector se envía como `""`, igual que en Mercado y Región. Si con "Todos" el control da 0 filas donde debería haber datos, capturar el Payload de la web con Sector o Subsector en "Todos" y ajustar `filtros()`.
+4. **Supuesto:** el formato de `Empresa` (RUC o razón social) no se ha confirmado.
+5. **Concurrencia:** el notebook consulta `CantidadActualDescarga` pero no espera según su valor, porque se desconoce el máximo permitido. Si la web empieza a rechazar descargas, agregar una espera mientras `VALOR` esté por encima del límite.
+6. **Idea:** unir los CSV por año o en un solo archivo para el BI. Power BI también puede leer la carpeta completa.
 
 ---
 
