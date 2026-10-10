@@ -18,7 +18,7 @@ Descargar el detalle de **exportaciones del Perú** (datos de SUNAT) desde Infot
 Abrir en Colab:
 https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/EXPORT/EXP_Infotrade_Exportaciones.ipynb
 
-**Estado:** primera prueba real el 09/10/2026 (Loreto, No Tradicional / MADERAS Y PAPELES, partida 4412310000, ene–jul 2026). Funcionó sin contraseña y con los filtros aplicados. Se detectó y corrigió la fila de TOTAL (ver §3.1); con la corrección, filas y totales cuadran al centavo con la web. Falta probar con varias regiones y con "Todos".
+**Estado:** primera prueba real el 09/10/2026 (Loreto, No Tradicional / MADERAS Y PAPELES, partida 4412310000, ene–jul 2026). Funcionó sin contraseña y con los filtros aplicados. Se detectó y corrigió la fila de TOTAL (ver §3.1); con la corrección, filas y totales cuadran al centavo con la web. Segunda corrida el 10/10/2026 con la versión que tiene capítulos y países: los mismos 2 cortes salieron OK (33 y 27 filas, FOB 254 817,25 y 238 650,71 USD). El control de la primera prueba se actualizó solo con las columnas nuevas. Falta probar con varias regiones, con "Todos" y con los filtros de capítulo y de país.
 
 ---
 
