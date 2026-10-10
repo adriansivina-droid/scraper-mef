@@ -76,7 +76,7 @@ El mapa está en https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?
 - `LOTES`, `FILAS_IMPUTADAS`, `FILAS_REVISAR`.
 - `BARRILES_PETROLEO` / `BARRILES_LGN`.
 - `DIF_MAX_PETROLEO` / `DIF_MAX_LGN`: la mayor diferencia mensual entre la suma de lotes y el SUB-TOTAL/TOTAL que imprime el PDF (debe ser 0).
-- `ESTADO`: `OK`, `REVISAR`, `SIN TABLA`, `ERROR DE DESCARGA` o `NO ES ESTADÍSTICA…`.
+- `ESTADO`: `OK`, `REVISAR`, `SIN TABLA`, `ESCANEADO (sin texto)`, `FORMATO ANTIGUO (texto OCR)`, `ERROR DE DESCARGA` o `NO ES ESTADÍSTICA…`.
 
 ## 6. Pruebas
 
@@ -95,11 +95,23 @@ Loreto (petróleo, millones de bbl):
 
 ## 7. Pendientes
 
-1. **Primera corrida real en Colab** (1994–2026). Los PDF antiguos (antes de 2012, aprox.) pueden tener otro formato. Si el control los marca `SIN TABLA` o `REVISAR`, se ajusta el extractor con esos PDF.
-2. **Mapa de lotes** (ArcGIS público) para los polígonos y el departamento de cada lote.
-3. Otras tablas del anual: producción por **yacimiento**, **estado de pozos**, **regalías por lote**, canasta de precios.
-4. Cruce con Infotrade (exportación de crudo de Loreto) y canon (MEF / tabla de canon del PDF).
-5. Banco de Datos de PERUPETRO (cuenta del usuario, credenciales en Colab → Secretos): pozos y sísmica. Requiere capturas F12.
+1. **Primera corrida real en Colab** (1994–2026), para saber desde qué año los PDF tienen texto.
+2. **PDF antiguos.** Revisados 1994 y 1998:
+   - **1998** es un escaneo sin texto.
+   - **1994** es un escaneo con texto OCR de mala calidad y otro diseño: "PRODUCCION MENSUAL DE PETROLEO CRUDO", punto como separador de miles, por contratista y lote.
+
+   El notebook los marca `ESCANEADO (sin texto)` o `FORMATO ANTIGUO (texto OCR)` y **los guarda igual** en `DATA/PDF` como `PP_ANUAL_<año>.pdf`.
+
+   Opciones para esos años:
+   - OCR con Tesseract en Colab, solo de la tabla resumen anual por contratista y lote (unas 15 filas por año), validando que la suma dé el TOTAL;
+   - las tablas de 10 años de los anuales digitales (cada anual trae la serie anual por lote de la década anterior);
+   - transcripción manual de las pocas tablas que el OCR no lea bien.
+
+   Dato del anual 1994: Lote 1-AB (Occidental) 20,04 MM bbl; Lote 8 (Petroperú) 10,62 MM bbl; total país 46,47 MM bbl.
+3. **Mapa de lotes** (ArcGIS público) para los polígonos y el departamento de cada lote.
+4. Otras tablas del anual: producción por **yacimiento**, **estado de pozos**, **regalías por lote**, canasta de precios.
+5. Cruce con Infotrade (exportación de crudo de Loreto) y canon (MEF / tabla de canon del PDF).
+6. Banco de Datos de PERUPETRO (cuenta del usuario, credenciales en Colab → Secretos): pozos y sísmica. Requiere capturas F12.
 
 ## 8. Flujo de trabajo con GitHub
 
