@@ -18,7 +18,13 @@ Descargar el detalle de **exportaciones del Perú** (datos de SUNAT) desde Infot
 Abrir en Colab:
 https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/EXPORT/EXP_Infotrade_Exportaciones.ipynb
 
-**Estado:** primera prueba real el 09/10/2026 (Loreto, No Tradicional / MADERAS Y PAPELES, partida 4412310000, ene–jul 2026). Funcionó sin contraseña y con los filtros aplicados. Se detectó y corrigió la fila de TOTAL (ver §3.1); con la corrección, filas y totales cuadran al centavo con la web. Segunda corrida el 10/10/2026 con la versión que tiene capítulos y países: los mismos 2 cortes salieron OK (33 y 27 filas, FOB 254 817,25 y 238 650,71 USD). El control de la primera prueba se actualizó solo con las columnas nuevas. Falta probar con varias regiones, con "Todos" y con los filtros de capítulo y de país.
+**Estado:** primera prueba real el 09/10/2026 (Loreto, No Tradicional / MADERAS Y PAPELES, partida 4412310000, ene–jul 2026). Funcionó sin contraseña y con los filtros aplicados. Se detectó y corrigió la fila de TOTAL (ver §3.1); con la corrección, filas y totales cuadran al centavo con la web. Segunda corrida el 10/10/2026 con la versión que tiene capítulos y países: los mismos 2 cortes salieron OK (33 y 27 filas, FOB 254 817,25 y 238 650,71 USD). El control de la primera prueba se actualizó solo con las columnas nuevas. Tercera corrida el 10/10/2026, con capítulo 44, país China, Sector "Todos" y Subsector MADERAS Y PAPELES, ene–jul 2025, en Lima Metropolitana y Loreto. Los 4 cortes salieron OK.
+- Lima S1: 14 976 filas, igual que la web. Se guardaron 61 (FOB 814 897,67 USD).
+- Lima julio: 2 599 filas; se guardaron 22.
+- Loreto S1: 46 filas, ninguna del capítulo 44 a China.
+- Loreto julio: 0 filas, también 0 en la web.
+
+Con esto queda confirmado que "Todos" en Sector se envía como `""`. El nombre "China" de la lista incluida coincide con los datos, y el filtro de capítulo + país funciona.
 
 ---
 
@@ -291,7 +297,7 @@ Ejemplos (2005–2025 = las 5 versiones): hay 4 812 partidas habilitadas. `44123
 
 1. **Primera prueba real hecha** (09/10/2026, una región). **Siguiente:** probar con 2–3 regiones y Sector/Subsector "Todos", y medir cuánto tarda cada corte para planificar la descarga desde 2005.
 2. **Confirmado** (prueba real): no hace falta iniciar sesión, y `Partida` acepta el código de 10 dígitos.
-3. **Supuesto:** "Todos" en Sector y Subsector se envía como `""`, igual que en Mercado y Región. Si con "Todos" el control da 0 filas donde debería haber datos, capturar el Payload de la web con Sector o Subsector en "Todos" y ajustar `filtros()`.
+3. **Confirmado para Sector** (10/10/2026); **supuesto aún para Subsector:** "Todos" se envía como `""`, igual que en Mercado y Región. Si con "Todos" el control da 0 filas donde debería haber datos, capturar el Payload de la web con Sector o Subsector en "Todos" y ajustar `filtros()`.
 4. **Supuesto:** el formato de `Empresa` (RUC o razón social) no se ha confirmado.
 5. **Concurrencia:** el notebook consulta `CantidadActualDescarga` pero no espera según su valor, porque se desconoce el máximo permitido. Si la web empieza a rechazar descargas, agregar una espera mientras `VALOR` esté por encima del límite.
 6. **Diccionario de partidas:** falta confirmar la fecha de vigencia del Arancel 2002 (se asume 01/01/2002). Cuando SUNAT publique un Arancel nuevo, agregar su correlación y volver a ejecutar `construir_diccionario.py`.
