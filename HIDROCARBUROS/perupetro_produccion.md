@@ -104,7 +104,11 @@ Loreto (petróleo, millones de bbl):
 
 1. **Primera corrida real (10/10/2026).** Resultado por año:
    - 2019–2025 y 2026 (mensual de junio): OK.
-   - 2017 y 2018: REVISAR. Al petróleo le faltan 3.975 y 3.449 bbl contra el total; falta revisar esos PDF.
+   - 2017 y 2018: REVISAR, por unos 3–4 mil bbl. **Corregido:** el Lote 31-B/D de Maple aparece como `31B/31D` en 2012–2018 y quedaba fuera.
+   - 2012, 2016 y 2017 ahora cuadran con diferencia 0 (probado con los PDF reales).
+     - 2016 titula la tabla sin "FISCALIZADA" ("PRODUCCIÓN DE HIDROCARBUROS LIQUIDOS MENSUAL 2016").
+     - 2016 tiene "Pág. 24" pegado al rótulo de LGN.
+   - **Velocidad:** con `pypdf` se ubican primero las pocas páginas con la tabla (lectura rápida) y solo esas se analizan con pdfplumber. 8 anuales en menos de 2 min.
    - 1994–2016: no reconocidos por la portada. Se corrigió: 2001 y 2008 son **digitales** y ahora se leen con diferencia 0.
      - Se aceptan los títulos "PRODUCCIÓN FISCALIZADA MENSUAL 2008" y "PRODUCCION MENSUAL FISCALIZADA DE HIDROCARBUROS LIQUIDOS - 2001".
      - Se aceptan las columnas CONTRATISTA, los meses abreviados (ENE…DIC) y el punto como separador de miles.
@@ -112,6 +116,7 @@ Loreto (petróleo, millones de bbl):
      - Se leen las páginas con texto girado 90° (anual 2008).
      - Control contra un solo TOTAL general cuando no hay subtotal por producto.
    - Se excluyen los documentos legales enlazados en la misma página, como un reglamento de participación ciudadana.
+   - Escaneados sin texto confirmados: 1995 y 1998 (pendiente OCR). Los demás años antiguos (1994, 1996, 1997, 1999–2007, 2009–2011) se verán en la siguiente corrida.
 2. **PDF antiguos.** Revisados 1994 y 1998:
    - **1998** es un escaneo sin texto.
    - **1994** es un escaneo con texto OCR de mala calidad y otro diseño: "PRODUCCION MENSUAL DE PETROLEO CRUDO", punto como separador de miles, por contratista y lote.
