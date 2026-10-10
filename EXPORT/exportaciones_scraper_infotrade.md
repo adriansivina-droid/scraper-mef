@@ -192,7 +192,7 @@ Fechas: el notebook acepta `dd/mm/aaaa` y otros formatos que pudiera mandar la A
 
 **Reanudación:**
 - Se **saltan** los cortes con `ESTADO = OK`, `CORTE_COMPLETO = SI`, `FILAS_REF > 0` y archivo presente en Drive.
-- Los cortes con 0 filas (`SIN_DATOS`, o `OK` con `FILAS_REF = 0` en controles antiguos) **se vuelven a consultar** siempre. El 10/10/2026 la API devolvió 0 filas para 2015–2020 en Loreto, San Martín y Ucayali, mientras 2014 y 2021 tenían datos; antes esos cortes quedaban como OK y no se reintentaban.
+- Los cortes con 0 filas (`SIN_DATOS`, o `OK` con `FILAS_REF = 0` en controles antiguos) **se vuelven a consultar** siempre. El 10/10/2026 la API devolvió 0 filas para 2015–2020 en Loreto, San Martín y Ucayali, mientras 2014 y 2021 tenían datos; antes esos cortes quedaban como OK y no se reintentaban. **Confirmado en la web** el mismo día: la página de Infotrade también responde "No existen registros" para 2015–2020, por ejemplo con la partida 4418990000, todas las regiones, ene–jun 2017. El usuario sí había descargado esos datos un mes antes, así que es un vacío temporal de la fuente (la web indica "Datos disponibles hasta julio de 2026, cargados el 9 de sep…"), no del scraper.
 - Se **vuelven a descargar** los cortes con error, los que quedaron en REVISAR y los semestres incompletos.
 - Si Colab se desconecta, basta con **ejecutar de nuevo el Bloque 3**.
 
