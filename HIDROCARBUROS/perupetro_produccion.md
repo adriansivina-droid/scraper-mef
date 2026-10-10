@@ -43,6 +43,13 @@ El mapa está en https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?
 
 **Zona vs departamento:** los PDF usan zonas (Selva Norte, Selva Central, Selva Sur, Noroeste, Zócalo). Por ahora solo se asigna `DEPARTAMENTO = LORETO` a Selva Norte (lotes 1-AB/192, 8, 67, 95, 102, 64, 39). El resto queda vacío hasta cruzarlo con el mapa de lotes.
 
+**Certificado HTTPS.** perupetro.com.pe no envía su certificado intermedio. Los navegadores lo completan solos, pero Python falla con `CERTIFICATE_VERIFY_FAILED` (visto en Colab el 10/10/2026). El Bloque 3 resuelve esto sin desactivar la verificación:
+- lee el certificado del servidor;
+- descarga los intermedios desde la dirección AIA del propio certificado (hasta 3 niveles);
+- arma `ca_perupetro.pem` (certifi + intermedios) y verifica con la cadena completa.
+
+`VERIFICAR_SSL = False` existe solo como último recurso. La otra alternativa es subir los PDF a mano a `DATA/PDF`.
+
 ## 4. Notebook (3 bloques)
 
 1. **Instalación y extractor.** `pdfplumber` lee la tabla "PRODUCCIÓN FISCALIZADA MENSUAL DE HIDROCARBUROS LÍQUIDOS" **por coordenadas**: ubica cada número en la columna del mes más cercana. Así no se mezclan columnas con gráficos o notas al pie.
