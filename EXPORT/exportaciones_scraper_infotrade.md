@@ -154,7 +154,7 @@ En la API los nombres están **cruzados** respecto a la web: `Tipo` corresponde 
 | Sector | Lista desplegable (una opción) | Todos |
 | Subsector | Lista desplegable (una opción) | Todos |
 | Capítulos | **Selección múltiple** (97 capítulos del Sistema Armonizado) y botón "Quitar capítulos" | Ninguno (todas las partidas) |
-| Países de destino | **Selección múltiple** con la lista de la web (`Comunes?TIPOCONSULTA=EjecutarPais`, leída al ejecutar el bloque) y botón "Quitar países", más un campo de texto para escribir otros separados por coma | Ninguno (todos los países) |
+| Países de destino | **Selección múltiple** y botón "Quitar países", más un campo de texto para escribir otros separados por coma ("todos" o vacío = sin filtro). La lista se intenta leer de la web (`Comunes?TIPOCONSULTA=EjecutarPais`, con cookies del sitio). Si la web no la entrega, como pasó en Colab el 10/10/2026, se usa una lista de 211 países incluida en el notebook (`PAISES_BASE`) | Ninguno (todos los países) |
 | Partida, Empresa | Texto | Vacío (todas). No se puede combinar Partida con Capítulos |
 | Usuario (auditoría) | Texto | Vacío (no registra auditoría) |
 
