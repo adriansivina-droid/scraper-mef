@@ -154,6 +154,7 @@ En la API los nombres están **cruzados** respecto a la web: `Tipo` corresponde 
 | Sector | Lista desplegable (una opción) | Todos |
 | Subsector | Lista desplegable (una opción) | Todos |
 | Capítulos | **Selección múltiple** (97 capítulos del Sistema Armonizado) y botón "Quitar capítulos" | Ninguno (todas las partidas) |
+| Países de destino | **Selección múltiple** con la lista de la web (`Comunes?TIPOCONSULTA=EjecutarPais`, leída al ejecutar el bloque) y botón "Quitar países", más un campo de texto para escribir otros separados por coma | Ninguno (todos los países) |
 | Partida, Empresa | Texto | Vacío (todas). No se puede combinar Partida con Capítulos |
 | Usuario (auditoría) | Texto | Vacío (no registra auditoría) |
 
@@ -163,17 +164,21 @@ En la API los nombres están **cruzados** respecto a la web: `Tipo` corresponde 
 3. Lee el **control previo** desde Drive, si existe, para reanudar.
 4. Por cada **corte × región pendiente**, repite la secuencia de la web: concurrencia → `Exportaciones` (referencia) → `ExportacionesExcel` (si hay registros) → concurrencia `Tipo 1` y `Tipo 2` → auditoría (opcional).
 5. **Capítulos:** la web solo acepta en `Partida` códigos completos de 10 dígitos (lo confirmó el usuario: un código corto como `44` o `4412` no funciona). Por eso, cuando hay capítulos elegidos, se descarga el corte completo, el control lo compara con la web y luego se guardan **solo las filas cuya partida empieza por esos capítulos**. Antes, `PARTIDA` se normaliza a 10 dígitos (por si llega sin el 0 inicial).
-6. Guarda **un CSV por región y semestre**, lo sube a Drive y borra la copia local para no llenar el disco de Colab.
-7. Actualiza el control **después de cada corte**.
-8. Muestra un resumen con los cortes OK, los que hay que revisar y los que tuvieron error, y genera un LOG de errores.
+6. **Países de destino:** se aplican igual que los capítulos, filtrando localmente la columna `PaisDestino` (sin distinguir mayúsculas ni tildes). No se envían en `Mercado` porque todavía no se ha confirmado qué valor manda la web en ese campo (nombre o código). Si un país elegido no aparece en ninguna fila, el resumen lo avisa y sugiere nombres parecidos de los datos.
+   - **Cuando se quiera filtrar en el servidor:** capturar el Payload con un país elegido en la web. Si `Mercado` lleva el nombre, se puede enviar directamente y cada descarga será más liviana.
+7. Guarda **un CSV por región y semestre**, lo sube a Drive y borra la copia local para no llenar el disco de Colab.
+8. Actualiza el control **después de cada corte**.
+9. Muestra un resumen con los cortes OK, los que hay que revisar y los que tuvieron error, y genera un LOG de errores.
 
 **Nombres de archivo:**
 - Datos: `<prefijo> - <AAAAMM>-<AAAAMM> - <Región>.csv`. Ejemplos: `4412310000 - 202601-202606 - Loreto.csv`.
   - El prefijo es la partida; si se eligieron capítulos, `CAP44` o `CAP09+44`; si no hay ninguno de los dos, `TODAS`.
+  - Con países se agrega `[China+Estados Unidos]` al prefijo, p. ej. `CAP44 [China] - 202501-202506 - Loreto.csv`. Con más de 3 países se usa `[<n>paises-<código>]`.
   - Con más de 6 capítulos el prefijo es `CAP<n>caps-<código>`, donde el código identifica la selección exacta. Los capítulos elegidos quedan en la columna `CAPITULOS` del control.
   - El nombre **no incluye Sector ni Subsector**: dos corridas con la misma partida (o `TODAS`), el mismo período y la misma región, pero con otros filtros, se reemplazan entre sí en la carpeta. Para filtros distintos conviene usar otra carpeta.
   - Un semestre incompleto (p. ej. `202607-202607`) se **reemplaza** al volver a descargarse con más meses (`202607-202608`): el notebook borra la versión parcial anterior.
-- Control: `CONTROL Exportaciones - Sector <…> - Subsector <…>[ - Capitulos 09+44].csv` (uno por combinación de filtros; se acumula entre corridas).
+- Control: `CONTROL Exportaciones - Sector <…> - Subsector <…>[ - Capitulos 09+44][ - Mercados China].csv` (uno por combinación de filtros; se acumula entre corridas).
+  - Un control creado con una versión anterior del notebook se completa con las columnas nuevas vacías.
 - LOG: `LOG Exportaciones <fecha> - Sector <…> - Subsector <…>.csv`
 
 **Reanudación:**
@@ -199,12 +204,12 @@ Una fila por **año × semestre × región**:
 |---|---|
 | `AÑO`, `SEMESTRE`, `DESDE`, `HASTA` | Corte consultado |
 | `CORTE_COMPLETO` | `SI` si cubre el semestre entero; `NO` si quedó recortado por la fecha de inicio o por "Disponible hasta" |
-| `REGION`, `SECTOR`, `SUBSECTOR`, `PARTIDA`, `CAPITULOS`, `EMPRESA` | Filtros usados |
+| `REGION`, `SECTOR`, `SUBSECTOR`, `PARTIDA`, `CAPITULOS`, `MERCADOS`, `EMPRESA` | Filtros usados |
 | `FILAS_DESCARGADAS` / `FILAS_REF` / `DIF_FILAS` | Filas descargadas, `TotalRegistros` de la web y su diferencia |
 | `FOB_USD_DESCARGADO` / `FOB_USD_REF` / `DIF_FOB_USD` | Suma del FOB descargado contra `Totales.Monto` de la web |
 | `PESO_NETO_KG_*`, `PESO_BRUTO_KG_*`, `CANTIDAD_*` | Lo mismo para peso neto, peso bruto y cantidad |
 | `REGIONES_EN_DATOS` | Regiones que vienen en las filas descargadas (debe ser la pedida) |
-| `FILAS_GUARDADAS` / `FOB_USD_GUARDADO` | Filas y FOB que quedan en el CSV. Con capítulos, son solo las de esos capítulos; sin capítulos, coinciden con lo descargado. Las columnas `_DESCARGADO` / `_REF` se refieren siempre al corte completo |
+| `FILAS_GUARDADAS` / `FOB_USD_GUARDADO` | Filas y FOB que quedan en el CSV. Con capítulos o países, son solo las filas que pasan esos filtros; sin ellos, coinciden con lo descargado. Las columnas `_DESCARGADO` / `_REF` se refieren siempre al corte completo |
 | `ESTADO` | `OK` si filas y totales cuadran (tolerancia de 1 unidad) y la región coincide; si no, `REVISAR` |
 | `ARCHIVO` | Nombre del CSV en Drive |
 | `FECHA_EXTRACCION` | Fecha de la corrida |
@@ -216,7 +221,7 @@ Una fila por **año × semestre × región**:
 - **Otras carpetas de Drive:** cambiar `DRIVE_FOLDER_ID` y `DRIVE_FOLDER_CONTROL_ID` en el Bloque 3.
 - **Más o menos pausa:** `PAUSA` en el Bloque 3.
 - **Agregar una región o un subsector a los selectores:** editar las listas `REGIONES`, `SECTORES` y `SUBSECTORES` en el Bloque 2, con el texto exacto que envía la web.
-- **Filtrar por país:** agregar un selector `Mercado` y enviar en `filtros()` el valor que use la web. Antes hay que confirmar ese valor en el Payload.
+- **Filtrar por país en el servidor:** hoy el filtro de país se aplica después de descargar (ver §4). Para enviarlo en `Mercado`, confirmar en el Payload el valor que usa la web y ponerlo en `filtros()`.
 - **Si la API cambia:** volver a capturar con F12 → Network → Fetch/XHR la secuencia de §3.1 y revisar rutas, campos y la estructura de `RptData` y `Totales`.
 
 ---
