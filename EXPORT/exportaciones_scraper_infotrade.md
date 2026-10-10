@@ -24,7 +24,7 @@ https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/mai
 - Loreto S1: 46 filas, ninguna del capítulo 44 a China.
 - Loreto julio: 0 filas, también 0 en la web.
 
-Con esto queda confirmado que "Todos" en Sector se envía como `""`. El nombre "China" de la lista incluida coincide con los datos, y el filtro de capítulo + país funciona.
+Con esto queda confirmado que "Todos" en Sector se envía como `""`. **Tiempo:** el corte de Lima S1 (14 976 filas) tardó menos de 30 s, así que descargar todo y filtrar (capítulos y países) es rápido incluso en regiones grandes y no hace falta un modo partida por partida. El nombre "China" de la lista incluida coincide con los datos, y el filtro de capítulo + país funciona.
 
 ---
 
@@ -295,7 +295,7 @@ Ejemplos (2005–2025 = las 5 versiones): hay 4 812 partidas habilitadas. `44123
 
 ## 8. Supuestos y pendientes
 
-1. **Primera prueba real hecha** (09/10/2026, una región). **Siguiente:** probar con 2–3 regiones y Sector/Subsector "Todos", y medir cuánto tarda cada corte para planificar la descarga desde 2005.
+1. **Pruebas reales hechas** (09 y 10/10/2026): partida, capítulo y país, Lima y Loreto. Un corte de ~15 000 filas tarda menos de 30 s. **Siguiente:** probar Subsector "Todos" en Lima (el corte más grande posible) antes de la descarga completa desde 2005.
 2. **Confirmado** (prueba real): no hace falta iniciar sesión, y `Partida` acepta el código de 10 dígitos.
 3. **Confirmado para Sector** (10/10/2026); **supuesto aún para Subsector:** "Todos" se envía como `""`, igual que en Mercado y Región. Si con "Todos" el control da 0 filas donde debería haber datos, capturar el Payload de la web con Sector o Subsector en "Todos" y ajustar `filtros()`.
 4. **Supuesto:** el formato de `Empresa` (RUC o razón social) no se ha confirmado.
