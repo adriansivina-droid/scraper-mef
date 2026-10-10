@@ -130,7 +130,7 @@ En la API los nombres están **cruzados** respecto a la web: `Tipo` corresponde 
 | API | CSV del notebook | Columna en la web |
 |---|---|---|
 | `FechaEmbarque` | `FECHA_EMBARQUE` (texto **dd/mm/aaaa**, siempre con ceros: `02/01/2025`) | Fecha de embarque |
-| — | `AÑO`, `MES`, `SEMESTRE` (`S1`/`S2`) | Calculadas por el notebook a partir de la fecha, para ordenar y agrupar en el BI |
+| — | `AÑO`, `MES` | Calculadas por el notebook a partir de la fecha, para ordenar y agrupar en el BI |
 | `Ruc` | `RUC` (texto) | RUC |
 | `RazonSocial` | `RAZON_SOCIAL` | Razón social |
 | `Departamento` | `REGION` | Región |
