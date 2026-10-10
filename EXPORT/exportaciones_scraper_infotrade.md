@@ -191,7 +191,8 @@ Fechas: el notebook acepta `dd/mm/aaaa` y otros formatos que pudiera mandar la A
 - LOG: `LOG Exportaciones <fecha> - Sector <…> - Subsector <…>.csv`
 
 **Reanudación:**
-- Se **saltan** los cortes con `ESTADO = OK`, `CORTE_COMPLETO = SI` y archivo presente en Drive.
+- Se **saltan** los cortes con `ESTADO = OK`, `CORTE_COMPLETO = SI`, `FILAS_REF > 0` y archivo presente en Drive.
+- Los cortes con 0 filas (`SIN_DATOS`, o `OK` con `FILAS_REF = 0` en controles antiguos) **se vuelven a consultar** siempre. El 10/10/2026 la API devolvió 0 filas para 2015–2020 en Loreto, San Martín y Ucayali, mientras 2014 y 2021 tenían datos; antes esos cortes quedaban como OK y no se reintentaban.
 - Se **vuelven a descargar** los cortes con error, los que quedaron en REVISAR y los semestres incompletos.
 - Si Colab se desconecta, basta con **ejecutar de nuevo el Bloque 3**.
 
@@ -220,7 +221,7 @@ Una fila por **año × semestre × región**:
 | `REGIONES_EN_DATOS` | Regiones que vienen en las filas descargadas (debe ser la pedida) |
 | `FECHAS_INVALIDAS` | Filas cuya fecha de embarque no se pudo leer (debe ser 0) |
 | `FILAS_GUARDADAS` / `FOB_USD_GUARDADO` | Filas y FOB que quedan en el CSV. Con capítulos o países, son solo las filas que pasan esos filtros; sin ellos, coinciden con lo descargado. Las columnas `_DESCARGADO` / `_REF` se refieren siempre al corte completo |
-| `ESTADO` | `OK` si filas y totales cuadran (tolerancia de 1 unidad), la región coincide y todas las fechas se leyeron; si no, `REVISAR` |
+| `ESTADO` | `OK` si filas y totales cuadran (tolerancia de 1 unidad), la región coincide y todas las fechas se leyeron. `SIN_DATOS` si la web devolvió 0 filas: se vuelve a consultar en cada corrida. En cualquier otro caso, `REVISAR` |
 | `ARCHIVO` | Nombre del CSV en Drive |
 | `FECHA_EXTRACCION` | Fecha de la corrida (dd/mm/aaaa) |
 
