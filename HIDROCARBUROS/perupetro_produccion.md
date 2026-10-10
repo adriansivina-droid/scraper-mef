@@ -75,14 +75,14 @@ El mapa está en https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?
 | `AÑO`, `MES`, `FECHA` (dd/mm/aaaa, día 01) | Período |
 | `ZONA`, `DEPARTAMENTO` | Zona de PERUPETRO; departamento (por ahora solo Loreto) |
 | `OPERADOR`, `LOTE`, `LOTE_ORIGINAL` | Empresa operadora y lote |
-| `PRODUCTO` | `PETROLEO` o `LGN` (líquidos de gas natural) |
+| `PRODUCTO` | `PETROLEO`, `LGN` (líquidos de gas natural) o `CONDENSADO` (años antiguos, Lote 31-C) |
 | `BARRILES`, `BPD` | Producción fiscalizada del mes y promedio diario |
 | `ESTADO_FILA`, `FUENTE` | `OK` / `IMPUTADO <MES>` / `REVISAR`, y PDF de origen |
 
 **`CONTROL PP produccion_lote_mes_<ini>-<fin>.csv`** (CONTROL): una fila por PDF usado.
 - `LOTES`, `FILAS_IMPUTADAS`, `FILAS_REVISAR`.
 - `BARRILES_PETROLEO` / `BARRILES_LGN`.
-- `DIF_MAX_PETROLEO` / `DIF_MAX_LGN`: la mayor diferencia mensual entre la suma de lotes y el SUB-TOTAL/TOTAL que imprime el PDF (debe ser 0).
+- `DIF_MAX_TOTAL` (todos los productos contra el TOTAL general), `DIF_MAX_PETROLEO` / `DIF_MAX_LGN` / `DIF_MAX_CONDENSADO`: la mayor diferencia mensual entre la suma de lotes y el SUB-TOTAL/TOTAL que imprime el PDF (debe ser 0).
 - `ESTADO`: `OK`, `REVISAR`, `SIN TABLA`, `ESCANEADO (sin texto)`, `FORMATO ANTIGUO (texto OCR)`, `ERROR DE DESCARGA` o `NO ES ESTADÍSTICA…`.
 
 ## 6. Pruebas
@@ -102,7 +102,16 @@ Loreto (petróleo, millones de bbl):
 
 ## 7. Pendientes
 
-1. **Primera corrida real en Colab** (1994–2026), para saber desde qué año los PDF tienen texto.
+1. **Primera corrida real (10/10/2026).** Resultado por año:
+   - 2019–2025 y 2026 (mensual de junio): OK.
+   - 2017 y 2018: REVISAR. Al petróleo le faltan 3.975 y 3.449 bbl contra el total; falta revisar esos PDF.
+   - 1994–2016: no reconocidos por la portada. Se corrigió: 2001 y 2008 son **digitales** y ahora se leen con diferencia 0.
+     - Se aceptan los títulos "PRODUCCIÓN FISCALIZADA MENSUAL 2008" y "PRODUCCION MENSUAL FISCALIZADA DE HIDROCARBUROS LIQUIDOS - 2001".
+     - Se aceptan las columnas CONTRATISTA, los meses abreviados (ENE…DIC) y el punto como separador de miles.
+     - Se aceptan los lotes `Z - 2B`, `1 - AB`, `31B/D` (→ `31-B/D`) y `31-C ( LGN )` / `31-C ( COND.)` (producto CONDENSADO).
+     - Se leen las páginas con texto girado 90° (anual 2008).
+     - Control contra un solo TOTAL general cuando no hay subtotal por producto.
+   - Se excluyen los documentos legales enlazados en la misma página, como un reglamento de participación ciudadana.
 2. **PDF antiguos.** Revisados 1994 y 1998:
    - **1998** es un escaneo sin texto.
    - **1994** es un escaneo con texto OCR de mala calidad y otro diseño: "PRODUCCION MENSUAL DE PETROLEO CRUDO", punto como separador de miles, por contratista y lote.
