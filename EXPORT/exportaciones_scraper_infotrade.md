@@ -129,7 +129,8 @@ En la API los nombres están **cruzados** respecto a la web: `Tipo` corresponde 
 
 | API | CSV del notebook | Columna en la web |
 |---|---|---|
-| `FechaEmbarque` | `FECHA_EMBARQUE` | Fecha de embarque (dd/mm/aaaa) |
+| `FechaEmbarque` | `FECHA_EMBARQUE` (texto **dd/mm/aaaa**, siempre con ceros: `02/01/2025`) | Fecha de embarque |
+| — | `AÑO`, `MES`, `SEMESTRE` (`S1`/`S2`) | Calculadas por el notebook a partir de la fecha, para ordenar y agrupar en el BI |
 | `Ruc` | `RUC` (texto) | RUC |
 | `RazonSocial` | `RAZON_SOCIAL` | Razón social |
 | `Departamento` | `REGION` | Región |
@@ -143,6 +144,8 @@ En la API los nombres están **cruzados** respecto a la web: `Tipo` corresponde 
 | `Cantidad` | `CANTIDAD` | Cantidad |
 | `TipoSector` | `SECTOR` | Sector |
 | `Sector` | `SUBSECTOR` | Subsector |
+
+Fechas: el notebook acepta `dd/mm/aaaa` y otros formatos que pudiera mandar la API (p. ej. ISO `2025-01-02T00:00:00`) y siempre guarda `dd/mm/aaaa`. Una fecha que no se puede leer se deja tal cual y el corte queda en `REVISAR` (`FECHAS_INVALIDAS` del control). **En Power BI**, al cambiar el tipo de `FECHA_EMBARQUE` a Fecha, usar "Cambiar tipo → Usar configuración regional → Español (Perú)" para que no confunda día y mes.
 
 ---
 
@@ -208,17 +211,18 @@ Una fila por **año × semestre × región**:
 
 | Columna | Qué es |
 |---|---|
-| `AÑO`, `SEMESTRE`, `DESDE`, `HASTA` | Corte consultado |
+| `AÑO`, `SEMESTRE`, `DESDE`, `HASTA` | Corte consultado (`DESDE`/`HASTA` en dd/mm/aaaa) |
 | `CORTE_COMPLETO` | `SI` si cubre el semestre entero; `NO` si quedó recortado por la fecha de inicio o por "Disponible hasta" |
 | `REGION`, `SECTOR`, `SUBSECTOR`, `PARTIDA`, `CAPITULOS`, `MERCADOS`, `EMPRESA` | Filtros usados |
 | `FILAS_DESCARGADAS` / `FILAS_REF` / `DIF_FILAS` | Filas descargadas, `TotalRegistros` de la web y su diferencia |
 | `FOB_USD_DESCARGADO` / `FOB_USD_REF` / `DIF_FOB_USD` | Suma del FOB descargado contra `Totales.Monto` de la web |
 | `PESO_NETO_KG_*`, `PESO_BRUTO_KG_*`, `CANTIDAD_*` | Lo mismo para peso neto, peso bruto y cantidad |
 | `REGIONES_EN_DATOS` | Regiones que vienen en las filas descargadas (debe ser la pedida) |
+| `FECHAS_INVALIDAS` | Filas cuya fecha de embarque no se pudo leer (debe ser 0) |
 | `FILAS_GUARDADAS` / `FOB_USD_GUARDADO` | Filas y FOB que quedan en el CSV. Con capítulos o países, son solo las filas que pasan esos filtros; sin ellos, coinciden con lo descargado. Las columnas `_DESCARGADO` / `_REF` se refieren siempre al corte completo |
-| `ESTADO` | `OK` si filas y totales cuadran (tolerancia de 1 unidad) y la región coincide; si no, `REVISAR` |
+| `ESTADO` | `OK` si filas y totales cuadran (tolerancia de 1 unidad), la región coincide y todas las fechas se leyeron; si no, `REVISAR` |
 | `ARCHIVO` | Nombre del CSV en Drive |
-| `FECHA_EXTRACCION` | Fecha de la corrida |
+| `FECHA_EXTRACCION` | Fecha de la corrida (dd/mm/aaaa) |
 
 ---
 
