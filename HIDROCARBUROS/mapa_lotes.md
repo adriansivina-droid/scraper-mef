@@ -67,6 +67,12 @@ Problemas y correcciones:
 - **Mapa de fondo:** los mosaicos de OpenStreetMap respondían "403 Access blocked" dentro de Colab. Ahora el fondo es de Esri, topográfico y satelital.
 - **14 lotes con producción sin polígono:** 102, 31-B/D, I(T), I(TT), III(T), IV(T), LOB/EA/LO, VI(T), VII/VI, XIII, XIV, Z-2B, Z-69 y Z-69(T). Ahora se ubican solos los temporales (quitando (T)/(TT)), los compuestos (VII/VI → VII+VI) y los alias (31-B/D → 31-B+31-D, Z-69 ↔ Z-2B, 1-AB → 192). Se imprimen los lotes del mapa sin producción para encontrar el resto de nombres.
 
+**Revisión del mapa (`PP_mapa_lotes.html`, 48 lotes dibujados):**
+- El mapa divide algunos lotes en sectores: Z-2B → Z-2B A/B/C/D y XIII → XIII-A/B/C. Ahora se unen solos al lote de producción.
+- Z-1, Z-6 y los sectores de Z-2B tocan una franja de costa (1–11 % en tierra) y salían como ZOCALO = NO. Ahora es SI cuando menos del 50 % del lote está en tierra.
+- La capa de INGEMMET no trae operador ni cuenca, así que `OPERADOR_MAPA` y `CUENCA` quedan vacíos.
+- **El notebook de producción ahora toma `DEPARTAMENTO` de `PP_LOTES_GEO.csv`.** Agrega la columna `DEPARTAMENTO_FUENTE` (MAPA o ZONA). Con esto, 31-B, 31-E, 39 y 64 pasan a Loreto.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**

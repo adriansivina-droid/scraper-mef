@@ -110,8 +110,10 @@ h += [P("4. Producción por lote y mes", "h1"),
           ["FECHA", "texto dd/mm/aaaa", "Primer día del mes; útil para ordenar y graficar series. Ej.: 01/06/2026."],
           ["ZONA", "texto (código)", "Zona geográfica de PERUPETRO: NOROESTE, ZOCALO (zócalo continental, en el mar), SELVA NORTE, SELVA CENTRAL, "
                                      "SELVA SUR. Se toma del encabezado de la tabla del PDF o, si no lo trae, de una tabla fija por lote."],
-          ["DEPARTAMENTO", "texto", "Departamento (región) donde está el lote. <b>Provisional:</b> por ahora solo SELVA NORTE → LORETO; el resto "
-                                    "queda vacío hasta incorporar <font name='DVM'>PP_LOTES_GEO.csv</font> (mapa de lotes)."],
+          ["DEPARTAMENTO", "texto", "Departamento (región) donde está el lote: el de mayor área según el mapa de lotes "
+                                    "(<font name='DVM'>PP_LOTES_GEO.csv</font>). Si el lote no tiene polígono, se usa la zona (SELVA NORTE → LORETO) "
+                                    "o queda vacío."],
+          ["DEPARTAMENTO_FUENTE", "texto (código)", "MAPA (departamento por polígono del lote), ZONA (asignado por la zona) o vacío."],
           ["OPERADOR", "texto", "Empresa que opera el lote según el PDF de ese año (p. ej. OCCIDENTAL, PLUSPETROL, PETROTAL). Cambia en el tiempo: "
                                 "es el operador de ese mes, no el actual."],
           ["LOTE", "texto (código)", "Código homologado del contrato: sin la palabra \"Lote\", con guion estándar. Ej.: 192, 1-AB, 8, 95, Z-2B, "
@@ -194,7 +196,8 @@ h += [P("8. Variables geográficas por lote", "h1"),
           ["DEPARTAMENTO_PCT", "% (0–100)", "Porcentaje del área del lote en ese departamento."],
           ["DEPARTAMENTO_DETALLE", "texto", "Reparto completo, p. ej. \"LORETO 67,7%; UCAYALI 32,3%\"."],
           ["DEPARTAMENTO_N", "entero", "Número de departamentos que toca el lote."],
-          ["ZOCALO", "SI / NO", "SI para lotes en el mar; se asignan al departamento costero más cercano."],
+          ["ZOCALO", "SI / NO", "SI para lotes mayormente en el mar (menos del 50 % de su área en tierra); se asignan al departamento "
+                               "costero más cercano o al de su parte en tierra."],
           ["CUENCA, CUENCA_PCT", "texto, %", "Cuenca sedimentaria (Marañón, Ucayali, Talara, …) y % del lote en ella."],
           ["AREA_KM2", "número (km²)", "Superficie del lote (proyección equivalente de Sudamérica, ESRI:102033)."],
           ["LAT, LON", "grados decimales", "Punto interior del lote (WGS84)."],
@@ -241,14 +244,14 @@ h += [P("10. Lotes históricos y equivalencias", "h1"),
           "<b>Totales anuales:</b> sumar BARRILES por AÑO; para comparar años con distinto número de meses usar BPD promedio.",
           "<b>Series de un campo:</b> agrupar por LOTE_HISTORICO, no por LOTE.",
           "<b>Petróleo vs. LGN:</b> filtrar PRODUCTO; el LGN (Camisea desde 2004) supera al petróleo desde 2009 y distorsiona los totales de \"líquidos\".",
-          "<b>Loreto:</b> hoy = DEPARTAMENTO \"LORETO\" (zona Selva Norte). Cuando esté el mapa, usar el departamento de PP_LOTES_GEO.csv.",
+          "<b>Loreto:</b> filtrar DEPARTAMENTO = \"LORETO\" (incluye 31-B Maquía y 31-E, que el PDF ubica en Selva Central).",
           "<b>Año en curso:</b> es parcial; no comparar su total con años completos.",
           "<b>Operador:</b> es el del momento; para análisis por empresa usar OPERADOR del mes, no el actual.",
           "<b>Calidad:</b> antes de publicar, revisar que el CONTROL tenga ESTADO OK / OK (transcrito) en todos los años usados.",
       ]),
       P("12. Limitaciones conocidas", "h1"),
       *lista([
-          "DEPARTAMENTO es provisional hasta la corrida real del mapa de lotes.",
+          "Los polígonos de lotes son de enero 2019 (INGEMMET): los lotes firmados después no tienen polígono y su DEPARTAMENTO sale de la zona.",
           "La fecha exacta del paso Z-2B → Z-69 está por confirmar.",
           "1994–2000 provienen de escaneos: transcritos y validados al barril, pero sin capa digital original.",
           "Si PERUPETRO cambia el formato de sus PDF o de su página, el CONTROL lo mostrará como SIN TABLA o REVISAR (no como datos erróneos).",

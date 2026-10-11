@@ -65,7 +65,7 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 
 Notas sobre algunas columnas:
 - **`LOTE_HISTORICO`** une contratos del mismo campo: `1-AB/192` (el 1-AB terminó el 29/08/2015 y desde el 30/08/2015 es el 192) y `Z-2B/Z-69` (a confirmar) y `31-B/D` (Maple: hasta 2000 el PDF separa 31-B Maquía y 31-D Agua Caliente). También quita sufijos de contratos temporales como `(T)`.
-- **`DEPARTAMENTO`**: por ahora solo `LORETO`, asignado a la zona Selva Norte. El resto se completará con el mapa de lotes.
+- **`DEPARTAMENTO`**: sale del mapa de lotes (`PP_LOTES_GEO.csv`, polígonos INGEMMET de enero 2019). Si el lote no tiene polígono, se usa la zona (Selva Norte → Loreto). `DEPARTAMENTO_FUENTE` indica cuál de las dos se usó.
 
 ## 4. Estado de la serie (al 11/10/2026)
 
