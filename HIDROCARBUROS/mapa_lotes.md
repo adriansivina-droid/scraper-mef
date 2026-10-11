@@ -48,6 +48,24 @@ Correcciones:
 - **Selección visible:** se activa el gestor de selectores de Colab y la propuesta se imprime también en texto.
 - **Elección manual:** al inicio del Bloque 3 se pueden escribir los números N (`N_LOTES`, `N_OLEODUCTO`, etc.) sin depender de los selectores.
 
+**Resultados de la primera corrida completa (11/10/2026)**
+
+Fuentes elegidas:
+- lotes: `Lote_Petroleros_Enero_2019_PERUPETRO` (INGEMMET), 75 entidades y 49 lotes;
+- oleoducto: Oleoducto Norperuano (WWF Perú);
+- ANP: capa pública de 97 áreas;
+- comunidades nativas: "Comunidades Nativas/Reservas Territoriales" (Loreto Verde), 668 polígonos. **Solo cubre Loreto.**
+
+Resultados:
+- Lotes por departamento: Piura 22, Loreto 9, Cusco 4, Tumbes 3, La Libertad 3, Ucayali 2, Huánuco 2, y Amazonas, Junín, Pasco y San Martín con 1 cada uno.
+- Loreto: 1-AB/192, 8, 95, 67, 31-B, 31-E, 39, 64 y 192. **31-B (Maquía) y 31-E quedan en Loreto**, no en "Selva Central" como suponía la tabla de zonas del notebook de producción.
+
+Problemas y correcciones:
+- **HydroRIVERS no se leyó** ("not recognized as being in a supported file format"): el .shp está dentro de una carpeta del ZIP. Ahora se busca el .shp dentro del ZIP; si la descarga no es un ZIP, se borra y se avisa.
+- **`RIO_CERCANO` venía de Natural Earth**, que es demasiado gruesa: para el 192 daba "Santiago". Ahora usa ríos con nombre de OpenStreetMap, solo los que coinciden con un tramo grande de HydroRIVERS.
+- **Sensibilidad:** la distancia al río se calcula con umbrales de 100, 300 y 1.000 m³/s.
+- **14 lotes con producción sin polígono:** 102, 31-B/D, I(T), I(TT), III(T), IV(T), LOB/EA/LO, VI(T), VII/VI, XIII, XIV, Z-2B, Z-69 y Z-69(T). Ahora se ubican solos los temporales (quitando (T)/(TT)), los compuestos (VII/VI → VII+VI) y los alias (31-B/D → 31-B+31-D, Z-69 ↔ Z-2B, 1-AB → 192). Se imprimen los lotes del mapa sin producción para encontrar el resto de nombres.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**
