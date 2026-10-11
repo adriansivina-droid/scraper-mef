@@ -127,7 +127,10 @@ Loreto (petróleo, millones de bbl):
      Las celdas que no cuadran se releen con más zoom. Por ejemplo, en 1998 hubo 9 celdas mal leídas en la primera pasada, como 691.465 → 891.465 en el Lote 8 de enero.
    - Los archivos están en `HIDROCARBUROS/transcripciones/PP_mensual_<año>_transcrito.csv`, con las columnas `LOTE_ORIGINAL`, `LOTE` homologado y `FUENTE` (PDF y página).
    - El notebook los lee desde GitHub para los años sin extracción OK: `ESTADO = OK (transcrito)`, `ESTADO_FILA = TRANSCRITO`.
-   - Hechos: 1994, 1997, 1998, 1999 y 2000. Faltan 1995 y 1996 (pedir los PDF de DATA/PDF).
+   - **Serie completa 1994–2000.** Todos los años transcritos y validados con diferencia 0.
+   - **1995** (p.18, escaneo sin texto): 11 celdas dudosas (el 6 y el 8 se confunden en el escaneo) se resolvieron con la validación y con el "Cuadro de producción acumulada de petróleo crudo 1995" de la p.17, que trae las mismas cifras en otra tipografía (VI+VII y 31-B+31-D vienen sumados ahí y también cuadran). Total 44.443.276 bbl. Nota manuscrita: Cavelcas operó el Lote I hasta el 24/08/1995 (155.936 bbl).
+   - **1996** (p.16): transcrito desde la imagen; cuadra a la primera. Total 43.909.188 bbl. Incluye el lote LOB/EA/LO (OXY/Bridas) hasta julio: desde el 24/07/1996 pasó al Lote X (salvo Folche y Cruz, que pasaron al VI).
+   - Los PDF de 1995 y 1996 están en `HIDROCARBUROS/pdf_escaneados/` (subidos por el usuario porque pesan más de lo que admite el chat).
    - **1997** (p.10) trae una capa OCR legible: se tomó como base y se validó contra la imagen. Solo una celda estaba mal (Lote I, abril: 19.662 → 19.862). Total 43.157.111 bbl, igual a la tabla "por contratista". En 1997 no hay LGN ni condensado (Aguaytía empieza en 1998).
    - **1999** (p.10, "Producción mensual de hidrocarburos líquidos") también trae OCR, pero con 10 celdas mal leídas y sin las filas de LGN/condensado: se corrigió y completó desde la imagen (por ejemplo Mercantile abril 27.665 → 27.685, Lote 8 total 9.786.945 → 9.788.945). Total 38.663.371 bbl, igual a la tabla "por contratista" (p.8).
 2. **PDF antiguos.** Revisados 1994 y 1998:
