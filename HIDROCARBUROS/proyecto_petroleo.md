@@ -107,6 +107,23 @@ Notas sobre algunas columnas:
 
 Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región probablemente por ubigeo de producción; ver `EXPORT/exportaciones_scraper_infotrade.md`.
 
+**Serie nacional 1994–2026** (archivo CONTROL de la corrida completa del 11/10/2026):
+
+- **Validación cruzada:** el promedio diario calculado coincide con el que imprime el PDF (1995: 121.762 bpd; 1997: 118.239 bpd).
+- **Petróleo:** pasa de 46,5 MM bbl (127 mil bpd) en 1994 a 14–16 MM bbl (unos 40 mil bpd) desde 2020, una caída del 68 %.
+- **Caídas bruscas:**
+  - 2016: −30 %, por la paralización del Oleoducto Norperuano tras sus roturas, que dejó sin salida al 192 y al 8;
+  - 2020: −25 %, por el COVID y el cierre del 192.
+- **2026 (enero–junio):** unos 36 mil bpd, 18 % menos que el promedio de 2025, sobre todo por menor producción del Lote 95.
+- **LGN:** salta en 2004–2005 con Camisea y desde 2009 supera al petróleo; hoy es cerca de dos tercios de los líquidos del país.
+- **Peso de Loreto** en el petróleo nacional, sumando 1-AB/192, 8, 95, 67 y 102:
+  - 66 % en 1994;
+  - 65 % en 2000;
+  - 23–28 % en 2018–2021;
+  - 49 % en 2025, por el crecimiento del 95.
+
+  Es provisional: el departamento de cada lote se confirmará con el mapa.
+
 ## 6. Pendientes, en orden sugerido
 
 1. **Mapa de lotes** (EN CURSO). Notebook `PP_Mapa_Lotes.ipynb` creado y probado con datos simulados; falta la primera corrida real en Colab para confirmar las capas del visor de PERUPETRO. Detalle en `HIDROCARBUROS/mapa_lotes.md`.
