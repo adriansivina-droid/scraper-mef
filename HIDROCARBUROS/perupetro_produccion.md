@@ -119,7 +119,15 @@ Loreto (petróleo, millones de bbl):
    - Se excluyen los documentos legales enlazados en la misma página, como un reglamento de participación ciudadana.
    - **Corrida del 11/10/2026:** 25 años OK (2001–2009, 2011–2025 y 2026 ene–jun), todos con diferencia 0 contra el total del PDF (6.540 filas).
    - 2010: su título es "PRODUCCIÓN FISCALIZADA MENSUAL - 2010", con guion. Corregido; ahora OK.
-   - Quedan para OCR: 1995 y 1998 (escaneados sin texto) y 1994, 1996, 1997, 1999 y 2000 (escaneos con texto OCR de mala calidad; revisados 1994 y 2000).
+   - **1994–2000 (escaneados): transcripción validada.** El OCR automático no es confiable en estos escaneos. Por eso la tabla mensual de cada año se transcribe desde la imagen ampliada de la página y se valida en tres niveles:
+     - cada lote suma su total anual;
+     - cada mes suma el TOTAL del mes;
+     - el gran total coincide con la tabla resumen del PDF.
+
+     Las celdas que no cuadran se releen con más zoom. Por ejemplo, en 1998 hubo 9 celdas mal leídas en la primera pasada, como 691.465 → 891.465 en el Lote 8 de enero.
+   - Los archivos están en `HIDROCARBUROS/transcripciones/PP_mensual_<año>_transcrito.csv`, con las columnas `LOTE_ORIGINAL`, `LOTE` homologado y `FUENTE` (PDF y página).
+   - El notebook los lee desde GitHub para los años sin extracción OK: `ESTADO = OK (transcrito)`, `ESTADO_FILA = TRANSCRITO`.
+   - Hechos: 1994, 1998 y 2000. Faltan 1995, 1996, 1997 y 1999 (pedir los PDF de DATA/PDF).
 2. **PDF antiguos.** Revisados 1994 y 1998:
    - **1998** es un escaneo sin texto.
    - **1994** es un escaneo con texto OCR de mala calidad y otro diseño: "PRODUCCION MENSUAL DE PETROLEO CRUDO", punto como separador de miles, por contratista y lote.
