@@ -29,7 +29,8 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Qué | Dónde |
 |---|---|
 | Repositorio | `adriansivina-droid/scraper-mef` (público), carpeta `HIDROCARBUROS/` |
-| Notebook | `HIDROCARBUROS/PP_Produccion_Lotes.ipynb` |
+| Notebook de producción | `HIDROCARBUROS/PP_Produccion_Lotes.ipynb` |
+| Notebook del mapa de lotes | `HIDROCARBUROS/PP_Mapa_Lotes.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Mapa_Lotes.ipynb) · detalle en `HIDROCARBUROS/mapa_lotes.md` |
 | Abrir en Colab | https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Produccion_Lotes.ipynb |
 | Contexto técnico | `HIDROCARBUROS/perupetro_produccion.md` |
 | Transcripciones 1994–2000 | `HIDROCARBUROS/transcripciones/PP_mensual_<año>_transcrito.csv` |
@@ -108,7 +109,7 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 ## 6. Pendientes, en orden sugerido
 
-1. **Mapa de lotes.** PERUPETRO publica un mapa en ArcGIS Online (https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?id=cc883917c55a4264a01debfa02585e2e). De ahí salen los polígonos de los lotes, el departamento de cada uno y las variables geográficas: cuenca, distancia al Oleoducto Norperuano, ríos, áreas protegidas.
+1. **Mapa de lotes** (EN CURSO). Notebook `PP_Mapa_Lotes.ipynb` creado y probado con datos simulados; falta la primera corrida real en Colab para confirmar las capas del visor de PERUPETRO. Detalle en `HIDROCARBUROS/mapa_lotes.md`.
 2. **Otras tablas de los anuales**, ya identificadas en los PDF:
    - producción por **yacimiento**;
    - **estado de pozos** por lote;
