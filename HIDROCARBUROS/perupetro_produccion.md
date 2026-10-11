@@ -127,7 +127,8 @@ Loreto (petróleo, millones de bbl):
      Las celdas que no cuadran se releen con más zoom. Por ejemplo, en 1998 hubo 9 celdas mal leídas en la primera pasada, como 691.465 → 891.465 en el Lote 8 de enero.
    - Los archivos están en `HIDROCARBUROS/transcripciones/PP_mensual_<año>_transcrito.csv`, con las columnas `LOTE_ORIGINAL`, `LOTE` homologado y `FUENTE` (PDF y página).
    - El notebook los lee desde GitHub para los años sin extracción OK: `ESTADO = OK (transcrito)`, `ESTADO_FILA = TRANSCRITO`.
-   - Hechos: 1994, 1998 y 2000. Faltan 1995, 1996, 1997 y 1999 (pedir los PDF de DATA/PDF).
+   - Hechos: 1994, 1997, 1998 y 2000. Faltan 1995, 1996 y 1999 (pedir los PDF de DATA/PDF).
+   - **1997** (p.10) trae una capa OCR legible: se tomó como base y se validó contra la imagen. Solo una celda estaba mal (Lote I, abril: 19.662 → 19.862). Total 43.157.111 bbl, igual a la tabla "por contratista". En 1997 no hay LGN ni condensado (Aguaytía empieza en 1998).
 2. **PDF antiguos.** Revisados 1994 y 1998:
    - **1998** es un escaneo sin texto.
    - **1994** es un escaneo con texto OCR de mala calidad y otro diseño: "PRODUCCION MENSUAL DE PETROLEO CRUDO", punto como separador de miles, por contratista y lote.
