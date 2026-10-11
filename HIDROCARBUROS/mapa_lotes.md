@@ -22,6 +22,20 @@ Da a cada lote su **departamento real** y sus **variables geográficas**, para c
 
 Las capas de ArcGIS se consultan con su API pública, sin iniciar sesión. Si una capa pide credenciales, el notebook la marca "requiere inicio de sesión" y sigue con las demás.
 
+## Aviso: el visor de PERUPETRO tiene una capa rota (11/10/2026)
+
+Al abrir el visor en el navegador aparece el mensaje *"La capa, MapaBase_Set2019, , no se puede agregar al mapa"* y el mapa queda sin lotes. Esa capa es la de los polígonos de lotes, así que el servicio detrás está caído o ya no es público.
+
+Qué hace el notebook en ese caso:
+- el Bloque 2 lista las capas que no responden y el error del servidor;
+- también busca polígonos de lotes en otros servicios públicos de ArcGIS Online ("lotes hidrocarburos Peru", "lotes de contrato PERUPETRO");
+- si el visor no da lotes, propone la mejor candidata, con preferencia por servicios de PERUPETRO, MINEM, OSINERGMIN o INGEMMET;
+- también se puede pegar una URL conocida en `URLS_EXTRA`.
+
+Otras vías si nada sirve:
+- el enlace "Banco de Datos" del mismo visor (cuenta del usuario);
+- el shapefile de lotes que PERUPETRO entrega a pedido, por ejemplo a promocion@perupetro.com.pe, el contacto que figura en el visor.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**
