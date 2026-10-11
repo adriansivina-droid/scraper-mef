@@ -70,6 +70,7 @@ Problemas y correcciones:
 **Revisión del mapa (`PP_mapa_lotes.html`, 48 lotes dibujados):**
 - El mapa divide algunos lotes en sectores: Z-2B → Z-2B A/B/C/D y XIII → XIII-A/B/C. Ahora se unen solos al lote de producción.
 - Z-1, Z-6 y los sectores de Z-2B tocan una franja de costa (1–11 % en tierra) y salían como ZOCALO = NO. Ahora es SI cuando menos del 50 % del lote está en tierra.
+- **Mapa pesado (4,9 MB):** 3,6 MB eran la línea del oleoducto sin simplificar. Ahora todas las capas se simplifican y se redondean a 5 decimales; el mapa queda en ~1 MB.
 - La capa de INGEMMET no trae operador ni cuenca, así que `OPERADOR_MAPA` y `CUENCA` quedan vacíos.
 - **El notebook de producción ahora toma `DEPARTAMENTO` de `PP_LOTES_GEO.csv`.** Agrega la columna `DEPARTAMENTO_FUENTE` (MAPA o ZONA). Con esto, 31-B, 31-E, 39 y 64 pasan a Loreto.
 
