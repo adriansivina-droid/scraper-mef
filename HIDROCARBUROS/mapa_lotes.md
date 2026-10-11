@@ -36,6 +36,18 @@ Otras vías si nada sirve:
 - el enlace "Banco de Datos" del mismo visor (cuenta del usuario);
 - el shapefile de lotes que PERUPETRO entrega a pedido, por ejemplo a promocion@perupetro.com.pe, el contacto que figura en el visor.
 
+**Primera corrida real (11/10/2026):**
+- El visor apunta al mapa web «MAPA BASE 2024», cuya capa `MapaBase_Set2019` está en `gismaptemp.perupetro.com.pe` y da error de conexión.
+- La búsqueda en ArcGIS Online devolvió 1.023 capas porque se tomaban todas las capas de cada servicio hallado. Además, los selectores no se dibujaron.
+
+Correcciones:
+- **Certificado HTTPS:** si un servidor no envía su certificado intermedio, el notebook lo completa solo, igual que en el notebook de producción.
+- **Mensajes de error claros:** p. ej. "el servidor X no responde (caído o bloqueado)".
+- **Servidor de PERUPETRO:** si la capa del visor falla, se listan los demás servicios del mismo servidor y se prueban los de lotes o hidrocarburos.
+- **Candidatas filtradas por tema:** solo pasan las capas cuyo nombre corresponde al tema.
+- **Selección visible:** se activa el gestor de selectores de Colab y la propuesta se imprime también en texto.
+- **Elección manual:** al inicio del Bloque 3 se pueden escribir los números N (`N_LOTES`, `N_OLEODUCTO`, etc.) sin depender de los selectores.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**
