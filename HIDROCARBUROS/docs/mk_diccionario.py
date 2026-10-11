@@ -95,6 +95,7 @@ h += [P("Diccionario de datos", "tit"),
           ["DATA/PDF/PP_ANUAL_&lt;año&gt;.pdf, PP_MENSUAL_&lt;año&gt;_&lt;mes&gt;.pdf", "Fuente", "Copia de los PDF originales de PERUPETRO."],
           ["HIDROCARBUROS/transcripciones/PP_mensual_&lt;año&gt;_transcrito.csv", "Fuente", "Tablas 1994–2000 transcritas desde los escaneos (§7)."],
           ["DATA/PP_LOTES_GEO.csv", "Geografía", "Una fila por lote con departamento, cuenca, distancias, ANP y comunidades (§8)."],
+          ["DATA/PP_LOTES_INDICADORES.csv", "Producción", "Una fila por lote: estado, pico, producción actual, declinación, paralizaciones y operadores (§8b)."],
           ["DATA/MAPA/*.geojson, PP_mapa_lotes.html", "Geografía", "Polígonos y capas descargadas; mapa interactivo."],
           ["CONTROL/CONTROL PP mapa capas.csv / mapa descarga.csv", "Control", "Capas encontradas y descargadas para el mapa (§9)."],
       ], anchos=(7.3, 2.2, 7.5), cab=("Archivo", "Rol", "Contenido")),
@@ -203,15 +204,44 @@ h += [P("8. Variables geográficas por lote", "h1"),
           ["LAT, LON", "grados decimales", "Punto interior del lote (WGS84)."],
           ["DIST_OLEODUCTO_KM", "número (km)", "Distancia mínima del borde del lote al Oleoducto Norperuano; 0 si lo cruza."],
           ["DIST_IQUITOS_KM", "número (km)", "Distancia mínima del lote a Iquitos."],
-          ["DIST_RIO_GRANDE_KM", "número (km)", "Distancia al río más cercano con caudal medio ≥ umbral elegido (300 m³/s por defecto; "
-                                                "HydroRIVERS, caudal modelado). Aproxima el acceso fluvial; no es una medida oficial de navegabilidad."],
-          ["DIST_RIO_100_KM / _300_KM / _1000_KM", "número (km)", "Misma distancia con umbrales de 100, 300 y 1.000 m³/s (análisis de sensibilidad)."],
+          ["DIST_RIO_GRANDE_KM", "número (km)", "Distancia desde el punto interior del lote al río más cercano con caudal medio "
+                                                "≥ 5.000 m³/s (río troncal; HydroRIVERS, caudal modelado). Se mide desde el interior porque "
+                                                "casi todos los lotes amazónicos tienen un río grande dentro. Aproxima el acceso fluvial; "
+                                                "no es una medida oficial de navegabilidad."],
+          ["DIST_RIO_1000_KM / _5000_KM / _20000_KM", "número (km)", "Misma distancia para afluentes (≥ 1.000 m³/s), ríos troncales "
+                                                                       "(≥ 5.000) y el Amazonas o tramos bajos (≥ 20.000): sensibilidad."],
           ["RIO_CERCANO", "texto", "Nombre del río grande más cercano (ríos con nombre de OpenStreetMap que coinciden con un tramo "
                                    "de HydroRIVERS ≥ umbral; respaldo Natural Earth)."],
           ["ANP_PCT, ANP_DETALLE", "%, texto", "Porcentaje del lote dentro de Áreas Naturales Protegidas y cuáles."],
           ["CCNN_DENTRO_N, CCNN_5KM_N, CCNN_DENTRO", "entero, texto", "Comunidades nativas dentro del lote, a menos de 5 km, y sus nombres."],
           ["PETROLEO_ACUM_MMBBL", "número (MM bbl)", "Petróleo acumulado del lote en la base de §4."],
-          ["PETROLEO_ACUM_CAMPO_MMBBL", "número (MM bbl)", "Acumulado de todos los contratos que comparten el polígono (p. ej. 1-AB + 192)."],
+          ["CAMPO", "texto", "Campo al que pertenece el polígono: lotes que comparten polígono (1-AB/192; 31-B, 31-D y 31-B/D; "
+                             "Z-2B/Z-69…). Los indicadores de producción de esta tabla son del campo."],
+          ["PETROLEO_ACUM_CAMPO_MMBBL", "número (MM bbl)", "Acumulado de todos los contratos del campo (p. ej. 1-AB + 192)."],
+          ["ESTADO_PRODUCCION … OPERADORES", "varios", "Indicadores de producción del campo; misma definición que en §8b."],
+      ], anchos=(5.0, 2.6, 9.4)),
+      P("8b. Indicadores de producción por lote", "h1"),
+      P("Archivo <font name='DVM'>PP_LOTES_INDICADORES.csv</font> (notebook del mapa). Una fila por lote de la base de producción (§4), "
+        "tenga o no polígono. Se calculan sobre todos los líquidos fiscalizados (petróleo + LGN + condensado)."),
+      tabla([
+          ["LOTE, CAMPO, DEPARTAMENTO", "texto", "Lote de producción, campo al que pertenece y departamento (vacío si no tiene polígono)."],
+          ["TIENE_POLIGONO", "SI / NO", "Si el lote se ubicó en el mapa (directo o por equivalencia)."],
+          ["PETROLEO_ACUM_MMBBL, LIQUIDOS_ACUM_MMBBL", "número (MM bbl)", "Acumulado de petróleo y de todos los líquidos en la base."],
+          ["PRODUCTO_PRINCIPAL", "texto", "Producto con más barriles acumulados (PETROLEO, LGN o CONDENSADO)."],
+          ["ESTADO_PRODUCCION", "texto (código)", "EN PRODUCCIÓN (produjo en los últimos 12 meses de la base); PARALIZADO (produjo antes y no en "
+                                                  "los últimos 12 meses); SUCEDIDO POR … (el contrato terminó y el campo siguió con otro lote, "
+                                                  "p. ej. 1-AB → 192; LOB/EA/LO → X); SIN PRODUCCIÓN REGISTRADA."],
+          ["PRIMERA_PRODUCCION, ULTIMA_PRODUCCION", "texto mm/aaaa", "Primer y último mes con producción. \"≤01/1994\" = ya producía al "
+                                                                    "inicio de la base."],
+          ["BPD_ACTUAL", "número (bpd)", "Producción promedio de los últimos 12 meses de la base."],
+          ["PICO_AÑO, PICO_BPD", "entero, bpd", "Año completo de mayor producción diaria y su valor."],
+          ["DECLINACION_ANUAL_5A_PCT", "% anual", "Variación anual compuesta de la producción diaria entre el último año activo completo y "
+                                                  "5 años antes. Negativo = declina."],
+          ["MESES_SIN_PRODUCCION", "entero", "Meses con 0 barriles desde la primera producción hasta el final de la base."],
+          ["PARALIZACION_MAX_MESES, PARALIZACION_MAX_DESDE", "entero, mm/aaaa", "Racha más larga de meses sin producción y su inicio "
+                                                                              "(si llega al final de la base, sigue paralizado)."],
+          ["OPERADORES", "texto", "Empresas que operaron el lote con producción, con sus años, en orden: p. ej. "
+                                  "\"OCCIDENTAL (1994–2000) → PLUSPETROL (2001–2015)\"."],
       ], anchos=(5.0, 2.6, 9.4)),
       P("<b>Fuentes del mapa:</b> visor \"Mapa de Lotes de contrato\" de PERUPETRO (ArcGIS Online); límites departamentales geoBoundaries "
         "(basados en INEI); HydroRIVERS y Natural Earth (ríos); SERNANP u OpenStreetMap (ANP); servicios públicos de comunidades nativas; "
