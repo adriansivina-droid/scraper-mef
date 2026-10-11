@@ -74,6 +74,30 @@ Problemas y correcciones:
 - La capa de INGEMMET no trae operador ni cuenca, así que `OPERADOR_MAPA` y `CUENCA` quedan vacíos.
 - **El notebook de producción ahora toma `DEPARTAMENTO` de `PP_LOTES_GEO.csv`.** Agrega la columna `DEPARTAMENTO_FUENTE` (MAPA o ZONA). Con esto, 31-B, 31-E, 39 y 64 pasan a Loreto.
 
+**Versión 2 del mapa (11/10/2026), a partir de la revisión de la segunda corrida:**
+- **Indicadores de producción** por lote y por campo, en el nuevo archivo `DATA/PP_LOTES_INDICADORES.csv`:
+  - estado: en producción, paralizado, sucedido por otro lote o sin producción;
+  - primera y última producción;
+  - producción actual (bpd de los últimos 12 meses);
+  - pico (año y bpd);
+  - declinación a 5 años;
+  - meses sin producción y paralización más larga;
+  - historia de operadores.
+- **Campo = componente conexa de polígonos compartidos.** Corrige el acumulado de Maple, que era distinto en 31-B, 31-D y 31-B/D. Un contrato que terminó y siguió con otro lote figura como "SUCEDIDO POR": 1-AB → 192, Z-2B → Z-69, LOB/EA/LO → X (nota del anual 1996).
+- **Ríos:**
+  - se recortan al contorno de Perú; antes se dibujaba el rectángulo de descarga, con ríos de Ecuador, Colombia y Brasil;
+  - se dibujan solo los de ≥ 1.000 m³/s, en tres clases: afluente, río troncal y Amazonas/tramo bajo;
+  - la distancia se mide desde el punto interior del lote (desde el borde casi todos daban 0) con umbrales de 1.000, 5.000 y 20.000 m³/s; "río grande" = 5.000 m³/s por defecto.
+- **Overpass (nombres de ríos):** daba error 406. Ahora la consulta se identifica como pide su política de uso y prueba tres servidores.
+- **Mapa:**
+  - una capa por estado (verde en producción, naranja paralizado, gris sin producción) y círculos ∝ bpd actual;
+  - leyenda;
+  - ficha al hacer clic, con etiquetas en español, unidades, operadores y mini gráfico de la producción anual 1994–2026;
+  - comunidades nativas agrupadas;
+  - nombre al pasar el cursor por ANP, ríos y oleoducto (antes el oleoducto no mostraba nada);
+  - topográfico por defecto.
+- **Diagnóstico del HTML anterior (10,9 MB):** los ríos pesaban 6 MB (17.640 tramos ≥ 100 m³/s) y el oleoducto 3,6 MB. Las líneas verticales de una captura no están en la geometría de ninguna capa; probablemente eran un artefacto de dibujo. Si reaparecen, revisar con la capa de departamentos apagada.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**
