@@ -70,11 +70,11 @@ Notas sobre algunas columnas:
 |---|---|---|
 | 2001–2025 | Extracción automática de los PDF anuales digitales | ✅ **OK, diferencia 0 contra los totales del PDF** |
 | 2026 (ene–jun) | Mensual de junio 2026 (acumulado del año) | ✅ OK |
-| 1994, 1997, 1998, 2000 | **Transcritos a mano** desde la imagen (escaneos) y validados con los totales del PDF | ✅ OK (transcrito) |
-| **1995, 1996, 1999** | Escaneos | ⏳ **Pendiente de transcribir**: el usuario debe subir `PP_ANUAL_1995/1996/1999.pdf` desde DATA/PDF |
+| 1994, 1997, 1998, 1999, 2000 | **Transcritos a mano** desde la imagen (escaneos) y validados con los totales del PDF | ✅ OK (transcrito) |
+| **1995, 1996** | Escaneos | ⏳ **Pendiente de transcribir**: el usuario debe subir `PP_ANUAL_1995/1996.pdf` desde DATA/PDF |
 
 **Cómo se transcriben los años escaneados.** Es el método para continuar con los pendientes:
-1. Ubicar la página "PRODUCCION MENSUAL DE HIDROCARBUROS LIQUIDOS, <año>": 1994 → p.16, 1997 → p.10, 1998 → p.10, 2000 → p.10. Si el PDF trae capa OCR (1997), sirve de borrador, pero se valida igual contra la imagen.
+1. Ubicar la página "PRODUCCION MENSUAL DE HIDROCARBUROS LIQUIDOS, <año>": 1994 → p.16, 1997 → p.10, 1998 → p.10, 1999 → p.10, 2000 → p.10. Si el PDF trae capa OCR (1997, 1999), sirve de borrador, pero se valida igual contra la imagen.
 2. Renderizar la página con `pdftoppm -r 300…600` y recortar la tabla en mitad izquierda y mitad derecha para leerla ampliada.
 3. Transcribir a un CSV con estas columnas:
    - `ANIO, PRODUCTO, OPERADOR, LOTE_ORIGINAL, LOTE, ENE…DIC, TOTAL, FUENTE`;
@@ -108,7 +108,7 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 ## 6. Pendientes, en orden sugerido
 
-1. **Transcribir 1995, 1996 y 1999** con el método de §4. Pedir los PDF al usuario.
+1. **Transcribir 1995 y 1996** con el método de §4. Pedir los PDF al usuario.
 2. **Mapa de lotes.** PERUPETRO publica un mapa en ArcGIS Online (https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?id=cc883917c55a4264a01debfa02585e2e). De ahí salen los polígonos de los lotes, el departamento de cada uno y las variables geográficas: cuenca, distancia al Oleoducto Norperuano, ríos, áreas protegidas.
 3. **Otras tablas de los anuales**, ya identificadas en los PDF:
    - producción por **yacimiento**;
@@ -138,7 +138,7 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 Pegar algo como:
 
-> Continúa el **Proyecto Petróleo** del repositorio `adriansivina-droid/scraper-mef`. Lee `HIDROCARBUROS/proyecto_petroleo.md` y `HIDROCARBUROS/perupetro_produccion.md`. Trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`, haz PR y merge a `main`. Siguiente tarea: [por ejemplo, transcribir 1995, 1996 y 1999 / mapa de lotes / regalías por lote]. Te subo los PDF que necesites.
+> Continúa el **Proyecto Petróleo** del repositorio `adriansivina-droid/scraper-mef`. Lee `HIDROCARBUROS/proyecto_petroleo.md` y `HIDROCARBUROS/perupetro_produccion.md`. Trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`, haz PR y merge a `main`. Siguiente tarea: [por ejemplo, transcribir 1995 y 1996 / mapa de lotes / regalías por lote]. Te subo los PDF que necesites.
 
 Otros proyectos del mismo repositorio:
 - `FISCAL/`: scrapers MEF Consulta Amigable (ver `FISCAL/CONTEXTO_PROYECTO.md`).
