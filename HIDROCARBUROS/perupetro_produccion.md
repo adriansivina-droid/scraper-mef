@@ -75,6 +75,7 @@ El mapa está en https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?
 | `AÑO`, `MES`, `FECHA` (dd/mm/aaaa, día 01) | Período |
 | `ZONA`, `DEPARTAMENTO` | Zona de PERUPETRO; departamento (por ahora solo Loreto) |
 | `OPERADOR`, `LOTE`, `LOTE_ORIGINAL` | Empresa operadora y lote |
+| `LOTE_HISTORICO` | Une contratos sucesivos del mismo campo para series largas y rankings: `1-AB/192` (el 1-AB terminó el 29/08/2015 y desde el 30/08/2015 es el 192), `Z-2B/Z-69` (Z-2B pasó a Z-69 en 2023, a confirmar), y quita los sufijos de contratos temporales (`I(T)`/`I(TT)` → `I`, `VI(T)` → `VI`) |
 | `PRODUCTO` | `PETROLEO`, `LGN` (líquidos de gas natural) o `CONDENSADO` (años antiguos, Lote 31-C) |
 | `BARRILES`, `BPD` | Producción fiscalizada del mes y promedio diario |
 | `ESTADO_FILA`, `FUENTE` | `OK` / `IMPUTADO <MES>` / `REVISAR`, y PDF de origen |
@@ -116,7 +117,9 @@ Loreto (petróleo, millones de bbl):
      - Se leen las páginas con texto girado 90° (anual 2008).
      - Control contra un solo TOTAL general cuando no hay subtotal por producto.
    - Se excluyen los documentos legales enlazados en la misma página, como un reglamento de participación ciudadana.
-   - Escaneados sin texto confirmados: 1995 y 1998 (pendiente OCR). Los demás años antiguos (1994, 1996, 1997, 1999–2007, 2009–2011) se verán en la siguiente corrida.
+   - **Corrida del 11/10/2026:** 25 años OK (2001–2009, 2011–2025 y 2026 ene–jun), todos con diferencia 0 contra el total del PDF (6.540 filas).
+   - 2010: su título es "PRODUCCIÓN FISCALIZADA MENSUAL - 2010", con guion. Corregido; ahora OK.
+   - Quedan para OCR: 1995 y 1998 (escaneados sin texto) y 1994, 1996, 1997, 1999 y 2000 (escaneos con texto OCR de mala calidad; revisados 1994 y 2000).
 2. **PDF antiguos.** Revisados 1994 y 1998:
    - **1998** es un escaneo sin texto.
    - **1994** es un escaneo con texto OCR de mala calidad y otro diseño: "PRODUCCION MENSUAL DE PETROLEO CRUDO", punto como separador de miles, por contratista y lote.
