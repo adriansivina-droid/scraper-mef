@@ -118,6 +118,7 @@ Loreto (petróleo, millones de bbl):
      - Control contra un solo TOTAL general cuando no hay subtotal por producto.
    - Se excluyen los documentos legales enlazados en la misma página, como un reglamento de participación ciudadana.
    - **Corrida del 11/10/2026:** 25 años OK (2001–2009, 2011–2025 y 2026 ene–jun), todos con diferencia 0 contra el total del PDF (6.540 filas).
+   - **Corrida completa 1994–2026 (11/10/2026):** 33 años con datos y 8.076 filas: 26 años OK por extracción y 7 OK (transcrito). En 2001–2006 la columna `DIF_MAX_LGN` mostraba millones de barriles, pero era un falso aviso: el TOTAL general del PDF, que va después de la sección LGN, se comparaba como si fuera el subtotal de LGN. Ahora el control por producto ignora el total general; el total sigue controlado en `DIF_MAX_TOTAL` (0 en todos los años).
    - 2010: su título es "PRODUCCIÓN FISCALIZADA MENSUAL - 2010", con guion. Corregido; ahora OK.
    - **1994–2000 (escaneados): transcripción validada.** El OCR automático no es confiable en estos escaneos. Por eso la tabla mensual de cada año se transcribe desde la imagen ampliada de la página y se valida en tres niveles:
      - cada lote suma su total anual;
