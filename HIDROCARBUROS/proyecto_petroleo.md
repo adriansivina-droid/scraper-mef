@@ -33,6 +33,7 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Notebook del mapa de lotes | `HIDROCARBUROS/PP_Mapa_Lotes.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Mapa_Lotes.ipynb) · detalle en `HIDROCARBUROS/mapa_lotes.md` |
 | Abrir en Colab | https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Produccion_Lotes.ipynb |
 | Contexto técnico | `HIDROCARBUROS/perupetro_produccion.md` |
+| Diccionario de datos (PDF) | `HIDROCARBUROS/docs/Diccionario_datos_Proyecto_Petroleo.pdf` (se regenera con `python3 HIDROCARBUROS/docs/mk_diccionario.py`) |
 | Transcripciones 1994–2000 | `HIDROCARBUROS/transcripciones/PP_mensual_<año>_transcrito.csv` |
 | PDF escaneados pesados | `HIDROCARBUROS/pdf_escaneados/` (1995 y 1996, demasiado grandes para el chat) |
 | Drive · DATA | `1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq` (CSV de producción + subcarpeta `PDF` con todos los PDF descargados) |
