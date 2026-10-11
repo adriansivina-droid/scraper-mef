@@ -186,8 +186,9 @@ h += [P("8. Variables geográficas por lote", "h1"),
       tabla([
           ["FECHA_EXTRACCION", "texto dd/mm/aaaa", "Día de la corrida."],
           ["LOTE", "texto (código)", "Mismo código que en §4, para unir ambas tablas."],
-          ["GEOMETRIA_DE", "texto", "Lote cuyo polígono se usó. Igual a LOTE, salvo lotes históricos que se ubican con el polígono actual "
-                                    "del mismo campo (1-AB → 192)."],
+          ["GEOMETRIA_DE", "texto", "Lote(s) del mapa cuyo polígono se usó. Igual a LOTE, salvo equivalencias: lote histórico "
+                                    "(1-AB → 192; Z-69 → Z-2B), contrato temporal sin sufijo (I(T) → I) o unión de partes "
+                                    "(31-B/D → 31-B+31-D; VII/VI → VII+VI)."],
           ["LOTE_MAPA, OPERADOR_MAPA, ESTADO_MAPA, CAPA", "texto", "Nombre, operador y estado del lote según el mapa, y capa de origen."],
           ["DEPARTAMENTO", "texto", "Departamento con mayor parte del área del lote."],
           ["DEPARTAMENTO_PCT", "% (0–100)", "Porcentaje del área del lote en ese departamento."],
@@ -199,8 +200,11 @@ h += [P("8. Variables geográficas por lote", "h1"),
           ["LAT, LON", "grados decimales", "Punto interior del lote (WGS84)."],
           ["DIST_OLEODUCTO_KM", "número (km)", "Distancia mínima del borde del lote al Oleoducto Norperuano; 0 si lo cruza."],
           ["DIST_IQUITOS_KM", "número (km)", "Distancia mínima del lote a Iquitos."],
-          ["DIST_RIO_GRANDE_KM", "número (km)", "Distancia al río más cercano con caudal medio ≥ 300 m³/s (HydroRIVERS); aproxima acceso fluvial."],
-          ["RIO_CERCANO", "texto", "Nombre del río principal más cercano (Natural Earth)."],
+          ["DIST_RIO_GRANDE_KM", "número (km)", "Distancia al río más cercano con caudal medio ≥ umbral elegido (300 m³/s por defecto; "
+                                                "HydroRIVERS, caudal modelado). Aproxima el acceso fluvial; no es una medida oficial de navegabilidad."],
+          ["DIST_RIO_100_KM / _300_KM / _1000_KM", "número (km)", "Misma distancia con umbrales de 100, 300 y 1.000 m³/s (análisis de sensibilidad)."],
+          ["RIO_CERCANO", "texto", "Nombre del río grande más cercano (ríos con nombre de OpenStreetMap que coinciden con un tramo "
+                                   "de HydroRIVERS ≥ umbral; respaldo Natural Earth)."],
           ["ANP_PCT, ANP_DETALLE", "%, texto", "Porcentaje del lote dentro de Áreas Naturales Protegidas y cuáles."],
           ["CCNN_DENTRO_N, CCNN_5KM_N, CCNN_DENTRO", "entero, texto", "Comunidades nativas dentro del lote, a menos de 5 km, y sus nombres."],
           ["PETROLEO_ACUM_MMBBL", "número (MM bbl)", "Petróleo acumulado del lote en la base de §4."],
@@ -208,8 +212,9 @@ h += [P("8. Variables geográficas por lote", "h1"),
       ], anchos=(5.0, 2.6, 9.4)),
       P("<b>Fuentes del mapa:</b> visor \"Mapa de Lotes de contrato\" de PERUPETRO (ArcGIS Online); límites departamentales geoBoundaries "
         "(basados en INEI); HydroRIVERS y Natural Earth (ríos); SERNANP u OpenStreetMap (ANP); servicios públicos de comunidades nativas; "
-        "oleoducto desde PERUPETRO u OpenStreetMap. <b>Aviso (11/10/2026):</b> la capa de lotes del visor (MapaBase_Set2019) no carga; el "
-        "notebook busca fuentes alternativas."),
+        "oleoducto desde PERUPETRO u OpenStreetMap. <b>Primera corrida (11/10/2026):</b> el servidor de PERUPETRO (gismaptemp) no responde; "
+        "se usaron los lotes de enero 2019 publicados por INGEMMET, el Oleoducto Norperuano de WWF Perú, ANP y comunidades nativas de "
+        "servicios públicos de ArcGIS Online (ver CONTROL PP mapa capas.csv)."),
       P("9. Control del mapa", "h1"),
       tabla([
           ["N, CAPA, GRUPO", "texto", "Número, nombre y grupo de la capa encontrada."],
