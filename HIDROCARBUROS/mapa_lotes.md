@@ -214,6 +214,28 @@ Correcciones:
 - `PETROMONT` es el nombre corto de Petrolera Monterrico desde 2010. Se homologa a `PETROLERA MONTERRICO` en los lotes II, XV y XX.
 - `DPB` en los lotes 56 y 88 (2021) era el rótulo del eje de un gráfico del PDF, no un operador. El parser ignora esos rótulos (`ETIQUETA_GRAFICO`): DPB, BPD, MBBL, MMBBL, LBB, MM y "Página…".
 
+## Panel de producción anual y mensual (12/10/2026)
+
+- **Cómo se abre:**
+  - en la ficha de un lote, clic en la línea de tiempo roja o en el botón «📊 Ver producción anual y mensual»;
+  - o con el botón «📊 Producción anual y mensual» de la esquina inferior izquierda.
+- **Selectores:**
+  - **Serie:** Perú (total), un departamento, un campo (lotes sucesivos sumados, p. ej. 1-AB/192) o un lote.
+  - **Comparar con:** una segunda serie.
+  - **Producto:** líquidos totales, petróleo o LGN y condensado.
+  - **Vista:** anual o mensual, con años **Desde** y **Hasta**.
+  - **Unidad:** barriles o barriles por día. Los bpd usan los días reales de cada mes; el año en curso solo cuenta los meses publicados.
+- **Gráfico:**
+  - barras por año y líneas por mes;
+  - al pasar el cursor se ven el valor y el operador de ese año;
+  - **clic en una barra anual** abre los 12 meses de ese año, y «↩ Serie anual» vuelve.
+- **Resumen:** total del periodo, promedio diario, máximo y meses sin producción.
+- **Tabla y CSV:** botón «Tabla» con los datos, y descarga en CSV (separador `;` y coma decimal).
+- **Funcionamiento:** los datos mensuales van dentro del HTML (función `series_panel` del Bloque 4) y el gráfico es SVG propio, sin librerías externas.
+- **Al abrir el panel** se cierra la ficha del lote, para que no tape el gráfico. El panel se puede minimizar (–) o cerrar (×).
+- **Leyenda:** ahora tiene un botón visible **+ / –** para abrirla y minimizarla. Antes era un `<details>` sin marcador visible.
+- **Técnico:** `folium.Element` lee el texto como plantilla Jinja. Por eso el panel va entre `{% raw %}` … `{% endraw %}`; sin eso, el `{#` del CSS rompe el render.
+
 ## Pruebas
 
 - **Lo que no se pudo probar:** desde el entorno de Claude, arcgis.com y perupetro.com.pe están bloqueados (403 del proxy). La primera corrida real se hace en Colab.
