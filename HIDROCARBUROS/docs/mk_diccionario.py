@@ -195,7 +195,12 @@ h += [P("8. Variables geográficas por lote", "h1"),
           ["GEOMETRIA_DE", "texto", "Lote(s) del mapa cuyo polígono se usó. Igual a LOTE, salvo equivalencias: lote histórico "
                                     "(1-AB → 192; Z-69 → Z-2B), contrato temporal sin sufijo (I(T) → I) o unión de partes "
                                     "(31-B/D → 31-B+31-D; VII/VI → VII+VI)."],
-          ["LOTE_MAPA, OPERADOR_MAPA, ESTADO_MAPA, CAPA", "texto", "Nombre, operador y estado del lote según el mapa, y capa de origen."],
+          ["LOTE_MAPA, CAPA, FUENTE_POLIGONO", "texto", "Nombre del lote en la capa (p. ej. LOTE_XCV = 95), capa y fuente del polígono. "
+                                                          "Prioridad: geoportal de PERUPETRO (contratos vigentes); los lotes antiguos sin "
+                                                          "contrato vigente salen de la capa INGEMMET de enero 2019."],
+          ["OPERADOR_MAPA, ESTADO_MAPA, TIPO_CONTRATO, F_SUSCRIPCION", "texto", "Según el geoportal de PERUPETRO: operador del contrato "
+                                                          "vigente, fase (EXPLORACIÓN/EXPLOTACIÓN), tipo (LICENCIA/SERVICIOS) y fecha de "
+                                                          "suscripción. Vacíos para lotes que solo están en la capa de 2019."],
           ["DEPARTAMENTO", "texto", "Departamento con mayor parte del área del lote."],
           ["DEPARTAMENTO_PCT", "% (0–100)", "Porcentaje del área del lote en ese departamento."],
           ["DEPARTAMENTO_DETALLE", "texto", "Reparto completo, p. ej. \"LORETO 67,7%; UCAYALI 32,3%\"."],
@@ -251,7 +256,8 @@ h += [P("8. Variables geográficas por lote", "h1"),
       ], anchos=(5.0, 2.6, 9.4)),
       P("<b>Fuentes del mapa:</b> visor \"Mapa de Lotes de contrato\" de PERUPETRO (ArcGIS Online); límites departamentales geoBoundaries "
         "(basados en INEI); HydroRIVERS y Natural Earth (ríos); SERNANP u OpenStreetMap (ANP); servicios públicos de comunidades nativas; "
-        "oleoducto desde PERUPETRO u OpenStreetMap. <b>Primera corrida (11/10/2026):</b> el servidor de PERUPETRO (gismaptemp) no responde; "
+        "oleoducto desde PERUPETRO u OpenStreetMap. <b>Desde el 12/10/2026</b> la fuente principal es el geoportal oficial de PERUPETRO "
+        "(geoportal.perupetro.com.pe, servicio WFS: lotes de contrato vigentes, cuencas sedimentarias y otras capas). <b>Primera corrida (11/10/2026):</b> el servidor de PERUPETRO (gismaptemp) no responde; "
         "se usaron los lotes de enero 2019 publicados por INGEMMET, el Oleoducto Norperuano de WWF Perú, ANP y comunidades nativas de "
         "servicios públicos de ArcGIS Online (ver CONTROL PP mapa capas.csv)."),
       P("9. Control del mapa", "h1"),
