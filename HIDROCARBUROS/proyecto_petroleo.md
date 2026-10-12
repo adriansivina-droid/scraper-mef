@@ -32,7 +32,7 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Notebook de producción | `HIDROCARBUROS/PP_Produccion_Lotes.ipynb` |
 | Notebook del mapa de lotes | `HIDROCARBUROS/PP_Mapa_Lotes.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Mapa_Lotes.ipynb) · detalle en `HIDROCARBUROS/mapa_lotes.md` |
 | Abrir en Colab | https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Produccion_Lotes.ipynb |
-| Notebook de producción **diaria** (líquidos y gas, por lote) | `HIDROCARBUROS/PP_Produccion_Diaria.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Produccion_Diaria.ipynb) · `DATA/PP_produccion_diaria.csv` |
+| Producción **diaria** (líquidos y gas, por lote) | Sección 8 del Bloque 3 del notebook de producción (casilla «Producción diaria») → `DATA/PP_produccion_diaria.csv` |
 | Gas natural fiscalizado por lote y mes (1994–hoy) | `DATA/PP_produccion_gas_lote_mes_<ini>-<fin>.csv` (notebook de producción) |
 | Contexto técnico | `HIDROCARBUROS/perupetro_produccion.md` |
 | Indicadores por lote (estado, pico, declinación, paralizaciones, operadores) | `DATA/PP_LOTES_INDICADORES.csv` (notebook del mapa) |

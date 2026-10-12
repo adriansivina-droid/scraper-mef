@@ -178,7 +178,9 @@ Loreto (petróleo, millones de bbl):
 El mismo de los demás proyectos (ver `FISCAL/CONTEXTO_PROYECTO.md` §9): rama `claude/scraper-gobiernos-regionales-kk6ecm`, PR y merge a `main`, notebooks sin salidas.
 
 
-## Producción diaria (`PP_Produccion_Diaria.ipynb`, 12/10/2026)
+## Producción diaria (sección 8 del Bloque 3 de `PP_Produccion_Lotes.ipynb`, 12/10/2026)
+
+Primero fue un notebook aparte; ahora corre en el mismo notebook de producción si está marcada la casilla «Producción diaria» del Bloque 2, que viene marcada por defecto. No depende del período elegido. Usa la conexión a Drive y el certificado del Bloque 3.
 
 **Fuente.** perupetro.com.pe → Estadísticas → Producción Hidrocarburos → **Producción Diaria**. Hay un PDF por mes (cierre de mes) y uno del mes en curso:
 - «Líquidos en b/d»: *Reporte de producción fiscalizada de hidrocarburos líquidos a nivel nacional (barriles)*, con una columna por lote para petróleo y condensado, una por lote de LGN, los SUB TOTAL y el TOTAL.
