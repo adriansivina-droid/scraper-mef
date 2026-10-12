@@ -98,6 +98,19 @@ Problemas y correcciones:
   - topográfico por defecto.
 - **Diagnóstico del HTML anterior (10,9 MB):** los ríos pesaban 6 MB (17.640 tramos ≥ 100 m³/s) y el oleoducto 3,6 MB. Las líneas verticales de una captura no están en la geometría de ninguna capa; probablemente eran un artefacto de dibujo. Si reaparecen, revisar con la capa de departamentos apagada.
 
+**Revisión de la tercera corrida (12/10/2026): 9 correcciones**
+1. **Operadores:** los nombres se homologan en el notebook de producción (`norm_operador`). Se agrega `OPERADOR_ORIGINAL`.
+2. **Pico:** se busca en años completos con producción. Antes, el 102 y el XIV daban "pico 0 bpd".
+3. **Declinación a 5 años:** se calcula entre años "normales" (≤ 2 meses sin producción). Se agrega `DECLINACION_PERIODO`. Antes daba +13,8 % en el 8 y +49 % en el Z-1 al comparar con 2020.
+4. **Paralizaciones por lote:** los meses en que el campo produjo con otro contrato no cuentan. Antes VI y VII daban 317 y 285 meses por el periodo reportado como VII/VI.
+5. **Departamento** de los lotes sin polígono (102, XIV, LOB/EA/LO), tomado de la base de producción.
+6. **Formato del CSV:** enteros sin decimales.
+7. **Overpass:** se piden solo los ríos principales como relaciones; la consulta anterior de todos los tramos daba 504/500.
+8. **Ficha:** muestra la distancia a un afluente (≥ 1.000 m³/s) además de la distancia a un río troncal.
+9. **Los círculos de producción actual también abren la ficha** del lote.
+
+La línea negra vertical que se vio en algunas capturas no está en ninguna capa vectorial; al dibujar el HTML real sin mapa de fondo no aparece. Viene del fondo topográfico de Esri.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**

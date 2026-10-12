@@ -115,8 +115,11 @@ h += [P("4. Producción por lote y mes", "h1"),
                                     "(<font name='DVM'>PP_LOTES_GEO.csv</font>). Si el lote no tiene polígono, se usa la zona (SELVA NORTE → LORETO) "
                                     "o queda vacío."],
           ["DEPARTAMENTO_FUENTE", "texto (código)", "MAPA (departamento por polígono del lote), ZONA (asignado por la zona) o vacío."],
-          ["OPERADOR", "texto", "Empresa que opera el lote según el PDF de ese año (p. ej. OCCIDENTAL, PLUSPETROL, PETROTAL). Cambia en el tiempo: "
-                                "es el operador de ese mes, no el actual."],
+          ["OPERADOR", "texto", "Empresa que opera el lote según el PDF de ese año (p. ej. OCCIDENTAL, PLUSPETROL, PETROTAL), con el nombre "
+                                "homologado: se corrigen nombres cortados y erratas del PDF (PLUSPETRO → PLUSPETROL, UPLAND OIL AND → UPLAND OIL "
+                                "AND GAS, PETROLERA MONTERRRICO → PETROLERA MONTERRICO, G.M.P. → GMP…). Cambia en el tiempo: es el operador de ese "
+                                "mes, no el actual."],
+          ["OPERADOR_ORIGINAL", "texto", "Nombre tal como aparece en el PDF, para auditar la homologación."],
           ["LOTE", "texto (código)", "Código homologado del contrato: sin la palabra \"Lote\", con guion estándar. Ej.: 192, 1-AB, 8, 95, Z-2B, "
                                      "31-B/D, X, LOB/EA/LO. Los contratos temporales conservan el sufijo (T), p. ej. I(T)."],
           ["LOTE_HISTORICO", "texto (código)", "Agrupa contratos que son el <b>mismo campo</b> a lo largo del tiempo, para series largas y rankings "
@@ -235,9 +238,12 @@ h += [P("8. Variables geográficas por lote", "h1"),
                                                                     "inicio de la base."],
           ["BPD_ACTUAL", "número (bpd)", "Producción promedio de los últimos 12 meses de la base."],
           ["PICO_AÑO, PICO_BPD", "entero, bpd", "Año completo de mayor producción diaria y su valor."],
-          ["DECLINACION_ANUAL_5A_PCT", "% anual", "Variación anual compuesta de la producción diaria entre el último año activo completo y "
-                                                  "5 años antes. Negativo = declina."],
-          ["MESES_SIN_PRODUCCION", "entero", "Meses con 0 barriles desde la primera producción hasta el final de la base."],
+          ["DECLINACION_ANUAL_5A_PCT, DECLINACION_PERIODO", "% anual, texto", "Variación anual compuesta de la producción diaria en 5 años, "
+                                                  "entre dos años completos \"normales\" (máximo 2 meses sin producción), para que una paralización "
+                                                  "(2016, 2020) no la distorsione. Se usa el periodo más reciente que cumple (p. ej. 2019–2024). "
+                                                  "Negativo = declina; vacío si no hay dos años normales."],
+          ["MESES_SIN_PRODUCCION", "entero", "Meses con 0 barriles desde la primera producción hasta el final de la base. A nivel de lote no "
+                                             "cuentan los meses en que el campo produjo con otro contrato (p. ej. VI reportado como VII/VI)."],
           ["PARALIZACION_MAX_MESES, PARALIZACION_MAX_DESDE", "entero, mm/aaaa", "Racha más larga de meses sin producción y su inicio "
                                                                               "(si llega al final de la base, sigue paralizado)."],
           ["OPERADORES", "texto", "Empresas que operaron el lote con producción, con sus años, en orden: p. ej. "
