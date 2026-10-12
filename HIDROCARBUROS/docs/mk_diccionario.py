@@ -92,7 +92,8 @@ h += [P("Diccionario de datos", "tit"),
       P("3. Archivos", "h1"),
       tabla([
           ["DATA/PP_produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Producción", "Base principal: lote × producto × mes (§4)."],
-          ["DATA/PP_produccion_gas_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Producción", "Gas natural fiscalizado: lote × mes, en MPC, desde 2001 (§4b)."],
+          ["DATA/PP_produccion_gas_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Producción", "Gas natural fiscalizado: lote × mes, en MPC, 1994–hoy (§4b)."],
+          ["DATA/PP_produccion_diaria.csv", "Producción", "Producción fiscalizada diaria por lote: líquidos (bbl) y gas (Mcf, MMBtu) (§4c)."],
           ["CONTROL/CONTROL PP produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Control", "Una fila por año: de qué PDF salió y si cuadra con sus totales (§5)."],
           ["CONTROL/PP_CATALOGO_PDF.csv", "Control", "Qué URL de PERUPETRO corresponde a cada PDF guardado (§6)."],
           ["DATA/PDF/PP_ANUAL_&lt;año&gt;.pdf, PP_MENSUAL_&lt;año&gt;_&lt;mes&gt;.pdf", "Fuente", "Copia de los PDF originales de PERUPETRO."],
@@ -147,19 +148,37 @@ h += [P("4. Producción por lote y mes", "h1"),
 h += [P("4b. Gas natural por lote y mes", "h1"),
       P("Archivo <font name='DVM'>PP_produccion_gas_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv</font>, del mismo notebook y de los mismos PDF: tabla "
         "«Producción fiscalizada mensual de gas natural (MPC)». Se descartan la versión en MMBTU, la producción «de campo» y los balances. "
-        "<b>Cobertura:</b> desde 2001; los PDF escaneados de 1994–2000 no se transcribieron para gas. Clave única: AÑO + MES + LOTE."),
+        "<b>Cobertura:</b> 1994–hoy. 2001 en adelante se extrae del PDF digital; 1994–2000 se transcribió a mano desde los escaneos "
+        "(<font name='DVM'>transcripciones/PP_gas_mensual_&lt;año&gt;_transcrito.csv</font>) y cuadra exacto con los totales del PDF. "
+        "Clave única: AÑO + MES + LOTE."),
       tabla([
           ["AÑO, MES, FECHA, ZONA, DEPARTAMENTO, DEPARTAMENTO_FUENTE", "—", "Igual que en §4."],
           ["OPERADOR, OPERADOR_ORIGINAL, LOTE, LOTE_HISTORICO, LOTE_ORIGINAL", "—", "Igual que en §4."],
           ["PRODUCTO", "texto", "Siempre GAS NATURAL."],
           ["MPC", "número (MPC)", "Gas natural fiscalizado del mes, en miles de pies cúbicos. Camisea (lotes 88, 56 y 57) concentra ~95 %."],
           ["MMPCD", "número (MMPC/día)", "MPC ÷ días del mes ÷ 1.000 (millones de pies cúbicos por día), 3 decimales."],
-          ["ESTADO_FILA", "texto (código)", "OK o REVISAR. En gas el PDF trae decimales y redondea cada celda: se acepta hasta 6 MPC de diferencia "
+          ["ESTADO_FILA", "texto (código)", "OK, REVISAR o TRANSCRITO (1994–2000). En gas el PDF trae decimales y redondea cada celda: se acepta hasta 6 MPC de diferencia "
                                             "entre la suma de los meses y el total del lote."],
           ["FUENTE", "texto", "PDF de origen."],
       ]),
       P("En el archivo de control se agregan LOTES_GAS, GAS_MPC (total del año), DIF_MAX_GAS (máxima diferencia mensual contra el TOTAL "
-        "del PDF; tolerancia 12 MPC por redondeo) y ESTADO_GAS (OK, REVISAR o SIN TABLA)."),
+        "del PDF; tolerancia 12 MPC por redondeo) y ESTADO_GAS (OK, OK (transcrito), REVISAR o SIN TABLA)."),
+      P("4c. Producción diaria por lote", "h1"),
+      P("Archivo <font name='DVM'>PP_produccion_diaria.csv</font> (notebook <font name='DVM'>PP_Produccion_Diaria.ipynb</font>), de los "
+        "reportes diarios de la página «Producción Diaria» de PERUPETRO. Se acumula: cada corrida reemplaza los meses que vuelve a leer. "
+        "Clave única: FECHA + UNIDAD + PRODUCTO + LOTE + OPERADOR."),
+      tabla([
+          ["FECHA, AÑO, MES, DIA", "fecha dd/mm/aaaa, enteros", "Día de la producción."],
+          ["FLUIDO", "texto", "LIQUIDOS o GAS NATURAL."],
+          ["PRODUCTO", "texto (código)", "PETROLEO Y CONDENSADO, LGN o GAS NATURAL."],
+          ["UNIDAD", "texto (código)", "BBL (barriles), MCF (miles de pies cúbicos) o MMBTU (millones de BTU, contenido energético del gas)."],
+          ["OPERADOR, LOTE_ORIGINAL, LOTE", "texto", "Como figuran en el encabezado del reporte; LOTE homologado (X. → X, 192_LIC → 192)."],
+          ["VALOR", "número", "Producción fiscalizada del día en la UNIDAD indicada. En líquidos, algunos lotes se fiscalizan por lotes "
+                              "(entregas), por eso hay días en 0 y días con valores altos: para promedios usar el mes."],
+          ["FUENTE, DEPARTAMENTO", "texto", "PDF guardado en DATA/PDF_DIARIA y departamento del lote según el mapa."],
+      ]),
+      P("Control: <font name='DVM'>CONTROL PP produccion_diaria.csv</font>, una fila por mes y unidad con DIAS, DIAS_OK (días en que la "
+        "suma de lotes cuadra con el SUB TOTAL / TOTAL del PDF), DIF_MAX y ESTADO."),
       ]
 
 # ── 5. Control de producción ─────────────────────────────────────────────────

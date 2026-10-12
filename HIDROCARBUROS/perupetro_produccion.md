@@ -81,7 +81,7 @@ El mapa está en https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?
 | `BARRILES`, `BPD` | Producción fiscalizada del mes y promedio diario |
 | `ESTADO_FILA`, `FUENTE` | `OK` / `IMPUTADO <MES>` / `REVISAR`, y PDF de origen |
 
-**`PP_produccion_gas_lote_mes_<ini>-<fin>.csv`** (DATA), añadido el 12/10/2026: gas natural fiscalizado por lote y mes, desde 2001.
+**`PP_produccion_gas_lote_mes_<ini>-<fin>.csv`** (DATA), añadido el 12/10/2026: gas natural fiscalizado por lote y mes, 1994–hoy (2001+ del PDF; 1994–2000 transcrito).
 - **Origen:** la tabla «Producción fiscalizada mensual de gas natural (MPC)» de los mismos PDF, leída en la misma pasada (`extraer(path, "GAS")`).
 - **Columnas:** las mismas de identificación que el CSV de líquidos, más `PRODUCTO` = `GAS NATURAL`, `MPC` (miles de pies cúbicos) y `MMPCD` (millones de pies cúbicos por día).
 - **Variantes de título que se reconocen:**
@@ -93,7 +93,10 @@ El mapa está en https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?
 - **Prueba con los PDF reales:** 2001, 2008, 2010, 2016, 2020, 2021, 02/2024 y 01/2026. La suma de lotes cuadra con el TOTAL del PDF con ≤ 2 MPC de diferencia, por redondeo de decimales. En 2021 el total es 401.690.512 MPC, frente a 401.690.513 en el PDF.
 - **Tolerancia por fila:** 6 MPC.
 - **Control:** columnas `LOTES_GAS`, `GAS_MPC`, `DIF_MAX_GAS` y `ESTADO_GAS`.
-- **Sin gas:** 1994–2000 (escaneados, no transcritos para gas).
+- **1994–2000:** transcritos a mano desde los escaneos (`transcripciones/PP_gas_mensual_<año>_transcrito.csv`, 12/10/2026). Cuadran exacto filas, meses y total general.
+  - Lotes con gas fiscalizado en esos años: I (Cavelcas/GMP), VI (Petroperú/Sapet), VII (1994), VII/VI (2000), X (Petroperú/Pérez Companc), Z-2B (Petrotech) y 31-C (Aguaytía, desde marzo de 1998).
+  - Totales anuales en MPC: 1994 9.536.727; 1995 9.425.074; 1996 8.768.216; 1997 8.530.880; 1998 14.431.906; 1999 14.644.530; 2000 12.183.917.
+  - Nota del PDF de 1995: el gas fiscalizado del lote VI se reinyectó mientras lo operó Petroperú, hasta el 10/10/1995.
 
 **`CONTROL PP produccion_lote_mes_<ini>-<fin>.csv`** (CONTROL): una fila por PDF usado.
 - `LOTES`, `FILAS_IMPUTADAS`, `FILAS_REVISAR`.
@@ -173,3 +176,30 @@ Loreto (petróleo, millones de bbl):
 ## 8. Flujo de trabajo con GitHub
 
 El mismo de los demás proyectos (ver `FISCAL/CONTEXTO_PROYECTO.md` §9): rama `claude/scraper-gobiernos-regionales-kk6ecm`, PR y merge a `main`, notebooks sin salidas.
+
+
+## Producción diaria (`PP_Produccion_Diaria.ipynb`, 12/10/2026)
+
+**Fuente.** perupetro.com.pe → Estadísticas → Producción Hidrocarburos → **Producción Diaria**. Hay un PDF por mes (cierre de mes) y uno del mes en curso:
+- «Líquidos en b/d»: *Reporte de producción fiscalizada de hidrocarburos líquidos a nivel nacional (barriles)*, con una columna por lote para petróleo y condensado, una por lote de LGN, los SUB TOTAL y el TOTAL.
+- «Gas en Mcfd»: *Reporte de producción fiscalizada de gas natural (Mcf)*. Trae una segunda hoja en MMBtu.
+- «Gas en m3»: no se usa. Repite el gas en otra unidad y sus rótulos de UNNA (lotes III y IV) están corruptos en el PDF.
+
+**Lector (`pd_parser`).**
+- **Cabecera:** lee la tabla por coordenadas. Toma la primera fila con 5 o más códigos de lote; en gas vienen como «Lote : 31-C».
+- **Operadores:** salen del encabezado, aunque un operador abarque varios lotes. Por ejemplo, MONTERRICO cubre II y XX, y UNNA ENERGIA cubre III y IV.
+- **Valores:** van alineados a la derecha de su celda.
+- **Control por día:** la suma de los lotes de cada producto se compara con su SUB TOTAL y la de todos con el TOTAL. La tolerancia es 1 bbl en líquidos y 0,05 en gas.
+- **Lotes:** `X.` → `X` y `192_LIC` → `192`. El lote 8 aparece dos veces en líquidos, con PLUSPETROL NORTE y con UPLAND OIL; se conserva el operador de cada columna.
+
+**Salidas.**
+- `DATA/PP_produccion_diaria.csv`, una fila por día × lote × producto × unidad.
+  - Columnas: `FECHA` (dd/mm/aaaa), `AÑO`, `MES`, `DIA`, `FLUIDO`, `PRODUCTO` (PETROLEO Y CONDENSADO / LGN / GAS NATURAL), `UNIDAD` (BBL / MCF / MMBTU), `OPERADOR`, `LOTE_ORIGINAL`, `LOTE`, `VALOR`, `FUENTE` y `DEPARTAMENTO` (del mapa).
+  - Se **acumula**: cada corrida reemplaza los meses que vuelve a leer y conserva los anteriores.
+- `CONTROL/CONTROL PP produccion_diaria.csv`, una fila por mes y unidad: `REPORTE_AL`, `DIAS`, `DIAS_OK`, `DIF_MAX`, `LOTES` y `ESTADO`.
+- Los PDF se guardan en `DATA/PDF_DIARIA/PP_DIARIA_<LIQUIDOS|GAS>_<año>_<mes>.pdf`. Un PDF subido a mano a esa carpeta también se lee.
+
+**Prueba (setiembre 2026, PDF reales).**
+- Líquidos, gas en Mcf y gas en MMBtu: 30/30 días OK, con diferencia 0.
+- Los promedios del mes coinciden con los «PROMEDIOS» que imprime el PDF: gas del lote 88 1.034,88 MMPCD; LGN del 88 42.020 bpd; lote 95 11.612 bpd; X 9.084 bpd.
+- **No probado contra la página real:** desde la nube de Claude no se accede a perupetro.com.pe. Los enlaces se reconocen por el texto («Líquidos», «Gas en Mcfd») o por el nombre del archivo.
