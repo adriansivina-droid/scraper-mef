@@ -54,6 +54,7 @@ El mapa está en https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?
 
 1. **Instalación y extractor.** `pdfplumber` lee la tabla "PRODUCCIÓN FISCALIZADA MENSUAL DE HIDROCARBUROS LÍQUIDOS" **por coordenadas**: ubica cada número en la columna del mes más cercana. Así no se mezclan columnas con gráficos o notas al pie.
    - **Nombres de lote:** se homologan, por ejemplo `8.`→`8`, `IX,`→`IX`, `192 (1)`→`192`, `1AB`→`1-AB`. `LOTE_ORIGINAL` conserva el texto del PDF.
+   - **Operadores:** `PETROMONT` se homologa a `PETROLERA MONTERRICO`. Los rótulos de gráficos (`DPB`, `BPD`, `MBBL`…) ya no se toman como operador; antes aparecía `DPB` en los lotes 56 y 88 en 2021.
    - **Operador:** si en la tabla mensual sale ilegible por una nota superpuesta, se toma de la tabla resumen del mismo PDF.
    - **Mes vacío:** si a una fila le falta un mes y el total lo permite, se imputa (`IMPUTADO <MES>`), por ejemplo el Lote 56 en setiembre de 2021.
 2. **Selectores:**
