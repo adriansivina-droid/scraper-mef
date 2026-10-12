@@ -83,6 +83,8 @@ h += [P("Diccionario de datos", "tit"),
           ["bbl", "unidad", "Barril estadounidense = 42 galones = 158,987 litros. Todas las columnas BARRILES están en barriles."],
           ["BPD / bpd", "unidad", "Barriles por día calendario. Mensual: barriles del mes ÷ días del mes. Anual: barriles del año ÷ 365 (366 en bisiesto)."],
           ["MM bbl", "unidad", "Millones de barriles (usado en resúmenes y en el mapa)."],
+          ["MPC / MMPC / BCF", "unidad (gas)", "Gas natural: MPC = miles de pies cúbicos (Mcf); MMPC = millones; BCF = miles de millones. "
+                                               "MMPCD = millones de pies cúbicos por día."],
           ["Fechas", "texto", "Formato <b>dd/mm/aaaa</b>. En los datos mensuales, FECHA es el día 01 del mes (01/03/2015 = marzo 2015)."],
           ["Codificación", "archivo", "CSV en UTF-8 con BOM (se abre directo en Excel con tildes correctas), separador coma, punto decimal."],
           ["Vacío / NaN", "—", "Sin dato. En el ranking, vacío = el lote aún no existía; 0 = existía y no produjo (o no figura en el PDF ese año)."],
@@ -90,6 +92,7 @@ h += [P("Diccionario de datos", "tit"),
       P("3. Archivos", "h1"),
       tabla([
           ["DATA/PP_produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Producción", "Base principal: lote × producto × mes (§4)."],
+          ["DATA/PP_produccion_gas_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Producción", "Gas natural fiscalizado: lote × mes, en MPC, desde 2001 (§4b)."],
           ["CONTROL/CONTROL PP produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Control", "Una fila por año: de qué PDF salió y si cuadra con sus totales (§5)."],
           ["CONTROL/PP_CATALOGO_PDF.csv", "Control", "Qué URL de PERUPETRO corresponde a cada PDF guardado (§6)."],
           ["DATA/PDF/PP_ANUAL_&lt;año&gt;.pdf, PP_MENSUAL_&lt;año&gt;_&lt;mes&gt;.pdf", "Fuente", "Copia de los PDF originales de PERUPETRO."],
@@ -138,6 +141,25 @@ h += [P("4. Producción por lote y mes", "h1"),
       P("<b>Cómo se eligió la fuente de cada año.</b> Si existe el anual, se usa el anual (trae los 12 meses ya revisados). Para el año en curso, "
         "se usa la estadística mensual más reciente, que trae el acumulado del año. Por eso 2026 llega hasta junio y cambiará al volver a correr "
         "el notebook cuando PERUPETRO publique meses nuevos."),
+      ]
+
+# ── 4b. Gas natural ──────────────────────────────────────────────────────────
+h += [P("4b. Gas natural por lote y mes", "h1"),
+      P("Archivo <font name='DVM'>PP_produccion_gas_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv</font>, del mismo notebook y de los mismos PDF: tabla "
+        "«Producción fiscalizada mensual de gas natural (MPC)». Se descartan la versión en MMBTU, la producción «de campo» y los balances. "
+        "<b>Cobertura:</b> desde 2001; los PDF escaneados de 1994–2000 no se transcribieron para gas. Clave única: AÑO + MES + LOTE."),
+      tabla([
+          ["AÑO, MES, FECHA, ZONA, DEPARTAMENTO, DEPARTAMENTO_FUENTE", "—", "Igual que en §4."],
+          ["OPERADOR, OPERADOR_ORIGINAL, LOTE, LOTE_HISTORICO, LOTE_ORIGINAL", "—", "Igual que en §4."],
+          ["PRODUCTO", "texto", "Siempre GAS NATURAL."],
+          ["MPC", "número (MPC)", "Gas natural fiscalizado del mes, en miles de pies cúbicos. Camisea (lotes 88, 56 y 57) concentra ~95 %."],
+          ["MMPCD", "número (MMPC/día)", "MPC ÷ días del mes ÷ 1.000 (millones de pies cúbicos por día), 3 decimales."],
+          ["ESTADO_FILA", "texto (código)", "OK o REVISAR. En gas el PDF trae decimales y redondea cada celda: se acepta hasta 6 MPC de diferencia "
+                                            "entre la suma de los meses y el total del lote."],
+          ["FUENTE", "texto", "PDF de origen."],
+      ]),
+      P("En el archivo de control se agregan LOTES_GAS, GAS_MPC (total del año), DIF_MAX_GAS (máxima diferencia mensual contra el TOTAL "
+        "del PDF; tolerancia 12 MPC por redondeo) y ESTADO_GAS (OK, REVISAR o SIN TABLA)."),
       ]
 
 # ── 5. Control de producción ─────────────────────────────────────────────────

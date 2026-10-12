@@ -236,6 +236,15 @@ Correcciones:
 - **Leyenda:** ahora tiene un botón visible **+ / –** para abrirla y minimizarla. Antes era un `<details>` sin marcador visible.
 - **Técnico:** `folium.Element` lee el texto como plantilla Jinja. Por eso el panel va entre `{% raw %}` … `{% endraw %}`; sin eso, el `{#` del CSS rompe el render.
 
+## Gas natural y «producción fiscalizada» en el mapa (12/10/2026)
+
+- **Lectura en el Bloque 3:** lee `PP_produccion_gas_lote_mes_*.csv` si existe; si no, el mapa funciona igual, sin gas.
+- **Panel:** el selector **Producto** incluye «Gas natural».
+  - Unidades: millones de pies cúbicos (MMPC) o MMPC por día (MMPCD). Los totales grandes se muestran en BCF.
+  - Al elegirlo, el eje empieza en 2001.
+- **Ficha:** muestra «Gas natural acumulado del campo (desde 2001)» en BCF, solo si el campo tiene gas. Columna nueva `GAS_ACUM_CAMPO_BCF` en `PP_LOTES_GEO.csv`.
+- **Textos:** el panel y la ficha dicen «producción fiscalizada». La nota del gráfico explica la fuente y que un mes en 0 puede ser paralización.
+
 ## Pruebas
 
 - **Lo que no se pudo probar:** desde el entorno de Claude, arcgis.com y perupetro.com.pe están bloqueados (403 del proxy). La primera corrida real se hace en Colab.
