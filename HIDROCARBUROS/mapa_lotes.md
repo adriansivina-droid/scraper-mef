@@ -139,6 +139,19 @@ Correcciones:
 - **Comunidades:** se prefiere "Comunidades Amazónicas" a "Pueblos Indígenas".
 - El mensaje "Runtime no longer has a reference to this dataframe" es de la tabla interactiva de Colab al recargar; no afecta.
 
+**Segunda corrida con el geoportal (12/10/2026)**
+- Polígonos por fuente: 32 lotes del geoportal y 18 de INGEMMET 2019.
+
+Problemas encontrados:
+- La leyenda tapaba el mapa.
+- Los operadores seguían sin homologar: el CSV de producción de Drive era anterior a la corrección.
+- Los sectores de INGEMMET (XIII-A/B/C, Z-2B A..D) se dibujaban encima de XIII y Z-69 del geoportal.
+
+Correcciones:
+- Leyenda plegable en la esquina inferior derecha.
+- El notebook del mapa también aplica `norm_operador` al leer la producción.
+- Un polígono de una fuente secundaria cubierto en más del 50 % por la fuente principal se descarta, salvo que tenga producción propia.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**
