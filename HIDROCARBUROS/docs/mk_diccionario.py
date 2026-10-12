@@ -164,7 +164,7 @@ h += [P("4b. Gas natural por lote y mes", "h1"),
       P("En el archivo de control se agregan LOTES_GAS, GAS_MPC (total del año), DIF_MAX_GAS (máxima diferencia mensual contra el TOTAL "
         "del PDF; tolerancia 12 MPC por redondeo) y ESTADO_GAS (OK, OK (transcrito), REVISAR o SIN TABLA)."),
       P("4c. Producción diaria por lote", "h1"),
-      P("Archivo <font name='DVM'>PP_produccion_diaria.csv</font> (notebook <font name='DVM'>PP_Produccion_Diaria.ipynb</font>), de los "
+      P("Archivo <font name='DVM'>PP_produccion_diaria.csv</font> (notebook <font name='DVM'>PP_Produccion_Lotes.ipynb</font>, sección «Producción diaria»), de los "
         "reportes diarios de la página «Producción Diaria» de PERUPETRO. Se acumula: cada corrida reemplaza los meses que vuelve a leer. "
         "Clave única: FECHA + UNIDAD + PRODUCTO + LOTE + OPERADOR."),
       tabla([
