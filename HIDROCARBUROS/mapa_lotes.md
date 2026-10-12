@@ -207,6 +207,13 @@ Correcciones:
 - El Bloque 3 imprime y guarda en CONTROL los lotes con producción que no tienen polígono en el mapa actual. Son lotes que ya no existen o que se renombraron, como LOB/EA/LO o 31-B/D.
 - Se resuelven agregando el equivalente en `LOTES_ALIAS_GEOMETRIA` (Bloque 3). Por ahora solo está `{"1-AB": "192"}`.
 
+## Correcciones del 12/10/2026 (revisión del mapa final)
+
+- `F_SUSCRIPCION` llegaba del WFS como epoch en milisegundos (`1092009600000.0` en el lote 103). Ahora `fecha_dmy()` la convierte a dd/mm/aaaa; también acepta fechas ISO y dd/mm/aaaa.
+- `OPERADORES` ya no muestra `NAN`. Los meses sin operador en el PDF (III(T), IV(T) e IV entre 2014 y 2016) se excluyen de la secuencia.
+- `PETROMONT` es el nombre corto de Petrolera Monterrico desde 2010. Se homologa a `PETROLERA MONTERRICO` en los lotes II, XV y XX.
+- `DPB` en los lotes 56 y 88 (2021) era el rótulo del eje de un gráfico del PDF, no un operador. El parser ignora esos rótulos (`ETIQUETA_GRAFICO`): DPB, BPD, MBBL, MMBBL, LBB, MM y "Página…".
+
 ## Pruebas
 
 - **Lo que no se pudo probar:** desde el entorno de Claude, arcgis.com y perupetro.com.pe están bloqueados (403 del proxy). La primera corrida real se hace en Colab.
