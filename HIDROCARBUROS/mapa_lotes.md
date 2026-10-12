@@ -123,6 +123,22 @@ La línea negra vertical que se vio en algunas capturas no está en ninguna capa
 - **Nuevas columnas:** `TIPO_CONTRATO`, `F_SUSCRIPCION`, `FUENTE_POLIGONO`; la ficha muestra operador, fase, tipo y fecha del contrato vigente.
 - La descarga "Interoperabilidad" (ZIP/RAR) del geoportal da "archivo no disponible": es un enlace roto de PERUPETRO. El WFS la reemplaza.
 
+**Primera corrida con el geoportal (12/10/2026):** el WFS publica 165 capas.
+
+Problemas encontrados:
+- El Bloque 2 tardó unos 11 minutos.
+- La propuesta incluía "Cuencas Sedimentarias" y "lote_contrato_pash" como si fueran lotes.
+- Para comunidades eligió "Pueblos Indígenas".
+
+Correcciones:
+- **Servidores caídos:** 2 intentos y no se vuelve a esperar en la misma sesión (el visor viejo `gismaptemp` hacía perder minutos).
+- **Una sola petición DescribeFeatureType** para todas las capas útiles, en vez de 31.
+- **Capas útiles con lista explícita:** se excluyen las auxiliares (`_inicio`, `_fin`, `_nw`, `_pash`, acueducto, gasoducto, poliducto).
+- **ArcGIS Online solo se consulta para lo que el geoportal no trae** (hoy, el complemento de lotes antiguos).
+- **Lotes:** solo `lote_contrato` y después `lotes_contrato` del geoportal, más INGEMMET 2019 para los antiguos.
+- **Comunidades:** se prefiere "Comunidades Amazónicas" a "Pueblos Indígenas".
+- El mensaje "Runtime no longer has a reference to this dataframe" es de la tabla interactiva de Colab al recargar; no afecta.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**
