@@ -111,6 +111,18 @@ Problemas y correcciones:
 
 La línea negra vertical que se vio en algunas capturas no está en ninguna capa vectorial; al dibujar el HTML real sin mapa de fondo no aparece. Viene del fondo topográfico de Esri.
 
+**Geoportal oficial de PERUPETRO como fuente principal (12/10/2026)**
+- `https://geoportal.perupetro.com.pe/geoserver` es un GeoServer con WFS abierto, sin iniciar sesión. Lo encontró el usuario: el visor ArcGIS anterior estaba caído.
+- La capa `cartografia_pp:lote_contrato` trae 32 lotes vigentes con estos campos: `lote` (p. ej. LOTE_Z62; en el mapa algunos en romanos, XCV = 95), `cia_oper`, `contrato` (EXPLORACIÓN/EXPLOTACIÓN), `tipo_contr`, `f_suscripc`, `decreto_su`, `ubicacion` y `Area_Ha`.
+- El Bloque 2 lista todas las capas del WFS y describe las útiles: lotes, cuencas sedimentarias, ANP, comunidades, ductos, yacimientos, áreas promocionales, convenios y arcos. La propuesta automática las prefiere a las de terceros.
+- **Lotes:**
+  - primero los del geoportal (vigentes);
+  - después la capa INGEMMET 2019 para lotes antiguos sin contrato vigente (1-AB, 31-B/D, etc.);
+  - si un lote está en ambas, manda el del geoportal (`FUENTE_POLIGONO`).
+- **Nombres de lote:** `lote_clave` acepta guion bajo y convierte los romanos de la selva (≥ 30 y VIII) a arábigos. Los del noroeste (I a XXIX) siguen en romanos, como en la producción.
+- **Nuevas columnas:** `TIPO_CONTRATO`, `F_SUSCRIPCION`, `FUENTE_POLIGONO`; la ficha muestra operador, fase, tipo y fecha del contrato vigente.
+- La descarga "Interoperabilidad" (ZIP/RAR) del geoportal da "archivo no disponible": es un enlace roto de PERUPETRO. El WFS la reemplaza.
+
 ## Bloques
 
 1. **Instalación, Drive y funciones.**

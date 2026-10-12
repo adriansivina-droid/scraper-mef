@@ -39,6 +39,7 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | PDF escaneados pesados | `HIDROCARBUROS/pdf_escaneados/` (1995 y 1996, demasiado grandes para el chat) |
 | Drive · DATA | `1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq` (CSV de producción + subcarpeta `PDF` con todos los PDF descargados) |
 | Drive · CONTROL | `1TKjS2Wjpnf26oladjhqstmN5c9Irq-Aj` (control por año y `PP_CATALOGO_PDF.csv`) |
+| Geoportal PERUPETRO (mapas oficiales, WFS) | https://geoportal.perupetro.com.pe — servicio `https://geoportal.perupetro.com.pe/geoserver/wfs` (capa de lotes `cartografia_pp:lote_contrato`) |
 | Fuente de los PDF | perupetro.com.pe → Estadísticas → **Estadística Petrolera**: anuales 1994–2025 y mensuales del año en curso. La URL completa está en el Bloque 3 (`PAGINA_EST`) |
 
 **Abrir siempre desde el enlace de Colab.** Una copia guardada en Drive no recibe las correcciones nuevas.
