@@ -81,6 +81,20 @@ El mapa está en https://perupetro.maps.arcgis.com/apps/webappviewer/index.html?
 | `BARRILES`, `BPD` | Producción fiscalizada del mes y promedio diario |
 | `ESTADO_FILA`, `FUENTE` | `OK` / `IMPUTADO <MES>` / `REVISAR`, y PDF de origen |
 
+**`PP_produccion_gas_lote_mes_<ini>-<fin>.csv`** (DATA), añadido el 12/10/2026: gas natural fiscalizado por lote y mes, desde 2001.
+- **Origen:** la tabla «Producción fiscalizada mensual de gas natural (MPC)» de los mismos PDF, leída en la misma pasada (`extraer(path, "GAS")`).
+- **Columnas:** las mismas de identificación que el CSV de líquidos, más `PRODUCTO` = `GAS NATURAL`, `MPC` (miles de pies cúbicos) y `MMPCD` (millones de pies cúbicos por día).
+- **Variantes de título que se reconocen:**
+  - «… FISCALIZADA MENSUAL DE GAS NATURAL 2021 (MPC)»;
+  - «… MENSUAL FISCALIZADA DE GAS NATURAL - 2001»;
+  - «… FISCALIZADA DE GAS NATURAL MENSUAL (MPC) - 2012», en página girada 90°;
+  - «… FISCALIZADA MENSUAL (Mscf) - 2008», sin la palabra gas; se reconoce por la unidad.
+- **Tablas descartadas:** la versión en MMBTU, la producción «de campo» y los balances.
+- **Prueba con los PDF reales:** 2001, 2008, 2010, 2016, 2020, 2021, 02/2024 y 01/2026. La suma de lotes cuadra con el TOTAL del PDF con ≤ 2 MPC de diferencia, por redondeo de decimales. En 2021 el total es 401.690.512 MPC, frente a 401.690.513 en el PDF.
+- **Tolerancia por fila:** 6 MPC.
+- **Control:** columnas `LOTES_GAS`, `GAS_MPC`, `DIF_MAX_GAS` y `ESTADO_GAS`.
+- **Sin gas:** 1994–2000 (escaneados, no transcritos para gas).
+
 **`CONTROL PP produccion_lote_mes_<ini>-<fin>.csv`** (CONTROL): una fila por PDF usado.
 - `LOTES`, `FILAS_IMPUTADAS`, `FILAS_REVISAR`.
 - `BARRILES_PETROLEO` / `BARRILES_LGN`.
