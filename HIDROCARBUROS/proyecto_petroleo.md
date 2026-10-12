@@ -32,10 +32,12 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Notebook de producción | `HIDROCARBUROS/PP_Produccion_Lotes.ipynb` |
 | Notebook del mapa de lotes | `HIDROCARBUROS/PP_Mapa_Lotes.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Mapa_Lotes.ipynb) · detalle en `HIDROCARBUROS/mapa_lotes.md` |
 | Abrir en Colab | https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Produccion_Lotes.ipynb |
+| Notebook de producción **diaria** (líquidos y gas, por lote) | `HIDROCARBUROS/PP_Produccion_Diaria.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Produccion_Diaria.ipynb) · `DATA/PP_produccion_diaria.csv` |
+| Gas natural fiscalizado por lote y mes (1994–hoy) | `DATA/PP_produccion_gas_lote_mes_<ini>-<fin>.csv` (notebook de producción) |
 | Contexto técnico | `HIDROCARBUROS/perupetro_produccion.md` |
 | Indicadores por lote (estado, pico, declinación, paralizaciones, operadores) | `DATA/PP_LOTES_INDICADORES.csv` (notebook del mapa) |
 | Diccionario de datos (PDF) | `HIDROCARBUROS/docs/Diccionario_datos_Proyecto_Petroleo.pdf` (se regenera con `python3 HIDROCARBUROS/docs/mk_diccionario.py`) |
-| Transcripciones 1994–2000 | `HIDROCARBUROS/transcripciones/PP_mensual_<año>_transcrito.csv` |
+| Transcripciones 1994–2000 | `HIDROCARBUROS/transcripciones/PP_mensual_<año>_transcrito.csv` (líquidos) y `PP_gas_mensual_<año>_transcrito.csv` (gas) |
 | PDF escaneados pesados | `HIDROCARBUROS/pdf_escaneados/` (1995 y 1996, demasiado grandes para el chat) |
 | Drive · DATA | `1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq` (CSV de producción + subcarpeta `PDF` con todos los PDF descargados) |
 | Drive · CONTROL | `1TKjS2Wjpnf26oladjhqstmN5c9Irq-Aj` (control por año y `PP_CATALOGO_PDF.csv`) |
@@ -76,9 +78,13 @@ Notas sobre algunas columnas:
 | 2001–2025 | Extracción automática de los PDF anuales digitales | ✅ **OK, diferencia 0 contra los totales del PDF** |
 | 2026 (ene–jun) | Mensual de junio 2026 (acumulado del año) | ✅ OK |
 | 1994–2000 | **Transcritos a mano** desde la imagen (escaneos) y validados con los totales del PDF | ✅ OK (transcrito) |
+| Gas natural 2001–2026 | Extracción automática de la tabla «Producción fiscalizada mensual de gas natural (MPC)» | ✅ OK (≤ 2 MPC de diferencia por redondeo) |
+| Gas natural 1994–2000 | **Transcrito a mano** (12/10/2026) y validado: filas, meses y total general cuadran exacto | ✅ OK (transcrito) |
+| Producción diaria | Reportes diarios de la página «Producción Diaria» (líquidos en bbl, gas en Mcf y MMBtu), desde el año en curso; se acumula en Drive | ✅ Probado con setiembre 2026: 30/30 días cuadran con el TOTAL del PDF |
 
 **Cómo se transcribieron los años escaneados** (método por si aparece otra tabla escaneada):
-1. Ubicar la página "PRODUCCION MENSUAL DE HIDROCARBUROS LIQUIDOS, <año>": 1994 → p.16, 1995 → p.18 (y cuadro de control en p.17), 1996 → p.16, 1997 → p.10, 1998 → p.10, 1999 → p.10, 2000 → p.10. Si el PDF trae capa OCR (1997, 1999), sirve de borrador, pero se valida igual contra la imagen.
+1. Ubicar la página "PRODUCCION MENSUAL DE HIDROCARBUROS LIQUIDOS, <año>": 1994 → p.16, 1995 → p.18 (y cuadro de control en p.17), 1996 → p.16, 1997 → p.10, 1998 → p.10, 1999 → p.10, 2000 → p.10.
+   Gas («PRODUCCION FISCALIZADA MENSUAL DE GAS NATURAL», en KPC = MPC): 1994 → p.53, 1995 → p.82, 1996 → p.71, 1997 → p.38, 1998 → p.38, 1999 → p.39, 2000 → p.38. Si el PDF trae capa OCR (1997, 1999), sirve de borrador, pero se valida igual contra la imagen.
 2. Renderizar la página con `pdftoppm -r 300…600` y recortar la tabla en mitad izquierda y mitad derecha para leerla ampliada.
 3. Transcribir a un CSV con estas columnas:
    - `ANIO, PRODUCTO, OPERADOR, LOTE_ORIGINAL, LOTE, ENE…DIC, TOTAL, FUENTE`;
