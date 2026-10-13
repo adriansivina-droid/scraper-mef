@@ -221,3 +221,4 @@ Primero fue un notebook aparte; ahora corre en el mismo notebook de producción 
 - **Enlace real de la tabla** (13/10/2026, enero 2026): `https://www.perupetro.com.pe/wps/wcm/connect/corporativo/a48b83b1-…/Reporte+de+Producci%C3%B3n+de+L%C3%ADquidos+31.1.2026.pdf?MOD=AJPERES&Liquidos%20-%20enero%202025`.
   - Es una dirección normal a un PDF; la falla anterior se debía, con toda probabilidad, al formato del `href` (comillas).
   - El texto del enlace dice «enero 2025», pero el PDF es de enero de 2026. El año y el mes se toman siempre del contenido del PDF.
+- **Ajuste 3 (13/10/2026), causa real:** sin cabecera de idioma, el portal de PERUPETRO responde la página en **inglés** («Liquid Production b/d»), y esa versión no trae la tabla de meses. Ahora todas las descargas envían `Accept-Language: es-PE,es`; la página diaria se pide con sesión y, si sigue en inglés, se reintenta una vez y se avisa.
