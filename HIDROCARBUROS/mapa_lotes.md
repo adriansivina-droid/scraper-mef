@@ -244,6 +244,12 @@ Correcciones:
 - **Ficha:** muestra «Gas natural acumulado del campo» en BCF, solo si el campo tiene gas. Columna nueva `GAS_ACUM_CAMPO_BCF` en `PP_LOTES_GEO.csv`.
 - **Textos:** el panel y la ficha dicen «producción fiscalizada». La nota del gráfico explica la fuente y que un mes en 0 puede ser paralización.
 
+## Panel centrado (13/10/2026)
+
+- **Al abrirse:** el panel de producción aparece **centrado en la pantalla**, con el mapa atenuado detrás, para concentrar la atención en el gráfico.
+- **Para cerrarlo:** botón **×**, clic fuera del panel o tecla **Esc**.
+- **Al minimizarlo (–):** queda como una barra abajo al centro y el mapa vuelve a estar libre. Con **+** se expande de nuevo.
+
 ## Pruebas
 
 - **Lo que no se pudo probar:** desde el entorno de Claude, arcgis.com y perupetro.com.pe están bloqueados (403 del proxy). La primera corrida real se hace en Colab.
