@@ -1,6 +1,6 @@
 # Proyecto Petróleo · Loreto · Resumen para continuar en otro chat
 
-Resumen ejecutivo del proyecto de producción petrolera. Sirve para retomarlo en una sesión nueva sin perder el contexto. El detalle técnico del extractor está en `HIDROCARBUROS/perupetro_produccion.md`. Última actualización: **11/10/2026**.
+Resumen ejecutivo del proyecto de producción petrolera. Sirve para retomarlo en una sesión nueva sin perder el contexto. El detalle técnico del extractor está en `HIDROCARBUROS/perupetro_produccion.md`. Última actualización: **13/10/2026**.
 
 ---
 
@@ -19,9 +19,9 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
                    │
  ┌─────────────────┼──────────────────────┬──────────────────────┐
  Producción        Mapa / Banco de Datos  Infotrade              Canon
- lote × mes        polígonos, pozos       exportación 2709       Loreto × mes
- (HECHO)           (PENDIENTE)            (scraper listo,        (PENDIENTE)
-                                           cruce pendiente)
+ lote × mes        polígonos, pozos       exportación 2709       Loreto × año
+ (HECHO)           (PENDIENTE)            (scraper listo,        (HECHO: anual por
+                                           cruce pendiente)       departamento)
 ```
 
 ## 2. Dónde está todo
@@ -34,6 +34,7 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Abrir en Colab | https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Produccion_Lotes.ipynb |
 | Producción **diaria** (líquidos y gas, por lote) | Sección 8 del Bloque 3 del notebook de producción (casilla «Producción diaria») → `DATA/PP_produccion_diaria.csv` |
 | Gas natural fiscalizado por lote y mes (1994–hoy) | `DATA/PP_produccion_gas_lote_mes_<ini>-<fin>.csv` (notebook de producción) |
+| Pozos perforados por lote (1995–hoy), regalías por lote (2001–hoy), canon por departamento (1993–hoy), precio de canasta por lote y mes (2001–hoy) y valor de la producción | `DATA/PP_pozos_perforados_lote_anio.csv`, `PP_regalias_lote_anio.csv`, `PP_canon_departamento_anio.csv`, `PP_precio_canasta_lote_mes.csv`, `PP_valor_produccion_lote_mes.csv` (notebook de producción, sección 6.1; detalle en `perupetro_produccion.md`) |
 | Contexto técnico | `HIDROCARBUROS/perupetro_produccion.md` |
 | Indicadores por lote (estado, pico, declinación, paralizaciones, operadores) | `DATA/PP_LOTES_INDICADORES.csv` (notebook del mapa) |
 | Diccionario de datos (PDF) | `HIDROCARBUROS/docs/Diccionario_datos_Proyecto_Petroleo.pdf` (se regenera con `python3 HIDROCARBUROS/docs/mk_diccionario.py`) |
@@ -136,13 +137,18 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 ## 6. Pendientes, en orden sugerido
 
 1. **Mapa de lotes** (EN CURSO). Notebook `PP_Mapa_Lotes.ipynb` creado y probado con datos simulados; falta la primera corrida real en Colab para confirmar las capas del visor de PERUPETRO. Detalle en `HIDROCARBUROS/mapa_lotes.md`.
-2. **Otras tablas de los anuales**, ya identificadas en los PDF:
-   - producción por **yacimiento**;
-   - **estado de pozos** por lote;
-   - **regalías por lote** ("Ingresos al fisco por contrato");
-   - **precio de la canasta** por lote;
-   - **canon y sobrecanon** por departamento;
-   - **contratos** (fechas y área).
+2. **Otras tablas de los anuales.**
+   - HECHO (13/10/2026):
+     - **pozos perforados** por lote y tipo;
+     - **regalías** por lote;
+     - **canon y sobrecanon** por departamento;
+     - **precio de canasta** por lote y mes, y con él el **valor de la producción**.
+   - Falta la primera corrida real desde 2001 en Colab.
+   - Pendientes:
+     - producción por **yacimiento**;
+     - **estado de pozos** por lote;
+     - **contratos** (fechas y área).
+   - La **inversión en US$ por lote no está en los anuales**; habría que buscarla en otra fuente (memorias de PERUPETRO, MINEM).
 3. **Cruce con Infotrade.** Exportación de crudo (partida 2709) de Loreto vs producción; operador ↔ exportador.
 4. **Banco de Datos de PERUPETRO.** El usuario tiene cuenta, para pozos y sísmica:
    - credenciales en **Colab → Secretos**, nunca en el código;
