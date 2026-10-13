@@ -31,6 +31,7 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Repositorio | `adriansivina-droid/scraper-mef` (público), carpeta `HIDROCARBUROS/` |
 | Notebook de producción | `HIDROCARBUROS/PP_Produccion_Lotes.ipynb` |
 | Notebook del mapa de lotes | `HIDROCARBUROS/PP_Mapa_Lotes.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Mapa_Lotes.ipynb) · detalle en `HIDROCARBUROS/mapa_lotes.md` |
+| Mapa con plugins (fondos CARTO, nombres, buscador, pantalla completa, minimapa, medición, línea de tiempo animada) | `HIDROCARBUROS/PP_Mapa_Lotes_Plus.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Mapa_Lotes_Plus.ipynb) · `DATA/MAPA/PP_mapa_lotes_plus.html` |
 | Abrir en Colab | https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Produccion_Lotes.ipynb |
 | Producción **diaria** (líquidos y gas, por lote) | Sección 8 del Bloque 3 del notebook de producción (casilla «Producción diaria») → `DATA/PP_produccion_diaria.csv` |
 | Gas natural fiscalizado por lote y mes (1994–hoy) | `DATA/PP_produccion_gas_lote_mes_<ini>-<fin>.csv` (notebook de producción) |

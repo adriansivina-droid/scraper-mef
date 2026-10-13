@@ -307,3 +307,29 @@ Correcciones:
   - Ahora, en cada `overlayadd` / `baselayerchange`, los lotes y los círculos vuelven al frente; con eso responden los 24.
   - Se quitó el contorno de foco (`path.leaflet-interactive:focus{outline:none}`).
   - Sin productos marcados, los lotes se ocultan del todo: sin sombra ni clic.
+
+## Mapa con plugins: `PP_Mapa_Lotes_Plus.ipynb` (13/10/2026)
+
+Notebook aparte, a pedido del usuario. Tiene los mismos bloques 1–4 que `PP_Mapa_Lotes.ipynb` y un **Bloque 5** que agrega plugins al mapa `m` y lo guarda como `DATA/MAPA/PP_mapa_lotes_plus.html`. El Bloque 4 sigue guardando el mapa base `PP_mapa_lotes.html`.
+Colab: https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_Mapa_Lotes_Plus.ipynb
+
+| Plugin | Detalle |
+|---|---|
+| Fondos CARTO claro y oscuro | Capas base nuevas en el selector. Se cargan desde `basemaps.cartocdn.com` con URL explícita, para evitar el aviso de API key de xyzservices. |
+| Nombres de lotes | Capa «Nombres de lotes»: rótulo en un punto interior de cada polígono, visible desde el zoom 7. |
+| Comunidades discretas | `icon_create_function` del `MarkerCluster` de comunidades: círculos morados de 18–26 px. |
+| Buscador de lotes | Control propio arriba a la izquierda, con lista desplegable. Encuadra el lote (zoom máximo 9) y abre su ficha; si el lote no existe, avisa. |
+| Pantalla completa, minimapa, medición | `plugins.Fullscreen`, `plugins.MiniMap` (abajo a la izquierda, plegable; oculto en pantallas de menos de 700 px) y `plugins.MeasureControl` (km y ha). |
+| Línea de tiempo animada | Botón «⏱ Evolución histórica de la producción». Colorea cada lote por el bep/d anual de su campo (gas: 6 mil pies³ = 1 bep) según los productos marcados. Usa una escala verde de 5 clases (1–1.000, 1.000–5.000, 5.000–20.000, 20.000–50.000 y ≥ 50.000) y gris para 0. Tiene ▶/⏸ y deslizador por año; ✕ vuelve al estado actual. Con la línea de tiempo abierta se ocultan los círculos de producción actual, y cambiar los productos repinta el año. |
+
+**Detalles técnicos:**
+- `productos.html` (compartido con el mapa base) expone `window.ppProductos`, y su `aplicar()` cede el pintado a `window.ppTL` cuando la línea de tiempo está activa. En el mapa base no cambia nada.
+- **Control de capas al final:** el Bloque 5 saca el `LayerControl`, y también su script del HTML ya renderizado por el guardado del Bloque 4, y lo vuelve a agregar al final. Si no, el control se construye antes de las capas nuevas y falla (`setZIndex` de undefined).
+- **Prueba:** corrida simulada del notebook y Chromium sin conexión con las librerías locales, en escritorio (1366 px) y móvil (390 px). Se verificaron:
+  - las capas nuevas y los controles;
+  - los nombres desde el zoom 7;
+  - el buscador («95» abre la ficha);
+  - la línea de tiempo: 1994, ▶ avanza, ✕ restaura los colores y los círculos;
+  - la ficha con la línea de tiempo abierta;
+  - sin errores de JavaScript.
+- **No se pudo verificar desde la nube** que carguen los mosaicos de CARTO: la red de Claude los bloquea.
