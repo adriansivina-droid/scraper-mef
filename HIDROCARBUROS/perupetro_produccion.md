@@ -214,3 +214,4 @@ Primero fue un notebook aparte; ahora corre en el mismo notebook de producción 
 - **Diagnóstico nuevo:**
   - guarda la página en `CONTROL/PP_pagina_produccion_diaria.html`;
   - si encuentra menos de 4 reportes, imprime los enlaces a PDF que vio («🔎 Diagnóstico»).
+- **Ajuste 2 (13/10/2026):** también se toman los enlaces cuyo **texto** es «Líquidos en b/d» o «Gas en Mcfd», aunque la dirección no termine en `.pdf`. Al descargar solo se acepta lo que de verdad es un PDF.
