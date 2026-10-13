@@ -223,3 +223,16 @@ Primero fue un notebook aparte; ahora corre en el mismo notebook de producción 
   - El texto del enlace dice «enero 2025», pero el PDF es de enero de 2026. El año y el mes se toman siempre del contenido del PDF.
 - **Ajuste 3 (13/10/2026), causa real:** sin cabecera de idioma, el portal de PERUPETRO responde la página en **inglés** («Liquid Production b/d»), y esa versión no trae la tabla de meses. Ahora todas las descargas envían `Accept-Language: es-PE,es`; la página diaria se pide con sesión y, si sigue en inglés, se reintenta una vez y se avisa.
 - **Ajuste 4 (13/10/2026), m3 de mayo «REVISAR»:** el operador LATIN AMERICAN ENERGY ocupa tres renglones en la cabecera y su columna no trae el rótulo «Lote …». Solo produjo el 30 y 31/05 (14.548 y 39.931 m3), por eso solo esos días no cuadraban. Ahora, si un operador de la cabecera no tiene columna de lote debajo, se crea su columna. El lote sale de `LOTE_DE_OPERADOR` (LATIN AMERICAN ENERGY / LAET → VI); si el operador no está ahí, el lote queda «SIN ROTULO». Mayo pasa a 31/31 días OK.
+
+**Gas mensual: 7 años corregidos (13/10/2026)**, con los PDF reales. En la corrida del 13/10 salían 3 en REVISAR y 4 SIN TABLA.
+
+| Año | Problema | Corrección |
+|---|---|---|
+| 2005, 2006 | Además de la tabla en MPC se leía la de «PODER CALORÍFICO» (energía) y se sumaba: 21 y 14 lotes | Se descartan los títulos con CALOR, MMBTU, CAMPO o BALANCE |
+| 2007 | El PDF imprime «-3616», «3-3402» y «4-3034» (SAPET VII/VI, may–jul) por 3.616, 33.402 y 43.034 | En gas se quita el guion intercalado; la fila cuadra con su TOTAL |
+| 2011 | El rótulo del lote va 3 pt más arriba que sus valores (página girada) | En gas, las filas se agrupan con 3,6 pt de tolerancia |
+| 2013 | Título «PRODUCCIÓN MENSUAL (MPC) - 2013», sin «fiscalizada» ni «gas» | Se acepta «MENSUAL» con unidad MPC/MSCF/MCF |
+| 2024, 2025 | La tabla mensual en MPC se titula «RESUMEN DE PRODUCCIÓN FISCALIZADA DE GAS NATURAL» | Se acepta ese título (con columnas de meses) |
+
+- **Resultado:** los 7 años cuadran con el TOTAL del PDF, con ≤ 2 MPC de diferencia por redondeo. Los otros años probados siguen igual, y los líquidos no cambian.
+- **PDF de prueba:** 2005, 2006, 2007, 2011, 2013 y 2024 están en `HIDROCARBUROS/pdf_fuente/` (son digitales). 2025 no se sube porque pesa 28 MB.
