@@ -286,3 +286,20 @@ Correcciones:
 ## Elección del CSV de producción (13/10/2026)
 - **Problema:** con `PP_produccion_lote_mes_1994-2026.csv` y `…_2026-2026.csv` en DATA (este último de una corrida rápida), el mapa tomaba el último por orden alfabético, el de **2026-2026**. Los indicadores salían solo de 2026 (pico 2026, 1-AB/192 «sin producción»).
 - **Corrección:** ahora se elige el archivo que cubre más años, es decir, el de inicio más antiguo y, si empatan, el de fin más reciente. Vale también para el CSV de gas.
+
+
+## Selector de productos y estado por producto (13/10/2026)
+- **Selector de capas:** solo Departamentos, Áreas Naturales Protegidas, Ríos, Comunidades nativas y Oleoducto, más la sección **Productos** con casillas: Petróleo, LGN y condensado, Gas natural. Las capas «Lotes · En producción / Paralizado / Sin producción» y «Producción actual» dejaron de ser capas fijas.
+- **Lotes:** van en una sola capa. Su color se calcula en el navegador según los productos marcados:
+  - **en producción**, si alguno de los productos marcados produjo en los últimos 12 meses con datos;
+  - **paralizado**, si alguno produjo antes;
+  - **sin producción**, en otro caso.
+  - Así un lote puede estar en producción de gas y paralizado en petróleo.
+- **Círculos de producción actual:** representan el promedio diario de los últimos 12 meses de los productos marcados, en **bep/d** (gas: 6 mil pies³ = 1 bep). Un clic abre la ficha del lote.
+- **Ficha:** muestra el «Estado por producto» con el promedio de 12 meses (bpd o MMPCD) o la última producción si está paralizado. Se quitó la fila «Producción actual de líquidos», que usaba solo las estadísticas mensuales.
+- **Cálculo:** `estados_producto()` usa las series mensuales del panel. Los meses posteriores a la última estadística mensual salen de los reportes diarios.
+  - Petróleo = PETROLEO.
+  - LGN y condensado = LGN + CONDENSADO.
+  - Gas en Mcf.
+  - En los reportes diarios, PERUPETRO junta petróleo y condensado; esos días se cuentan como petróleo.
+- **Nuevo archivo `DATA/PP_LOTES_ESTADO_PRODUCTO.csv`:** una fila por campo, con estado, última producción y promedio actual de cada producto.
