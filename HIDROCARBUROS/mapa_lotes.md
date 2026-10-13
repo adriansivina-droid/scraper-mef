@@ -250,6 +250,18 @@ Correcciones:
 - **Para cerrarlo:** botón **×**, clic fuera del panel o tecla **Esc**.
 - **Al minimizarlo (–):** queda como una barra abajo al centro y el mapa vuelve a estar libre. Con **+** se expande de nuevo.
 
+## Vista «Diaria» del panel (13/10/2026)
+
+- **Datos:** el Bloque 3 lee `DATA/PP_produccion_diaria.csv`, generado por la sección 8 del notebook de producción. `series_diarias()` agrega a cada serie del panel (Perú, departamento, campo, lote) su producción por día: `dd.p` petróleo y condensado y `dd.l` LGN, en bbl, y `dd.g` gas, en Mcf.
+- **Vista:** el selector **Vista** tiene «Diaria». Navegación:
+  - clic en un año → sus meses;
+  - clic en un mes con reporte diario → sus días;
+  - «↩» vuelve un nivel.
+- **Meses recientes:** en la vista mensual, los meses posteriores a la última estadística mensual (hoy, julio a octubre de 2026) se arman **sumando los reportes diarios** y se rotulan «(diario)». Si el mes está incompleto se indica, por ejemplo «días 1–11».
+- **Unidades en la vista diaria:** bpd en líquidos y MMPCD en gas; el selector «Unidad» se desactiva. El resumen muestra «Días sin producción».
+- **Advertencia en la nota:** en líquidos varios lotes se fiscalizan por entregas (días en 0 y días altos); para comparar conviene usar el promedio.
+- **Prueba:** el gas de Perú en setiembre 2026 da 1.643,7 MMPCD de promedio, igual al «PROMEDIOS» del PDF diario.
+
 ## Pruebas
 
 - **Lo que no se pudo probar:** desde el entorno de Claude, arcgis.com y perupetro.com.pe están bloqueados (403 del proxy). La primera corrida real se hace en Colab.
