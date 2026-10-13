@@ -303,3 +303,7 @@ Correcciones:
   - Gas en Mcf.
   - En los reportes diarios, PERUPETRO junta petróleo y condensado; esos días se cuentan como petróleo.
 - **Nuevo archivo `DATA/PP_LOTES_ESTADO_PRODUCTO.csv`:** una fila por campo, con estado, última producción y promedio actual de cada producto.
+- **Ajuste (13/10/2026), lotes que dejaban de responder:** al apagar y prender una capa del selector (Departamentos, Comunidades…), Leaflet la vuelve a dibujar encima de los lotes. Entonces el clic caía en el departamento: se veía un rectángulo negro sobre Loreto y solo su nombre. Con el HTML real, tras prender y apagar Departamentos, solo 6 de 24 lotes respondían.
+  - Ahora, en cada `overlayadd` / `baselayerchange`, los lotes y los círculos vuelven al frente; con eso responden los 24.
+  - Se quitó el contorno de foco (`path.leaflet-interactive:focus{outline:none}`).
+  - Sin productos marcados, los lotes se ocultan del todo: sin sombra ni clic.
