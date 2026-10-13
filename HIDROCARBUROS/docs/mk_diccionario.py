@@ -171,7 +171,7 @@ h += [P("4b. Gas natural por lote y mes", "h1"),
           ["FECHA, AÑO, MES, DIA", "fecha dd/mm/aaaa, enteros", "Día de la producción."],
           ["FLUIDO", "texto", "LIQUIDOS o GAS NATURAL."],
           ["PRODUCTO", "texto (código)", "PETROLEO Y CONDENSADO, LGN o GAS NATURAL."],
-          ["UNIDAD", "texto (código)", "BBL (barriles), MCF (miles de pies cúbicos) o MMBTU (millones de BTU, contenido energético del gas)."],
+          ["UNIDAD", "texto (código)", "BBL (barriles), MCF (miles de pies cúbicos), MMBTU (millones de BTU, contenido energético del gas) o M3 (metros cúbicos; 1 Mcf = 28,3168 m3)."],
           ["OPERADOR, LOTE_ORIGINAL, LOTE", "texto", "Como figuran en el encabezado del reporte; LOTE homologado (X. → X, 192_LIC → 192)."],
           ["VALOR", "número", "Producción fiscalizada del día en la UNIDAD indicada. En líquidos, algunos lotes se fiscalizan por lotes "
                               "(entregas), por eso hay días en 0 y días con valores altos: para promedios usar el mes."],
