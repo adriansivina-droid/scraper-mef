@@ -185,7 +185,10 @@ Primero fue un notebook aparte; ahora corre en el mismo notebook de producción 
 **Fuente.** perupetro.com.pe → Estadísticas → Producción Hidrocarburos → **Producción Diaria**. Hay un PDF por mes (cierre de mes) y uno del mes en curso:
 - «Líquidos en b/d»: *Reporte de producción fiscalizada de hidrocarburos líquidos a nivel nacional (barriles)*, con una columna por lote para petróleo y condensado, una por lote de LGN, los SUB TOTAL y el TOTAL.
 - «Gas en Mcfd»: *Reporte de producción fiscalizada de gas natural (Mcf)*. Trae una segunda hoja en MMBtu.
-- «Gas en m3»: no se usa. Repite el gas en otra unidad y sus rótulos de UNNA (lotes III y IV) están corruptos en el PDF.
+- «Gas en m3/d»: se usa desde el 13/10/2026 (`UNIDAD` = M3).
+  - Sus rótulos de UNNA («Lote III.» y «Lote IV.», en negrita) se montan sobre los números del día 1; el lector separa las palabras por tipo de letra.
+  - Los nombres de operador vienen cortados («N EXPORT»); se toman del reporte en Mcf del mismo mes.
+  - Control: m3 ÷ Mcf = 28,317 en todos los lotes (1 Mcf = 28,3168 m3).
 
 **Lector (`pd_parser`).**
 - **Cabecera:** lee la tabla por coordenadas. Toma la primera fila con 5 o más códigos de lote; en gas vienen como «Lote : 31-C».
@@ -196,7 +199,7 @@ Primero fue un notebook aparte; ahora corre en el mismo notebook de producción 
 
 **Salidas.**
 - `DATA/PP_produccion_diaria.csv`, una fila por día × lote × producto × unidad.
-  - Columnas: `FECHA` (dd/mm/aaaa), `AÑO`, `MES`, `DIA`, `FLUIDO`, `PRODUCTO` (PETROLEO Y CONDENSADO / LGN / GAS NATURAL), `UNIDAD` (BBL / MCF / MMBTU), `OPERADOR`, `LOTE_ORIGINAL`, `LOTE`, `VALOR`, `FUENTE` y `DEPARTAMENTO` (del mapa).
+  - Columnas: `FECHA` (dd/mm/aaaa), `AÑO`, `MES`, `DIA`, `FLUIDO`, `PRODUCTO` (PETROLEO Y CONDENSADO / LGN / GAS NATURAL), `UNIDAD` (BBL / MCF / MMBTU / M3), `OPERADOR`, `LOTE_ORIGINAL`, `LOTE`, `VALOR`, `FUENTE` y `DEPARTAMENTO` (del mapa).
   - Se **acumula**: cada corrida reemplaza los meses que vuelve a leer y conserva los anteriores.
 - `CONTROL/CONTROL PP produccion_diaria.csv`, una fila por mes y unidad: `REPORTE_AL`, `DIAS`, `DIAS_OK`, `DIF_MAX`, `LOTES` y `ESTADO`.
 - Los PDF se guardan en `DATA/PDF_DIARIA/PP_DIARIA_<LIQUIDOS|GAS>_<año>_<mes>.pdf`. Un PDF subido a mano a esa carpeta también se lee.
@@ -215,3 +218,6 @@ Primero fue un notebook aparte; ahora corre en el mismo notebook de producción 
   - guarda la página en `CONTROL/PP_pagina_produccion_diaria.html`;
   - si encuentra menos de 4 reportes, imprime los enlaces a PDF que vio («🔎 Diagnóstico»).
 - **Ajuste 2 (13/10/2026):** también se toman los enlaces cuyo **texto** es «Líquidos en b/d» o «Gas en Mcfd», aunque la dirección no termine en `.pdf`. Al descargar solo se acepta lo que de verdad es un PDF.
+- **Enlace real de la tabla** (13/10/2026, enero 2026): `https://www.perupetro.com.pe/wps/wcm/connect/corporativo/a48b83b1-…/Reporte+de+Producci%C3%B3n+de+L%C3%ADquidos+31.1.2026.pdf?MOD=AJPERES&Liquidos%20-%20enero%202025`.
+  - Es una dirección normal a un PDF; la falla anterior se debía, con toda probabilidad, al formato del `href` (comillas).
+  - El texto del enlace dice «enero 2025», pero el PDF es de enero de 2026. El año y el mes se toman siempre del contenido del PDF.
