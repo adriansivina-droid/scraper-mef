@@ -94,6 +94,12 @@ h += [P("Diccionario de datos", "tit"),
           ["DATA/PP_produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Producción", "Base principal: lote × producto × mes (§4)."],
           ["DATA/PP_produccion_gas_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Producción", "Gas natural fiscalizado: lote × mes, en MPC, 1994–hoy (§4b)."],
           ["DATA/PP_produccion_diaria.csv", "Producción", "Producción fiscalizada diaria por lote: líquidos (bbl) y gas (Mcf, MMBtu) (§4c)."],
+          ["DATA/PP_pozos_perforados_lote_anio.csv", "Actividad", "Pozos perforados por lote, año y tipo (exploratorio, confirmatorio, desarrollo), 1995–hoy (§4d)."],
+          ["DATA/PP_regalias_lote_anio.csv", "Fiscal", "Regalías (ingresos al fisco) por lote e hidrocarburo, US$, 2001–hoy (§4d)."],
+          ["DATA/PP_canon_departamento_anio.csv", "Fiscal", "Canon y sobrecanon petrolero por departamento, millones de soles, 1993–hoy (§4d)."],
+          ["DATA/PP_precio_canasta_lote_mes.csv", "Precios", "Precio de la canasta de líquidos por lote y mes, US$/bbl, 2001–hoy (§4d)."],
+          ["DATA/PP_valor_produccion_lote_mes.csv", "Producción", "Valor de la producción de líquidos = barriles × precio de canasta (§4d)."],
+          ["CONTROL/CONTROL PP tablas_adicionales.csv", "Control", "Suma de lotes vs total del PDF de cada tabla adicional (§4d)."],
           ["CONTROL/CONTROL PP produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Control", "Una fila por año: de qué PDF salió y si cuadra con sus totales (§5)."],
           ["CONTROL/PP_CATALOGO_PDF.csv", "Control", "Qué URL de PERUPETRO corresponde a cada PDF guardado (§6)."],
           ["DATA/PDF/PP_ANUAL_&lt;año&gt;.pdf, PP_MENSUAL_&lt;año&gt;_&lt;mes&gt;.pdf", "Fuente", "Copia de los PDF originales de PERUPETRO."],
@@ -179,6 +185,52 @@ h += [P("4b. Gas natural por lote y mes", "h1"),
       ]),
       P("Control: <font name='DVM'>CONTROL PP produccion_diaria.csv</font>, una fila por mes y unidad con DIAS, DIAS_OK (días en que la "
         "suma de lotes cuadra con el SUB TOTAL / TOTAL del PDF), DIF_MAX y ESTADO."),
+      ]
+
+# ── 4d. Tablas adicionales de los anuales ────────────────────────────────────
+h += [P("4d. Pozos, regalías, canon y precio de canasta", "h1"),
+      P("Salen de las mismas Estadísticas Anuales (notebook <font name='DVM'>PP_Produccion_Lotes.ipynb</font>, casilla «Pozos, regalías, "
+        "canon y precio de canasta»). Solo se leen los anuales del período elegido: para la serie completa, correr desde 2001. "
+        "<b>Inversión en US$ por lote: no la publica la Estadística Anual</b> (solo trae la inversión total del país en el resumen); "
+        "los pozos perforados son el indicador de actividad disponible por lote."),
+      P("<b>PP_pozos_perforados_lote_anio.csv</b> — tablas «Pozos exploratorios / confirmatorios / de desarrollo perforados por contrato» "
+        "(cada anual trae 10–11 años; el de 2005 llega a 1995). Para cada año manda la <b>edición más reciente</b> (PERUPETRO corrige "
+        "algunas cifras: p. ej. 2013 desarrollo = 83 en la edición 2016 y 84 en la 2020). Clave: AÑO + TIPO + LOTE + OPERADOR."),
+      tabla([
+          ["AÑO", "entero", "Año de perforación (1995–hoy)."],
+          ["TIPO", "texto (código)", "EXPLORATORIO (busca un yacimiento nuevo), CONFIRMATORIO (delimita un descubrimiento) o DESARROLLO "
+                                     "(produce un yacimiento conocido). Hasta 2001 (ediciones 2005 y 2008) los confirmatorios van dentro de "
+                                     "EXPLORATORIO; desde 2002 vienen aparte. Desde 2013 no se cuentan pozos inyectores."],
+          ["DEPARTAMENTO, OPERADOR, OPERADOR_ORIGINAL, LOTE, LOTE_HISTORICO", "texto", "Como en §4. Cuando un lote cambió de operador en "
+                                     "el período, la tabla trae una fila por operador (celda de lote combinada)."],
+          ["POZOS", "entero", "Pozos perforados en el año."],
+          ["FUENTE", "texto", "PP_ANUAL_&lt;edición&gt;.pdf usado para ese año."],
+      ]),
+      P("<b>PP_regalias_lote_anio.csv</b> — «Ingresos al fisco» / «Ingreso por regalías por contrato» de cada anual (2007–hoy, en US$) "
+        "e «Ingresos por contratos» (2001–2006, en miles de US$, convertidos a US$). Clave: AÑO + MODALIDAD + HIDROCARBURO + LOTE_PDF."),
+      tabla([
+          ["AÑO", "entero", "Año de las regalías."],
+          ["MODALIDAD", "texto (código)", "LICENCIA (regalía) o SERVICIOS (regalía equivalente: retribución al contratista)."],
+          ["HIDROCARBURO", "texto (código)", "PETRÓLEO, LGN, GAS NATURAL o CONDENSADO."],
+          ["DEPARTAMENTO, LOTE, LOTE_HISTORICO", "texto", "Como en §4. LOTE sin sufijos (T)/(TT)."],
+          ["LOTE_PDF", "texto", "Lote como figura en el PDF: distingue contratos del mismo lote (I (TT) e I.; X y X.)."],
+          ["REGALIA_PCT", "número (%)", "Porcentaje de regalía (solo edición 2007)."],
+          ["REGALIA_US$", "número (US$)", "Monto del año."],
+      ]),
+      P("<b>PP_canon_departamento_anio.csv</b> — «Distribución del canon / sobrecanon» (series de 10 años; la edición 2001 llega a 1993). "
+        "Columnas: AÑO, DEPARTAMENTO, CANON_MM_SOLES (millones de soles corrientes) y FUENTE. Para cada año manda la edición más reciente."),
+      P("<b>PP_precio_canasta_lote_mes.csv</b> — «Valor mensual del precio de canasta de hidrocarburos líquidos» (US$/bbl), el precio "
+        "con que se calculan las regalías de cada lote. Columnas: AÑO, MES, FECHA, LOTE, VARIANTE (P = petróleo y L = líquidos del "
+        "lote Z-69; LGN = líquidos de Z-2B), LOTE_PDF, PRECIO_US$_BBL y FUENTE. Cuando el PDF agrupa lotes («VII y V», «31B-31D / 31C») "
+        "se repite el precio para cada uno. En 2001 el PDF da un solo precio para la zona NOROESTE."),
+      P("<b>PP_valor_produccion_lote_mes.csv</b> — producción de líquidos de §4 × precio de canasta del lote y mes: BARRILES, "
+        "PRECIO_US$_BBL, VALOR_US$ y ESTADO_PRECIO (OK, SIN PRECIO o SIN PRODUCCION). Para petróleo se usa la variante P y para "
+        "LGN/condensado la LGN/L, si existen; si no, el precio del lote. Es un valor a precio de canasta, no el ingreso de la empresa."),
+      P("<b>Control</b> (<font name='DVM'>CONTROL PP tablas_adicionales.csv</font>): una fila por tabla, edición y año con SUMA (suma de lotes "
+        "o departamentos; en canasta, promedio calculado), TOTAL_PDF (total o promedio impreso), PAGINA, USADO (si esa edición es la que "
+        "quedó para el año) y ESTADO. Tolerancias: pozos exacto; regalías 0,1 % (2001–2006 vienen redondeadas a miles); canon 0,05; "
+        "canasta 0,011 US$/bbl. Sin promedio impreso (2007–2011) se exige el año completo. En la prueba con los anuales 2001–2025 "
+        "todas las tablas cuadran, salvo dos casos reales de 2008 (lote 56, que empezó en setiembre, y XIII, al que le falta un mes en el PDF)."),
       ]
 
 # ── 5. Control de producción ─────────────────────────────────────────────────

@@ -236,3 +236,39 @@ Primero fue un notebook aparte; ahora corre en el mismo notebook de producción 
 
 - **Resultado:** los 7 años cuadran con el TOTAL del PDF, con ≤ 2 MPC de diferencia por redondeo. Los otros años probados siguen igual, y los líquidos no cambian.
 - **PDF de prueba:** 2005, 2006, 2007, 2011, 2013 y 2024 están en `HIDROCARBUROS/pdf_fuente/` (son digitales). 2025 no se sube porque pesa 28 MB.
+
+## Pozos, regalías, canon y precio de canasta (sección 6.1 del Bloque 3, 13/10/2026)
+
+Se leen de las mismas **Estadísticas Anuales** si está marcada la casilla «Pozos, regalías, canon y precio de canasta» del Bloque 2 (viene marcada). Solo se leen los anuales del período elegido: para la serie completa, correr desde 2001. Lector: `px_parser` (embebido en el Bloque 1), que reutiliza `palabras` y `lineas` de `pp_parser`.
+
+**Inversión en US$ por lote: no está en los anuales.** El resumen ejecutivo solo trae la inversión total del país. El indicador de actividad por lote disponible son los **pozos perforados**.
+
+| Tabla del PDF | Archivo (DATA) | Cobertura | Control |
+|---|---|---|---|
+| «Pozos exploratorios / confirmatorios / de desarrollo perforados por contrato aaaa–aaaa» (series de 10–11 años) | `PP_pozos_perforados_lote_anio.csv` | 1995–hoy (la edición 2005 llega a 1995) | suma de lotes = fila TOTAL, por año y tipo |
+| «Ingresos al fisco» / «Ingreso por regalías por contrato» (2007+, US$) e «Ingresos por contratos» (2001–2006, miles de US$) | `PP_regalias_lote_anio.csv` | 2001–hoy | suma de lotes = TOTAL (0,1 % en 2001–2006, que vienen redondeados a miles) |
+| «Distribución del canon / sobrecanon aaaa–aaaa» (millones de soles) | `PP_canon_departamento_anio.csv` | 1993–hoy (la edición 2001 llega a 1993) | suma de departamentos = TOTAL |
+| «Valor mensual del precio de canasta de hidrocarburos líquidos» (US$/bbl) | `PP_precio_canasta_lote_mes.csv` | 2001–hoy | promedio de los 12 meses = PROMEDIO del PDF (2012+); en 2007–2011, que no lo imprimen, se exigen 12 meses |
+| producción de líquidos × precio de canasta | `PP_valor_produccion_lote_mes.csv` | años con canasta | ESTADO_PRECIO: OK / SIN PRECIO / SIN PRODUCCION |
+
+Control: `CONTROL/CONTROL PP tablas_adicionales.csv` (TABLA, EDICION, AÑO, SUMA, TOTAL_PDF, PAGINA, USADO, ESTADO).
+
+**Cómo se leen** (todas por coordenadas):
+- **Series por lote (pozos, canon):** el encabezado es la primera línea con 4 o más años; cada número va a la columna más cercana. Así funciona aunque el PDF deje celdas vacías sin «-». Para cada año manda la **edición más reciente**: PERUPETRO corrige cifras, por ejemplo desarrollo 2013 = 83 en la edición 2016 y 84 en la 2020.
+- **Celdas combinadas:** cuando un lote tuvo varios operadores, el rótulo del lote va centrado verticalmente en su bloque de filas. Por ejemplo, el lote III cubre MERCANTILE, INTEROIL y GMP, y el IV cubre RIO BRAVO, INTEROIL y GMP. Las filas se reparten entre los rótulos con una partición óptima (`asignar_lotes`), de modo que el centro de cada bloque quede junto a su rótulo. Lo mismo se hace con la modalidad (licencia / servicios) y el hidrocarburo en regalías, y con el operador escrito en otra línea («REPSOL» para los lotes 39 y 57).
+- **Formatos especiales:**
+  - Edición 2005 de pozos: traspuesta, con lotes en columnas, años en filas y 3 páginas giradas. Las columnas salen de los bordes de las celdas (`rects_lectura`) y el operador de la celda combinada de arriba.
+  - Canasta 2001–2006: también traspuesta, con meses en filas. Se asigna por orden de columnas y se descartan las de gas natural.
+  - Regalías 2001–2006: dos columnas de página (petróleo/LGN a la izquierda, gas/condensado a la derecha).
+  - Regalías 2001 usa punto de miles.
+- **Lotes:** se aceptan variantes como `VII-VI` y `VII_VI` → VII/VI; `31B-31D` → 31-B/D; `31C` → 31-C; `I (TT)`, `VI (T)` → I, VI (el original queda en `LOTE_PDF`). La canasta separa los lotes agrupados («VII y V», «31B-31D / 31C») y las variantes de producto (`Z-69-L`, `Z-69-P`, `Z-2B (LGN)` → columna VARIANTE). En 2001 hay un solo precio para la zona NOROESTE, que se usa para sus lotes.
+- **Restos de gráficos:** en la canasta se lee hasta donde empieza el eje del gráfico. Solo se aceptan precios con decimales, porque hay textos superpuestos como «6677866778».
+- **Pozos antiguos:** hasta 2001 (ediciones 2005 y 2008) los confirmatorios van dentro de los exploratorios. Desde 2013 no se cuentan pozos inyectores (nota del PDF).
+
+**Prueba** con 15 anuales reales (2001, 2005–2008, 2010, 2012, 2013, 2016, 2017, 2020, 2021, 2024, 2025):
+- **Pozos:** las 7 ediciones con series cuadran exacto con su TOTAL. Además coinciden entre sí en los años que comparten: 1998–2012 idénticos en todas, con solo 2013 y 2014 corregidos en +1.
+- **Regalías:** cuadran exacto en 2001, 2007, 2008, 2010, 2012, 2013, 2016, 2020, 2024 y 2025. En 2005 y 2006 la diferencia es de 2 a 2,4 mil US$, por el redondeo a miles.
+- **Canon:** todas las ediciones cuadran, con diferencias de 0,01 por redondeo; en la edición 2001, de 1.
+- **Canasta:** el promedio calculado coincide con el impreso (≤ 0,01 US$/bbl). Hay 2 casos reales en 2008, que quedan en REVISAR: el lote 56 empezó en setiembre (4 meses) y a XIII le falta un mes en el PDF. En 2010, a V le falta enero por un texto superpuesto en el PDF.
+- **Corrida simulada del notebook (2001–2026)** con Drive falso: sin errores. Genera los 5 CSV y el control; solo 1 fila de producción queda sin precio (XIII, 2008).
+- **Tiempo:** unos 10 s más por anual.
