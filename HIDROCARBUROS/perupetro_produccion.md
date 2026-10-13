@@ -205,3 +205,12 @@ Primero fue un notebook aparte; ahora corre en el mismo notebook de producción 
 - Líquidos, gas en Mcf y gas en MMBtu: 30/30 días OK, con diferencia 0.
 - Los promedios del mes coinciden con los «PROMEDIOS» que imprime el PDF: gas del lote 88 1.034,88 MMPCD; LGN del 88 42.020 bpd; lote 95 11.612 bpd; X 9.084 bpd.
 - **No probado contra la página real:** desde la nube de Claude no se accede a perupetro.com.pe. Los enlaces se reconocen por el texto («Líquidos», «Gas en Mcfd») o por el nombre del archivo.
+
+**Ajuste del 13/10/2026: solo encontraba el mes en curso.**
+- **Síntoma:** en la primera corrida real solo halló los 2 enlaces del mes en curso (octubre, días 1–11, con los 11 días OK). No vio la tabla de enero–setiembre.
+- **Cambios en la búsqueda de enlaces:**
+  - acepta `href` con comillas simples, dobles o sin comillas, y enlaces con `.pdf` o `AJPERES` en cualquier parte;
+  - también lee las páginas de los `iframe`.
+- **Diagnóstico nuevo:**
+  - guarda la página en `CONTROL/PP_pagina_produccion_diaria.html`;
+  - si encuentra menos de 4 reportes, imprime los enlaces a PDF que vio («🔎 Diagnóstico»).
