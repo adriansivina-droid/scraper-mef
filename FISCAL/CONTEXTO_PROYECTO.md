@@ -22,7 +22,7 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 
 **Estructura del repositorio:**
 - `FISCAL/`: scrapers del MEF (este documento, los notebooks y `docs/`).
-- `FISCAL/corrección/`: `Fiscal_Scraper.ipynb` (scraper unificado) y `Fiscal_Procesamiento.ipynb` (workbooks `Fiscal-<Depto>_AUTO.xlsx`), con la corrección del servicio de la deuda. Ver sección 13.
+- `CORRECIÓN/` (raíz del repositorio): `Fiscal_Scraper.ipynb` (scraper unificado) y `Fiscal_Procesamiento.ipynb` (workbooks `Fiscal-<Depto>_AUTO.xlsx`), con la corrección del servicio de la deuda. Ver sección 13.
 - `EXPORT/`: proyecto de exportaciones de Infotrade (notebook y su `.md`).
 
 | Notebook | Dato | Nivel de gobierno | Regiones | Ruta de consulta |
@@ -251,7 +251,7 @@ Es un proyecto aparte, con su propio documento de contexto: **`EXPORT/exportacio
 
 ---
 
-## 13. Scraper unificado y procesamiento (`FISCAL/corrección/`)
+## 13. Scraper unificado y procesamiento (`CORRECIÓN/` (raíz del repositorio))
 
 **`Fiscal_Scraper.ipynb`** reemplaza a los scrapers DEV/PIM por función y agrega los bloques Generica, Fuente, InvFuente y Deuda.
 - Usa Drive montado (`MyDrive/Fiscal/Scrapeo/output/...`), no IDs de carpeta.
