@@ -19,6 +19,14 @@ Versiones corregidas de `Fiscal_Scraper.ipynb` y `Fiscal_Procesamiento.ipynb`. R
 - Los meses sin deuda se escriben como 0.
 - Hay una nueva fila de control: `Deuda sin desglosar = total - (intereses + amortización)`.
 
+## Rango de años
+En el Bloque 2 del scraper:
+```python
+AÑO_INICIO = 2025; MES_INICIO = 1
+AÑO_FIN = 2026;    MES_FIN = None   # None = último mes cerrado
+```
+Raspa de Enero 2025 hasta el último mes cerrado de 2026 (Setiembre, si se corre en octubre). Los años intermedios van completos. Los archivos, los controles y el PIM se siguen generando por año.
+
 ## Cómo usar
 1. Corre `Fiscal_Scraper.ipynb` (conviene primero con `PRUEBA_RAPIDA = True`). Revisa la salida de "Calibrando sub-niveles…": debe terminar en `✅ cadena Sub-genérica = [...]`.
    Si dice que no la encontró: en Consulta Amigable entra a Genérica 2-8 y luego a Sub-Genérica. Copia la clave numérica nueva de la URL (F12 > Network) y ponla primera en `CANDIDATOS_SUBGENERICA`.
