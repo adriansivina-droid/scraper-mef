@@ -333,3 +333,13 @@ Colab: https://colab.research.google.com/github/adriansivina-droid/scraper-mef/b
   - la ficha con la línea de tiempo abierta;
   - sin errores de JavaScript.
 - **No se pudo verificar desde la nube** que carguen los mosaicos de CARTO: la red de Claude los bloquea.
+
+## Pozos perforados y regalías en la ficha del lote (14/10/2026)
+
+En los dos notebooks del mapa (base y con plugins), el Bloque 4 lee de `DATA/` los archivos `PP_pozos_perforados_lote_anio.csv` y `PP_regalias_lote_anio.csv`, que genera el notebook de producción en su sección 6.1. Si no existen, la ficha queda igual que antes.
+
+- **Agrupación por campo:** como la producción, se usa `CAMPO_DE` (o `LOTE_HISTORICO`). Por ejemplo, 1-AB y 192 suman juntos.
+- **Pozos perforados:** total de desarrollo y total de exploratorios + confirmatorios, último año con perforación y barras apiladas por año (desarrollo azul `#1565c0`, exploratorios verde azulado `#00897b`), de 1995 a hoy.
+- **Regalías pagadas al Estado:** total y monto del último año, en millones de US$, con barras por año (marrón `#6d4c41`), de 2001 a hoy.
+- Al pasar el cursor por cada barra se ve el valor del año.
+- **Prueba:** corrida simulada con pozos y regalías falsos para 1-AB, 192, 8, 95 y Z-2B. En la ficha del 192 aparecen los dos bloques, sin errores de JavaScript, en escritorio y en móvil.

@@ -150,6 +150,7 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
      - **estado de pozos** por lote;
      - **contratos** (fechas y área).
    - La **inversión en US$ por lote no está en los anuales**; habría que buscarla en otra fuente (memorias de PERUPETRO, MINEM).
+   - **Regalías 1994–2000: no existen en los anuales.** Revisé los índices de los 7 escaneados: pasan de «Canasta» a «Canon» y «Contratos»; el cuadro «Ingresos por contratos» aparece recién en la edición 2001. Alternativas: memorias anuales de PERUPETRO de esos años, o transcribir la canasta 1994–2000 (sí está, sección 6) para tener el valor de la producción.
 3. **Cruce con Infotrade.** Exportación de crudo (partida 2709) de Loreto vs producción; operador ↔ exportador.
 4. **Banco de Datos de PERUPETRO.** El usuario tiene cuenta, para pozos y sísmica:
    - credenciales en **Colab → Secretos**, nunca en el código;
