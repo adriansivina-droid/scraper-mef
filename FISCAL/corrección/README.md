@@ -10,7 +10,7 @@ Versiones corregidas de `Fiscal_Scraper.ipynb` y `Fiscal_Procesamiento.ipynb`. R
 ## Qué cambió
 
 **Scraper**
-- `calibrar_deuda()` acepta una clave solo si todas sus filas son rubros de deuda. Prueba los 3 departamentos, los niveles R/M/E, el año y el anterior, y más claves candidatas. Si no encuentra la cadena, lo avisa y no guarda datos sin verificar.
+- `calibrar_deuda()` acepta una clave solo si todas sus filas son rubros de deuda. Prueba los 3 departamentos, los niveles R/M/E, el año y el anterior, y más claves candidatas. Si no encuentra la cadena, lo avisa y no guarda datos sin verificar. Para evitar el bloqueo de Incapsula, solo consulta donde la 2.8 tiene monto y descarta las claves que fallan (como máximo unas 45 consultas).
 - `extraer_deuda()` guarda siempre una fila `CLASIFICACION = TOTAL` con el total de la genérica 2.8, aunque falle el desglose. También avisa las filas que quedan como `OTRO`.
 
 **Procesamiento**

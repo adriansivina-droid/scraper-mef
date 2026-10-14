@@ -1,6 +1,6 @@
 # Scrapers MEF – Consulta Amigable · Contexto del proyecto
 
-Documento de traspaso para retomar el proyecto sin perder contexto, sea una persona o una sesión nueva de un asistente. Última actualización: **09/10/2026**.
+Documento de traspaso para retomar el proyecto sin perder contexto, sea una persona o una sesión nueva de un asistente. Última actualización: **14/10/2026**.
 
 ---
 
@@ -22,6 +22,7 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 
 **Estructura del repositorio:**
 - `FISCAL/`: scrapers del MEF (este documento, los notebooks y `docs/`).
+- `FISCAL/corrección/`: `Fiscal_Scraper.ipynb` (scraper unificado) y `Fiscal_Procesamiento.ipynb` (workbooks `Fiscal-<Depto>_AUTO.xlsx`), con la corrección del servicio de la deuda. Ver sección 13.
 - `EXPORT/`: proyecto de exportaciones de Infotrade (notebook y su `.md`).
 
 | Notebook | Dato | Nivel de gobierno | Regiones | Ruta de consulta |
@@ -89,6 +90,8 @@ Navegar_6.aspx?_tgt=frame&_uhc=yes&0=&24=6-2-6&23=1&1=R&21=16&8=&y=2025&ap=ActPr
 | `21` | Departamento (Meta: dónde se ejecuta el gasto) | `16` |
 | `8` | Función | `03`, `15`, … |
 | `7` | Municipalidad | listada como `160101-301263: MUNICIPALIDAD …` |
+| `14` | Fuente de financiamiento | verificada el 09/10/2026 |
+| ? | Sub-Genérica / Sub-Genérica Detalle (deuda 2.8) | **sin confirmar**: el scraper unificado la autocalibra (sección 13) |
 
 Departamentos: `16` Loreto · `22` San Martín · `25` Ucayali (los 25 están en `DEV_Funcion_Municipalidad.ipynb`).
 
@@ -236,6 +239,7 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 ## 11. Pendientes / ideas
 
 - Confirmar en el MEF real los notebooks que solo se probaron con el simulador: Nacional, Municipalidad (25 regiones) y los dos de PIM.
+- Confirmar en el MEF real la clave de URL de Sub-Genérica y Sub-Genérica Detalle (lo imprime `calibrar_deuda`) y fijarla en `CANDIDATOS_SUBGENERICA`.
 - Si se necesita el PIM municipal de las 25 regiones, se puede crear la variante copiando el catálogo de `DEV_Funcion_Municipalidad.ipynb`.
 - La opción de meses sueltos ("1, 3, 5") se eliminó al unificar con `MES_INICIO`/`MES_FIN`. Se puede volver a agregar.
 
@@ -244,3 +248,27 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 ## 12. Proyecto Exportaciones (Infotrade · PROMPERÚ)
 
 Es un proyecto aparte, con su propio documento de contexto: **`EXPORT/exportaciones_scraper_infotrade.md`**. Allí están la API descubierta, el notebook `EXPORT/EXP_Infotrade_Exportaciones.ipynb`, las carpetas de Drive, el control y los pendientes.
+
+---
+
+## 13. Scraper unificado y procesamiento (`FISCAL/corrección/`)
+
+**`Fiscal_Scraper.ipynb`** reemplaza a los scrapers DEV/PIM por función y agrega los bloques Generica, Fuente, InvFuente y Deuda.
+- Usa Drive montado (`MyDrive/Fiscal/Scrapeo/output/...`), no IDs de carpeta.
+- Crea solo sus carpetas.
+
+**`Fiscal_Procesamiento.ipynb`** lee esas salidas y `Fiscal/Procesamiento/input/IPC.xlsx`, que se sube a mano. Genera `Fiscal/Procesamiento/output/Fiscal-<Depto>_AUTO.xlsx`.
+
+**Corrección del servicio de la deuda (14/10/2026).** La hoja `GASTO*` mostraba SERVICIO DE LA DEUDA en 0, con Intereses y Amortización vacías. Había dos causas:
+1. `calibrar()` aceptaba como Sub-Genérica cualquier clave candidata que devolviera una tabla, sin verificar la dimensión, y bajaba solo por la primera fila. Con una cadena errónea, las filas salían `OTRO` o con error.
+2. El procesamiento calculaba el subtotal solo como Intereses + Amortización, y descartaba `OTRO`.
+
+Cambios:
+- **`calibrar_deuda()`:** acepta una clave solo si todas las filas que lista son rubros de deuda. Prueba departamentos, niveles R/M/E y el año actual y el anterior. Solo consulta donde la 2.8 tiene monto, y descarta para siempre las claves que fallan, para hacer pocas consultas por Incapsula (≤ ~45 si no existe la clave; 5 si está primera en la lista).
+- **`DEV Deuda.*`:** ahora incluye una fila `CLASIFICACION = TOTAL`.
+- **Procesamiento:**
+  - El subtotal sale de la genérica tipo 7 de `DEV Generica`.
+  - Reclasifica `OTRO` por `RUTA`.
+  - Escribe 0 en los meses sin deuda.
+  - Agrega la fila de control "Deuda sin desglosar".
+- **Pruebas:** se probó con un simulador. El MEF real sigue sin probarse desde el entorno del asistente.
