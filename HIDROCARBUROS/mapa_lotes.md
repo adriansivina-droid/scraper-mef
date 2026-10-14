@@ -319,7 +319,7 @@ Colab: https://colab.research.google.com/github/adriansivina-droid/scraper-mef/b
 | Nombres de lotes | Capa «Nombres de lotes»: rótulo en un punto interior de cada polígono, visible desde el zoom 7. |
 | Comunidades discretas | `icon_create_function` del `MarkerCluster` de comunidades: círculos morados de 18–26 px. |
 | Buscador de lotes | Control propio arriba a la izquierda, con lista desplegable. Encuadra el lote (zoom máximo 9) y abre su ficha; si el lote no existe, avisa. |
-| Pantalla completa, minimapa, medición | `plugins.Fullscreen`, `plugins.MiniMap` (abajo a la izquierda, plegable; oculto en pantallas de menos de 700 px) y `plugins.MeasureControl` (km y ha). |
+| Pantalla completa y medición | `plugins.Fullscreen` y `plugins.MeasureControl` (km y ha). El minimapa se quitó el 14/10/2026 a pedido del usuario. |
 | Línea de tiempo animada | Botón «⏱ Evolución histórica de la producción». Colorea cada lote por el bep/d anual de su campo (gas: 6 mil pies³ = 1 bep) según los productos marcados. Usa una escala verde de 5 clases (1–1.000, 1.000–5.000, 5.000–20.000, 20.000–50.000 y ≥ 50.000) y gris para 0. Tiene ▶/⏸ y deslizador por año; ✕ vuelve al estado actual. Con la línea de tiempo abierta se ocultan los círculos de producción actual, y cambiar los productos repinta el año. |
 
 **Detalles técnicos:**
@@ -343,3 +343,24 @@ En los dos notebooks del mapa (base y con plugins), el Bloque 4 lee de `DATA/` l
 - **Regalías pagadas al Estado:** total y monto del último año, en millones de US$, con barras por año (marrón `#6d4c41`), de 2001 a hoy.
 - Al pasar el cursor por cada barra se ve el valor del año.
 - **Prueba:** corrida simulada con pozos y regalías falsos para 1-AB, 192, 8, 95 y Z-2B. En la ficha del 192 aparecen los dos bloques, sin errores de JavaScript, en escritorio y en móvil.
+
+## Panel «Pozos, regalías y canon» (14/10/2026)
+
+- **Ficha del lote:**
+  - Se agrega un tercer bloque: **canon y sobrecanon del departamento del lote**, en millones de S/ desde 1993. Lee `PP_canon_departamento_anio.csv` y lleva la aclaración de que es del departamento entero, no solo del lote.
+  - Los tres bloques (pozos, regalías y canon) y el botón «📊 Ver pozos, regalías y canon» abren un **panel interactivo** centrado (`act_panel.html`). Se cierra con ×, Esc o clic fuera.
+- **Panel:**
+  - Pestañas: Pozos perforados, Regalías y Canon y sobrecanon. Las que no tienen datos quedan desactivadas.
+  - Barras anuales con eje y líneas guía. Pozos van apilados por tipo; regalías, por hidrocarburo (petróleo, LGN, gas natural, condensado).
+  - Al pasar el cursor por una barra se ven los valores del año. El área sensible de cada barra es toda la columna del año.
+  - Al hacer clic en un año aparece su detalle:
+    - pozos y regalías: **por lote del campo** (p. ej. 192 y 1-AB);
+    - canon: con la variación respecto del año anterior.
+  - Arriba hay un resumen con el total del período, el año máximo y el último año con dato.
+- **Datos:** un solo JSON `ACT` en el HTML: `p[campo][lote][d|e][año]`, `r[campo][lote][hidrocarburo][año]` en MM US$, `c[departamento][año]` en MM S/ y `rango` con los años de cada tabla. Los departamentos se comparan sin tildes y en mayúsculas.
+- **Prueba:** corrida simulada y Chromium en escritorio (1300 px) y móvil (390 px). Se verificaron:
+  - la ficha muestra los 3 bloques;
+  - el panel abre con el título del campo y sus lotes;
+  - la ayuda al pasar el cursor y el detalle por lote al hacer clic;
+  - el cambio de pestañas y el cierre con Esc;
+  - sin errores de JavaScript.
