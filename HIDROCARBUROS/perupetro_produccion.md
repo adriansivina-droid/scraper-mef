@@ -296,3 +296,15 @@ Control: `CONTROL/CONTROL PP tablas_adicionales.csv` (TABLA, EDICION, AÑO, SUMA
   - Si a un lote le falta un solo mes por texto superpuesto (V en enero de 2009 y de 2010), se completa como 12 × promedio − suma de los otros 11 meses. Queda marcado en la columna `ESTADO` del CSV de canasta: «IMPUTADO (12 × promedio − otros meses)».
   - En 2007 el gráfico da 67,64 para III, IV, VII/VI, X, XIII, I, V e IX, pero los meses del cuadro promedian 69,42. Es una inconsistencia del propio PDF: queda en REVISAR y se conservan los valores del cuadro.
 - **Canasta 2018, lote 192:** julio = 0,00 y el PDF promedia entre 12 (50,93). Ahora el control acepta también suma ÷ meses presentes (`PROMEDIO_CALC_12`).
+
+**Segunda corrida real (14/10/2026), revisión del control.**
+- **Producción:** líquidos y gas OK en los 33 años (1994–2026).
+- **Regalías:** los 25 años cuadran con el TOTAL del PDF.
+  - El título del cuadro del anual 2022 dice «2021» por error, así que salía 2021 dos veces y faltaba 2022.
+  - Ahora en regalías y canasta, que solo traen el año del anual, `AÑO` = edición. El año del título queda en `AÑO_TITULO` del control.
+- **Canasta:** V en 2009 y 2010 completado con el promedio del gráfico (`IMPUTADOS` = 1, OK).
+  - Siguen en REVISAR, por inconsistencias del propio PDF:
+    - XIII 2006: el promedio impreso es 78,03 y sus 5 meses dan 62,42;
+    - 2007: el gráfico da 67,64 para III, IV, VII/VI, X, XIII, I, V e IX, y 70,88 para XX, pero el cuadro mensual da 69,42 y 72,70.
+  - Se usan los valores mensuales del cuadro.
+- **Pozos y canon:** las 5 filas en REVISAR son de ediciones que no se usan (2004 y 2019), con `USADO` = False.
