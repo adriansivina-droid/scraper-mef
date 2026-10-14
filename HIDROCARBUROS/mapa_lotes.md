@@ -364,3 +364,22 @@ En los dos notebooks del mapa (base y con plugins), el Bloque 4 lee de `DATA/` l
   - la ayuda al pasar el cursor y el detalle por lote al hacer clic;
   - el cambio de pestañas y el cierre con Esc;
   - sin errores de JavaScript.
+
+## Ficha del lote reordenada (14/10/2026)
+
+Revisión a pedido del usuario: se quita lo que repite información y se aclara lo que puede confundir. La ficha queda en 4 secciones con título: **Producción**, **Contrato**, **Geografía y sociedad** y **Pozos, regalías y canon**.
+
+| Ítem | Regla |
+|---|---|
+| Estado por producto | Solo los productos que el lote produjo alguna vez (en producción o paralizado). Si no produjo nada: «Sin producción fiscalizada registrada (1994–hoy)». |
+| Campo | Solo si suma varios contratos (p. ej. 1-AB/192), con la etiqueta «Campo (contratos sumados)». |
+| Fase del contrato | Se oculta si es EXPLOTACIÓN y el lote tiene producción; se muestra en lotes en exploración o sin producción. |
+| Departamento | Sin «100 %» cuando el lote está en un solo departamento; con porcentajes cuando cruza límites (define el canon). |
+| Tipo de contrato | Se mantiene: licencia frente a servicios cambia la lectura de las regalías. |
+| Ríos | Las dos distancias por caudal se reemplazan por una línea: «Río grande más cercano: nombre · km». |
+| Ríos e Iquitos | Solo para lotes de la selva (no zócalo ni costa). |
+| Pico y acumulado | Si la primera producción es «≤01/1994», las etiquetas dicen «(desde 1994)» / «(1994–hoy)» y una nota avisa que el pico y el acumulado reales pueden ser mayores. |
+| Acumulados | No se muestran si son 0. |
+
+- **Se mantienen:** estado y volumen, operador vigente e historial, última producción, paralización más larga, oleoducto, áreas protegidas, comunidades nativas e Iquitos (para la selva).
+- **Prueba:** corrida simulada y navegador, con fichas de 192, 8, 95 y Z-1 revisadas; sin errores de JavaScript.
