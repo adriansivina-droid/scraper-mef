@@ -290,7 +290,8 @@ Control: `CONTROL/CONTROL PP tablas_adicionales.csv` (TABLA, EDICION, AÑO, SUMA
 **Ajuste con los PDF 2004, 2009, 2015 y 2018 (14/10/2026).**
 - **Regalías 2004:** el cuadro no trae «TOTAL:» general. El total pasa a ser la suma de los «SUB - TOTAL:» de licencia y servicios, y cuadra (redondeo de miles).
 - **Regalías 2015:** III y IV tienen dos contratos cada uno: el temporal (T), hasta abril, y el de GMP. El rótulo («III (T) Y III (*)») va en su propia línea, entre sus dos montos. Ahora los montos sin lote toman el rótulo suelto más cercano, repartido en orden por «Y». Cuadra exacto (765.732.696 US$).
-  - 2014 no se pudo probar porque falta el PDF; es probable que tenga el mismo formato.
+  - **2014:** mismo formato. El rótulo «III y III(T)» va con «y» minúscula, así que la separación ya no distingue mayúsculas. Cuadra exacto (1.690.625.448 US$). Se probó con un extracto de 7 páginas del PDF, porque el anual completo pesa 53 MB.
+  - Con esto, las regalías de 2001 a 2025 cuadran todas con el total del PDF.
 - **Canasta 2007–2011:** el cuadro no trae columna PROMEDIO, pero el gráfico de la misma página imprime «PRECIO PROMEDIO» por lote (`promedio_grafico`); se usa como control (`PROMEDIO_FUENTE` = GRAFICO).
   - Si a un lote le falta un solo mes por texto superpuesto (V en enero de 2009 y de 2010), se completa como 12 × promedio − suma de los otros 11 meses. Queda marcado en la columna `ESTADO` del CSV de canasta: «IMPUTADO (12 × promedio − otros meses)».
   - En 2007 el gráfico da 67,64 para III, IV, VII/VI, X, XIII, I, V e IX, pero los meses del cuadro promedian 69,42. Es una inconsistencia del propio PDF: queda en REVISAR y se conservan los valores del cuadro.
