@@ -286,3 +286,12 @@ Control: `CONTROL/CONTROL PP tablas_adicionales.csv` (TABLA, EDICION, AÑO, SUMA
   - Pendiente: revisar con los PDF.
 - **Ediciones que no se usan.** Pozos y canon de la edición 2019 (columnas corridas en la fila TOTAL) y pozos 2001 de la edición 2004. Esos años salen de ediciones más recientes que sí cuadran.
 - **Resumen.** Las regalías y el valor de producción de lotes sin departamento se muestran como «SIN DEPARTAMENTO (zócalo u otros)».
+
+**Ajuste con los PDF 2004, 2009, 2015 y 2018 (14/10/2026).**
+- **Regalías 2004:** el cuadro no trae «TOTAL:» general. El total pasa a ser la suma de los «SUB - TOTAL:» de licencia y servicios, y cuadra (redondeo de miles).
+- **Regalías 2015:** III y IV tienen dos contratos cada uno: el temporal (T), hasta abril, y el de GMP. El rótulo («III (T) Y III (*)») va en su propia línea, entre sus dos montos. Ahora los montos sin lote toman el rótulo suelto más cercano, repartido en orden por «Y». Cuadra exacto (765.732.696 US$).
+  - 2014 no se pudo probar porque falta el PDF; es probable que tenga el mismo formato.
+- **Canasta 2007–2011:** el cuadro no trae columna PROMEDIO, pero el gráfico de la misma página imprime «PRECIO PROMEDIO» por lote (`promedio_grafico`); se usa como control (`PROMEDIO_FUENTE` = GRAFICO).
+  - Si a un lote le falta un solo mes por texto superpuesto (V en enero de 2009 y de 2010), se completa como 12 × promedio − suma de los otros 11 meses. Queda marcado en la columna `ESTADO` del CSV de canasta: «IMPUTADO (12 × promedio − otros meses)».
+  - En 2007 el gráfico da 67,64 para III, IV, VII/VI, X, XIII, I, V e IX, pero los meses del cuadro promedian 69,42. Es una inconsistencia del propio PDF: queda en REVISAR y se conservan los valores del cuadro.
+- **Canasta 2018, lote 192:** julio = 0,00 y el PDF promedia entre 12 (50,93). Ahora el control acepta también suma ÷ meses presentes (`PROMEDIO_CALC_12`).
