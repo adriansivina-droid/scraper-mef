@@ -272,3 +272,11 @@ Cambios:
   - Escribe 0 en los meses sin deuda.
   - Agrega la fila de control "Deuda sin desglosar".
 - **Pruebas:** se probó con un simulador. El MEF real sigue sin probarse desde el entorno del asistente.
+
+**Eficiencia (14/10/2026).**
+- Caché de consultas repetidas.
+- Ejecución del año completo en paralelo, sin esperar mes a mes. Las filas se ordenan por departamento.
+- `REUSAR_AÑOS_CERRADOS`: no re-consulta años anteriores ya guardados en Drive.
+- `SALTAR_FUNCIONES_SIN_DEVENGADO`: opcional, por defecto False, para respetar la regla de conservar filas en 0.
+
+En el simulador, Ene 2025 – Set 2026 pasó de 2475 a 2153 consultas, y a 977 al reutilizar 2025.

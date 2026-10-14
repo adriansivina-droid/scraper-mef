@@ -27,6 +27,12 @@ AÑO_FIN = 2026;    MES_FIN = None   # None = último mes cerrado
 ```
 Raspa de Enero 2025 hasta el último mes cerrado de 2026 (Setiembre, si se corre en octubre). Los años intermedios van completos. Los archivos, los controles y el PIM se siguen generando por año.
 
+## Eficiencia (Bloque 2 del scraper)
+- **Caché de consultas** (siempre activa): una consulta repetida no se vuelve a pedir al MEF. Por ejemplo, el listado de genéricas que usan Generica y Deuda, o las vistas anuales que usan el control y el PIM. Ahorra ~13%.
+- **Todo el año en paralelo:** ya no se espera a que termine cada mes para empezar el siguiente.
+- `REUSAR_AÑOS_CERRADOS = True`: en los años anteriores al actual no vuelve a consultar los CSV, controles ni PIM que ya están en Drive. En la corrida mensual (Ene 2025 – mes actual) ahorra ~60%. **Déjalo en False en la primera corrida con esta versión**, porque hay que regenerar DEV Deuda.
+- `SALTAR_FUNCIONES_SIN_DEVENGADO = True` (opcional): en GL no baja a municipalidades en las funciones con devengado 0 ese mes. Ahorra ~15%. Solo se pierden filas en 0 por municipalidad; los totales no cambian.
+
 ## Cómo usar
 1. Corre `Fiscal_Scraper.ipynb` (conviene primero con `PRUEBA_RAPIDA = True`). Revisa la salida de "Calibrando sub-niveles…": debe terminar en `✅ cadena Sub-genérica = [...]`.
    Si dice que no la encontró: en Consulta Amigable entra a Genérica 2-8 y luego a Sub-Genérica. Copia la clave numérica nueva de la URL (F12 > Network) y ponla primera en `CANDIDATOS_SUBGENERICA`.
