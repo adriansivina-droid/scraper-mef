@@ -91,7 +91,7 @@ Navegar_6.aspx?_tgt=frame&_uhc=yes&0=&24=6-2-6&23=1&1=R&21=16&8=&y=2025&ap=ActPr
 | `8` | Función | `03`, `15`, … |
 | `7` | Municipalidad | listada como `160101-301263: MUNICIPALIDAD …` |
 | `14` | Fuente de financiamiento | verificada el 09/10/2026 |
-| ? | Sub-Genérica / Sub-Genérica Detalle (deuda 2.8) | **sin confirmar**: el scraper unificado la autocalibra (sección 13) |
+| `25` | Sub-Genérica (bajo Genérica `7-2-8` lista directo `1: AMORTIZACION DE LA DEUDA`, intereses…) | verificada en el MEF real el 14/10/2026 |
 
 Departamentos: `16` Loreto · `22` San Martín · `25` Ucayali (los 25 están en `DEV_Funcion_Municipalidad.ipynb`).
 
@@ -239,7 +239,6 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 ## 11. Pendientes / ideas
 
 - Confirmar en el MEF real los notebooks que solo se probaron con el simulador: Nacional, Municipalidad (25 regiones) y los dos de PIM.
-- Confirmar en el MEF real la clave de URL de Sub-Genérica y Sub-Genérica Detalle (lo imprime `calibrar_deuda`) y fijarla en `CANDIDATOS_SUBGENERICA`.
 - Si se necesita el PIM municipal de las 25 regiones, se puede crear la variante copiando el catálogo de `DEV_Funcion_Municipalidad.ipynb`.
 - La opción de meses sueltos ("1, 3, 5") se eliminó al unificar con `MES_INICIO`/`MES_FIN`. Se puede volver a agregar.
 
@@ -280,3 +279,8 @@ Cambios:
 - `SALTAR_FUNCIONES_SIN_DEVENGADO`: opcional, por defecto False, para respetar la regla de conservar filas en 0.
 
 En el simulador, Ene 2025 – Set 2026 pasó de 2475 a 2153 consultas, y a 977 al reutilizar 2025.
+
+**Control anual (14/10/2026).** Primera corrida real de 2025: 12 meses sin errores, clave Sub-Genérica = 25. Ajustes:
+- Las referencias anuales del control se consultan en paralelo.
+- El control de `Funcion.M` usa el total por función, sin bajar a municipalidades. Antes ese paso tardaba más de 10 minutos.
+- En el simulador, los controles salen idénticos.

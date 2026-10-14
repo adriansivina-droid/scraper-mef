@@ -31,9 +31,10 @@ Raspa de Enero 2025 hasta el último mes cerrado de 2026 (Setiembre, si se corre
 - **Caché de consultas** (siempre activa): una consulta repetida no se vuelve a pedir al MEF. Por ejemplo, el listado de genéricas que usan Generica y Deuda, o las vistas anuales que usan el control y el PIM. Ahorra ~13%.
 - **Todo el año en paralelo:** ya no se espera a que termine cada mes para empezar el siguiente.
 - `REUSAR_AÑOS_CERRADOS = True`: en los años anteriores al actual no vuelve a consultar los CSV, controles ni PIM que ya están en Drive. En la corrida mensual (Ene 2025 – mes actual) ahorra ~60%. **Déjalo en False en la primera corrida con esta versión**, porque hay que regenerar DEV Deuda.
+- **Control anual más rápido:** las referencias anuales se consultan en paralelo. El control de `Funcion.M` compara contra el total por función del MEF, sin bajar a cada municipalidad (antes eran ~25 consultas por departamento, una por una).
 - `SALTAR_FUNCIONES_SIN_DEVENGADO = True` (opcional): en GL no baja a municipalidades en las funciones con devengado 0 ese mes. Ahorra ~15%. Solo se pierden filas en 0 por municipalidad; los totales no cambian.
 
 ## Cómo usar
-1. Corre `Fiscal_Scraper.ipynb` (conviene primero con `PRUEBA_RAPIDA = True`). Revisa la salida de "Calibrando sub-niveles…": debe terminar en `✅ cadena Sub-genérica = [...]`.
+1. Corre `Fiscal_Scraper.ipynb` (conviene primero con `PRUEBA_RAPIDA = True`). Revisa la salida de "Calibrando sub-niveles…": debe terminar en `✅ cadena Sub-genérica = ['25']`. La clave 25 está verificada en el MEF real el 14/10/2026.
    Si dice que no la encontró: en Consulta Amigable entra a Genérica 2-8 y luego a Sub-Genérica. Copia la clave numérica nueva de la URL (F12 > Network) y ponla primera en `CANDIDATOS_SUBGENERICA`.
 2. Vuelve a raspar los meses (`MES_INICIO = 1`) para regenerar `DEV Deuda.*`. Después corre `Fiscal_Procesamiento.ipynb`.
