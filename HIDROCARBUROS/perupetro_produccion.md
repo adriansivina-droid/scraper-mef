@@ -272,3 +272,17 @@ Control: `CONTROL/CONTROL PP tablas_adicionales.csv` (TABLA, EDICION, AÑO, SUMA
 - **Canasta:** el promedio calculado coincide con el impreso (≤ 0,01 US$/bbl). Hay 2 casos reales en 2008, que quedan en REVISAR: el lote 56 empezó en setiembre (4 meses) y a XIII le falta un mes en el PDF. En 2010, a V le falta enero por un texto superpuesto en el PDF.
 - **Corrida simulada del notebook (2001–2026)** con Drive falso: sin errores. Genera los 5 CSV y el control; solo 1 fila de producción queda sin precio (XIII, 2008).
 - **Tiempo:** unos 10 s más por anual.
+
+**Primera corrida real (14/10/2026, 1994–2026).** Revisión de `CONTROL PP tablas_adicionales.csv`: 1.326 filas OK y 17 en REVISAR.
+- **Canasta.** Los meses con «-» en el PDF (el lote empezó o paró ese año: XX y Z-1 en 2007, XIII y 56 en 2008) ahora cuentan como presentes (`MESES_PDF`) y pasan a OK.
+  - Siguen en REVISAR:
+    - XIII 2006: el promedio que imprime el PDF no coincide con sus meses;
+    - V en 2009 y 2010: a cada uno le falta un mes por texto superpuesto;
+    - Z-2B (LGN) 2009: 5 meses;
+    - 192 2018: 11 meses y un promedio distinto.
+- **Regalías.**
+  - 2004: no se encontró el TOTAL.
+  - 2014 y 2015: la suma de lotes queda 2,3 % y 1,8 % bajo el TOTAL; faltan filas.
+  - Pendiente: revisar con los PDF.
+- **Ediciones que no se usan.** Pozos y canon de la edición 2019 (columnas corridas en la fila TOTAL) y pozos 2001 de la edición 2004. Esos años salen de ediciones más recientes que sí cuadran.
+- **Resumen.** Las regalías y el valor de producción de lotes sin departamento se muestran como «SIN DEPARTAMENTO (zócalo u otros)».
