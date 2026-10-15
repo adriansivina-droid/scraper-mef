@@ -383,3 +383,29 @@ Revisión a pedido del usuario: se quita lo que repite información y se aclara 
 
 - **Se mantienen:** estado y volumen, operador vigente e historial, última producción, paralización más larga, oleoducto, áreas protegidas, comunidades nativas e Iquitos (para la selva).
 - **Prueba:** corrida simulada y navegador, con fichas de 192, 8, 95 y Z-1 revisadas; sin errores de JavaScript.
+
+## Aporte estimado al canon, vista de tabla y descarga (15/10/2026)
+
+**Problema:** la pestaña de canon mostraba el canon de todo el departamento. Así, el lote 95 parecía «aportar» desde 1993, aunque empezó a producir en 2013.
+
+**Aporte estimado del campo** = canon del departamento × participación del campo en el valor de la producción de líquidos del departamento.
+- **Valor de la producción:** `PP_valor_produccion_lote_mes.csv`, es decir, barriles × precio de canasta, desde 2001.
+- **Sin precio de canasta (1994–2000):** la participación se mide en barriles. La columna `BASE` dice cuál se usó.
+- **Departamento de cada campo:** el de su producción (`DEPARTAMENTO` del CSV de producción).
+- **Datos:** el JSON lleva `a[campo][departamento][año] = [participación, aporte MM S/, base]`.
+- Es una **estimación**: PERUPETRO publica el canon solo por departamento. Así se rotula en la ficha y en el panel.
+
+**Cambios en la ficha:** el bloque de canon muestra el aporte estimado del último año (MM S/ y % del canon del departamento) y barras apiladas: el aporte del campo (morado) sobre el resto del departamento (lila claro).
+
+**Cambios en el panel:**
+- La pestaña de canon usa las mismas barras apiladas. El detalle por año muestra canon del departamento, variación, participación y aporte estimado.
+- El resumen da el aporte total del período y su %.
+
+**Tabla y descarga (las tres pestañas):**
+- «📋 Tabla» cambia a una tabla completa por año (la más reciente arriba); «📈 Gráfico» vuelve al gráfico.
+- «⬇ Descargar CSV» baja los datos detallados en formato largo. Usa separador `;`, coma decimal y BOM, como el panel de producción, así que abre directo en Excel. Archivos:
+  - `pozos_perforados_campo_<c>.csv`: AÑO, CAMPO, LOTE, DESARROLLO, EXPLORATORIOS_Y_CONFIRMATORIOS;
+  - `regalias_campo_<c>.csv`: AÑO, CAMPO, LOTE, HIDROCARBURO, REGALIA_MM_US$;
+  - `canon_aporte_estimado_campo_<c>.csv`: AÑO, DEPARTAMENTO, CANON_DEPARTAMENTO_MM_S/, CAMPO, PARTICIPACION_CAMPO, APORTE_ESTIMADO_MM_S/, BASE_PARTICIPACION.
+
+**Prueba:** corrida simulada y Chromium en escritorio y móvil, con la ficha y el panel del lote 95 revisados. Se verificaron el aporte en 0 antes de su primera producción, las barras apiladas, la ayuda al pasar el cursor, la tabla de 33 años y la descarga de los 3 CSV con contenido correcto; sin errores de JavaScript.
