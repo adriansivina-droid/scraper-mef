@@ -272,15 +272,8 @@ Cambios:
   - Agrega la fila de control "Deuda sin desglosar".
 - **Pruebas:** se probó con un simulador. El MEF real sigue sin probarse desde el entorno del asistente.
 
-**Eficiencia (14/10/2026).**
-- Caché de consultas repetidas.
-- Ejecución del año completo en paralelo, sin esperar mes a mes. Las filas se ordenan por departamento.
-- `REUSAR_AÑOS_CERRADOS`: no re-consulta años anteriores ya guardados en Drive.
-- `SALTAR_FUNCIONES_SIN_DEVENGADO`: opcional, por defecto False, para respetar la regla de conservar filas en 0.
-
-En el simulador, Ene 2025 – Set 2026 pasó de 2475 a 2153 consultas, y a 977 al reutilizar 2025.
-
-**Control anual (14/10/2026).** Primera corrida real de 2025: 12 meses sin errores, clave Sub-Genérica = 25. Ajustes:
-- Las referencias anuales del control se consultan en paralelo.
-- El control de `Funcion.M` usa el total por función, sin bajar a municipalidades. Antes ese paso tardaba más de 10 minutos.
-- En el simulador, los controles salen idénticos.
+**Versión en uso (15/10/2026).** Se trabaja solo con la versión "Fiscal_Scraper (2)", equivalente al commit `911fc93`. Tiene la corrección de deuda y el rango de años, procesa mes por mes y guarda cada mes al terminar. Tarda unos 4 minutos por mes.
+- Primera corrida real: 2025 y Ene–Set 2026 sin errores, clave Sub-Genérica = 25 y controles OK.
+- El MEF revisa 2025 y 2026 todos los meses, por lo que la corrida mensual debe cubrir ambos años completos.
+- Se descartaron las variantes de eficiencia: caché, año completo en paralelo, `REUSAR_AÑOS_CERRADOS` (dejaba 2025 desactualizado), `SALTAR_FUNCIONES_SIN_DEVENGADO` y control anual en paralelo. Quedan en el historial (commit `d172c90`).
+- El procesamiento vuelve a ignorar los archivos `- PRUEBA.csv`, como el original.

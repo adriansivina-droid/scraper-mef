@@ -28,14 +28,15 @@ AÑO_FIN = 2026;    MES_FIN = None   # None = último mes cerrado
 ```
 Raspa de Enero 2025 hasta el último mes cerrado de 2026 (Setiembre, si se corre en octubre). Los años intermedios van completos. Los archivos, los controles y el PIM se siguen generando por año.
 
-## Eficiencia (Bloque 2 del scraper)
-- **Caché de consultas** (siempre activa): una consulta repetida no se vuelve a pedir al MEF. Por ejemplo, el listado de genéricas que usan Generica y Deuda, o las vistas anuales que usan el control y el PIM. Ahorra ~13%.
-- **Todo el año en paralelo:** ya no se espera a que termine cada mes para empezar el siguiente.
-- `REUSAR_AÑOS_CERRADOS = True`: en los años anteriores al actual no vuelve a consultar los CSV, controles ni PIM que ya están en Drive. En la corrida mensual (Ene 2025 – mes actual) ahorra ~60%. **Déjalo en False en la primera corrida con esta versión**, porque hay que regenerar DEV Deuda.
-- **Control anual más rápido:** las referencias anuales se consultan en paralelo. El control de `Funcion.M` compara contra el total por función del MEF, sin bajar a cada municipalidad (antes eran ~25 consultas por departamento, una por una).
-- `SALTAR_FUNCIONES_SIN_DEVENGADO = True` (opcional): en GL no baja a municipalidades en las funciones con devengado 0 ese mes. Ahorra ~15%. Solo se pierden filas en 0 por municipalidad; los totales no cambian.
+## Versión en uso
+`Fiscal_Scraper.ipynb` es la versión con la que se trabaja (el archivo "Fiscal_Scraper (2)"):
+- Procesa **mes por mes** y **guarda cada mes en Drive al terminarlo**. Si Colab se corta, lo hecho no se pierde.
+- Cada corrida vuelve a descargar todos los meses del rango. Así recoge las revisiones que el MEF hace mes a mes, tanto de 2025 como de 2026.
+- Tarda unos 4 minutos por mes de información.
+
+Las pruebas de eficiencia (memoria de consultas, año completo en paralelo, reutilizar años cerrados) se descartaron. Una de ellas, reutilizar años cerrados, dejaba 2025 desactualizado. Quedan en el historial de git (commit `d172c90`) por si se retoman.
 
 ## Cómo usar
 1. Corre `Fiscal_Scraper.ipynb` (conviene primero con `PRUEBA_RAPIDA = True`). Revisa la salida de "Calibrando sub-niveles…": debe terminar en `✅ cadena Sub-genérica = ['25']`. La clave 25 está verificada en el MEF real el 14/10/2026.
    Si dice que no la encontró: en Consulta Amigable entra a Genérica 2-8 y luego a Sub-Genérica. Copia la clave numérica nueva de la URL (F12 > Network) y ponla primera en `CANDIDATOS_SUBGENERICA`.
-2. Vuelve a raspar los meses (`MES_INICIO = 1`) para regenerar `DEV Deuda.*`. Después corre `Fiscal_Procesamiento.ipynb`.
+2. Para la corrida mensual usa `AÑO_INICIO = 2025`, `MES_INICIO = 1`, `AÑO_FIN = 2026` y `MES_FIN = None`, porque el MEF revisa ambos años. Vuelve a raspar los meses (`MES_INICIO = 1`) para regenerar `DEV Deuda.*`. Después corre `Fiscal_Procesamiento.ipynb`.
