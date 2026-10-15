@@ -168,6 +168,11 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
   - los `.md` de contexto se mantienen al día;
   - los resultados van a Drive, no se descargan con `files.download`.
 
+## 7b. Análisis Loreto 2025 (estilo BCRP)
+
+- `analisis/Loreto_petroleo_2025_texto.md`: texto «3. Extracción de petróleo crudo» para Loreto 2025. Abre con el VAB del INEI (extracción de petróleo, gas y minerales +11,2%, 23,2% del VAB regional, 2,5 p.p. del crecimiento de 4,9%) y sigue con producción, precios, regalías, canon y pozos (PERUPETRO).
+- `analisis/Loreto_petroleo_2025_evidencia.xlsx`: datos de respaldo con fórmulas; hoja `VAB_INEI` transcrita de los cuadros 1 y 2 del INEI (información a junio del 2026; 2024P, 2025E), con control contra el total publicado.
+
 ## 8. Cómo continuar en un chat nuevo
 
 Pegar algo como:
