@@ -18,6 +18,7 @@ Versiones corregidas de `Fiscal_Scraper.ipynb` y `Fiscal_Procesamiento.ipynb`. R
 - Las filas `OTRO` de los CSV ya existentes se reclasifican por el texto de `RUTA`.
 - Los meses sin deuda se escriben como 0.
 - Hay una nueva fila de control: `Deuda sin desglosar = total - (intereses + amortización)`.
+- Ignora los archivos de prueba, los que terminan en ` - PRUEBA.csv` y salen de `PRUEBA_RAPIDA = True`, tanto en los datos como en los controles. La versión original ya lo hacía; se había perdido en la corrección.
 
 ## Rango de años
 En el Bloque 2 del scraper:
