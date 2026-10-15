@@ -99,6 +99,8 @@ h += [P("Diccionario de datos", "tit"),
           ["DATA/PP_canon_departamento_anio.csv", "Fiscal", "Canon y sobrecanon petrolero por departamento, millones de soles, 1993–hoy (§4d)."],
           ["DATA/PP_precio_canasta_lote_mes.csv", "Precios", "Precio de la canasta de líquidos por lote y mes, US$/bbl, 2001–hoy (§4d)."],
           ["DATA/PP_valor_produccion_lote_mes.csv", "Producción", "Valor de la producción de líquidos = barriles × precio de canasta (§4d)."],
+          ["DATA/PP_canon_departamento_mes.csv", "Fiscal", "Canon y sobrecanon por departamento y mes, de las estadísticas mensuales (2025–hoy, se acumula) (§4d)."],
+          ["DATA/PP_ingresos_estado_mes.csv", "Fiscal", "Ingresos para el Estado por mes y tipo de contrato, total nacional (§4d)."],
           ["CONTROL/CONTROL PP tablas_adicionales.csv", "Control", "Suma de lotes vs total del PDF de cada tabla adicional (§4d)."],
           ["CONTROL/CONTROL PP produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Control", "Una fila por año: de qué PDF salió y si cuadra con sus totales (§5)."],
           ["CONTROL/PP_CATALOGO_PDF.csv", "Control", "Qué URL de PERUPETRO corresponde a cada PDF guardado (§6)."],
@@ -219,6 +221,13 @@ h += [P("4d. Pozos, regalías, canon y precio de canasta", "h1"),
       ]),
       P("<b>PP_canon_departamento_anio.csv</b> — «Distribución del canon / sobrecanon» (series de 10 años; la edición 2001 llega a 1993). "
         "Columnas: AÑO, DEPARTAMENTO, CANON_MM_SOLES (millones de soles corrientes) y FUENTE. Para cada año manda la edición más reciente."),
+      P("<b>PP_canon_departamento_mes.csv</b> y <b>PP_ingresos_estado_mes.csv</b> — del «Resumen ejecutivo» de cada estadística "
+        "mensual: canon y sobrecanon por departamento (MM S/, con un mes de rezago: el reporte de enero trae los 12 meses del año "
+        "anterior) e ingresos para el Estado (regalías + regalía equivalente, MM US$, total nacional por LICENCIA / SERVICIOS / TOTAL). "
+        "PERUPETRO solo publica las mensuales del año en curso, así que ambas series se acumulan en Drive en cada corrida. Columnas: "
+        "AÑO, MES, FECHA, DEPARTAMENTO o MODALIDAD, valor y FUENTE. Cuando hay 12 meses de canon, su suma reemplaza al anual en "
+        "PP_canon_departamento_anio.csv (el valor del anual queda en CANON_PDF_ANUAL): el anual 2025 daba 20,19 para Loreto y los "
+        "meses suman 213,85."),
       P("<b>PP_precio_canasta_lote_mes.csv</b> — «Valor mensual del precio de canasta de hidrocarburos líquidos» (US$/bbl), el precio "
         "con que se calculan las regalías de cada lote. Columnas: AÑO, MES, FECHA, LOTE, VARIANTE (P = petróleo y L = líquidos del "
         "lote Z-69; LGN = líquidos de Z-2B), LOTE_PDF, PRECIO_US$_BBL y FUENTE. Cuando el PDF agrupa lotes («VII y V», «31B-31D / 31C») "

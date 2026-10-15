@@ -308,3 +308,29 @@ Control: `CONTROL/CONTROL PP tablas_adicionales.csv` (TABLA, EDICION, AÑO, SUMA
     - 2007: el gráfico da 67,64 para III, IV, VII/VI, X, XIII, I, V e IX, y 70,88 para XX, pero el cuadro mensual da 69,42 y 72,70.
   - Se usan los valores mensuales del cuadro.
 - **Pozos y canon:** las 5 filas en REVISAR son de ediciones que no se usan (2004 y 2019), con `USADO` = False.
+
+## Canon e ingresos para el Estado mensuales (15/10/2026)
+
+**Fuente.** La página 2 («Resumen ejecutivo») de cada **estadística mensual** trae una tabla con columnas ENERO…DICIEMBRE + TOTAL. Lector: `resumen_mensual`.
+- **Distribución del canon y sobrecanon** por departamento, en MM S/. Va con un mes de rezago: el reporte de enero 2026 trae los 12 meses de 2025. El año sale de la nota «(3) … actualizada a <mes> <año>».
+- **Ingresos para el Estado** (regalías + regalía equivalente), en MM US$. Total nacional por contrato de licencia, de servicios y total, del año del reporte.
+- Las **regalías por lote** solo existen por año, en los anuales.
+
+**Cobertura.** PERUPETRO solo publica las mensuales del año en curso (2026). Por eso las series se **acumulan en Drive**: cada corrida agrega o reemplaza los meses que lee, y manda el reporte más reciente. Arrancan con los 12 meses de 2025 (canon) y 2026 en adelante.
+
+**Salidas** (DATA):
+- `PP_canon_departamento_mes.csv`: AÑO, MES, FECHA, DEPARTAMENTO (incluye TOTAL), CANON_MM_SOLES, FUENTE;
+- `PP_ingresos_estado_mes.csv`: AÑO, MES, FECHA, MODALIDAD (LICENCIA / SERVICIOS / TOTAL), INGRESO_MM_US$, FUENTE.
+
+**Control** (en `CONTROL PP tablas_adicionales.csv`): en cada fila, suma de meses = columna TOTAL; en cada mes, suma de departamentos = TOTAL. En los reportes de enero 2026 y febrero 2024 todo cuadra.
+
+**Corrección del canon anual.**
+- Si el resumen mensual trae los 12 meses de un año, `PP_canon_departamento_anio.csv` usa su suma, y deja el valor del anual en `CANON_PDF_ANUAL`. El control queda como «CORREGIDO CON LA SUMA MENSUAL».
+- **Caso 2025:** el anual da Loreto 20,19 y los 12 meses suman 213,85.
+  - Los otros departamentos también quedan 5–8 % bajo la suma mensual: Cusco 1.404,79 contra 1.517,37; Piura 304,28 contra 320,21.
+  - Probablemente el anual 2025 no incluía todo el año.
+
+**Mapa (pantalla completa).**
+- **Problema:** con el plugin de pantalla completa solo se ve el contenedor del mapa. Los paneles de producción y de pozos/regalías/canon, la leyenda y el botón «Producción fiscalizada» están en `<body>`, así que desaparecían y la ficha no abría las estadísticas.
+- **Solución:** al entrar a pantalla completa se mueven dentro del elemento en pantalla completa, y al salir vuelven a `<body>`.
+- **Prueba:** Chromium, con la leyenda, el botón y los dos paneles visibles en pantalla completa; sin errores de JavaScript.
