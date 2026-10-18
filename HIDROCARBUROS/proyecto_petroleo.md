@@ -170,8 +170,8 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 ## 7b. Análisis Loreto 2025 (estilo BCRP)
 
-- `analisis/Loreto_petroleo_2025_texto.md`: texto «3. Extracción de petróleo, gas, minerales y servicios conexos» para Loreto 2025, con la estructura del informe del BCRP (1. tendencia de diez años, VAB INEI e historia 2015–2020; 2. lotes en operación; 3. Lote 95, precios, regalías, canon, reservas y riesgos). Al final, un anexo con la versión ampliada por tema.
-- `analisis/Loreto_petroleo_2025_evidencia.xlsx`: datos de respaldo con fórmulas; hoja `VAB_INEI` transcrita de los cuadros 1 y 2 del INEI (información a junio del 2026; 2024P, 2025E), con control contra el total publicado; hoja `VAB_INEI_2014_2025` (serie del INEI) y hoja `Serie_Loreto_2006_2025` con la producción de Loreto y del país y las reservas probadas de la zona Selva.
+- `analisis/Loreto_petroleo_2025_texto.md`: texto «3. Extracción de petróleo, gas, minerales y servicios conexos» para Loreto 2025, con la estructura del informe del BCRP (1. tendencia de diez años, VAB INEI e historia 2015–2020; 2. lotes en operación; 3. Lote 95, precios, regalías, canon, reservas y riesgos), más «Empresas que operan en Loreto» (PetroTal, Upland, Petroperú y Perenco). Al final, un anexo con la versión ampliada por tema.
+- `analisis/Loreto_petroleo_2025_evidencia.xlsx`: datos de respaldo con fórmulas; hoja `VAB_INEI` transcrita de los cuadros 1 y 2 del INEI (información a junio del 2026; 2024P, 2025E), con control contra el total publicado; hoja `VAB_INEI_2014_2025` (serie del INEI), hoja `Empresas_Loreto` (contratos vigentes y producción por operador 2006–2025) y hoja `Serie_Loreto_2006_2025` con la producción de Loreto y del país y las reservas probadas de la zona Selva.
 
 ## 8. Cómo continuar en un chat nuevo
 

@@ -334,3 +334,19 @@ Control: `CONTROL/CONTROL PP tablas_adicionales.csv` (TABLA, EDICION, AÑO, SUMA
 - **Problema:** con el plugin de pantalla completa solo se ve el contenedor del mapa. Los paneles de producción y de pozos/regalías/canon, la leyenda y el botón «Producción fiscalizada» están en `<body>`, así que desaparecían y la ficha no abría las estadísticas.
 - **Solución:** al entrar a pantalla completa se mueven dentro del elemento en pantalla completa, y al salir vuelven a `<body>`.
 - **Prueba:** Chromium, con la leyenda, el botón y los dos paneles visibles en pantalla completa; sin errores de JavaScript.
+
+## Contratos: empresas, participación y vigencia (sección 6.1, 18/10/2026)
+
+Responde «quién opera cada lote y desde cuándo». Se lee junto con las demás tablas adicionales de cada anual (casilla «Pozos, regalías, canon, precio de canasta y contratos»).
+
+| Tabla del PDF | Qué trae |
+|---|---|
+| «Contratos en fase de explotación / exploración» (vigentes al 31.12) | por lote: empresas socias con su %, fecha de suscripción y de término (desde la edición 2014; antes solo suscripción), área (ha) y modalidad |
+| «Contratos terminados aaaa» | operador, lote, suscripción y último día de vigencia |
+| «Contratos suscritos durante aaaa» (2007) | contratos firmados en el año |
+
+- **Salida:** `DATA/PP_contratos.csv`, una fila por empresa socia: EDICION, ESTADO (VIGENTE / TERMINADO / SUSCRITO EN EL AÑO), FASE, DEPARTAMENTO, LOTE, LOTE_HISTORICO, OPERADOR (1.ª empresa listada), EMPRESA, PARTICIPACION_PCT, FECHA_SUSCRIPCION y FECHA_TERMINO (dd/mm/aaaa), AREA_HA, MODALIDAD, PAGINA, FUENTE.
+- **Acumulado en Drive por edición:** cada corrida reemplaza las ediciones que vuelve a leer, así que no hace falta correr todo desde 2004.
+- **Lector:** `contratos()` en `px_parser`. Lee el texto de la página (pypdf), no coordenadas: las filas se reconocen por «lote fecha fecha área modalidad» y la empresa es el texto anterior. Las ediciones antiguas no traen %: los socios se separan por «/», con participación vacía.
+- **Control** (`CONTROL PP tablas_adicionales.csv`, TABLA «CONTRATOS …»): lotes leídos = «TOTAL n» de cada cuadro. Probado con las ediciones 2004–2025 que tenemos: cuadran las 19 (2001 tiene otro formato y no se lee).
+- **Cuidado con las fechas:** el cuadro de contratos y las notas de la tabla de producción no siempre coinciden. Lote 8: nota 08/07/2024, cuadro 04/11/2024. Lote 192: nota 28/02/2023, cuadro 26/10/2023. El PDF no aclara si una es la suscripción y otra la entrada en vigencia.
