@@ -412,3 +412,16 @@ Revisión a pedido del usuario: se quita lo que repite información y se aclara 
 - **Pestañas compartidas:** Producción · Pozos perforados · Regalías · Canon y sobrecanon · Empresas. Son dos paneles (`panel_prod.html` y `act_panel.html`) con la misma barra de pestañas, el mismo ancho (900 px) y en el mismo lugar: al cambiar de pestaña se cierra uno y se abre el otro con el mismo lote.
 - **Las pestañas siguen al selector «Serie»:** si en Producción se elige otro campo o lote, las pestañas pasan a ese campo (pozos, regalías, empresas y el canon de su departamento); si se elige un departamento, queda activo solo su canon; con «Perú (total)» se ocultan y vuelven al elegir otra serie. Cada serie del panel lleva su campo (`cp`) y departamento (`dp`). El botón de abajo a la izquierda abre Producción sin pestañas, como antes.
 - **Prueba:** Chromium, escritorio y móvil: ficha sin gráficos, Producción → Regalías → Empresas → Producción; sin errores de JavaScript.
+
+## Fuente de cada mes y mes incompleto en el panel de producción (18/10/2026)
+
+Lo publicado por PERUPETRO al 18/10/2026: estadística mensual de enero a junio de 2026; reportes diarios de cierre de mes de enero a setiembre; reporte diario en curso de octubre.
+
+- **Vista mensual:**
+  - meses de la estadística mensual, con línea continua;
+  - meses posteriores, con la suma de los reportes diarios de cierre de mes, con línea punteada;
+  - mes en curso (días 1–N), con punto hueco y «*» en el eje («oct*»).
+  - El cursor indica la fuente: «suma de los reportes diarios» o «reporte diario en curso, días 1–N: mes incompleto».
+- **Vista anual:** el año que la estadística mensual cubre a medias va con «*» («2026*») y barra clara. Suma solo los meses de la estadística mensual (ene–jun); los meses de los reportes diarios se ven en la vista mensual, para no mezclar fuentes en una barra.
+- **Nota del gráfico:** se arma con los datos: «Estadística mensual de PERUPETRO hasta jun 2026. jul–set 2026: suma de los reportes diarios de cierre de mes (línea punteada). oct* 2026: reporte diario en curso, días 1–17 (mes incompleto…)».
+- En «barriles por día» el mes incompleto no se ve más bajo, porque se divide entre los días con reporte. El «Estado por producto» de la ficha ya usaba esa cuenta.
