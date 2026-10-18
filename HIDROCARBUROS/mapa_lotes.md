@@ -404,3 +404,11 @@ Revisión a pedido del usuario: se quita lo que repite información y se aclara 
   - «📋 Tabla» y «⬇ Descargar CSV» (`empresas_campo_<campo>.csv`, con TIPO = OPERADOR CON PRODUCCION / SOCIO DEL CONTRATO VIGENTE / CONTRATO TERMINADO).
 - **Prueba:** Chromium con contratos reales (ediciones 2021, 2024 y 2025), escritorio y móvil, lotes 95 y 192; sin errores de JavaScript.
 - **Regalías por empresa (18/10/2026):** `PP_operadores_lote.csv` suma REGALIAS_US$ por operador y periodo (con la columna OPERADOR de `PP_regalias_lote_anio.csv`). En la pestaña «Empresas» aparecen en el cursor, la tabla y el CSV; las que el PDF no permite atribuir van en una nota («REGALIAS SIN OPERADOR IDENTIFICADO» en el CSV). La pestaña «Regalías» sigue sumando por lote.
+
+## Ficha sin gráficos: un solo botón «📊 Ver estadísticas» (18/10/2026)
+
+- **Ficha del lote:** se quitaron todos los gráficos (línea de producción anual, barras de pozos, regalías y canon) y sus botones. Quedan el estado por producto, las secciones de texto y una línea **«Resumen <año>»**: pozos perforados, regalías del campo y canon del departamento del último año (por ejemplo, «1 pozo perforado · regalías US$ 24,4 MM · canon y sobrecanon de Loreto S/ 213,9 MM (todo el departamento)»).
+- **Botón «📊 Ver estadísticas»:** abre la pestaña **Producción** del campo (vistas anual, mensual y diaria) si tiene serie; si no, la primera pestaña con datos.
+- **Pestañas compartidas:** Producción · Pozos perforados · Regalías · Canon y sobrecanon · Empresas. Son dos paneles (`panel_prod.html` y `act_panel.html`) con la misma barra de pestañas, el mismo ancho (900 px) y en el mismo lugar: al cambiar de pestaña se cierra uno y se abre el otro con el mismo lote.
+- Si en Producción se elige otra serie (Perú, un departamento u otro campo), la barra de pestañas se oculta, porque ya no corresponde al lote. El botón de abajo a la izquierda abre Producción sin pestañas, como antes.
+- **Prueba:** Chromium, escritorio y móvil: ficha sin gráficos, Producción → Regalías → Empresas → Producción; sin errores de JavaScript.
