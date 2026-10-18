@@ -54,7 +54,7 @@ def tabla(filas, anchos=(4.0, 3.0, 10.0), cab=("Variable", "Tipo / unidad", "Des
 def pie(c, d):
     c.saveState()
     c.setFont("DV", 7.5); c.setFillColor(colors.HexColor("#718096"))
-    c.drawString(2 * cm, 1.2 * cm, "Proyecto Petróleo · Diccionario de datos · versión 11/10/2026")
+    c.drawString(2 * cm, 1.2 * cm, "Proyecto Petróleo · Diccionario de datos · versión 18/10/2026")
     c.drawRightString(A4[0] - 2 * cm, 1.2 * cm, f"Página {d.page}")
     c.restoreState()
 
@@ -101,6 +101,8 @@ h += [P("Diccionario de datos", "tit"),
           ["DATA/PP_valor_produccion_lote_mes.csv", "Producción", "Valor de la producción de líquidos = barriles × precio de canasta (§4d)."],
           ["DATA/PP_canon_departamento_mes.csv", "Fiscal", "Canon y sobrecanon por departamento y mes, de las estadísticas mensuales (2025–hoy, se acumula) (§4d)."],
           ["DATA/PP_ingresos_estado_mes.csv", "Fiscal", "Ingresos para el Estado por mes y tipo de contrato, total nacional (§4d)."],
+          ["DATA/PP_contratos.csv", "Empresas", "Contratos vigentes y terminados por edición: empresas socias con su %, suscripción, término y área, 2004–hoy (§4d)."],
+          ["DATA/PP_operadores_lote.csv", "Empresas", "Quién operó cada lote y en qué años, según la producción fiscalizada (lo arma el mapa, §8b)."],
           ["CONTROL/CONTROL PP tablas_adicionales.csv", "Control", "Suma de lotes vs total del PDF de cada tabla adicional (§4d)."],
           ["CONTROL/CONTROL PP produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Control", "Una fila por año: de qué PDF salió y si cuadra con sus totales (§5)."],
           ["CONTROL/PP_CATALOGO_PDF.csv", "Control", "Qué URL de PERUPETRO corresponde a cada PDF guardado (§6)."],
@@ -235,6 +237,26 @@ h += [P("4d. Pozos, regalías, canon y precio de canasta", "h1"),
       P("<b>PP_valor_produccion_lote_mes.csv</b> — producción de líquidos de §4 × precio de canasta del lote y mes: BARRILES, "
         "PRECIO_US$_BBL, VALOR_US$ y ESTADO_PRECIO (OK, SIN PRECIO o SIN PRODUCCION). Para petróleo se usa la variante P y para "
         "LGN/condensado la LGN/L, si existen; si no, el precio del lote. Es un valor a precio de canasta, no el ingreso de la empresa."),
+      P("<b>PP_contratos.csv</b> — cuadros «Contratos en fase de explotación / exploración» (vigentes al 31.12), «Contratos terminados» "
+        "y, en 2007, «Contratos suscritos durante el año», de cada anual (2004–hoy; 2001 no se lee). Una fila por empresa socia. Se acumula "
+        "en Drive por edición. Clave: EDICION + ESTADO + LOTE + EMPRESA."),
+      tabla([
+          ["EDICION", "entero", "Año del anual (contratos al 31.12 de ese año)."],
+          ["ESTADO", "texto (código)", "VIGENTE, TERMINADO (en el año) o SUSCRITO EN EL AÑO."],
+          ["FASE", "texto (código)", "EXPLOTACION o EXPLORACION (en terminados, según el bloque del cuadro)."],
+          ["DEPARTAMENTO, LOTE, LOTE_HISTORICO", "texto", "Como en §4."],
+          ["OPERADOR", "texto", "Primera empresa listada en el contrato."],
+          ["EMPRESA", "texto", "Empresa socia, como figura en el PDF."],
+          ["PARTICIPACION_PCT", "número (%)", "Participación de la empresa. Vacío en ediciones antiguas, que no la traen."],
+          ["FECHA_SUSCRIPCION, FECHA_TERMINO", "fecha (dd/mm/aaaa)", "Suscripción y término (o último día de vigencia). El término "
+                                     "aparece desde la edición 2014. Puede diferir de las notas de la tabla de producción (lotes 8 y 192)."],
+          ["AREA_HA", "número (ha)", "Área del contrato."],
+          ["MODALIDAD", "texto (código)", "LICENCIA, SERVICIOS u OPERACIONES."],
+          ["PAGINA", "entero", "Página del PDF."],
+      ]),
+      P("<b>PP_operadores_lote.csv</b> — lo arma el notebook del mapa desde la producción fiscalizada (líquidos y gas): una fila por lote, "
+        "operador y periodo continuo con producción. Columnas: DEPARTAMENTO, CAMPO, LOTE, OPERADOR, AÑO_INICIO, AÑO_FIN, "
+        "AÑOS_CON_PRODUCCION, LIQUIDOS_BBL y GAS_MPC. Un año sin producción corta el periodo."),
       P("<b>Control</b> (<font name='DVM'>CONTROL PP tablas_adicionales.csv</font>): una fila por tabla, edición y año con SUMA (suma de lotes "
         "o departamentos; en canasta, promedio calculado), TOTAL_PDF (total o promedio impreso), PAGINA, USADO (si esa edición es la que "
         "quedó para el año) y ESTADO. Tolerancias: pozos exacto; regalías 0,1 % (2001–2006 vienen redondeadas a miles); canon 0,05; "

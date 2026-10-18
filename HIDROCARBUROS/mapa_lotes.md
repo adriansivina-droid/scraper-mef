@@ -393,3 +393,13 @@ Revisión a pedido del usuario: se quita lo que repite información y se aclara 
   - `regalias_campo_<c>.csv`: AÑO, CAMPO, LOTE, HIDROCARBURO, REGALIA_MM_US$;
   - `canon_sobrecanon_<DEPARTAMENTO>.csv`: AÑO, DEPARTAMENTO, CANON_SOBRECANON_MM_S/.
 - **Prueba:** corrida simulada y Chromium en escritorio y móvil, con la tabla de 33 años y la descarga de los 3 CSV con contenido correcto; sin errores de JavaScript.
+
+## Empresas: ficha y pestaña «Empresas» (18/10/2026)
+
+- **Historial de operadores:** el Bloque 4 arma `DATA/PP_operadores_lote.csv` desde la producción fiscalizada (líquidos y gas, 1994–hoy): DEPARTAMENTO, CAMPO, LOTE, OPERADOR, AÑO_INICIO, AÑO_FIN, AÑOS_CON_PRODUCCION, LIQUIDOS_BBL, GAS_MPC. Un año sin producción corta el periodo.
+- **Ficha del lote:** la sección «Contrato» pasa a **«Empresa y contrato»**: operador, empresas del contrato con su % y vigencia (de `PP_contratos.csv`, edición más reciente), y «Operadores con producción». Si hay vigencia, no se repite la fecha de suscripción del visor. Botón «🏢 Ver empresas y operadores».
+- **Pestaña «Empresas»** del panel (`act_panel.html`):
+  - línea de tiempo con una barra por lote y operador (cursor: años y producción);
+  - tabla del contrato vigente (empresa, %, suscripción, término, fase) y de los contratos terminados;
+  - «📋 Tabla» y «⬇ Descargar CSV» (`empresas_campo_<campo>.csv`, con TIPO = OPERADOR CON PRODUCCION / SOCIO DEL CONTRATO VIGENTE / CONTRATO TERMINADO).
+- **Prueba:** Chromium con contratos reales (ediciones 2021, 2024 y 2025), escritorio y móvil, lotes 95 y 192; sin errores de JavaScript.
