@@ -425,3 +425,10 @@ Lo publicado por PERUPETRO al 18/10/2026: estadística mensual de enero a junio 
 - **Vista anual:** el año que la estadística mensual cubre a medias va con «*» («2026*») y barra clara. Suma solo los meses de la estadística mensual (ene–jun); los meses de los reportes diarios se ven en la vista mensual, para no mezclar fuentes en una barra.
 - **Nota del gráfico:** se arma con los datos: «Estadística mensual de PERUPETRO hasta jun 2026. jul–set 2026: suma de los reportes diarios de cierre de mes (línea punteada). oct* 2026: reporte diario en curso, días 1–17 (mes incompleto…)».
 - En «barriles por día» el mes incompleto no se ve más bajo, porque se divide entre los días con reporte. El «Estado por producto» de la ficha ya usaba esa cuenta.
+
+## Producción por empresa operadora (18/10/2026)
+
+- **Vista anual de Producción** (una sola serie de campo o lote): las barras se apilan por empresa operadora, con leyenda «Operador: …». El cursor da la producción de cada empresa en el año. Los datos van en cada serie del panel (`ob`: operador → p / l / g por año, solo de la estadística mensual).
+- **Mismos colores** en Producción y en la línea de tiempo de «Empresas» (`window.ppColOp`): la paleta sigue el orden del primer año con producción de cada empresa en el campo, también cuando se ve un solo lote.
+- **Clic en una barra de la línea de tiempo** («Empresas»): abre Producción de ese lote (o del campo, si tiene un solo lote) en los años de esa empresa, con las pestañas del campo.
+- Con «Comparar con», o para Perú y los departamentos, las barras siguen siendo de un solo color.
