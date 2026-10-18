@@ -403,3 +403,4 @@ Revisión a pedido del usuario: se quita lo que repite información y se aclara 
   - tabla del contrato vigente (empresa, %, suscripción, término, fase) y de los contratos terminados;
   - «📋 Tabla» y «⬇ Descargar CSV» (`empresas_campo_<campo>.csv`, con TIPO = OPERADOR CON PRODUCCION / SOCIO DEL CONTRATO VIGENTE / CONTRATO TERMINADO).
 - **Prueba:** Chromium con contratos reales (ediciones 2021, 2024 y 2025), escritorio y móvil, lotes 95 y 192; sin errores de JavaScript.
+- **Regalías por empresa (18/10/2026):** `PP_operadores_lote.csv` suma REGALIAS_US$ por operador y periodo (con la columna OPERADOR de `PP_regalias_lote_anio.csv`). En la pestaña «Empresas» aparecen en el cursor, la tabla y el CSV; las que el PDF no permite atribuir van en una nota («REGALIAS SIN OPERADOR IDENTIFICADO» en el CSV). La pestaña «Regalías» sigue sumando por lote.

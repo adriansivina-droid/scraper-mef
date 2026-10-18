@@ -350,3 +350,10 @@ Responde «quién opera cada lote y desde cuándo». Se lee junto con las demás
 - **Lector:** `contratos()` en `px_parser`. Lee el texto de la página (pypdf), no coordenadas: las filas se reconocen por «lote fecha fecha área modalidad» y la empresa es el texto anterior. Las ediciones antiguas no traen %: los socios se separan por «/», con participación vacía.
 - **Control** (`CONTROL PP tablas_adicionales.csv`, TABLA «CONTRATOS …»): lotes leídos = «TOTAL n» de cada cuadro. Probado con las ediciones 2004–2025 que tenemos: cuadran las 19 (2001 tiene otro formato y no se lee).
 - **Cuidado con las fechas:** el cuadro de contratos y las notas de la tabla de producción no siempre coinciden. Lote 8: nota 08/07/2024, cuadro 04/11/2024. Lote 192: nota 28/02/2023, cuadro 26/10/2023. El PDF no aclara si una es la suscripción y otra la entrada en vigencia.
+
+## Regalías por empresa (18/10/2026)
+
+- `PP_regalias_lote_anio.csv` tiene una columna nueva, **OPERADOR**. El cuadro de regalías distingue los contratos de un mismo lote igual que la tabla de producción del mismo anual («8» = PPN en liquidación y «8.» = Upland; «I (TT)» = Petroperú e «I.» = Inexport), así que el operador sale de la producción.
+- Si el lote del PDF no basta, se usa el único operador con producción del lote ese año. Si hubo varios y el PDF no los distingue, queda «VARIOS OPERADORES» (Lote 8 en 2024).
+- **Criterio:** la vista por lote suma las regalías del lote (Lote 8 2025: US$ 10,0 MM, US$ 8,8/bbl); la vista por empresa las separa (Upland US$ 7,9 MM, US$ 8,0/bbl; PPN en liquidación US$ 2,1 MM).
+- La asignación sigue al PDF: en 2024 la tabla de producción pone a OIG en las dos filas del Lote X, aunque el contrato de CNPC terminó el 19/05/2024.

@@ -218,6 +218,8 @@ h += [P("4d. Pozos, regalías, canon y precio de canasta", "h1"),
           ["HIDROCARBURO", "texto (código)", "PETRÓLEO, LGN, GAS NATURAL o CONDENSADO."],
           ["DEPARTAMENTO, LOTE, LOTE_HISTORICO", "texto", "Como en §4. LOTE sin sufijos (T)/(TT)."],
           ["LOTE_PDF", "texto", "Lote como figura en el PDF: distingue contratos del mismo lote (I (TT) e I.; X y X.)."],
+          ["OPERADOR", "texto", "Empresa que pagó: sale de la tabla de producción del mismo anual (mismo lote del PDF). «VARIOS OPERADORES» "
+                                "si el PDF no distingue los contratos (Lote 8 en 2024). La vista por lote suma; la vista por empresa separa."],
           ["REGALIA_PCT", "número (%)", "Porcentaje de regalía (solo edición 2007)."],
           ["REGALIA_US$", "número (US$)", "Monto del año."],
       ]),
@@ -256,7 +258,7 @@ h += [P("4d. Pozos, regalías, canon y precio de canasta", "h1"),
       ]),
       P("<b>PP_operadores_lote.csv</b> — lo arma el notebook del mapa desde la producción fiscalizada (líquidos y gas): una fila por lote, "
         "operador y periodo continuo con producción. Columnas: DEPARTAMENTO, CAMPO, LOTE, OPERADOR, AÑO_INICIO, AÑO_FIN, "
-        "AÑOS_CON_PRODUCCION, LIQUIDOS_BBL y GAS_MPC. Un año sin producción corta el periodo."),
+        "AÑOS_CON_PRODUCCION, LIQUIDOS_BBL, GAS_MPC y REGALIAS_US$ (regalías de ese operador en el periodo). Un año sin producción corta el periodo."),
       P("<b>Control</b> (<font name='DVM'>CONTROL PP tablas_adicionales.csv</font>): una fila por tabla, edición y año con SUMA (suma de lotes "
         "o departamentos; en canasta, promedio calculado), TOTAL_PDF (total o promedio impreso), PAGINA, USADO (si esa edición es la que "
         "quedó para el año) y ESTADO. Tolerancias: pozos exacto; regalías 0,1 % (2001–2006 vienen redondeadas a miles); canon 0,05; "
