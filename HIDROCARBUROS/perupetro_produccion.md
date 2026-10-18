@@ -361,3 +361,24 @@ Responde «quién opera cada lote y desde cuándo». Se lee junto con las demás
 ## Año inicio por defecto: 1994 (18/10/2026)
 
 El selector «Año inicio» del Bloque 2 viene ahora en **1994** (antes, 2012). Hay que correr la serie completa porque pozos, regalías, canon y canasta no se acumulan en Drive: cada corrida los reescribe solo con los anuales que procesa. Solo se acumulan los contratos (por edición) y el canon e ingresos mensuales. Para una prueba rápida se puede elegir un año más reciente, sabiendo que esas tablas quedarán incompletas hasta la siguiente corrida completa.
+
+## Sección 9: Excel de canon (19/10/2026)
+
+Casilla del Bloque 2: «Excel de canon (determinación por lote, distribución y municipalidades)», marcada por defecto.
+
+- **Páginas:**
+  - «Canon y Sobre Canon» (`PAGINA_CANON`, la dirección que dio el usuario);
+  - «Canon Municipalidades», que se toma del enlace del menú lateral de esa misma página.
+- **Clasificación por el texto del enlace:**
+
+| Texto del enlace | Archivo en `DATA/CANON_EXCEL/` |
+|---|---|
+| «Canon Petrolero <año>» | `PP_CANON_DETERMINACION_<año>.xlsx` |
+| «Canon por Año <Dep.>» (Canon y Sobre Canon) | `PP_CANON_DISTRIBUCION_<DEP>.xlsx` |
+| «Canon por Año <Dep.>» (Canon Municipalidades) | `PP_CANON_MUNICIPAL_<DEP>.xlsx` |
+
+- **Qué se descarga en cada corrida:** los de Determinación de años cerrados que ya están en Drive no se vuelven a bajar. El año en curso, la Distribución y las Municipalidades se bajan siempre, porque PERUPETRO los actualiza cada mes.
+- **Verificación:** se confirma que el contenido sea Excel (xlsx = «PK», xls = OLE). Una página de error queda como «ERROR: no es un Excel».
+- **Respaldo:** si la descarga falla, se ponen los Excel a mano en `DATA/CANON_EXCEL`. El control los lista como «MANUAL».
+- **Control:** `CONTROL/CONTROL PP canon_excel.csv`, con PAGINA, TEXTO_ENLACE, URL, TIPO, AÑO, DEPARTAMENTO, ARCHIVO, BYTES y ESTADO (DESCARGADO / YA EN DRIVE / ERROR… / SIN CLASIFICAR / MANUAL). El resumen del notebook muestra los casos a revisar.
+- **Prueba:** con una copia simulada de la página (20 enlaces de Determinación, 6 de Distribución, 5 de Municipalidades) y los Excel reales de `fuentes_canon/`. Desde Claude Code no se puede abrir perupetro.com.pe; la primera corrida real en Colab confirmará la forma de los enlaces.

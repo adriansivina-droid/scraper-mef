@@ -185,7 +185,7 @@ Otros proyectos del mismo repositorio:
 
 ## 9. Siguiente tarea: canon por lote, por beneficiario y por municipalidad (pendiente, 18/10/2026)
 
-**Estado:** revisado y propuesto, **sin implementar**. El usuario aprobó revisar las fuentes; falta su orden para implementar los cinco puntos de abajo.
+**Estado:** punto 1 (descarga) implementado; puntos 2–5 pendientes de orden.
 
 ### Fuentes (PERUPETRO, web «Estadísticas»; no están en los PDF anuales)
 
@@ -202,8 +202,8 @@ Dirección de la página «Canon y Sobre Canon» (Determinación y Distribución
 
 Desde la sesión de Claude Code **no se puede abrir perupetro.com.pe** (el proxy da 403): los archivos se suben al repositorio (GitHub → Add file → Upload files, en una rama aparte) o se descargan desde Colab. La rama `fuentes-canon` del usuario ya se copió a `HIDROCARBUROS/fuentes_canon/` y se puede borrar.
 
-### Propuesta (5 puntos, esperando orden)
-1. **Descarga** en el notebook de producción (sección nueva) de los Excel de Determinación (2007–hoy), Distribución (6 dep.) y Canon Municipalidades (5 dep.), guardados en Drive con fecha; respaldo: carpeta de Drive con los archivos puestos a mano.
+### Propuesta (5 puntos)
+1. ✅ **Implementado (19/10/2026, sección 9 del notebook de producción; ver `perupetro_produccion.md`). Pendiente: primera corrida real en Colab y revisar `CONTROL PP canon_excel.csv`.** **Descarga** en el notebook de producción (sección nueva) de los Excel de Determinación (2007–hoy), Distribución (6 dep.) y Canon Municipalidades (5 dep.), guardados en Drive con fecha; respaldo: carpeta de Drive con los archivos puestos a mano.
 2. **Lectores**: `PP_canon_lote_mes.csv` (año, mes, departamento, lote, producto, volumen, canasta, deducciones, valor US$, canon US$, parte por departamento, tipo de cambio), `PP_canon_distribucion_mes.csv` (1993–hoy, por beneficiario) y `PP_canon_municipal_mes.csv` (1993–2002 + año en curso, acumulado en Drive). Control: lotes = subtotal de zona; S/ = serie mensual; total anual = PDF anual.
 3. La serie de canon por departamento pasa a usar estos totales mensuales (1993–hoy); los PDF quedan como control.
 4. **Mapa**: pestaña «Canon» con el canon **del lote** (de Determinación), el del departamento por beneficiario y el de provincia/distrito del lote (requiere la capa de distritos INEI).
