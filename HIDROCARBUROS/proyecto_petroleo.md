@@ -177,8 +177,32 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 Pegar algo como:
 
-> Continúa el **Proyecto Petróleo** del repositorio `adriansivina-droid/scraper-mef`. Lee `HIDROCARBUROS/proyecto_petroleo.md` y `HIDROCARBUROS/perupetro_produccion.md`. Trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`, haz PR y merge a `main`. Siguiente tarea: [por ejemplo, mapa de lotes / regalías por lote]. Te subo los PDF que necesites.
+> Continúa el **Proyecto Petróleo** del repositorio `adriansivina-droid/scraper-mef`. Lee `HIDROCARBUROS/proyecto_petroleo.md` y `HIDROCARBUROS/perupetro_produccion.md`. Trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`, haz PR y merge a `main`. Siguiente tarea: la de la sección 9 (canon por lote, por beneficiario y por municipalidad); los Excel de muestra están en `HIDROCARBUROS/fuentes_canon/`. Te subo los PDF o Excel que necesites (si no se pueden adjuntar, los subo a GitHub en una rama aparte).
 
 Otros proyectos del mismo repositorio:
 - `FISCAL/`: scrapers MEF Consulta Amigable (ver `FISCAL/CONTEXTO_PROYECTO.md`).
 - `EXPORT/`: scraper Infotrade y diccionario de partidas arancelarias (ver `EXPORT/exportaciones_scraper_infotrade.md`).
+
+## 9. Siguiente tarea: canon por lote, por beneficiario y por municipalidad (pendiente, 18/10/2026)
+
+**Estado:** revisado y propuesto, **sin implementar**. El usuario aprobó revisar las fuentes; falta su orden para implementar los cinco puntos de abajo.
+
+### Fuentes (PERUPETRO, web «Estadísticas»; no están en los PDF anuales)
+
+| Página | Archivo | Contenido | Revisión |
+|---|---|---|---|
+| Canon y Sobre Canon → **Determinación** | «Canon Petrolero 2007…2026» (un Excel por año; copias de 2025 y 2026 en `HIDROCARBUROS/fuentes_canon/Determinacion_canon_2025.xlsx` y `_2026.xlsx`) | **Canon por lote y mes**: una hoja por mes (Ene…Dic, TOTAL; hay hojas extra como «Abr (2)», «Ene-2», «Recuperado_Hoja1», «cuadre», «Nov-original» que se deben ignorar). Por zona (Piura/Tumbes, Puerto Inca-Huánuco, Loreto/Ucayali, Cusco): lote, modalidad, período (Quincena/Mes), fórmula (F1–F4), unidades (Bls / MM BTU), volumen 1.ª y 2.ª quincena, canasta, deducciones (flete, comercialización, oleoducto, fiscalización), **valor de la producción (US$)**, **canon y sobrecanon total (US$)** y la parte de cada departamento («Localidad 1» = Loreto); subtotal en US$ y en S/ (tipo de cambio en la fila 5). | Ene-2025: Loreto/Ucayali, Lote 95 = valor US$ 40,40 MM, canon US$ 7,58 MM, parte de Loreto US$ 6,06 MM (80 %); **subtotal Loreto S/ 23.157.055 = canon mensual de Loreto ene-2025 (23,16 MM) ✔**. |
+| Canon y Sobre Canon → **Distribución** | «Canon por Año <Dep.>» (Ucayali, Piura, Huánuco, Tumbes, Loreto, Cusco); copia de Loreto en `fuentes_canon/Canon_por_anio_Loreto.xlsx` | Una hoja por año, **1993–2026**: canon de cada mes, fecha de pago y reparto por beneficiario (gobierno regional, instituto tecnológico, universidades, IIAP, concejos municipales, Ley 29289) con su %. **1993–2002 trae además el detalle por municipalidad**; 2003+ solo el total municipal. % por norma: 52/5/3/40 hasta 2023; 20/2/2,5/2,5/3/70 desde la Ley 31934 (30/01/2024). | Loreto: total anual = canon de los PDF anuales en **1995–2024 (diferencia 0)**; 2025 = 213,84 MM (confirma la corrección por suma mensual); agrega 1993–1994 y 2026 ene–jul (125,37 MM). |
+| **Canon Municipalidades** | «Canon por Año <Dep.>» (Cusco, Huánuco, Loreto, Tumbes, Piura); copia de Loreto en `fuentes_canon/Canon_municipalidades_Loreto_2025.xlsx` | Año en curso (el de Loreto trae solo 2025): gobierno regional, universidades, IIAP y **las 53 municipalidades provinciales y distritales** de Loreto, + 5 % comunidades (D.U. 026-2010). | Ene–ago 2025 = serie mensual al centavo; set (Ucayali en 0) y oct (municipios en 0) incompletos. Puinahua (distrito del Lote 95) S/ 20,0 MM ene–set 2025 = 16 % de lo municipal; provincia de Requena 47 %. |
+
+Desde la sesión de Claude Code **no se puede abrir perupetro.com.pe** (el proxy da 403): los archivos se suben al repositorio (GitHub → Add file → Upload files, en una rama aparte) o se descargan desde Colab. La rama `fuentes-canon` del usuario ya se copió a `HIDROCARBUROS/fuentes_canon/` y se puede borrar.
+
+### Propuesta (5 puntos, esperando orden)
+1. **Descarga** en el notebook de producción (sección nueva) de los Excel de Determinación (2007–hoy), Distribución (6 dep.) y Canon Municipalidades (5 dep.), guardados en Drive con fecha; respaldo: carpeta de Drive con los archivos puestos a mano.
+2. **Lectores**: `PP_canon_lote_mes.csv` (año, mes, departamento, lote, producto, volumen, canasta, deducciones, valor US$, canon US$, parte por departamento, tipo de cambio), `PP_canon_distribucion_mes.csv` (1993–hoy, por beneficiario) y `PP_canon_municipal_mes.csv` (1993–2002 + año en curso, acumulado en Drive). Control: lotes = subtotal de zona; S/ = serie mensual; total anual = PDF anual.
+3. La serie de canon por departamento pasa a usar estos totales mensuales (1993–hoy); los PDF quedan como control.
+4. **Mapa**: pestaña «Canon» con el canon **del lote** (de Determinación), el del departamento por beneficiario y el de provincia/distrito del lote (requiere la capa de distritos INEI).
+5. **Texto y evidencia** Loreto 2025: canon generado por el Lote 95 y el Lote 8, reparto por beneficiario, Puinahua y Requena; hoja nueva en el libro de evidencia.
+
+### Otros pendientes menores
+- Ejes de los gráficos de pozos/regalías/canon (`act_panel.html`): años encimados al inicio (1994/1995), igual que se corrigió en la línea de tiempo de «Empresas».
