@@ -357,3 +357,7 @@ Responde «quién opera cada lote y desde cuándo». Se lee junto con las demás
 - Si el lote del PDF no basta, se usa el único operador con producción del lote ese año. Si hubo varios y el PDF no los distingue, queda «VARIOS OPERADORES» (Lote 8 en 2024).
 - **Criterio:** la vista por lote suma las regalías del lote (Lote 8 2025: US$ 10,0 MM, US$ 8,8/bbl); la vista por empresa las separa (Upland US$ 7,9 MM, US$ 8,0/bbl; PPN en liquidación US$ 2,1 MM).
 - La asignación sigue al PDF: en 2024 la tabla de producción pone a OIG en las dos filas del Lote X, aunque el contrato de CNPC terminó el 19/05/2024.
+
+## Año inicio por defecto: 1994 (18/10/2026)
+
+El selector «Año inicio» del Bloque 2 viene ahora en **1994** (antes, 2012). Hay que correr la serie completa porque pozos, regalías, canon y canasta no se acumulan en Drive: cada corrida los reescribe solo con los anuales que procesa. Solo se acumulan los contratos (por edición) y el canon e ingresos mensuales. Para una prueba rápida se puede elegir un año más reciente, sabiendo que esas tablas quedarán incompletas hasta la siguiente corrida completa.
