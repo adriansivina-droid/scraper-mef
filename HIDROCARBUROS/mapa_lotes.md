@@ -432,3 +432,8 @@ Lo publicado por PERUPETRO al 18/10/2026: estadística mensual de enero a junio 
 - **Mismos colores** en Producción y en la línea de tiempo de «Empresas» (`window.ppColOp`): la paleta sigue el orden del primer año con producción de cada empresa en el campo, también cuando se ve un solo lote.
 - **Clic en una barra de la línea de tiempo** («Empresas»): abre Producción de ese lote (o del campo, si tiene un solo lote) en los años de esa empresa, con las pestañas del campo.
 - Con «Comparar con», o para Perú y los departamentos, las barras siguen siendo de un solo color.
+
+
+## Canon: serie del Excel de Distribución (19/10/2026)
+
+La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de los Excel de Distribución (1993–hoy; ver `perupetro_produccion.md`). Si el archivo trae AÑO_COMPLETO, se muestran solo los años completos, para que el año en curso no parezca una caída. Hay que volver a correr el notebook del mapa después del de producción.

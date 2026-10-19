@@ -96,10 +96,12 @@ h += [P("Diccionario de datos", "tit"),
           ["DATA/PP_produccion_diaria.csv", "Producción", "Producción fiscalizada diaria por lote: líquidos (bbl) y gas (Mcf, MMBtu) (§4c)."],
           ["DATA/PP_pozos_perforados_lote_anio.csv", "Actividad", "Pozos perforados por lote, año y tipo (exploratorio, confirmatorio, desarrollo), 1995–hoy (§4d)."],
           ["DATA/PP_regalias_lote_anio.csv", "Fiscal", "Regalías (ingresos al fisco) por lote e hidrocarburo, US$, 2001–hoy (§4d)."],
-          ["DATA/PP_canon_departamento_anio.csv", "Fiscal", "Canon y sobrecanon petrolero por departamento, millones de soles, 1993–hoy (§4d)."],
+          ["DATA/PP_canon_departamento_anio.csv", "Fiscal", "Serie oficial de canon por departamento y año (MM S/), suma mensual del Excel de Distribución, 1993–hoy (§4e)."],
+          ["DATA/PP_canon_departamento_anio_pdf.csv", "Control", "Canon por departamento de los PDF anuales (control de la serie oficial) (§4d)."],
           ["DATA/PP_precio_canasta_lote_mes.csv", "Precios", "Precio de la canasta de líquidos por lote y mes, US$/bbl, 2001–hoy (§4d)."],
           ["DATA/PP_valor_produccion_lote_mes.csv", "Producción", "Valor de la producción de líquidos = barriles × precio de canasta (§4d)."],
-          ["DATA/PP_canon_departamento_mes.csv", "Fiscal", "Canon y sobrecanon por departamento y mes, de las estadísticas mensuales (2025–hoy, se acumula) (§4d)."],
+          ["DATA/PP_canon_departamento_mes.csv", "Fiscal", "Serie oficial de canon por departamento y mes (MM S/), del Excel de Distribución, 1993–hoy (§4e)."],
+          ["DATA/PP_canon_departamento_mes_pdf.csv", "Control", "Canon por departamento y mes de las estadísticas mensuales en PDF (2025–hoy, se acumula) (§4d)."],
           ["DATA/PP_ingresos_estado_mes.csv", "Fiscal", "Ingresos para el Estado por mes y tipo de contrato, total nacional (§4d)."],
           ["DATA/PP_contratos.csv", "Empresas", "Contratos vigentes y terminados por edición: empresas socias con su %, suscripción, término y área, 2004–hoy (§4d)."],
           ["DATA/CANON_EXCEL/PP_CANON_*.xlsx", "Fuente", "Excel de canon de PERUPETRO: Determinación por año, Distribución y Municipalidades por departamento (§4e)."],
@@ -228,9 +230,9 @@ h += [P("4d. Pozos, regalías, canon y precio de canasta", "h1"),
           ["REGALIA_PCT", "número (%)", "Porcentaje de regalía (solo edición 2007)."],
           ["REGALIA_US$", "número (US$)", "Monto del año."],
       ]),
-      P("<b>PP_canon_departamento_anio.csv</b> — «Distribución del canon / sobrecanon» (series de 10 años; la edición 2001 llega a 1993). "
+      P("<b>PP_canon_departamento_anio_pdf.csv</b> (antes PP_canon_departamento_anio.csv; desde el 19/10/2026 es control y la serie oficial sale del Excel de Distribución, §4e) — «Distribución del canon / sobrecanon» (series de 10 años; la edición 2001 llega a 1993). "
         "Columnas: AÑO, DEPARTAMENTO, CANON_MM_SOLES (millones de soles corrientes) y FUENTE. Para cada año manda la edición más reciente."),
-      P("<b>PP_canon_departamento_mes.csv</b> y <b>PP_ingresos_estado_mes.csv</b> — del «Resumen ejecutivo» de cada estadística "
+      P("<b>PP_canon_departamento_mes_pdf.csv</b> (antes PP_canon_departamento_mes.csv; ahora control) y <b>PP_ingresos_estado_mes.csv</b> — del «Resumen ejecutivo» de cada estadística "
         "mensual: canon y sobrecanon por departamento (MM S/, con un mes de rezago: el reporte de enero trae los 12 meses del año "
         "anterior) e ingresos para el Estado (regalías + regalía equivalente, MM US$, total nacional por LICENCIA / SERVICIOS / TOTAL). "
         "PERUPETRO solo publica las mensuales del año en curso, así que ambas series se acumulan en Drive en cada corrida. Columnas: "
@@ -300,6 +302,12 @@ h += [P("4d. Pozos, regalías, canon y precio de canasta", "h1"),
         "(sin notas «(*)»), NIVEL (PROVINCIAL o DISTRITAL: la primera de cada provincia o la marcada «(Provincial)»), MONTO_SOLES y "
         "FUENTE_EXCEL. Los meses que en el Excel aún están en 0 no se cargan. Como el Excel de Municipalidades solo trae el año en curso, "
         "la tabla se acumula en Drive (cada corrida reemplaza los meses que vuelve a leer)."),
+      P("<b>Serie oficial de canon por departamento</b> (punto 3): <b>PP_canon_departamento_mes.csv</b> — AÑO, MES, FECHA, "
+        "DEPARTAMENTO (los 6 productores y TOTAL), CANON_MM_SOLES (suma de beneficiarios de la Distribución), CANON_PDF_MM_SOLES "
+        "(control, estadística mensual en PDF) y FUENTE; un mes que ya está en el PDF pero no en el Excel se toma del PDF. "
+        "<b>PP_canon_departamento_anio.csv</b> — AÑO, DEPARTAMENTO, CANON_MM_SOLES (suma de los meses), MESES, AÑO_COMPLETO, "
+        "CANON_PDF_ANUAL (control, PDF anual) y FUENTE; departamentos o años fuera del Excel se toman del PDF anual. El mapa usa "
+        "solo los años completos."),
       P("<b>Control</b> (<font name='DVM'>CONTROL PP canon_excel_lectura.csv</font>): una fila por archivo, hoja, mes y parte con SUMA, "
         "TOTAL_EXCEL y ESTADO. Dentro de cada Excel: suma de lotes = «Subtotal» de la zona (US$); suma de beneficiarios = TOTAL; suma de "
         "municipalidades = TOTAL de su sección. Cruces: soles por departamento de la Determinación = total de la Distribución del mismo mes; "

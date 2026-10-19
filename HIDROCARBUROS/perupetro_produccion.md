@@ -422,3 +422,20 @@ Segunda corrida (19/10/2026): mismos resultados que la relectura local. Se unifi
 **Diferencias conocidas en el control:** las 16 diferencias anteriores (todas de las fuentes de PERUPETRO) están listadas en `CONOCIDAS`, dentro de la sección 9. El control las marca «DIFERENCIA DE LA FUENTE (conocida): <nota>» y ya no salen en «A revisar». Solo aparece como «REVISAR» una diferencia nueva; si no hay ninguna, el cuaderno imprime «✅ Sin casos nuevos a revisar».
 
 **Ucayali en Canon Municipalidades (cerrado):** en la corrida no apareció «MISMO ARCHIVO QUE CANON Y SOBRE CANON». La página de Municipalidades tiene 5 Excel; el enlace de Ucayali que pasó el usuario es el de Distribución.
+
+## Serie oficial de canon por departamento desde la Distribución (punto 3, 19/10/2026)
+
+Desde esta versión, la serie de canon y sobrecanon por departamento se arma en la sección 9 con los totales mensuales de los Excel de Distribución, de 1993 a hoy. Los PDF quedan como control.
+
+| Archivo (`DATA/`) | Qué es ahora |
+|---|---|
+| `PP_canon_departamento_mes.csv` | **Serie oficial mensual** por departamento, más una fila TOTAL (suma de los 6), en MM S/: AÑO, MES, FECHA, DEPARTAMENTO, CANON_MM_SOLES, CANON_PDF_MM_SOLES (control, de la estadística mensual en PDF) y FUENTE. Si un mes ya salió en el PDF pero aún no en el Excel, se usa el PDF y FUENTE lo dice. |
+| `PP_canon_departamento_anio.csv` | **Serie oficial anual**, suma de los meses: AÑO, DEPARTAMENTO, CANON_MM_SOLES, MESES, AÑO_COMPLETO, CANON_PDF_ANUAL (control, del PDF anual) y FUENTE. Los departamentos o años que el Excel no cubre se toman del PDF anual. |
+| `PP_canon_departamento_mes_pdf.csv` | Lo que antes era `PP_canon_departamento_mes.csv`: canon del «Resumen ejecutivo» de las estadísticas mensuales (2025–hoy). Se acumula. |
+| `PP_canon_departamento_anio_pdf.csv` | Lo que antes era `PP_canon_departamento_anio.csv`: canon de los PDF anuales, con la corrección por suma mensual. |
+
+- **Migración automática:** en la primera corrida con esta versión, los archivos anteriores se copian como `_pdf`, antes de que la sección 9 escriba la serie nueva. No se pierde la serie mensual en PDF ya acumulada.
+- **Corrida sin «Excel de canon»:** la sección 9 no se ejecuta y la serie oficial de Drive no se toca; los `_pdf` se actualizan igual.
+- **Mapa:** la pestaña «Canon» sigue leyendo `PP_canon_departamento_anio.csv` y muestra solo los años completos (AÑO_COMPLETO). Así, el año en curso no aparece como una caída.
+- **Resumen del notebook:** los cuadros de canon de la sección 6 se rotulan «según los PDF (control)». La sección 9 muestra la serie oficial de los últimos años, con «*» en el año incompleto.
+- **Totales 2016–2025 de la serie nueva (MM S/):** 1 327,77; 1 558,22; 2 067,78; 1 675,43; 1 151,83; 2 807,94; 3 913,82; 2 633,62; 2 555,49 y 2 199,72. El de 2025 coincide con la suma mensual de la Estadística Mensual de enero de 2026 (2 199,72). Loreto 2025 queda en 213,84 sin corrección manual, cuando el PDF anual daba 20,19.
