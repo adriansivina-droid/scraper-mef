@@ -368,7 +368,7 @@ Casilla del Bloque 2: «Excel de canon (determinación por lote, distribución y
 
 - **Páginas:**
   - «Canon y Sobre Canon» (`PAGINA_CANON`, la dirección que dio el usuario);
-  - «Canon Municipalidades», que se toma del enlace del menú lateral de esa misma página.
+  - «Canon Municipalidades»: se toma del enlace del menú lateral (por texto o por «canon%20municipalidades» en la dirección); si no aparece, se prueba la dirección directa `…/estadisticas/canon%20municipalidades/`. En la primera corrida real (19/10/2026) el menú no lo traía y se agregó esa alternativa.
 - **Clasificación por el texto del enlace:**
 
 | Texto del enlace | Archivo en `DATA/CANON_EXCEL/` |
@@ -378,6 +378,8 @@ Casilla del Bloque 2: «Excel de canon (determinación por lote, distribución y
 | «Canon por Año <Dep.>» (Canon Municipalidades) | `PP_CANON_MUNICIPAL_<DEP>.xlsx` |
 
 - **Qué se descarga en cada corrida:** los de Determinación de años cerrados que ya están en Drive no se vuelven a bajar. El año en curso, la Distribución y las Municipalidades se bajan siempre, porque PERUPETRO los actualiza cada mes.
+- Los documentos legales de la página (reglamentos, decretos, resoluciones) se ignoran.
+- **Primera corrida real (19/10/2026):** 34 Excel de Determinación y 6 de Distribución descargados.
 - **Verificación:** se confirma que el contenido sea Excel (xlsx = «PK», xls = OLE). Una página de error queda como «ERROR: no es un Excel».
 - **Respaldo:** si la descarga falla, se ponen los Excel a mano en `DATA/CANON_EXCEL`. El control los lista como «MANUAL».
 - **Control:** `CONTROL/CONTROL PP canon_excel.csv`, con PAGINA, TEXTO_ENLACE, URL, TIPO, AÑO, DEPARTAMENTO, ARCHIVO, BYTES y ESTADO (DESCARGADO / YA EN DRIVE / ERROR… / SIN CLASIFICAR / MANUAL). El resumen del notebook muestra los casos a revisar.
