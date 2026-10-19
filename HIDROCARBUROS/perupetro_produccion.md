@@ -384,3 +384,26 @@ Casilla del Bloque 2: «Excel de canon (determinación por lote, distribución y
 - **Respaldo:** si la descarga falla, se ponen los Excel a mano en `DATA/CANON_EXCEL`. El control los lista como «MANUAL».
 - **Control:** `CONTROL/CONTROL PP canon_excel.csv`, con PAGINA, TEXTO_ENLACE, URL, TIPO, AÑO, DEPARTAMENTO, ARCHIVO, BYTES y ESTADO (DESCARGADO / YA EN DRIVE / ERROR… / SIN CLASIFICAR / MANUAL). El resumen del notebook muestra los casos a revisar.
 - **Prueba:** con una copia simulada de la página (20 enlaces de Determinación, 6 de Distribución, 5 de Municipalidades) y los Excel reales de `fuentes_canon/`. Desde Claude Code no se puede abrir perupetro.com.pe; la primera corrida real en Colab confirmará la forma de los enlaces.
+
+### Lectura de los Excel de canon (punto 2, 19/10/2026)
+
+Va en la misma sección 9, después de la descarga y con la misma casilla. Lee todos los `PP_CANON_*.xlsx` de `DATA/CANON_EXCEL` (baja de Drive los que no bajó en esta corrida). El código está en `canon_xls.py` (scratchpad) y se inserta en el Bloque 1 del notebook. Los `.xls` antiguos se leen con `xlrd`.
+
+| Salida (`DATA/`) | Fuente | Qué trae |
+|---|---|---|
+| `PP_canon_lote_mes.csv` | Determinación «Canon Petrolero <año>» | Una fila por lote e hidrocarburo y mes: volumen, precios 1.ª/2.ª quincena, deducciones, valor de la producción (US$), canon total (US$) y la parte de cada departamento de la zona (Loreto/Ucayali, Piura/Tumbes, Huánuco, Cusco), tipo de cambio. Los ajustes de meses anteriores van como `LOTE = AJUSTES MESES ANTERIORES`. |
+| `PP_canon_distribucion_mes.csv` | Distribución «Canon por Año <Dep.>» | Canon por departamento, mes y beneficiario (S/), 1993–hoy, con `TIPO_BENEFICIARIO` (GOBIERNO REGIONAL, INSTITUTOS, UNIVERSIDADES, IIAP, MUNICIPALIDADES, LEY 29289) y el % como figura. |
+| `PP_canon_municipal_mes.csv` | Canon Municipalidades + detalle por concejos de la Distribución 1993–2002 | Canon por municipalidad provincial y distrital (S/) con provincia, nivel y sección (GOBIERNOS LOCALES, COMUNIDADES (5%), CONCEJOS MUNICIPALES). **Se acumula en Drive** porque el Excel solo trae el año en curso. |
+
+Reglas que salieron de revisar los Excel reales:
+- **Determinación:** solo hojas con nombre de mes exacto (Ene…Dic, Set/Sep). Se ignoran «Ene-2», «Abr (2)», «Ene(2)», «Nov-original», «Dic (4)», «cuadre», «TOTAL»… y los meses aún vacíos (2026: may–dic en la copia del repositorio). El mes es el de la hoja: el texto «Correspondiente a …» a veces quedó del año anterior («Jun» 2025 dice «Junio 2024»). Las columnas se ubican por su cabecera («Valor de la Producción», «Canon y Sobrecanon», «Localidad 1/2», «Unidades»). «Puerto Inca» = HUANUCO.
+- **Distribución:** el año es el de la hoja («99» = 1999); la etiqueta del mes no manda (la hoja 2024 de Ucayali dice «Ene.2025»). En 1993–2002, las filas de provincia («MAYNAS (36.72%)») a veces traen un 1 en los meses: se toman como encabezado.
+- **Municipalidades:** se lee el bloque «validado con la PCM». La provincia sale del encabezado espaciado («A L T O    A M A Z O N A S») o de la fila sin montos seguida de municipios; la municipalidad provincial es la marcada «(Provincial)» o la primera de su provincia. Los meses que en el Excel están todos en 0 (p. ej., oct–dic 2025) no se cargan: el control los marca «SIN REPARTO EN EL EXCEL».
+
+**Control** `CONTROL/CONTROL PP canon_excel_lectura.csv`: lotes = «Subtotal» de su zona; beneficiarios = TOTAL; municipalidades = TOTAL de su sección; y tres cruces: soles por departamento de la Determinación = total de la Distribución del mismo mes; Distribución = `PP_canon_departamento_mes.csv` y `PP_canon_departamento_anio.csv` de los PDF; municipalidades = rubro municipal de la Distribución.
+
+**Prueba con los Excel del repositorio y del zip de Municipalidades (19/10/2026):**
+- Distribución Loreto y Ucayali 1993–2026: 816 meses, todos cuadran con su TOTAL; 240 controles de concejos 1993–2002, todos OK. Loreto 2024 = 219,13 MM y 2025 = 213,84 MM, iguales al PDF.
+- Determinación 2025 y 2026 (ene–abr): 160 subtotales de zona OK; soles por departamento = Distribución en los 30 meses comparables.
+- Municipalidades (5 dep., 2025): 229 cruces con la Distribución OK. Único «REVISAR»: Loreto set-2025, donde el TOTAL GOBIERNOS LOCALES del Excel (10,10 MM) deja fuera a la provincia de Ucayali (su subtotal está en 0, pero sus 6 municipios tienen montos); con ellos, el detalle cuadra con la Distribución. Es un error del Excel, no del lector.
+- **Pendiente:** Determinación 1993–2024 y Distribución de Cusco, Huánuco, Piura y Tumbes no se pudieron probar aquí (no están en el repositorio). Si alguna hoja tiene otra forma, el control dirá «SIN CABECERA RECONOCIBLE» o «REVISAR».

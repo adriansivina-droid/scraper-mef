@@ -102,6 +102,11 @@ h += [P("Diccionario de datos", "tit"),
           ["DATA/PP_canon_departamento_mes.csv", "Fiscal", "Canon y sobrecanon por departamento y mes, de las estadísticas mensuales (2025–hoy, se acumula) (§4d)."],
           ["DATA/PP_ingresos_estado_mes.csv", "Fiscal", "Ingresos para el Estado por mes y tipo de contrato, total nacional (§4d)."],
           ["DATA/PP_contratos.csv", "Empresas", "Contratos vigentes y terminados por edición: empresas socias con su %, suscripción, término y área, 2004–hoy (§4d)."],
+          ["DATA/CANON_EXCEL/PP_CANON_*.xlsx", "Fuente", "Excel de canon de PERUPETRO: Determinación por año, Distribución y Municipalidades por departamento (§4e)."],
+          ["DATA/PP_canon_lote_mes.csv", "Fiscal", "Canon y sobrecanon por lote y mes (US$) y la parte de cada departamento, de la Determinación (§4e)."],
+          ["DATA/PP_canon_distribucion_mes.csv", "Fiscal", "Canon por departamento, mes y beneficiario (S/), 1993–hoy, de la Distribución (§4e)."],
+          ["DATA/PP_canon_municipal_mes.csv", "Fiscal", "Canon por municipalidad provincial y distrital y mes (S/): año en curso y 1993–2002 (§4e)."],
+          ["CONTROL/CONTROL PP canon_excel.csv · canon_excel_lectura.csv", "Control", "Descarga de los Excel de canon y control de su lectura y cruces (§4e)."],
           ["DATA/PP_operadores_lote.csv", "Empresas", "Quién operó cada lote y en qué años, según la producción fiscalizada (lo arma el mapa, §8b)."],
           ["CONTROL/CONTROL PP tablas_adicionales.csv", "Control", "Suma de lotes vs total del PDF de cada tabla adicional (§4d)."],
           ["CONTROL/CONTROL PP produccion_lote_mes_&lt;ini&gt;-&lt;fin&gt;.csv", "Control", "Una fila por año: de qué PDF salió y si cuadra con sus totales (§5)."],
@@ -264,6 +269,42 @@ h += [P("4d. Pozos, regalías, canon y precio de canasta", "h1"),
         "quedó para el año) y ESTADO. Tolerancias: pozos exacto; regalías 0,1 % (2001–2006 vienen redondeadas a miles); canon 0,05; "
         "canasta 0,011 US$/bbl. Sin promedio impreso (2007–2011) se exige el año completo. En la prueba con los anuales 2001–2025 "
         "todas las tablas cuadran, salvo dos casos reales de 2008 (lote 56, que empezó en setiembre, y XIII, al que le falta un mes en el PDF)."),
+      P("4e. Excel de canon (sección 9 del notebook)", "h2"),
+      P("Se bajan de las páginas «Canon y Sobre Canon» y «Canon Municipalidades» de PERUPETRO a DATA/CANON_EXCEL y se leen en cada "
+        "corrida. Montos tal como los imprime el Excel (US$ o soles corrientes, con decimales). Meses: el MES es el de la producción "
+        "(Determinación) o el «periodo de pago» (Distribución y Municipalidades), que es el mismo mes: enero se paga en febrero (FECHA_PAGO)."),
+      P("<b>PP_canon_lote_mes.csv</b> — «Canon Petrolero &lt;año&gt;», una hoja por mes (se ignoran hojas de trabajo como «Ene-2», "
+        "«Abr (2)», «Nov-original» o «TOTAL», y los meses aún vacíos). Una fila por lote e hidrocarburo."),
+      tabla([
+          ["AÑO, MES, FECHA", "entero / fecha", "Mes de producción. FECHA = 01/mm/aaaa."],
+          ["ZONA", "texto", "Bloque del Excel: PIURA / TUMBES, PROVINCIA PUERTO INCA HUANUCO, LORETO / UCAYALI, CUSCO."],
+          ["LOTE_ITEM", "texto", "Fila tal como figura («X-GAS», «31-C LGN (*)», «Ajustes meses anteriores (3)»)."],
+          ["LOTE, PRODUCTO", "texto (código)", "Lote sin el producto (Z1 → Z-1) y PETROLEO, GAS, LGN o CONDENSADO. Los ajustes van como "
+                                               "LOTE = AJUSTES MESES ANTERIORES."],
+          ["MODALIDAD, UNIDAD, VOLUMEN", "texto / número", "LICENCIA o SERVICIOS; BLS o MM BTU; volumen del mes (1ra + 2da quincena)."],
+          ["PRECIO_1Q, PRECIO_2Q_MES", "número (US$/unidad)", "Canasta o valor de venta de la 1ra quincena y de la 2da (o del mes)."],
+          ["DEDUCCIONES_US$", "número (US$)", "Suma de flete marítimo, comercialización, oleoducto y fiscalización, como los trae el Excel."],
+          ["VALOR_PRODUCCION_US$, CANON_TOTAL_US$", "número (US$)", "Valor de la producción y canon + sobrecanon (o participación) del lote."],
+          ["DEPARTAMENTO_1, CANON_DEP_1_US$", "texto / US$", "Primer departamento de la zona (Piura, Huánuco, Loreto, Cusco) y su parte."],
+          ["DEPARTAMENTO_2, CANON_DEP_2_US$", "texto / US$", "Segundo departamento (Tumbes, Ucayali) y su parte; vacío si la zona tiene uno."],
+          ["TIPO_CAMBIO, HOJA", "número / texto", "Tipo de cambio del Excel (0 si aún no lo tiene) y hoja de origen."],
+      ]),
+      P("<b>PP_canon_distribucion_mes.csv</b> — «Canon por Año &lt;Dep.&gt;» de Distribución: una hoja por año (1993–hoy). Columnas: "
+        "DEPARTAMENTO, AÑO, MES, FECHA, FECHA_PAGO, BENEFICIARIO (como figura), TIPO_BENEFICIARIO (GOBIERNO REGIONAL, INSTITUTOS, "
+        "UNIVERSIDADES, IIAP, MUNICIPALIDADES, LEY 29289), PORCENTAJE (como figura: «52% », «20% - 40%») y MONTO_SOLES. El año de la "
+        "hoja manda sobre la etiqueta del mes (la hoja 2024 de Ucayali dice «Ene.2025»). Huánuco es solo la provincia de Puerto Inca."),
+      P("<b>PP_canon_municipal_mes.csv</b> — dos fuentes: (1) «Canon por Año &lt;Dep.&gt;» de Canon Municipalidades (año en curso, 5 "
+        "departamentos; Ucayali no tiene), bloque «validado con la PCM», secciones GOBIERNOS LOCALES y COMUNIDADES (5%) del D.U. "
+        "026-2010; (2) el detalle «Distribución por concejos» de la Distribución 1993–2002 (SECCION = CONCEJOS MUNICIPALES, con el % "
+        "de la provincia). Columnas: DEPARTAMENTO, AÑO, MES, FECHA, FECHA_PAGO, SECCION, PROVINCIA, PORCENTAJE_PROVINCIA, MUNICIPALIDAD "
+        "(sin notas «(*)»), NIVEL (PROVINCIAL o DISTRITAL: la primera de cada provincia o la marcada «(Provincial)»), MONTO_SOLES y "
+        "FUENTE_EXCEL. Los meses que en el Excel aún están en 0 no se cargan. Como el Excel de Municipalidades solo trae el año en curso, "
+        "la tabla se acumula en Drive (cada corrida reemplaza los meses que vuelve a leer)."),
+      P("<b>Control</b> (<font name='DVM'>CONTROL PP canon_excel_lectura.csv</font>): una fila por archivo, hoja, mes y parte con SUMA, "
+        "TOTAL_EXCEL y ESTADO. Dentro de cada Excel: suma de lotes = «Subtotal» de la zona (US$); suma de beneficiarios = TOTAL; suma de "
+        "municipalidades = TOTAL de su sección. Cruces: soles por departamento de la Determinación = total de la Distribución del mismo mes; "
+        "Distribución = canon mensual y anual de los PDF (MM S/, ±0,011); municipalidades = rubro municipal de la Distribución. "
+        "Tolerancia S/ 1 dentro del Excel y S/ 10 o 0,01 % en los cruces."),
       ]
 
 # ── 5. Control de producción ─────────────────────────────────────────────────
