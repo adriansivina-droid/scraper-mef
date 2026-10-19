@@ -415,4 +415,8 @@ Resultado con los mismos 45 Excel: Determinación 3 653 controles OK (antes 20 �
 - **Soles de la Determinación vs. Distribución (10 meses):** Huánuco jun‑1996 (S/ 50); Loreto y Ucayali jun‑2006 (S/ 9 033 y 2 258); Tumbes set‑2007 y abr‑2008; Piura set‑2009 (S/ 0,53 MM, la misma diferencia que el anual: 270,75 vs 270,22); Loreto dic‑2009; Cusco jun‑2010 (S/ 33 006). En feb‑2026, Piura y Tumbes tienen ±S/ 201 039: el total es igual, pero el reparto entre ambos difiere (la Determinación da 80/20).
 - **Distribución vs. PDF anual (4 años):** Tumbes 2007 (71,69 vs 70,27), Piura 2009 (270,75 vs 270,22), Cusco 2015 (942,73 vs 939,73) y Piura 2024 (407,29 vs 374,79).
 
+- **Municipalidades vs. Distribución (1 mes):** Huánuco may‑2025. El Excel de Municipalidades no le da nada a Tornavista ese mes (S/ 327 280), y la Distribución reparte S/ 81 820 a cada uno de los 5 concejos (S/ 409 100).
+
+Segunda corrida (19/10/2026): mismos resultados que la relectura local. Se unificó «Cuzco» (así figura la zona en 2004–2015) como CUSCO, y el resumen cuenta los departamentos de ambas columnas de `PP_canon_lote_mes.csv` (6).
+
 **Ucayali en Canon Municipalidades (cerrado):** en la corrida no apareció «MISMO ARCHIVO QUE CANON Y SOBRE CANON». La página de Municipalidades tiene 5 Excel; el enlace de Ucayali que pasó el usuario es el de Distribución.
