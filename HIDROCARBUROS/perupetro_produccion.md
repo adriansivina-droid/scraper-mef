@@ -419,4 +419,6 @@ Resultado con los mismos 45 Excel: Determinación 3 653 controles OK (antes 20 �
 
 Segunda corrida (19/10/2026): mismos resultados que la relectura local. Se unificó «Cuzco» (así figura la zona en 2004–2015) como CUSCO, y el resumen cuenta los departamentos de ambas columnas de `PP_canon_lote_mes.csv` (6).
 
+**Diferencias conocidas en el control:** las 16 diferencias anteriores (todas de las fuentes de PERUPETRO) están listadas en `CONOCIDAS`, dentro de la sección 9. El control las marca «DIFERENCIA DE LA FUENTE (conocida): <nota>» y ya no salen en «A revisar». Solo aparece como «REVISAR» una diferencia nueva; si no hay ninguna, el cuaderno imprime «✅ Sin casos nuevos a revisar».
+
 **Ucayali en Canon Municipalidades (cerrado):** en la corrida no apareció «MISMO ARCHIVO QUE CANON Y SOBRE CANON». La página de Municipalidades tiene 5 Excel; el enlace de Ucayali que pasó el usuario es el de Distribución.
