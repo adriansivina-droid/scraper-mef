@@ -368,7 +368,7 @@ Casilla del Bloque 2: «Excel de canon (determinación por lote, distribución y
 
 - **Páginas:**
   - «Canon y Sobre Canon» (`PAGINA_CANON`, la dirección que dio el usuario);
-  - «Canon Municipalidades»: se toma del enlace del menú lateral (por texto o por «canon%20municipalidades» en la dirección); si no aparece, se prueba la dirección directa `…/estadisticas/canon%20municipalidades/`. En la primera corrida real (19/10/2026) el menú no lo traía y se agregó esa alternativa.
+  - «Canon Municipalidades»: se toma del enlace del menú lateral (por texto o por «canon%20municipalidades» en la dirección); si no aparece, se prueba la dirección directa `…/estadisticas/canon%20municipalidades/`. En la primera corrida real (19/10/2026) el menú no lo traía y se agregó esa alternativa. En la segunda corrida (19/10/2026) la página sí abrió y trajo 5 enlaces a Excel, pero sin texto (son íconos). Por eso, cuando un enlace no tiene texto, se usa su `title`/`alt`; si tampoco sirve, se baja el archivo y se clasifica por su cabecera «DEPARTAMENTO DE <DEP>: D.LEY 21678». Si el Excel no trae esa línea, queda como «SIN CLASIFICAR (Excel sin «DEPARTAMENTO DE …»)».
 - **Clasificación por el texto del enlace:**
 
 | Texto del enlace | Archivo en `DATA/CANON_EXCEL/` |
