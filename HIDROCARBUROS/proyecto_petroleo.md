@@ -39,6 +39,7 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Contexto técnico | `HIDROCARBUROS/perupetro_produccion.md` |
 | Indicadores por lote (estado, pico, declinación, paralizaciones, operadores) | `DATA/PP_LOTES_INDICADORES.csv` (notebook del mapa) |
 | Diccionario de datos (PDF) | `HIDROCARBUROS/docs/Diccionario_datos_Proyecto_Petroleo.pdf` (se regenera con `python3 HIDROCARBUROS/docs/mk_diccionario.py`) |
+| Diccionarios Word (APA 7) de la carpeta DATA | `HIDROCARBUROS/docs/diccionarios/`: `00_Diccionario_general_DATA.docx` (para qué sirve cada archivo y si es útil, control o redundante) y un `.docx` por archivo con sus variables; se regeneran con `node HIDROCARBUROS/docs/diccionarios/mk_diccionarios_docx.js` |
 | Transcripciones 1994–2000 | `HIDROCARBUROS/transcripciones/PP_mensual_<año>_transcrito.csv` (líquidos) y `PP_gas_mensual_<año>_transcrito.csv` (gas) |
 | PDF escaneados pesados | `HIDROCARBUROS/pdf_escaneados/` (1995 y 1996, demasiado grandes para el chat) |
 | Drive · DATA | `1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq` (CSV de producción + subcarpeta `PDF` con todos los PDF descargados) |
