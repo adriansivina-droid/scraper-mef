@@ -437,3 +437,26 @@ Lo publicado por PERUPETRO al 18/10/2026: estadística mensual de enero a junio 
 ## Canon: serie del Excel de Distribución (19/10/2026)
 
 La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de los Excel de Distribución (1993–hoy; ver `perupetro_produccion.md`). Si el archivo trae AÑO_COMPLETO, se muestran solo los años completos, para que el año en curso no parezca una caída. Hay que volver a correr el notebook del mapa después del de producción.
+
+## Punto 4: pestaña «Canon» por lote, beneficiario y municipalidades (20/10/2026)
+
+**Provincias y distritos de cada lote.** La sección 2 baja de geoBoundaries los límites de provincias (ADM2) y distritos (ADM3), la misma fuente que ya se usa para los departamentos. Cada distrito toma su departamento y su provincia por su punto interior. La sección 3 calcula, igual que con los departamentos, el % del área del lote en cada provincia y distrito: columnas `PROVINCIA_DETALLE` y `DISTRITO_DETALLE` de `PP_LOTES_GEO.csv`, con el formato «DEP|PROV|DIST 85.0%; …». Si geoBoundaries falla, el mapa sigue funcionando sin esas columnas (queda anotado en el control de capas). La ficha del lote muestra «Provincia» y «Distrito» con su %; si es el 100 %, sin porcentaje.
+
+**Datos del panel** (Plus, Bloque 4), leídos de los CSV que deja la sección 9 del notebook de producción:
+- `ACT.cl[campo][lote][departamento] = {año: MM US$}`: canon generado por el lote y la parte de cada departamento (`PP_canon_lote_mes.csv`, sin los ajustes de meses anteriores). Los lotes de la Determinación se asignan al campo con los mismos nombres de la producción; se prueban «(T)» y «(TT)».
+- `ACT.cb[departamento][beneficiario] = {año: MM S/}`: canon del departamento por beneficiario, solo años completos (`PP_canon_distribucion_mes.csv`).
+- `ACT.cm[campo]`: municipalidades de los distritos del lote, más la provincial de cada provincia, con su serie anual en MM S/ (`PP_canon_municipal_mes.csv`). El nombre del distrito de geoBoundaries se busca entre las municipalidades del departamento: primero exacto y, si no aparece, el más parecido (`difflib`, similitud ≥ 0,82). Igual se hace con la provincia.
+- `ACT.cln[año]` y `ACT.cmn[departamento][año]`: meses con dato, para marcar los años incompletos.
+
+**Pestaña «Canon y sobrecanon»:** tiene tres vistas, cada una con su gráfico, detalle por año, tabla y CSV:
+1. **Generado por el lote** (MM US$), con barras apiladas por el departamento que recibe la parte (Loreto 80 % y Ucayali 20 % en los lotes de Loreto). Es la vista inicial cuando el lote tiene datos.
+2. **Departamento por beneficiario** (MM S/): gobierno regional, municipalidades, universidades, institutos, IIAP y Ley 29289. Es lo que recibe el departamento entero.
+3. **Municipalidades del lote** (MM S/): distritos donde está el lote (con el % de su área) y la municipalidad provincial. Solo hay datos de 1993–2002 (Distribución) y del año que publica «Canon Municipalidades», que se acumula desde 2025. Los años incompletos se marcan con ⚠️ y los meses con dato.
+
+**Prueba** con el mapa simulado (`mock_plus4.py`, `pw_canon.py`), con los Excel reales de canon y distritos de prueba sobre el Lote 95:
+- 2025: Puinahua S/ 19,96 MM, Saquena S/ 1,31 MM y municipalidad provincial de Requena S/ 17,92 MM (9 meses).
+- Generado por el Lote 95 en 2026: US$ 15,16 MM para Loreto y US$ 3,79 MM para Ucayali (4 meses).
+- Loreto 2025 por beneficiario: 213,84 MM.
+- Sin errores en escritorio ni en móvil; las demás pestañas siguen igual.
+
+**Pendiente de la corrida real:** confirmar que geoBoundaries entrega ADM2 y ADM3 de Perú, y revisar los nombres de distrito que no se emparejen.
