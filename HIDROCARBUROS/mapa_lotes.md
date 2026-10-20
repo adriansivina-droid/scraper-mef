@@ -469,4 +469,6 @@ La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de lo
 
 **Nota canon vs. regalía (20/10/2026).** En las pestañas Regalías y Canon («Generado por el lote») el detalle del año trae una nota: la regalía es lo que la empresa paga según su contrato; el canon y sobrecanon petrolero no es una parte de ella, sino un porcentaje del valor de la producción (barriles × canasta menos deducciones); en la zona Loreto / Ucayali, 18,75 % (15 % Loreto, 3,75 % Ucayali, según la Determinación). Por eso el canon de un lote puede superar a sus regalías. (A pedido del usuario, la nota no muestra los montos del año ni la advertencia sobre las bases.)
 
+**Botón arriba (20/10/2026).** «📊 Ver estadísticas» está ahora en la parte superior de la ficha, debajo del nombre del lote, para no tener que bajar hasta el final.
+
 **Pendiente de la corrida real:** confirmar qué fuente entregó ADM2 y ADM3 (geoBoundaries o GADM), y revisar los nombres de distrito que no se emparejen.
