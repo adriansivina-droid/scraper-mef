@@ -42,6 +42,10 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         if "y" not in q: self.send_response(404); self.end_headers(); return
+        if self.path.lower().startswith("/default.aspx"):   # página principal: la tabla va en un iframe que carga después
+            b = (f"<html><head><title>Consulta Amigable de Ingresos</title></head><body><div id=x></div><script>setTimeout(function()"
+                 f"{{document.getElementById('x').innerHTML='<iframe src=\"Navegar_3.aspx?y={q['y'][0]}\" width=900 height=600></iframe>'}},2500)</script></body></html>").encode()
+            self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.end_headers(); self.wfile.write(b); return
         self.responder(int(q["y"][0]), [], "Fuente de Financiamiento")
     def do_POST(self):
         q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query); anio = int(q["y"][0])

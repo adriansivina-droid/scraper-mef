@@ -19,7 +19,12 @@ JS_ESTADO = r"""() => {
     const r = tr.querySelector('input[type=radio]');
     const etiqueta = tx.find(t => /^[0-9A-ZÑ]{1,3}(-\d+)?:\s/.test(t));
     const nums = tx.map(num).filter(v => v !== null);
-    if (r && etiqueta) out.filas.push({i: radios.indexOf(r), etiqueta, recaudado: nums.length ? nums[nums.length - 1] : null});
+    if (r && etiqueta) {
+      let rec = nums.length ? nums[nums.length - 1] : null;
+      const v = (r.value || '').split('/');              // «código/PIA/PIM/recaudado» con decimales exactos
+      if (v.length >= 3 && !isNaN(parseFloat(v[v.length - 1]))) rec = parseFloat(v[v.length - 1]);
+      out.filas.push({i: radios.indexOf(r), etiqueta, recaudado: rec});
+    }
     else if (!r && etiqueta === undefined && tx.length) {
       const m = tx.find(t => /^(TOTAL|Fuente de Financiamiento|Rubro|Tipo de Recurso|Nivel de Gobierno|Gob\.Loc|Sector|Pliego|Departamento|Provincia)\b/.test(t));
       if (m && nums.length) out.migas.push({etiqueta: m, recaudado: nums[nums.length - 1]});
@@ -47,16 +52,43 @@ class MEFIngresos:
     async def estado(self):
         return await self.frame.evaluate(JS_ESTADO)
 
+    async def diagnostico(self):
+        """Qué ve el navegador: título, marcos y primeras líneas de cada uno (para entender un bloqueo o un cambio de página)."""
+        partes = [f"título «{await self.page.title()}»"]
+        for f in self.page.frames:
+            try:
+                txt = (await f.evaluate("() => (document.body ? document.body.innerText : '')"))[:160]
+            except Exception as e:
+                txt = f"(no se pudo leer: {type(e).__name__})"
+            partes.append(f"marco {f.url[:90]} → {' '.join(txt.split())!r}")
+        return " | ".join(partes)
+
+    async def _buscar_tabla(self, espera=45):
+        """Espera hasta `espera` segundos a que algún marco muestre filas con radio (la tabla vive en un iframe)."""
+        for _ in range(int(espera / 1.5)):
+            marcos = [f for f in self.page.frames if "navegar" in f.url.lower()] + [self.page.main_frame]
+            for fr in marcos:
+                try:
+                    if await fr.locator("input[type=radio]").count():
+                        self.frame = fr
+                        return await self.estado()
+                except Exception:
+                    pass
+            await asyncio.sleep(1.5)
+        return None
+
     async def abrir_anio(self, anio):
-        for url in (f"{self.base}/Navegar_3.aspx?y={anio}", f"{self.base}/default.aspx?y={anio}"):
+        # primero la página principal (fija el año en la sesión y carga el iframe Navegar_…); si no, el marco directo
+        for url in (f"{self.base}/default.aspx?y={anio}", f"{self.base}/Navegar_3.aspx?y={anio}"):
             await self.page.goto(url, wait_until="domcontentloaded", timeout=90000)
-            await asyncio.sleep(self.pausa)
-            fr = next((f for f in self.page.frames if "navegar" in f.url.lower()), self.page.main_frame)
-            self.frame = fr
-            e = await self.estado()
-            if e["filas"]:
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=30000)
+            except Exception:
+                pass
+            e = await self._buscar_tabla()
+            if e and e["filas"]:
                 return e
-        raise RuntimeError(f"{anio}: la consulta no mostró filas (¿bloqueo o cambio de la página?)")
+        raise RuntimeError(f"{anio}: la consulta no mostró filas. Lo que ve el navegador: {await self.diagnostico()}")
 
     async def elegir(self, patron):
         e = await self.estado()
