@@ -1,6 +1,6 @@
 # Scraper de Exportaciones · Infotrade (PROMPERÚ) · Contexto del proyecto
 
-Documento de traspaso de este proyecto, para retomarlo sin perder contexto, sea una persona o una sesión nueva de un asistente. Es **independiente** de los scrapers del MEF, que se describen en `FISCAL/CONTEXTO_PROYECTO.md`. Última actualización: **09/10/2026**.
+Documento de traspaso de este proyecto, para retomarlo sin perder contexto, sea una persona o una sesión nueva de un asistente. Es **independiente** de los scrapers del MEF, que se describen en `FISCAL/CONTEXTO_PROYECTO.md`. Última actualización: **20/10/2026**.
 
 ---
 
@@ -192,7 +192,7 @@ Fechas: el notebook acepta `dd/mm/aaaa` y otros formatos que pudiera mandar la A
 
 **Reanudación:**
 - Se **saltan** los cortes con `ESTADO = OK`, `CORTE_COMPLETO = SI`, `FILAS_REF > 0` y archivo presente en Drive.
-- Los cortes con 0 filas (`SIN_DATOS`, o `OK` con `FILAS_REF = 0` en controles antiguos) **se vuelven a consultar** siempre. El 10/10/2026 la API devolvió 0 filas para 2015–2020 en Loreto, San Martín y Ucayali, mientras 2014 y 2021 tenían datos; antes esos cortes quedaban como OK y no se reintentaban. **Confirmado en la web** el mismo día: la página de Infotrade también responde "No existen registros" para 2015–2020, por ejemplo con la partida 4418990000, todas las regiones, ene–jun 2017. El usuario sí había descargado esos datos un mes antes, así que es un vacío temporal de la fuente (la web indica "Datos disponibles hasta julio de 2026, cargados el 9 de sep…"), no del scraper.
+- Los cortes con 0 filas (`SIN_DATOS`, o `OK` con `FILAS_REF = 0` en controles antiguos) **se vuelven a consultar** siempre. El 10/10/2026 la API devolvió 0 filas para 2015–2020 en Loreto, San Martín y Ucayali, mientras 2014 y 2021 tenían datos; antes esos cortes quedaban como OK y no se reintentaban. **Confirmado en la web** el mismo día: la página de Infotrade también responde "No existen registros" para 2015–2020, por ejemplo con la partida 4418990000, todas las regiones, ene–jun 2017. El usuario sí había descargado esos datos un mes antes, así que es un vacío temporal de la fuente (la web indica "Datos disponibles hasta julio de 2026, cargados el 9 de sep…"), no del scraper. **Respuesta de PROMPERÚ (20/10/2026):** Infotrade solo tiene información **desde 2021**; los años anteriores hay que sacarlos de la base de SUNAT (ver §9).
 - Se **vuelven a descargar** los cortes con error, los que quedaron en REVISAR y los semestres incompletos.
 - Si Colab se desconecta, basta con **ejecutar de nuevo el Bloque 3**.
 
@@ -300,17 +300,67 @@ Ejemplos (2005–2025 = las 5 versiones): hay 4 812 partidas habilitadas. `44123
 
 ## 8. Supuestos y pendientes
 
-1. **Pruebas reales hechas** (09 y 10/10/2026): partida, capítulo y país, Lima y Loreto. Un corte de ~15 000 filas tarda menos de 30 s. **Siguiente:** probar Subsector "Todos" en Lima (el corte más grande posible) antes de la descarga completa desde 2005.
+1. **Pruebas reales hechas** (09 y 10/10/2026): partida, capítulo y país, Lima y Loreto. Un corte de ~15 000 filas tarda menos de 30 s. **Siguiente:** probar Subsector "Todos" en Lima (el corte más grande posible) antes de la descarga completa desde 2021 (ver punto 8).
 2. **Confirmado** (prueba real): no hace falta iniciar sesión, y `Partida` acepta el código de 10 dígitos.
 3. **Confirmado para Sector** (10/10/2026); **supuesto aún para Subsector:** "Todos" se envía como `""`, igual que en Mercado y Región. Si con "Todos" el control da 0 filas donde debería haber datos, capturar el Payload de la web con Sector o Subsector en "Todos" y ajustar `filtros()`.
 4. **Supuesto:** el formato de `Empresa` (RUC o razón social) no se ha confirmado.
 5. **Concurrencia:** el notebook consulta `CantidadActualDescarga` pero no espera según su valor, porque se desconoce el máximo permitido. Si la web empieza a rechazar descargas, agregar una espera mientras `VALOR` esté por encima del límite.
 6. **Diccionario de partidas:** falta confirmar la fecha de vigencia del Arancel 2002 (se asume 01/01/2002). Cuando SUNAT publique un Arancel nuevo, agregar su correlación y volver a ejecutar `construir_diccionario.py`.
 7. **Idea:** unir los CSV por año o en un solo archivo para el BI. Power BI también puede leer la carpeta completa.
+8. **Infotrade solo tiene datos desde 2021** (PROMPERÚ, 20/10/2026). Para 2005–2020 hay que usar SUNAT «Detallado por subpartida nacional» (§9). Falta: capturar con F12 el envío del formulario y la página de Resultados, decidir cómo asignar la región (SUNAT no la trae) y revisar «Bases Regím. Definitivos». La descarga completa de Infotrade puede empezar en **enero de 2021**.
 
 ---
 
-## 9. Flujo de trabajo con GitHub
+## 9. Años anteriores a 2021: SUNAT «Detallado por subpartida nacional» (20/10/2026)
+
+**Respuesta de PROMPERÚ** (correo de Celia, 20/10/2026, a la consulta del usuario por 2015–2020): «toda información disponible en la plataforma Infotrade corresponde al periodo comprendido desde el año 2021 hasta la fecha»; para años anteriores, «deberá elaborarse mediante el procesamiento directo de la base de datos de la SUNAT». Adjuntaron el manual «Manual detallado por subpartida nacional – SUNAT» (PROMPERÚ, 11 páginas).
+
+**Ojo:** en las corridas del 10/10/2026, 2014 y años anteriores sí devolvieron filas, aunque PROMPERÚ dice que no hay nada antes de 2021. Antes de usar los datos de Infotrade anteriores a 2021, compararlos con SUNAT: pueden ser restos de una carga antigua.
+
+### Cómo funciona la consulta de SUNAT (según el manual)
+
+- **Página:** http://www.aduanet.gob.pe/aduanas/informae/aepartmen.htm → «EXPORTACIÓN». Régimen de exportación definitiva **desde 1993**. Incluye las declaraciones embarcadas y regularizadas hasta el día anterior; información consolidada en un 98 % a nivel nacional.
+- **Formulario** «Variables específicas de exportación» (`/cl-ad-itestdesp/FrmConsultaSumin.jsp?tcon=B`):
+  - `PARTIDA`: subpartida nacional de **10 dígitos** (obligatoria);
+  - `PERIODO`: desde–hasta en dd/mm/aaaa, **dentro de un mismo año**;
+  - `ADUANA` (todas o una lista) y `PAIS` (todos o una lista, con código de 2 letras: `US`, `CN`…);
+  - `FORMATO`: DBF.
+- **Es asíncrona.** Al pulsar «Consultar» (envío a `/cl-ad-itestdesp/SEGrabaReq`), la página responde «REQUERIMIENTO ENVIADO CORRECTAMENTE CON EL NOMBRE: 01202584.CON». Después, en «Descarga información → Resultados», aparece una lista (fecha, hora de inicio y fin, «Reporte», número de registros, enlace `01202584.ZIP`). El ZIP trae un `.DBF` con el detalle.
+- **Columnas del DBF:**
+
+| Columna | Descripción |
+|---|---|
+| `CNAN` | Partida (10 dígitos) |
+| `DESCRIP` | Descripción arancelaria |
+| `FECHA` | Fecha de embarque de la DAM (aaaammdd) |
+| `CADUANA`, `ADUA_DESC` | Código y nombre de la aduana |
+| `CPAIS`, `PAIS_DESC` | Código y nombre del país de destino |
+| `FOB_DOLPOL` | Valor FOB de la serie (US$) |
+| `PESO_NETO`, `PESO_BRUTO` | Pesos (kg) |
+| `UNID_FIQTY`, `UNID_FIDES` | Cantidad y unidad |
+| `PUER_EMBAR`, `PUER_DESC` | Puerto de desembarque |
+| `DESC_COM`, `DESC_ADIC` | Descripción comercial y adicional |
+| `EXPORTADOR` | Razón social (aparece en el ejemplo del manual, aunque no en su tabla de variables) |
+
+### Diferencias con Infotrade que hay que resolver
+
+1. **No trae región.** No hay departamento ni ubigeo; solo aduana y puerto. Para el BI por región habría que asignar la región por exportador, por ejemplo con la región que el mismo exportador tiene en Infotrade 2021+, o buscar otra base de SUNAT que sí la tenga («Bases Regím. Definitivos», en el mismo menú, sin revisar aún).
+2. **No trae RUC**, solo la razón social, que puede cambiar en el tiempo.
+3. **No trae sector ni subsector** (Tradicional / No Tradicional). Habría que asignarlos por partida, con una tabla de correspondencia.
+4. **Una consulta por partida y año**, sin capítulos ni «todas». Para un capítulo o una lista de partidas se usa el diccionario (§7) con las partidas vigentes en cada año. 6 años (2015–2020) × N partidas.
+5. Desde el entorno de Claude **no se puede abrir aduanet.gob.pe** (no resuelve el dominio). Desde Colab, por probar.
+
+### Para automatizarlo (pendiente)
+
+Capturar con F12 → Network, desde el navegador:
+- el envío de «Consultar» (`SEGrabaReq`): método, campos del formulario y si hay captcha o cookie de sesión;
+- la página «Resultados»: su URL y cómo se arma el enlace al ZIP.
+
+Con eso, un notebook nuevo (`EXP_SUNAT_Detallado.ipynb`) podría enviar las consultas por partida y año, esperar a que aparezcan en Resultados, bajar los ZIP, leer los DBF y dejar CSV con las mismas columnas que los de Infotrade (más aduana y puerto) en Drive.
+
+---
+
+## 10. Flujo de trabajo con GitHub
 
 Es el mismo que el de los scrapers del MEF (ver `FISCAL/CONTEXTO_PROYECTO.md` §9):
 - se trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`;
