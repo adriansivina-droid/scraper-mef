@@ -459,4 +459,6 @@ La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de lo
 - Loreto 2025 por beneficiario: 213,84 MM.
 - Sin errores en escritorio ni en móvil; las demás pestañas siguen igual.
 
+**Selector de año y detalle por beneficiario (20/10/2026).** En las pestañas con gráfico anual (pozos, regalías, canon) hay un selector «Año de la tabla» debajo del gráfico: cambia la tabla de detalle (y marca la barra), sin filtrar el gráfico; equivale a hacer clic en una barra. En la vista «Generado por el lote», los encabezados «Para Loreto ▾» / «Para Ucayali ▾» son botones: despliegan cómo repartió ese departamento su canon de ese año por beneficiario (gobierno regional, municipalidades, universidades, institutos, IIAP, Ley 29289), en MM S/ y con su participación, del Excel de Distribución. Es lo que recibió el departamento entero por todos sus lotes, no la parte del lote. En años incompletos se muestra con el aviso de meses con dato (datos `cbi`/`cbn` del panel; la vista «Departamento por beneficiario» sigue mostrando solo años completos).
+
 **Pendiente de la corrida real:** confirmar qué fuente entregó ADM2 y ADM3 (geoBoundaries o GADM), y revisar los nombres de distrito que no se emparejen.
