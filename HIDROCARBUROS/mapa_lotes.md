@@ -477,4 +477,6 @@ La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de lo
 
 **Paleta del proyecto en el panel de estadísticas (20/10/2026, a prueba).** Azul noche #111149, turquesa #72D2D5, naranja #DD6140, amarillo #FFC41D, gris azulado #CCD3DF, negro #181818 y blanco #FEFEFE, con tonos intermedios (#2A9DA1, #5A5A9E, #A8452B, #8C96AD) cuando hacen falta más series. Beneficiarios: gobierno regional azul noche, municipalidades turquesa, universidades naranja, institutos amarillo, IIAP turquesa oscuro, descuento Ley 29289 gris. Botones activos en azul noche. Los colores anteriores quedan en el historial de `act_panel.html` por si se descarta.
 
+**Tipo de letra Barlow (20/10/2026).** Todo el mapa (fichas, panel de producción, panel de estadísticas, leyenda y controles) usa Barlow de Google Fonts; los íconos no se tocan y, sin conexión a internet, cae en la letra del sistema.
+
 **Pendiente de la corrida real:** confirmar qué fuente entregó ADM2 y ADM3 (geoBoundaries o GADM), y revisar los nombres de distrito que no se emparejen.
