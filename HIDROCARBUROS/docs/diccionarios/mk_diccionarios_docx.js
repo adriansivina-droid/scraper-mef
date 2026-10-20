@@ -101,10 +101,11 @@ const REF = {
   estad: `PERUPETRO S.A. (s. f.-c). *Estadística petrolera* [Estadísticas anuales y mensuales de hidrocarburos en PDF]. Recuperado el 20 de octubre de 2026, de ${URL_PP}`,
   geo: "PERUPETRO S.A. (s. f.-d). *Geoportal de PERUPETRO* [Servicio WFS de lotes de contrato y cuencas sedimentarias]. Recuperado el 20 de octubre de 2026, de https://geoportal.perupetro.com.pe",
   diaria: `PERUPETRO S.A. (s. f.-e). *Producción diaria* [Reportes diarios de producción fiscalizada en PDF]. Recuperado el 20 de octubre de 2026, de ${URL_PP}`,
+  mef: "Ministerio de Economía y Finanzas. (s. f.). *Consulta Amigable de Ingresos (mensual)* [Base de datos]. Recuperado el 20 de octubre de 2026, de https://apps5.mineco.gob.pe/transparenciaingresos/mensual/",
   lehner: "Lehner, B., & Grill, G. (2013). Global river hydrography and network routing: Baseline data and new approaches to study the world’s large river systems. *Hydrological Processes, 27*(15), 2171–2186. https://doi.org/10.1002/hyp.9740",
   runfola: "Runfola, D., Anderson, A., Baier, H., Crittenden, M., Dowker, E., Fuhrig, S., Goodman, S., Grimsley, G., Layko, R., Melville, G., Mulder, M., Oberman, R., Panganiban, J., Peck, A., Seitz, L., Shea, S., Slevin, H., Youngerman, R., & Hobbs, L. (2020). geoBoundaries: A global database of political administrative boundaries. *PLoS ONE, 15*(4), Artículo e0231866. https://doi.org/10.1371/journal.pone.0231866",
 };
-const ORDEN_REF = ["lehner", "canonMun", "canon", "estad", "geo", "diaria", "runfola"];
+const ORDEN_REF = ["lehner", "mef", "canonMun", "canon", "estad", "geo", "diaria", "runfola"];
 function referencias(claves) {
   return [n1("Referencias"), ...ORDEN_REF.filter((k) => claves.includes(k)).map((k) => referencia(REF[k]))];
 }
@@ -377,6 +378,27 @@ const ARCHIVOS = [
       ["FUENTE_EXCEL", "Texto", "Excel de origen."]],
     nota: "Control: la suma de municipalidades se compara con el TOTAL de su sección y con el rubro municipal de la Distribución.",
     refs: ["canonMun", "canon"],
+  },
+  {
+    archivo: "PP_canon_municipal_mef_anio.csv", tema: "Fiscal (canon)", util: "Útil",
+    para: "Canon y sobrecanon petrolero recaudado por cada municipalidad y año según el MEF (2007–hoy); completa los años sin detalle de PERUPETRO.",
+    proposito: [
+      "Contiene el canon y sobrecanon petrolero que registró como recaudado cada municipalidad provincial y distrital, por año, según la Consulta Amigable de Ingresos del MEF (fuente 5, rubro 18, tipos de recurso «5: Canon y sobrecanon petrolero» y «K: Sub cuenta – Canon y sobrecanon petrolero»).",
+      "Sirve para completar el canon por municipalidad de 2007 en adelante, años en los que PERUPETRO entrega el total municipal a un intermediario (PCM) y no publica el reparto. Entre 2003 y 2006 el MEF registra el ingreso a nombre del Consejo Nacional de Descentralización, sin detalle por municipalidad.",
+    ],
+    origen: "Notebook PP_MEF_Canon_Municipal.ipynb, que maneja un navegador real (Playwright) porque la consulta funciona con postbacks de ASP.NET. Se acumula: cada corrida reemplaza los años que vuelve a leer. Lo recaudado puede diferir de lo transferido por PERUPETRO en el mismo año por las fechas de registro; el control lo compara (CONTROL PP canon_municipal_mef.csv).",
+    clave: "Un año, una municipalidad y un tipo de recurso. Clave: AÑO + DEPARTAMENTO + CODIGO + TIPO_RECURSO.",
+    vars: [V.AÑO,
+      ["DEPARTAMENTO", "Texto", "Departamento de la municipalidad (p. ej., LORETO)."],
+      ["CODIGO", "Texto", "Código de la entidad en el MEF, tal como figura (p. ej., 06-301459)."],
+      ["MUNICIPALIDAD_MEF", "Texto", "Nombre completo de la entidad en el MEF (p. ej., MUNICIPALIDAD DISTRITAL DE PUINAHUA)."],
+      ["MUNICIPALIDAD", "Texto", "Nombre corto: el distrito o, en las provinciales, la capital (MAYNAS - IQUITOS → IQUITOS)."],
+      ["NIVEL", "Texto (código)", "PROVINCIAL o DISTRITAL."],
+      ["PROVINCIA", "Texto", "Provincia: en las provinciales, del nombre del MEF; en las distritales, de la tabla de PERUPETRO cuando existe."],
+      ["TIPO_RECURSO", "Texto", "Tipo de recurso del MEF del que sale el monto (5 o K)."],
+      ["RECAUDADO_SOLES", "Decimal, soles (S/)", "Monto recaudado en el año."],
+      ["FUENTE", "Texto", "MEF, Consulta Amigable de Ingresos (recaudado)."]],
+    refs: ["mef"],
   },
   {
     archivo: "PP_canon_departamento_mes.csv", tema: "Fiscal (canon)", util: "Útil (serie oficial)",
