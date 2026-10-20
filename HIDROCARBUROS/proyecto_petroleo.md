@@ -1,6 +1,6 @@
 # Proyecto Petróleo · Loreto · Resumen para continuar en otro chat
 
-Resumen ejecutivo del proyecto de producción petrolera. Sirve para retomarlo en una sesión nueva sin perder el contexto. El detalle técnico del extractor está en `HIDROCARBUROS/perupetro_produccion.md`. Última actualización: **13/10/2026**.
+Resumen ejecutivo del proyecto de producción petrolera. Sirve para retomarlo en una sesión nueva sin perder el contexto. El detalle técnico del extractor está en `HIDROCARBUROS/perupetro_produccion.md`. Última actualización: **20/10/2026**.
 
 ---
 
@@ -18,10 +18,11 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
                  LOTE (1-AB/192, 8, 95, 67…)
                    │
  ┌─────────────────┼──────────────────────┬──────────────────────┐
- Producción        Mapa / Banco de Datos  Infotrade              Canon
- lote × mes        polígonos, pozos       exportación 2709       Loreto × año
- (HECHO)           (PENDIENTE)            (scraper listo,        (HECHO: anual por
-                                           cruce pendiente)       departamento)
+ Producción        Mapa de lotes          Infotrade              Canon
+ lote × mes        polígonos, distritos,  exportación 2709       por lote, beneficiario
+ (HECHO)           indicadores (HECHO);   (scraper listo,        y municipalidad
+                   Banco de Datos         cruce pendiente)       (HECHO, Excel de
+                   (PENDIENTE)                                    PERUPETRO)
 ```
 
 ## 2. Dónde está todo
@@ -37,6 +38,8 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Gas natural fiscalizado por lote y mes (1994–hoy) | `DATA/PP_produccion_gas_lote_mes_<ini>-<fin>.csv` (notebook de producción) |
 | Pozos perforados por lote (1995–hoy), regalías por lote (2001–hoy), canon por departamento (1993–hoy), precio de canasta por lote y mes (2001–hoy) y valor de la producción | `DATA/PP_pozos_perforados_lote_anio.csv`, `PP_regalias_lote_anio.csv`, `PP_canon_departamento_anio.csv`, `PP_precio_canasta_lote_mes.csv`, `PP_valor_produccion_lote_mes.csv` (notebook de producción, sección 6.1; detalle en `perupetro_produccion.md`) |
 | Contexto técnico | `HIDROCARBUROS/perupetro_produccion.md` |
+| Canon (Excel de PERUPETRO: Determinación, Distribución y Municipalidades) | Sección 9 del notebook de producción → `DATA/CANON_EXCEL/` y `DATA/PP_canon_lote_mes.csv`, `PP_canon_distribucion_mes.csv`, `PP_canon_municipal_mes.csv`; serie oficial `PP_canon_departamento_mes.csv` y `_anio.csv` (los `_pdf.csv` son control) |
+| Textos y evidencia (Loreto y Ucayali 2025) | `HIDROCARBUROS/analisis/` (.md, .docx y .xlsx) |
 | Indicadores por lote (estado, pico, declinación, paralizaciones, operadores) | `DATA/PP_LOTES_INDICADORES.csv` (notebook del mapa) |
 | Diccionario de datos (PDF) | `HIDROCARBUROS/docs/Diccionario_datos_Proyecto_Petroleo.pdf` (se regenera con `python3 HIDROCARBUROS/docs/mk_diccionario.py`) |
 | Diccionarios Word (APA 7) de la carpeta DATA | `HIDROCARBUROS/docs/diccionarios/`: `00_Diccionario_general_DATA.docx` (para qué sirve cada archivo y si es útil, control o redundante) y un `.docx` por archivo con sus variables; se regeneran con `node HIDROCARBUROS/docs/diccionarios/mk_diccionarios_docx.js` |
@@ -138,7 +141,8 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 ## 6. Pendientes, en orden sugerido
 
-1. **Mapa de lotes** (EN CURSO). Notebook `PP_Mapa_Lotes.ipynb` creado y probado con datos simulados; falta la primera corrida real en Colab para confirmar las capas del visor de PERUPETRO. Detalle en `HIDROCARBUROS/mapa_lotes.md`.
+0. **Hecho al 20/10/2026** (detalle en la sección 9 y en `mapa_lotes.md`): canon por lote, beneficiario y municipalidad (puntos 1–5); mapa de lotes con corrida real (geoportal de PERUPETRO, provincias de geoBoundaries y distritos de GADM 4.1 como respaldo), pestañas de pozos, regalías, canon y empresas, selector de año, unidades en «millones»; diccionarios Word de DATA; texto de Loreto en Word.
+1. **Mapa de lotes**: ✅ corrida real hecha (20/10/2026). Pendiente menor: la dirección de respaldo de geoBoundaries en GitHub da 404 (no afecta: entra GADM); los distritos de GADM son límites de 2022 y no los oficiales del INEI.
 2. **Otras tablas de los anuales.**
    - HECHO (13/10/2026):
      - **pozos perforados** por lote y tipo;
@@ -146,10 +150,10 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
      - **canon y sobrecanon** por departamento;
      - **precio de canasta** por lote y mes, y con él el **valor de la producción**.
    - Falta la primera corrida real desde 2001 en Colab.
+   - Hecho después: **contratos** (fechas, socios, área; `PP_contratos.csv`) e historial de operadores (`PP_operadores_lote.csv`).
    - Pendientes:
      - producción por **yacimiento**;
-     - **estado de pozos** por lote;
-     - **contratos** (fechas y área).
+     - **estado de pozos** por lote.
    - La **inversión en US$ por lote no está en los anuales**; habría que buscarla en otra fuente (memorias de PERUPETRO, MINEM).
    - **Regalías 1994–2000: no existen en los anuales.** Revisé los índices de los 7 escaneados: pasan de «Canasta» a «Canon» y «Contratos»; el cuadro «Ingresos por contratos» aparece recién en la edición 2001. Alternativas: memorias anuales de PERUPETRO de esos años, o transcribir la canasta 1994–2000 (sí está, sección 6) para tener el valor de la producción.
 3. **Cruce con Infotrade.** Exportación de crudo (partida 2709) de Loreto vs producción; operador ↔ exportador.
@@ -173,6 +177,7 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 - `analisis/Loreto_petroleo_2025_texto.md`: texto «3. Extracción de petróleo, gas, minerales y servicios conexos» para Loreto 2025, con la estructura del informe del BCRP (1. tendencia de diez años, VAB INEI e historia 2015–2020; 2. lotes en operación; 3. Lote 95, precios, regalías, canon, reservas y riesgos), más «Empresas que operan en Loreto» (PetroTal, Upland, Petroperú y Perenco). Al final, un anexo con la versión ampliada por tema.
 - `analisis/Loreto_petroleo_2025_evidencia.xlsx`: datos de respaldo con fórmulas; hoja `VAB_INEI` transcrita de los cuadros 1 y 2 del INEI (información a junio del 2026; 2024P, 2025E), con control contra el total publicado; hoja `VAB_INEI_2014_2025` (serie del INEI), hoja `Empresas_Loreto` (contratos vigentes y producción por operador 2006–2025) y hoja `Serie_Loreto_2006_2025` con la producción de Loreto y del país y las reservas probadas de la zona Selva.
+- Desde el 20/10/2026 el texto de Loreto incluye el subtítulo **«Canon y sobrecanon petrolero en Loreto»** (canon por lote: Lote 95 = 83,7 % y Lote 8 = 16,4 % de lo que recibió Loreto en US$; reparto por beneficiario con la Ley N° 31934; municipalidades ene–set 2025: Requena 47 %, Puinahua 16,2 %) y está también en Word: `analisis/Loreto_petroleo_2025_texto.docx` (generador `analisis/mk_docx_loreto.js`). Evidencia en la hoja `Canon_lotes_2025` (generador `analisis/mk_evid_canon_loreto.py`).
 - `analisis/Ucayali_petroleo_2025_texto.md` (19/10/2026): la misma sección para Ucayali, en texto continuo sin subtítulos (pedido del usuario): VAB del INEI (cuadro 1 de Ucayali 2015–2025: −12,2 % promedio anual, 8,2 % → 1,9 % de la economía regional, −18,2 % en 2025, −0,4 p.p. al crecimiento de 2,5 %), lotes 31-C (Aguaytía) y 131 (Ucawa Energy), sus contratos, regalías y canon por lote de origen y por beneficiario.
 - `analisis/Ucayali_petroleo_2025_evidencia.xlsx`: respaldo con fórmulas (producción 31-C y 131 2016–2025, regalías 2024–2025, canon 2016–2026 por mes y beneficiario, canon 2025 por lote de origen desde la Determinación, VAB INEI 2015–2025 y participación nacional, contratos). Generador: `mk_evid_ucayali.py` (scratchpad). Hallazgo: el 80,9 % del canon de Ucayali 2025 viene del Lote 95 (Loreto), porque la Determinación da a Ucayali el 20 % del canon de los lotes de Loreto; el canon del Lote 131 va a Puerto Inca (Huánuco) aunque el 57,5 % de su área está en Ucayali.
 
@@ -180,7 +185,7 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 Pegar algo como:
 
-> Continúa el **Proyecto Petróleo** del repositorio `adriansivina-droid/scraper-mef`. Lee `HIDROCARBUROS/proyecto_petroleo.md` y `HIDROCARBUROS/perupetro_produccion.md`. Trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`, haz PR y merge a `main`. Siguiente tarea: la de la sección 9 (canon por lote, por beneficiario y por municipalidad); los Excel de muestra están en `HIDROCARBUROS/fuentes_canon/`. Te subo los PDF o Excel que necesites (si no se pueden adjuntar, los subo a GitHub en una rama aparte).
+> Continúa el **Proyecto Petróleo** del repositorio `adriansivina-droid/scraper-mef`. Lee `HIDROCARBUROS/proyecto_petroleo.md` y `HIDROCARBUROS/perupetro_produccion.md`. Trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`, haz PR y merge a `main`. La sección 9 (canon) está terminada; siguientes tareas posibles en la sección 6 (cruce con Infotrade, Banco de Datos, yacimientos) o las que pida el usuario. Te subo los PDF o Excel que necesites (si no se pueden adjuntar, los subo a GitHub en una rama aparte).
 
 Otros proyectos del mismo repositorio:
 - `FISCAL/`: scrapers MEF Consulta Amigable (ver `FISCAL/CONTEXTO_PROYECTO.md`).
@@ -216,8 +221,11 @@ Desde la sesión de Claude Code **no se puede abrir perupetro.com.pe** (el proxy
 1. ✅ **Implementado (19/10/2026, sección 9 del notebook de producción; ver `perupetro_produccion.md`). Verificado en Colab el 19/10/2026: 34 de Determinación (1993–2026), 6 de Distribución (Cusco, Huánuco, Loreto, Piura, Tumbes, Ucayali) y 5 de Municipalidades (Cusco, Huánuco, Loreto, Piura, Tumbes: el de Ucayali es el mismo archivo de Distribución. Ucayali sí está en Distribución, con detalle por concejo solo en 1993–2002), sin pendientes en el control. Los enlaces de Municipalidades no tienen texto y se clasifican por la cabecera del Excel (PR 113–114).** **Descarga** en el notebook de producción (sección nueva) de los Excel de Determinación (2007–hoy), Distribución (6 dep.) y Canon Municipalidades (5 dep.), guardados en Drive con fecha; respaldo: carpeta de Drive con los archivos puestos a mano.
 2. ✅ **Implementado (19/10/2026; detalle y prueba en `perupetro_produccion.md`, «Lectura de los Excel de canon»). Verificado con los 45 Excel reales (19/10/2026): todos los controles internos OK salvo Loreto set‑2025 (error del Excel); quedan 10 meses y 4 años con diferencias entre fuentes de PERUPETRO, documentadas.** **Lectores**: `PP_canon_lote_mes.csv` (año, mes, departamento, lote, producto, volumen, canasta, deducciones, valor US$, canon US$, parte por departamento, tipo de cambio), `PP_canon_distribucion_mes.csv` (1993–hoy, por beneficiario) y `PP_canon_municipal_mes.csv` (1993–2002 + año en curso, acumulado en Drive). Control: lotes = subtotal de zona; S/ = serie mensual; total anual = PDF anual.
 3. ✅ **Implementado (19/10/2026; ver «Serie oficial de canon por departamento» en `perupetro_produccion.md`).** La serie de canon por departamento (`PP_canon_departamento_mes/anio.csv`) usa los totales mensuales de la Distribución (1993–hoy); lo de los PDF queda en `*_pdf.csv` como control. El mapa muestra solo años completos.
-4. ✅ **Implementado (20/10/2026; ver `mapa_lotes.md`, «Punto 4»). Pendiente: corrida real del mapa (geoBoundaries ADM2/ADM3 y emparejamiento de nombres de distrito).** **Mapa**: pestaña «Canon» con el canon **del lote** (de Determinación), el del departamento por beneficiario y el de provincia/distrito del lote (requiere la capa de distritos INEI).
+4. ✅ **Implementado y verificado en la corrida real (20/10/2026; ver `mapa_lotes.md`, «Punto 4»): 196 provincias (geoBoundaries) y 1815 distritos (GADM 4.1, porque la API de geoBoundaries cortó la conexión); el Lote 95 cruza con Tapiche, Soplín, Emilio San Martín, Puinahua, Capelo, Alto Tapiche y la provincial de Requena. En el gráfico por beneficiario, la «Ley 29289» se muestra en gris como «Descuento: pago de deuda (Ley 29289)» (contrapartida nacional y servicio de deuda, Loreto 2009–2023).** **Mapa**: pestaña «Canon» con el canon **del lote** (de Determinación), el del departamento por beneficiario y el de provincia/distrito del lote (requiere la capa de distritos INEI).
 5. ✅ **Hecho (20/10/2026): subtítulo «Canon y sobrecanon petrolero en Loreto» en `analisis/Loreto_petroleo_2025_texto.md` (y hoja Texto_2025) y hoja `Canon_lotes_2025` del libro de evidencia (generada con `analisis/mk_evid_canon_loreto.py` desde los Excel reales). El Excel de Determinación 2024 rotula el Lote 8 como «MM BTU» aunque es petróleo (error de la fuente).** **Texto y evidencia** Loreto 2025: canon generado por el Lote 95 y el Lote 8, reparto por beneficiario, Puinahua y Requena; hoja nueva en el libro de evidencia.
 
 ### Otros pendientes menores
-- Ejes de los gráficos de pozos/regalías/canon (`act_panel.html`): años encimados al inicio (1994/1995), igual que se corrigió en la línea de tiempo de «Empresas».
+- ✅ Ejes de los gráficos de pozos/regalías/canon: años encimados, corregido.
+- Archivos `PP_produccion_lote_mes_2026-2026.csv` y `PP_produccion_gas_lote_mes_2026-2026.csv` en DATA: redundantes (salen de correr solo 2026). Correr producción siempre con 1994-2026, que es el archivo que usa el mapa; propuesta pendiente: que una corrida parcial actualice también el archivo completo.
+- Excel de Determinación 2024: el Lote 8 figura con unidad «MM BTU» aunque es petróleo (error de la fuente; no afecta 2025).
+- Ley 29289: falta identificar qué deuda o proyecto se pagaba (el Excel no lo dice).
