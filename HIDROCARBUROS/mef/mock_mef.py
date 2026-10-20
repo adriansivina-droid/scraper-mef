@@ -5,8 +5,13 @@ MUNIS = {"01-301454: MUNICIPALIDAD PROVINCIAL DE REQUENA": 4819640, "06-301459: 
          "01-301422: MUNICIPALIDAD PROVINCIAL DE MAYNAS - IQUITOS": 9114760}
 def hijos(anio, ruta, dim):
     n = len(ruta)
-    if dim == "Fuente de Financiamiento": return {"1: RECURSOS ORDINARIOS": 5, "5: RECURSOS DETERMINADOS": 100}
+    if dim == "Fuente de Financiamiento":
+        return {"1: RECURSOS ORDINARIOS": 5, "5: RECURSOS DETERMINADOS": 100} if anio >= 2007 else {"00: RECURSOS ORDINARIOS": 0, "01: CANON Y SOBRECANON": 100}
     if dim == "Rubro": return {"18: CANON Y SOBRECANON, REGALIAS, RENTA DE ADUANAS Y PARTICIPACIONES": 90}
+    if dim == "Tipo de Recurso" and anio < 2007:
+        return {"0: NORMAL": 1413825905, "1: CANON MINERO": 2, "4: CANON Y SOBRECANON PETROLERO": 166368386} if anio != 2005 else {"0: NORMAL": 1413825905}
+    if dim == "Nivel de Gobierno" and anio < 2007:
+        return {"E: GOBIERNO NACIONAL": 1} if anio <= 2004 else {"M: GOBIERNOS LOCALES": 484948836, "R: GOBIERNOS REGIONALES": 1}
     if dim == "Tipo de Recurso":
         d = {"0: CANON": 50, "5: CANON Y SOBRECANON PETROLERO": 355110316}
         if anio >= 2020: d["K: SUB CUENTA - CANON Y SOBRECANON PETROLERO"] = 546062163
@@ -15,12 +20,12 @@ def hijos(anio, ruta, dim):
     if dim == "Gob.Loc./Mancom.": return {"M: MUNICIPALIDADES": 214414086}
     if dim == "Departamento": return {"15: LIMA": 3, "16: LORETO": 72246640}
     if dim == "Municipalidad":
-        k = 2 if ruta[2][1].startswith("K") else 1
+        k = 2 if any(c.startswith("K") for _, c in ruta) else 1
         return {m: v * k for m, v in MUNIS.items()}
     return {}
 def botones(anio, ruta, dim):
     usados = {d for d, _ in ruta} | {dim}
-    todos = ["Rubro", "Tipo de Recurso", "Nivel de Gobierno", "Departamento", "Municipalidad", "Mes"]
+    todos = (["Rubro"] if anio >= 2007 else []) + ["Tipo de Recurso", "Nivel de Gobierno", "Departamento", "Municipalidad", "Mes"]
     if anio >= 2020 and any(c.startswith("M:") for _, c in ruta) and not any(d == "Gob.Loc./Mancom." for d, _ in ruta):
         todos.insert(3, "Gob.Loc./Mancom.")
     return [b for b in todos if b not in usados]

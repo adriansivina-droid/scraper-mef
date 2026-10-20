@@ -78,39 +78,67 @@ class MEFIngresos:
         e = await self.estado()
         return bool(e["dim"] and e["dim"].lower().startswith(dimension.lower()))
 
-    async def municipalidades(self, anio, tipo_patron, dep_patron=r"^16:\s*LORETO"):
-        """Filas «Municipalidad» del departamento para un tipo de recurso. Devuelve (filas, total_departamento, ruta)."""
+    # dos clasificaciones: desde 2007, fuente 5 (Recursos determinados) → rubro 18 → tipo de recurso;
+    # hasta 2006, fuente 01 (Canon y sobrecanon) → tipo de recurso (4: petrolero, 0: NORMAL…)
+    ESQUEMAS = ([(r"^5:\s*RECURSOS DETERMINADOS", "Rubro"), (r"^18:", "Tipo de Recurso")],
+                [(r"^0?1:\s*CANON Y SOBRECANON", "Tipo de Recurso")])
+
+    async def _hasta_departamentos(self, anio, tipo_patron, esquema=0):
+        """Navega hasta la lista «Departamento» (gobiernos locales) de un tipo de recurso. Devuelve la ruta o un error."""
         await self.abrir_anio(anio)
         ruta = []
-        pasos = [(r"^5:\s*RECURSOS DETERMINADOS", "Rubro"), (r"^18:", "Tipo de Recurso"), (tipo_patron, "Nivel de Gobierno"),
-                 (r"^M:", None), (dep_patron, "Municipalidad")]
-        for patron, siguiente in pasos:
+        for patron, siguiente in self.ESQUEMAS[esquema] + [(tipo_patron, "Nivel de Gobierno"), (r"^M:", None)]:
             f = await self.elegir(patron)
             if f is None:
                 e = await self.estado()
-                return None, None, ruta + [f"NO ENCONTRADO {patron} en «{e['dim']}»"]
+                return ruta + [f"NO ENCONTRADO {patron} en «{e['dim']}»"], False
             ruta.append(f["etiqueta"])
             if siguiente is None:                          # nivel M: en años recientes aparece «Gob.Loc./Mancom.» antes del departamento
                 if await self.ir_a("Gob.Loc./Mancom."):
                     g = await self.elegir(r"^M:")
                     if g: ruta.append(g["etiqueta"])
                 if not await self.ir_a("Departamento"):
-                    return None, None, ruta + ["SIN BOTÓN Departamento"]
-                continue
-            if not await self.ir_a(siguiente):
-                return None, None, ruta + [f"SIN BOTÓN {siguiente}"]
+                    return ruta + ["SIN BOTÓN Departamento"], False
+            elif not await self.ir_a(siguiente):
+                return ruta + [f"SIN BOTÓN {siguiente}"], False
+        return ruta, True
+
+    async def departamentos(self, anio, tipo_patron, esquema=0):
+        """Departamentos con recaudado de ese tipo de recurso en gobiernos locales: [(etiqueta, recaudado)]."""
+        ruta, ok = await self._hasta_departamentos(anio, tipo_patron, esquema)
+        if not ok:
+            return [], ruta
+        e = await self.estado()
+        return [(f["etiqueta"], f["recaudado"]) for f in e["filas"] if (f["recaudado"] or 0) > 0], ruta
+
+    async def municipalidades(self, anio, tipo_patron, dep_patron=r"^16:\s*LORETO", esquema=0):
+        """Filas «Municipalidad» del departamento para un tipo de recurso. Devuelve (filas, total_departamento, ruta)."""
+        ruta, ok = await self._hasta_departamentos(anio, tipo_patron, esquema)
+        if not ok:
+            return None, None, ruta
+        f = await self.elegir(dep_patron)
+        if f is None:
+            return None, None, ruta + [f"NO ENCONTRADO {dep_patron} en «Departamento»"]
+        ruta.append(f["etiqueta"])
+        if not await self.ir_a("Municipalidad"):
+            return None, None, ruta + ["SIN BOTÓN Municipalidad"]
         e = await self.estado()
         total = next((m["recaudado"] for m in e["migas"] if m["etiqueta"].startswith("Departamento")), None)
         return e["filas"], total, ruta
 
-    async def tipos_petroleros(self, anio):
-        """Tipos de recurso del rubro 18 que dicen «PETROLERO» (5 y K, según el año)."""
-        await self.abrir_anio(anio)
-        for patron, siguiente in ((r"^5:\s*RECURSOS DETERMINADOS", "Rubro"), (r"^18:", "Tipo de Recurso")):
-            if await self.elegir(patron) is None or not await self.ir_a(siguiente):
-                return []
-        e = await self.estado()
-        return [(f["etiqueta"], f["recaudado"]) for f in e["filas"] if re.search("PETROLER", f["etiqueta"], re.I)]
+    async def tipos_petroleros(self, anio, patron=r"PETROLER"):
+        """Tipos de recurso que cumplen el patrón («PETROLERO»: 5 y K desde 2007; 4 hasta 2006): [(etiqueta, recaudado, esquema)]."""
+        for esquema, pasos in enumerate(self.ESQUEMAS):
+            await self.abrir_anio(anio)
+            ok = True
+            for pat, siguiente in pasos:
+                if await self.elegir(pat) is None or not await self.ir_a(siguiente):
+                    ok = False; break
+            if not ok:
+                continue
+            e = await self.estado()
+            return [(f["etiqueta"], f["recaudado"], esquema) for f in e["filas"] if re.search(patron, f["etiqueta"], re.I)]
+        return []
 
 def nombre_municipalidad(etiqueta):
     """«01-301422: MUNICIPALIDAD PROVINCIAL DE MAYNAS - IQUITOS» → (código, nivel, municipalidad, provincia)."""
