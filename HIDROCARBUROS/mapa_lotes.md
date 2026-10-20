@@ -440,7 +440,7 @@ La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de lo
 
 ## Punto 4: pestaña «Canon» por lote, beneficiario y municipalidades (20/10/2026)
 
-**Provincias y distritos de cada lote.** La sección 2 baja de geoBoundaries los límites de provincias (ADM2) y distritos (ADM3), la misma fuente que ya se usa para los departamentos. Cada distrito toma su departamento y su provincia por su punto interior. La sección 3 calcula, igual que con los departamentos, el % del área del lote en cada provincia y distrito: columnas `PROVINCIA_DETALLE` y `DISTRITO_DETALLE` de `PP_LOTES_GEO.csv`, con el formato «DEP|PROV|DIST 85.0%; …». Si geoBoundaries falla, el mapa sigue funcionando sin esas columnas (queda anotado en el control de capas). La ficha del lote muestra «Provincia» y «Distrito» con su %; si es el 100 %, sin porcentaje.
+**Provincias y distritos de cada lote.** La sección 2 baja de geoBoundaries los límites de provincias (ADM2) y distritos (ADM3), la misma fuente que ya se usa para los departamentos. Cada distrito toma su departamento y su provincia por su punto interior. La sección 3 calcula, igual que con los departamentos, el % del área del lote en cada provincia y distrito: columnas `PROVINCIA_DETALLE` y `DISTRITO_DETALLE` de `PP_LOTES_GEO.csv`, con el formato «DEP|PROV|DIST 85.0%; …». Desde el 20/10/2026, si la API de geoBoundaries no devuelve JSON (en la primera corrida real falló con «Expecting value»), se reintenta 3 veces, luego se baja el mismo archivo de geoBoundaries desde GitHub y, como último respaldo, GADM 4.1 (`gadm41_PER_2/3.json.zip`, columnas NAME_2 y NAME_3); el mensaje dice qué respondió cada fuente. Si todas fallan, el mapa sigue funcionando sin esas columnas (queda anotado en el control de capas). La ficha del lote muestra «Provincia» y «Distrito» con su %; si es el 100 %, sin porcentaje.
 
 **Datos del panel** (Plus, Bloque 4), leídos de los CSV que deja la sección 9 del notebook de producción:
 - `ACT.cl[campo][lote][departamento] = {año: MM US$}`: canon generado por el lote y la parte de cada departamento (`PP_canon_lote_mes.csv`, sin los ajustes de meses anteriores). Los lotes de la Determinación se asignan al campo con los mismos nombres de la producción; se prueban «(T)» y «(TT)».
@@ -459,4 +459,4 @@ La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de lo
 - Loreto 2025 por beneficiario: 213,84 MM.
 - Sin errores en escritorio ni en móvil; las demás pestañas siguen igual.
 
-**Pendiente de la corrida real:** confirmar que geoBoundaries entrega ADM2 y ADM3 de Perú, y revisar los nombres de distrito que no se emparejen.
+**Pendiente de la corrida real:** confirmar qué fuente entregó ADM2 y ADM3 (geoBoundaries o GADM), y revisar los nombres de distrito que no se emparejen.
