@@ -83,11 +83,20 @@ from playwright.async_api import async_playwright
 filas, ctrl = [], []
 async def correr():
     async with async_playwright() as p:
-        nav = await p.chromium.launch()
-        pg = await (await nav.new_context(locale="es-PE", user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                                                                       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")).new_page()
+        # navegador lo más parecido a uno normal (el portal tiene un filtro anti-bots)
+        nav = await p.chromium.launch(args=["--disable-blink-features=AutomationControlled"])
+        ctx_nav = await nav.new_context(locale="es-PE", viewport={"width": 1366, "height": 900},
+                                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                                                   "Chrome/124.0 Safari/537.36", extra_http_headers={"Accept-Language": "es-PE,es;q=0.9"})
+        await ctx_nav.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        pg = await ctx_nav.new_page()
         m = MEFIngresos(pg, BASE, pausa=1.5)
+        fallas_seguidas = 0
         for anio in range(ANIO_INICIO, ANIO_FIN + 1):
+            if fallas_seguidas >= 3:
+                print(f"⛔ {anio}: se detiene tras 3 años seguidos con error; revisa el diagnóstico de arriba y la captura en CONTROL")
+                ctrl.append({"AÑO": anio, "DEPARTAMENTO": "TODOS" if TODOS else DEPARTAMENTO, "ESTADO": "NO INTENTADO (3 años seguidos con error)"})
+                continue
             for intento in (1, 2):
                 try:
                     tipos = await m.tipos_petroleros(anio)
@@ -145,15 +154,17 @@ async def correr():
                     if not objetivos:
                         ctrl.append({"AÑO": anio, "DEPARTAMENTO": "TODOS" if TODOS else DEPARTAMENTO, "ESTADO": "SIN DEPARTAMENTOS CON CANON PETROLERO MUNICIPAL"})
                         print(f"ℹ️ {anio}: sin departamentos con canon petrolero en gobiernos locales")
+                    fallas_seguidas = 0
                     break
                 except Exception as e:
-                    print(f"⚠️ {anio} intento {intento}: {type(e).__name__}: {str(e)[:160]}")
+                    print(f"⚠️ {anio} intento {intento}: {type(e).__name__}: {str(e)[:700]}")
                     try:
                         png = os.path.join(ruta, f"CONTROL PP mef_error_{anio}.png"); await pg.screenshot(path=png, full_page=True)
                         subir(png, DRIVE_FOLDER_CONTROL_ID, control_drive, mime="image/png")
                     except Exception:
                         pass
                     if intento == 2:
+                        fallas_seguidas += 1
                         ctrl.append({"AÑO": anio, "DEPARTAMENTO": "TODOS" if TODOS else DEPARTAMENTO, "ESTADO": f"ERROR: {type(e).__name__}: {str(e)[:150]}"})
                     await asyncio.sleep(10)
         await nav.close()
