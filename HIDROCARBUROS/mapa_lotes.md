@@ -471,4 +471,6 @@ La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de lo
 
 **Botón arriba (20/10/2026).** «📊 Ver estadísticas» está ahora en la parte superior de la ficha, debajo del nombre del lote, para no tener que bajar hasta el final.
 
+**Fuente por periodo en «Municipalidades del lote» (20/10/2026).** PERUPETRO publica el detalle por municipalidad solo en 1993–2002 (Excel de Distribución, «Distribución por concejos») y el año en curso (Excel de Canon Municipalidades); 2003–2024 no tiene detalle (sí el total municipal del departamento). El gráfico pinta esos años con una franja gris «Sin detalle por municipalidad · la fuente no lo publica», muestra debajo la línea «Fuente por periodo», la fuente en el cuadro del cursor y en la nota del detalle, y el CSV trae la columna FUENTE (datos `cmf` del panel, desde FUENTE_EXCEL). Para completar 2003–2024 se busca la fuente del MEF (transferencias de canon y sobrecanon petrolero a gobiernos locales) con `PP_MEF_Canon_Explorar.ipynb`; cuando se integre, sus años saldrán con la fuente «MEF, transferencias a gobiernos locales».
+
 **Pendiente de la corrida real:** confirmar qué fuente entregó ADM2 y ADM3 (geoBoundaries o GADM), y revisar los nombres de distrito que no se emparejen.
