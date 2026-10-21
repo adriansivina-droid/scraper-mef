@@ -128,14 +128,21 @@ class MEFIngresos:
             self.log(f"   ❌ {anio}: el marco {url} no trajo la tabla ({err or 'sin tabla Data'})"); return False
         m = re.search(r"Navegar_(\d+)", url)
         self.pagina = m.group(1) if m else "?"
+        if not misma_dim(pg.dim, D_FUENTE) and pg.filas and pg.boton(D_FUENTE):
+            # al abrir, la raíz muestra solo la fila TOTAL: se elige y se pulsa «Fuente», como en la página
+            pf, err = self._postear(pg, pg.filas[0][0], D_FUENTE, validar=False)
+            if pf is None:
+                self.log(f"   ❌ {anio}: al pulsar «Fuente» desde la raíz: {err}"); return False
+            pg = pf
         if not misma_dim(pg.dim, D_FUENTE):
-            self.log(f"   ❌ {anio}: la raíz lista «{pg.dim}», no «{D_FUENTE}» (botones: {', '.join(pg.botones)})"); return False
+            self.log(f"   ❌ {anio}: la raíz lista «{pg.dim}», no «{D_FUENTE}» (filas: {', '.join(e for _, e, _ in pg.filas[:5]) or '–'}; "
+                     f"botones: {', '.join(pg.botones)})"); return False
         self._cache[()] = pg
         self._anio = anio
         self.log(f"🔎 {anio}: Navegar_{self.pagina}.aspx · raíz con {len(pg.filas)} fuentes")
         return True
 
-    def _postear(self, padre, cod, dim):
+    def _postear(self, padre, cod, dim, validar=True):
         """Desde la página `padre`: elige la fila `cod` y pulsa el botón de `dim`. Valida historial y cabecera."""
         if cod not in padre.radios:
             return None, f"la fila «{cod}» no está en «{padre.dim}»"
@@ -152,7 +159,7 @@ class MEFIngresos:
         etq = next((e for c, e, _ in padre.filas if c == cod), cod)
         if not misma_dim(pg.dim, dim):
             return None, f"ESTADO: se pidió «{dim}» y la tabla lista «{pg.dim}»"
-        if len(pg.filtros) != len(padre.filtros) + 1 or norm(etq) not in norm(pg.filtros[-1][0]):
+        if validar and (len(pg.filtros) != len(padre.filtros) + 1 or norm(etq) not in norm(pg.filtros[-1][0])):
             return None, f"ESTADO: filtro no aplicado (historial: {' › '.join(f for f, _ in pg.filtros)})"
         return pg, None
 

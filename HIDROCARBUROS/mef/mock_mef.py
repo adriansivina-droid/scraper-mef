@@ -1,12 +1,12 @@
 # Simulador de la Consulta Amigable de Ingresos con navegación por FORMULARIO (postback ASP.NET), como el MEF real:
 # default.aspx?y=AAAA trae un iframe Navegar_N.aspx (2007+ = 6; antes = 1); la raíz lista las fuentes; cada POST lleva
 # __VIEWSTATE (aquí: el estado en base64), grp1 = «código/PIA/PIM/recaudado» de la fila elegida y el botón de la dimensión.
-# Las URL con filtros se ignoran (como en el MEF). Desde 2020 el nivel M pasa por «Gob.Loc./Mancom.» antes del departamento.
+# Al abrir, la raíz muestra solo TOTAL con el botón «Fuente» (como el MEF). Las URL con filtros se ignoran (como en el MEF). Desde 2020 el nivel M pasa por «Gob.Loc./Mancom.» antes del departamento.
 # Uso: python3 mock_mef.py  (puerto 8766)
 import urllib.parse, html, re, json, base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 F, RU, T, N, G, D, MU = "Fuente de Financiamiento", "Rubro", "Tipo de Recurso", "Nivel de Gobierno", "Gob.Loc./Mancom.", "Departamento", "Municipalidad"
-BOTON = {RU: "BtnRubro", T: "BtnTipoRecurso", N: "BtnNivelGobierno", G: "BtnGobLoc", D: "BtnDepartamento", MU: "BtnMunicipalidad",
+BOTON = {"Fuente": "BtnFuente", RU: "BtnRubro", T: "BtnTipoRecurso", N: "BtnNivelGobierno", G: "BtnGobLoc", D: "BtnDepartamento", MU: "BtnMunicipalidad",
          "Mes": "BtnMes"}
 MUNIS = {"01-301454": ("MUNICIPALIDAD PROVINCIAL DE REQUENA", 4819640.25), "06-301459": ("MUNICIPALIDAD DISTRITAL DE PUINAHUA", 373651.10),
          "01-301422": ("MUNICIPALIDAD PROVINCIAL DE MAYNAS - IQUITOS", 9114760.40)}
@@ -14,6 +14,8 @@ MUNIS = {"01-301454": ("MUNICIPALIDAD PROVINCIAL DE REQUENA", 4819640.25), "06-3
 def opciones(anio, f, dim):
     """f = {dimensión: código} ya filtrado; devuelve {código: (nombre, recaudado)} o None si no hay datos."""
     nuevo = anio >= 2007
+    if dim == "":
+        return {"TOTAL": ("TOTAL", 1e11)}
     if dim == F:
         return ({"1": ("RECURSOS ORDINARIOS", 9e9), "5": ("RECURSOS DETERMINADOS", 5e9)} if nuevo
                 else {"00": ("RECURSOS ORDINARIOS", 9e9), "01": ("CANON Y SOBRECANON", 1e9)})
@@ -41,6 +43,8 @@ def opciones(anio, f, dim):
     return None
 
 def botones(anio, f, dim):
+    if dim == "":
+        return [N, "Fuente", RU, "Mes"]
     usados = set(f) | {dim}
     b = [x for x in (RU, T, N, G, D, MU) if x not in usados]
     if anio >= 2020 and N in f and f.get(N) == "M" and G not in f and dim != G: b = [x for x in b if x != D]
@@ -81,7 +85,7 @@ class H(BaseHTTPRequestHandler):
         if u.path.lower().startswith("/default.aspx"):
             return self.responder(f"<html><iframe src='Navegar_{n}.aspx?y={anio}'></iframe></html>".encode())
         if u.path.lower() == f"/navegar_{n}.aspx":
-            return self.responder(pagina(anio, [], F, n))
+            return self.responder(pagina(anio, [], "", n))
         self.responder(b"<html>Navegador</html>")
     def do_POST(self):
         u = urllib.parse.urlparse(self.path)
@@ -94,6 +98,8 @@ class H(BaseHTTPRequestHandler):
         cod = (datos.get("grp1") or "").split("/")[0]
         if nuevo is None or not cod or nuevo not in botones(anio, dict(filtros), dim):
             return self.responder(pagina(anio, filtros, dim, n))
+        if dim == "":
+            return self.responder(pagina(anio, [], F, n))    # TOTAL + «Fuente» → lista de fuentes (sin filtro nuevo)
         self.responder(pagina(anio, filtros + [(dim, cod)], nuevo, n))
 
 if __name__ == "__main__":
