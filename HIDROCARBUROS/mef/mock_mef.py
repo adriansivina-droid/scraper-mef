@@ -44,6 +44,10 @@ def opciones(anio, f, dim):
     if dim == D:
         if f.get(N) not in ("M", "R"): return None
         return {"15": ("LIMA", 5e6), "16": ("LORETO", 14308051.75 * (2 if f.get(T) == "K" else 1))}
+    if dim == "Sector" and f.get(N) == "R":            # años recientes: regionales por sector → pliego
+        return {"99": ("GOBIERNOS REGIONALES", 1e6)}
+    if dim == "Pliego" and f.get(N) == "R":
+        return {"453": ("GOBIERNO REGIONAL DEL DEPARTAMENTO DE LORETO", 7e6), "457": ("GOBIERNO REGIONAL DEL DEPARTAMENTO DE PIURA", 2e6)}
     if dim == "Sector":                                # 2003: sin nivel de gobierno; el petrolero va al CND (PCM)
         return {"01": ("PRESIDENCIA CONSEJO MINISTROS", opciones(anio, f, T)[f[T]][1])} if T in f else None
     if dim == "Pliego":
@@ -60,8 +64,11 @@ def botones(anio, f, dim):
     if anio == 2003:
         return [x for x in (T, "Sector", "Pliego") if x not in usados] + ["Mes"]
     b = [x for x in (RU, T, N, G, D, MU) if x not in usados]
+    if anio >= 2020 and f.get(N) == "R":             # bajo «Gobiernos Regionales» no hay «Departamento»: Sector → Pliego
+        b = [x for x in b if x != D] + [x for x in ("Sector", "Pliego") if x not in usados]
     if anio >= 2020 and N in f and f.get(N) == "M" and G not in f and dim != G: b = [x for x in b if x != D]
-    if dim == N and anio >= 2020: b = [x for x in b if x != D]     # en M hay que pasar por Gob.Loc. (los otros niveles no tienen departamento aquí)
+    if dim == N and anio >= 2020: b = [x for x in b if x != D]
+    if dim == N and anio >= 2020: b = b + ["Sector"]                # como en el MEF: «Sector, Gob.Loc./Mancom.»     # en M hay que pasar por Gob.Loc. (los otros niveles no tienen departamento aquí)
     return b + ["Mes"]
 
 def pagina(anio, filtros, dim, n):
