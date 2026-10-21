@@ -16,7 +16,7 @@ MUNIS = {"01-301454": ("MUNICIPALIDAD PROVINCIAL DE REQUENA", 4819640.25), "06-3
 def opciones(anio, f, dim):
     """f = {dimensión: código} ya filtrado; devuelve {código: (nombre, recaudado)} o None si no hay datos."""
     if dim == "Mes":                                   # dos meses, cada uno con la mitad de lo anual
-        return {"1": ("ENERO", 1.0), "2": ("FEBRERO", 1.0)}
+        return {"1": ("'Enero'", 1.0), "2": ("'Febrero'", 1.0)}     # las filas de meses llevan comillas
     if "Mes" in f:
         base = opciones(anio, {k: v for k, v in f.items() if k != "Mes"}, dim)
         return {c: (n, v / 2) for c, (n, v) in base.items()} if base else base
@@ -71,7 +71,7 @@ def pagina(anio, filtros, dim, n):
     for i, (d, c) in enumerate(filtros):
         nom, val = opciones(anio, pref, d)[c]
         pref[d] = c
-        hist += f"<tr><td onclick='GoUpTo({i+1})'><img/></td><td>{d} {c}: {html.escape(nom)}</td><td>0</td><td>0</td><td>{val:,.2f}</td></tr>"
+        hist += f"<tr><td onclick='GoUpTo({i+1})'><img/></td><td>{d} {c}: {html.escape(nom.strip("'").upper())}</td><td>0</td><td>0</td><td>{val:,.2f}</td></tr>"
     ops = opciones(anio, f, dim)
     vs = base64.b64encode(json.dumps({"y": anio, "f": filtros, "d": dim}).encode()).decode()
     btn = "".join(f"<input type='submit' name='ctl00$CPH1${BOTON[x]}' value='{x}' onclick='OnClickButton();' class='Button' />"
