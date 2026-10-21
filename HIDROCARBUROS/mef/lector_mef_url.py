@@ -136,12 +136,12 @@ class MEFIngresosURL:
                 self.log(f"   · clave {k} = {d}")
         return faltan
 
-    def listar(self, anio, ruta, dim):
+    def listar(self, anio, ruta, dim, reintentos=3):
         """Filas de la dimensión `dim` bajo `ruta`, validando que la tabla liste esa dimensión."""
         k = self.claves.get(dim)
         if k is None:
             return None, f"clave desconocida para «{dim}»"
-        pg, err = self._get(anio, ruta, k)
+        pg, err = self._get(anio, ruta, k, reintentos=reintentos)
         if err:
             return None, err
         if not norm(pg.dim).startswith(norm(dim)[:10]):
@@ -183,33 +183,46 @@ class MEFIngresosURL:
             return ruta, pt.filas, None
         return None, [], "sin fuente 5 (Recursos determinados) ni 01 (Canon y sobrecanon)"
 
-    def hasta_departamentos(self, anio, ruta, tipo):
-        """Agrega tipo de recurso y nivel M (y gob. local M si existe) y lista los departamentos."""
+    def niveles(self, anio, ruta, tipo):
+        """Distribución por nivel de gobierno (E nacional, M locales, R regionales) de un tipo de recurso.
+        Devuelve (ruta con el tipo, página «Nivel de Gobierno», error)."""
         r = ruta + [(self.claves["Tipo de Recurso"], tipo[0])]
         if "Nivel de Gobierno" not in self.claves:
             self.descubrir(anio, r, ["Nivel de Gobierno"])
         pn, err = self.listar(anio, r, "Nivel de Gobierno")
+        return r, pn, (f"nivel de gobierno: {err}" if err else None)
+
+    def departamentos_de_nivel(self, anio, r_tipo, nivel):
+        """Lista los departamentos bajo un nivel de gobierno (en M agrega «Gob.Loc./Mancom. M» si existe)."""
+        r = r_tipo + [(self.claves["Nivel de Gobierno"], nivel[0])]
+        if nivel[0] == "M":
+            if "Gob.Loc./Mancom." not in self.claves:      # solo en años recientes; en gasto es la clave 37
+                pg, _ = self._get(anio, r, "37", reintentos=1)
+                if pg is not None and norm(pg.dim).startswith("gob"):
+                    self.claves["Gob.Loc./Mancom."] = "37"; self.log("   · clave 37 = Gob.Loc./Mancom.")
+            if "Gob.Loc./Mancom." in self.claves:
+                pg, err = self.listar(anio, r, "Gob.Loc./Mancom.")
+                if not err:
+                    g = self.elegir(pg, r"^M:")
+                    if g:
+                        r = r + [(self.claves["Gob.Loc./Mancom."], g[0])]
+        if "Departamento" not in self.claves:
+            self.descubrir(anio, r, ["Departamento"])
+        # el nivel nacional puede no tener detalle por departamento: un solo intento fuera de M
+        pd_, err = self.listar(anio, r, "Departamento", reintentos=3 if nivel[0] == "M" else 1)
+        return r, pd_, (f"departamento: {err}" if err else None)
+
+    def hasta_departamentos(self, anio, ruta, tipo):
+        """Agrega tipo de recurso y nivel M (y gob. local M si existe) y lista los departamentos."""
+        r, pn, err = self.niveles(anio, ruta, tipo)
         if err:
-            return None, None, f"nivel de gobierno: {err}"
+            return None, None, err
         m = self.elegir(pn, r"^M:")
         if not m:
             return None, None, "sin gobiernos locales (nivel M) en este tipo de recurso"
-        r = r + [(self.claves["Nivel de Gobierno"], m[0])]
-        if "Gob.Loc./Mancom." not in self.claves:          # solo en años recientes; en gasto es la clave 37
-            pg, _ = self._get(anio, r, "37", reintentos=1)
-            if pg is not None and norm(pg.dim).startswith("gob"):
-                self.claves["Gob.Loc./Mancom."] = "37"; self.log("   · clave 37 = Gob.Loc./Mancom.")
-        if "Departamento" not in self.claves:
-            self.descubrir(anio, r, ["Departamento"])
-        if "Gob.Loc./Mancom." in self.claves:
-            pg, err = self.listar(anio, r, "Gob.Loc./Mancom.")
-            if not err:
-                g = self.elegir(pg, r"^M:")
-                if g:
-                    r = r + [(self.claves["Gob.Loc./Mancom."], g[0])]
-        pd_, err = self.listar(anio, r, "Departamento")
+        r, pd_, err = self.departamentos_de_nivel(anio, r, m)
         if err:
-            return None, None, f"departamento: {err}"
+            return None, None, err
         return r, pd_, None
 
     def municipalidades(self, anio, ruta_dep, dep):

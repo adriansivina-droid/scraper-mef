@@ -23,11 +23,11 @@ def opciones(anio, f, k):
     if k == "1":
         if anio <= 2004: return {"E": "GOBIERNO NACIONAL"}
         if anio < 2007 and f.get("11") == "0" and anio != 2005: return {"E": "GOBIERNO NACIONAL"}
-        return {"E": "GOBIERNO NACIONAL", "M": "GOBIERNOS LOCALES"}
+        return {"E": "GOBIERNO NACIONAL", "M": "GOBIERNOS LOCALES", "R": "GOBIERNOS REGIONALES"}
     if k == "37":
         return {"M": "MUNICIPALIDADES"} if anio >= 2020 and f.get("1") == "M" else None
     if k == "5":
-        return {"15": "LIMA", "16": "LORETO"} if f.get("1") == "M" else None
+        return {"15": "LIMA", "16": "LORETO"} if f.get("1") in ("M", "R") else None
     if k == "7":
         if "5" not in f: return None
         mult = 2 if f.get("11") == "K" else 1

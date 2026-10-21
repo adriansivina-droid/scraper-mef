@@ -380,6 +380,23 @@ const ARCHIVOS = [
     refs: ["canonMun", "canon"],
   },
   {
+    archivo: "PP_canon_nivel_gobierno_mef_anio.csv", tema: "Fiscal (canon)", util: "Útil",
+    para: "Canon y sobrecanon petrolero recaudado por nivel de gobierno (nacional, locales, regionales), total país y por departamento, según el MEF (2003–hoy).",
+    proposito: [
+      "Contiene, para cada año y tipo de recurso petrolero de la Consulta Amigable de Ingresos del MEF, el monto recaudado por cada nivel de gobierno: gobierno nacional (E), gobiernos locales (M) y gobiernos regionales (R), en total país y, cuando la consulta lo permite, por departamento.",
+      "Sirve para ver cómo se distribuye el canon petrolero entre niveles de gobierno antes del detalle por municipalidad (PP_canon_municipal_mef_anio.csv) y para contrastarlo con el reparto por beneficiario de PERUPETRO.",
+    ],
+    origen: "Notebook PP_MEF_Canon_Municipal.ipynb (lectura por URL, como los scrapers de FISCAL). Desde 2007: fuente 5 → rubro 18 → tipos «5» y «K» de canon y sobrecanon petrolero; 2003–2006: fuente 01 → tipo «4» (petrolero) y, en 2005–2006, «0: NORMAL» (todos los canones) cuando el petrolero no llega a gobiernos locales. Se acumula por año. Control: suma de niveles = total del tipo de recurso (CONTROL PP canon_nivel_gobierno_mef.csv).",
+    clave: "Un año, un tipo de recurso, un nivel de gobierno y un departamento (o TOTAL PAÍS). Clave: AÑO + TIPO_RECURSO + NIVEL_GOBIERNO + DEPARTAMENTO.",
+    vars: [V.AÑO,
+      ["TIPO_RECURSO", "Texto", "Tipo de recurso del MEF (p. ej., «5: CANON Y SOBRECANON PETROLERO»); «(todos los canones)» si es el tipo NORMAL."],
+      ["NIVEL_GOBIERNO", "Texto", "E: GOBIERNO NACIONAL, M: GOBIERNOS LOCALES o R: GOBIERNOS REGIONALES."],
+      ["DEPARTAMENTO", "Texto", "TOTAL PAÍS o el departamento."],
+      ["RECAUDADO_SOLES", "Decimal, soles (S/)", "Monto recaudado en el año."],
+      ["FUENTE", "Texto", "MEF, Consulta Amigable de Ingresos (recaudado)."]],
+    refs: ["mef"],
+  },
+  {
     archivo: "PP_canon_municipal_mef_anio.csv", tema: "Fiscal (canon)", util: "Útil",
     para: "Canon y sobrecanon petrolero recaudado por cada municipalidad y año según el MEF (2007–hoy); completa los años sin detalle de PERUPETRO.",
     proposito: [
