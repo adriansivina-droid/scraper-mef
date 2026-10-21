@@ -498,3 +498,5 @@ Bajo cada título hay una línea «📍 Alcance: …» que aclara si lo que se v
 - El panel de estadísticas (pozos, regalías y las cuatro vistas de canon) tiene selectores «Desde» y «Hasta», como Producción. El corte se mantiene al cambiar de vista; «↺ Toda la serie» lo quita. Afecta al gráfico, al resumen, a la tabla y al CSV.
 - En «Municipalidades del lote», la «Fuente por periodo» aparece como lista (un periodo por línea).
 - El botón «📊 Producción fiscalizada anual y mensual» pasa de la esquina inferior izquierda al selector de capas, debajo de «Productos».
+
+**«Por nivel de gobierno» solo con PERUPETRO (21/10/2026).** A pedido del usuario se quitó la opción «MEF · recaudado» de esta vista, para no complicar la lectura. La vista muestra lo transferido por PERUPETRO con los beneficiarios agrupados. El recaudado del MEF por nivel sigue en `DATA/PP_canon_nivel_gobierno_mef_anio.csv`.
