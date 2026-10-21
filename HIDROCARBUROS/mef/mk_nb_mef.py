@@ -212,6 +212,8 @@ if len(nuevo):
     subir(p, DRIVE_FOLDER_ID, datos_drive)
 c = pd.DataFrame(ctrl); c.insert(0, "FECHA_EXTRACCION", date.today().strftime("%d/%m/%Y"))
 previo_c = bajar("CONTROL PP canon_municipal_mef.csv", control_drive)
+if previo_c is not None:              # filas de versiones anteriores del notebook («16: LORETO», «NO INTENTADO…») se descartan
+    previo_c = previo_c[~previo_c["DEPARTAMENTO"].astype(str).str.contains(":") & ~previo_c["ESTADO"].astype(str).str.startswith("NO INTENTADO")]
 if previo_c is not None:
     leidos_c = set(zip(c["DEPARTAMENTO"], c["AÑO"]))
     c = pd.concat([previo_c[[(d, a) not in leidos_c for d, a in zip(previo_c["DEPARTAMENTO"], previo_c["AÑO"])]], c],
