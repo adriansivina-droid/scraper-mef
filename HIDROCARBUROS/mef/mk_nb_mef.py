@@ -16,6 +16,8 @@ PERUPETRO publica el canon **por municipalidad** solo en 1993–2002 (Excel de D
 - **Primero, la distribución por nivel de gobierno**: para cada año y tipo de recurso petrolero, lo recaudado por el gobierno nacional (E), los gobiernos locales (M) y los gobiernos regionales (R), en total país y por departamento → `DATA/PP_canon_nivel_gobierno_mef_anio.csv` (control: suma de niveles = total del tipo de recurso, en `CONTROL/CONTROL PP canon_nivel_gobierno_mef.csv`).
 - **Después, el detalle por municipalidad** (nivel M). **Resultado:** `DATA/PP_canon_municipal_mef_anio.csv` y `CONTROL/CONTROL PP canon_municipal_mef.csv` (suma de municipalidades vs. total del departamento en el MEF, y vs. el total municipal de PERUPETRO: *recaudado* y *transferido* pueden diferir por fechas de registro).
 
+- **Versión mensual** (`DETALLE = "Anual y mensual"`): con el botón «Mes» se baja lo mismo por mes → `DATA/PP_canon_municipal_mef_mes.csv` (AÑO, MES, municipalidad, tipo, recaudado) y `DATA/PP_canon_nivel_gobierno_mef_mes.csv`; control en `CONTROL/CONTROL PP canon_mef_mes.csv` (suma de los meses = total anual). Toma unas 12 veces más consultas que la versión anual.
+
 **Bloque 1** importa las librerías. **Bloque 2** descarga y controla."""
 
 b1 = """#@title Bloque 1 · Librerías { display-mode: "form" }
@@ -29,6 +31,7 @@ b2 = '''#@title Bloque 2 · Descargar y controlar { display-mode: "form" }
 ANIO_INICIO = 2003  #@param {type:"integer"}
 ANIO_FIN = 2026  #@param {type:"integer"}
 SI_NO_HAY_PETROLERO = "Usar NORMAL 2005–2006 (todos los canones)"  #@param ["Usar NORMAL 2005–2006 (todos los canones)", "Dejar sin dato"]
+DETALLE = "Anual y mensual"  #@param ["Anual", "Anual y mensual"]
 DEPARTAMENTO = "16: LORETO"  #@param ["TODOS", "16: LORETO", "25: UCAYALI", "20: PIURA", "24: TUMBES", "10: HUANUCO", "08: CUSCO"]
 import os, re, unicodedata, pandas as pd
 from datetime import date
@@ -91,6 +94,15 @@ m = MEFIngresos(log=print)
 if not m.preparar(min(ANIO_FIN, date.today().year)):
     raise SystemExit("❌ No se pudo abrir la consulta (ver el mensaje de arriba): el MEF cambió la página o bloqueó la consulta.")
 filas, ctrl, niv_filas, ctrl_niv = [], [], [], []
+MENSUAL = DETALLE.endswith("mensual")
+filas_mes, niv_mes, ctrl_mes = [], [], []          # versión mensual: municipalidades, niveles y control (suma de meses = año)
+
+def meses_de(anio, ruta):
+    """Meses (código, número, etiqueta) bajo la página de `ruta` (botón «Mes»)."""
+    pm, e = m.listar(anio, ruta, D_MES)
+    if e:
+        return None, e
+    return [(c, mes_num(c, et), et) for c, et, _ in pm.filas], None
 
 def registrar_niveles(anio, ruta, t, normal=False):
     """Distribución del tipo de recurso por nivel de gobierno (E, M, R): total país y por departamento."""
@@ -131,6 +143,24 @@ def registrar_niveles(anio, ruta, t, normal=False):
                      "SIN_DETALLE_DEPARTAMENTO": "; ".join(sin_dep),
                      "ESTADO": "OK" if abs(suma - t[2]) <= max(1, len(pn.filas)) else "REVISAR"})
     print(f"   🏛️ {anio} · {etq_t}: " + " · ".join(f"{et.split(':', 1)[-1].strip().title()} S/ {v/1e6:,.2f} millones" for _, et, v in pn.filas))
+    if MENSUAL:
+        ms, e = meses_de(anio, r_t)
+        if ms is None:
+            ctrl_mes.append({"AÑO": anio, "DEPARTAMENTO": "TOTAL PAÍS", "TIPO_RECURSO": etq_t, "ALCANCE": "NIVEL DE GOBIERNO",
+                             "ESTADO": f"ERROR meses: {e}"}); return
+        suma_m = 0.0
+        for mc, mn, met in ms:
+            pnm, e = m.listar(anio, r_t + [(D_MES, mc)], D_NIVEL)
+            if e:
+                ctrl_mes.append({"AÑO": anio, "MES": mn, "DEPARTAMENTO": "TOTAL PAÍS", "TIPO_RECURSO": etq_t,
+                                 "ALCANCE": "NIVEL DE GOBIERNO", "ESTADO": f"ERROR: {e}"}); continue
+            for c, et, v in pnm.filas:
+                niv_mes.append({"AÑO": anio, "MES": mn, "TIPO_RECURSO": etq_t, "NIVEL_GOBIERNO": et, "DEPARTAMENTO": "TOTAL PAÍS",
+                                "RECAUDADO_SOLES": round(v, 2), "FUENTE": fuente})
+                suma_m += v
+        ctrl_mes.append({"AÑO": anio, "DEPARTAMENTO": "TOTAL PAÍS", "TIPO_RECURSO": etq_t, "ALCANCE": "NIVEL DE GOBIERNO",
+                         "MESES": len(ms), "SUMA_MESES": round(suma_m, 2), "TOTAL_ANUAL": round(suma, 2), "DIF": round(suma_m - suma, 2),
+                         "ESTADO": "OK" if abs(suma_m - suma) <= max(1, len(ms) * len(pn.filas)) else "REVISAR"})
 
 for anio in range(ANIO_INICIO, ANIO_FIN + 1):
     etq_dep = "TODOS" if TODOS else norm_may(DEPARTAMENTO.split(":", 1)[1])
@@ -185,6 +215,36 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
                               "FUENTE": FUENTE + (" · tipo 0 NORMAL: todos los canones, no solo el petrolero" if normal else "")})
                 suma += v; n += 1
             tot += total or 0.0
+            if MENSUAL:
+                anual = sum(v for _, _, v in fs)
+                ms, e = meses_de(anio, r)                # meses bajo la misma página que lista los departamentos
+                if ms is None:
+                    ctrl_mes.append({"AÑO": anio, "DEPARTAMENTO": DEP, "TIPO_RECURSO": t[1], "ALCANCE": "MUNICIPALIDADES",
+                                     "ESTADO": f"ERROR meses: {e}"})
+                else:
+                    suma_m = 0.0; errores = []
+                    for mc, mn, met in ms:
+                        pdm, e = m.listar(anio, r + [(D_MES, mc)], D_DEPTO)
+                        dm = None if e else next(((c, et, v) for c, et, v in pdm.filas if c.lstrip("0") == cod_d.lstrip("0")), None)
+                        if dm is None:
+                            if e: errores.append(f"{met}: {e}")
+                            continue                     # ese mes no hubo recaudación en el departamento
+                        pmu, e = m.listar(anio, r + [(D_MES, mc), (D_DEPTO, dm[0])], D_MUNI)
+                        if e:
+                            errores.append(f"{met}: {e}"); continue
+                        for c, et, v in pmu.filas:
+                            codigo, nivel, mu, prov = nombre_municipalidad(et)
+                            filas_mes.append({"AÑO": anio, "MES": mn, "DEPARTAMENTO": DEP, "CODIGO": codigo,
+                                              "MUNICIPALIDAD_MEF": et.split(":", 1)[1].strip(), "MUNICIPALIDAD": mu, "NIVEL": nivel,
+                                              "PROVINCIA": prov or prov_de.get(norm_may(mu), ""),
+                                              "TIPO_RECURSO": t[1] + (" (todos los canones)" if normal else ""), "RECAUDADO_SOLES": round(v, 2),
+                                              "FUENTE": FUENTE + (" · tipo 0 NORMAL: todos los canones, no solo el petrolero" if normal else "")})
+                            suma_m += v
+                    ctrl_mes.append({"AÑO": anio, "DEPARTAMENTO": DEP, "TIPO_RECURSO": t[1] + (" (todos los canones)" if normal else ""),
+                                     "ALCANCE": "MUNICIPALIDADES", "MESES": len(ms), "SUMA_MESES": round(suma_m, 2),
+                                     "TOTAL_ANUAL": round(anual, 2), "DIF": round(suma_m - anual, 2), "ERRORES": "; ".join(errores),
+                                     "ESTADO": "OK" if not errores and abs(suma_m - anual) <= max(1, len(fs)) else "REVISAR"})
+                    print(f"   🗓️ {anio} · {DEP} · {t[1]}: {len(ms)} meses · suma S/ {suma_m/1e6:,.2f} millones vs año S/ {anual/1e6:,.2f} millones")
             detalle.append(f"{t[1]}{' (todos los canones)' if normal else ''}: S/ {total or 0:,.0f}")
         ref = pp_mun.get((DEP, anio))
         ctrl.append({"AÑO": anio, "DEPARTAMENTO": DEP, "TIPOS": " | ".join(detalle), "MUNICIPALIDADES": n,
@@ -217,6 +277,34 @@ if len(cn):
     subir(p, DRIVE_FOLDER_CONTROL_ID, control_drive)
     print(f"☁️ DATA/PP_canon_nivel_gobierno_mef_anio.csv ({len(nv)} filas) · CONTROL/CONTROL PP canon_nivel_gobierno_mef.csv")
     display(cn[cn["AÑO"].between(ANIO_INICIO, ANIO_FIN)].drop(columns=["FECHA_EXTRACCION"]))
+
+# ── Versión mensual (se acumula: cada corrida reemplaza los años que vuelve a leer) ──
+def acumular(df, nombre, carpeta, existentes, claves, orden):
+    previo = bajar(nombre, existentes)
+    if previo is not None and len(df):
+        leidos = set(map(tuple, df[claves].drop_duplicates().values.tolist()))
+        previo = previo[[tuple(x) not in leidos for x in previo[claves].values.tolist()]]
+        df = pd.concat([previo, df], ignore_index=True)
+    elif previo is not None:
+        df = previo
+    if len(df):
+        df = df.sort_values(orden)
+        p = os.path.join(ruta_local, nombre); df.to_csv(p, index=False, encoding="utf-8-sig")
+        subir(p, carpeta, existentes)
+    return df
+if MENSUAL:
+    fm = acumular(pd.DataFrame(filas_mes), "PP_canon_municipal_mef_mes.csv", DRIVE_FOLDER_ID, datos_drive,
+                  ["DEPARTAMENTO", "AÑO"], ["DEPARTAMENTO", "AÑO", "MES", "MUNICIPALIDAD", "TIPO_RECURSO"])
+    nm = acumular(pd.DataFrame(niv_mes), "PP_canon_nivel_gobierno_mef_mes.csv", DRIVE_FOLDER_ID, datos_drive,
+                  ["AÑO"], ["AÑO", "MES", "TIPO_RECURSO", "NIVEL_GOBIERNO"])
+    cm = pd.DataFrame(ctrl_mes)
+    if len(cm):
+        cm.insert(0, "FECHA_EXTRACCION", date.today().strftime("%d/%m/%Y"))
+        cm = acumular(cm, "CONTROL PP canon_mef_mes.csv", DRIVE_FOLDER_CONTROL_ID, control_drive,
+                      ["DEPARTAMENTO", "AÑO"], ["AÑO", "DEPARTAMENTO", "ALCANCE", "TIPO_RECURSO"])
+        print(f"☁️ DATA/PP_canon_municipal_mef_mes.csv ({len(fm)} filas) · DATA/PP_canon_nivel_gobierno_mef_mes.csv ({len(nm)} filas) · "
+              f"CONTROL/CONTROL PP canon_mef_mes.csv")
+        display(cm[cm["AÑO"].between(ANIO_INICIO, ANIO_FIN)].drop(columns=["FECHA_EXTRACCION"]))
 
 # ── Guardar (se acumula: cada corrida reemplaza los departamentos y años que vuelve a leer) ──
 nuevo = pd.DataFrame(filas)

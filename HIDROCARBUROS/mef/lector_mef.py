@@ -17,7 +17,15 @@ from bs4 import BeautifulSoup
 BASE = "https://apps5.mineco.gob.pe/transparenciaingresos/mensual"
 D_FUENTE, D_RUBRO, D_TIPO, D_NIVEL = "Fuente de Financiamiento", "Rubro", "Tipo de Recurso", "Nivel de Gobierno"
 D_GOBLOC, D_DEPTO, D_MUNI = "Gob.Loc./Mancom.", "Departamento", "Municipalidad"
-D_SECTOR, D_PLIEGO = "Sector", "Pliego"
+D_SECTOR, D_PLIEGO, D_MES = "Sector", "Pliego", "Mes"
+_MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SETIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
+
+def mes_num(cod, etiqueta=""):
+    """«1» / «01: ENERO» / «SETIEMBRE» → 1..12 (None si no se reconoce)."""
+    if str(cod).strip().isdigit() and 1 <= int(cod) <= 12:
+        return int(cod)
+    t = norm(etiqueta).upper().replace("SEPTIEMBRE", "SETIEMBRE")
+    return next((i + 1 for i, m in enumerate(_MESES) if m in t), None)
 _CODIGO = re.compile(r"^([\w\-\.]+)\s*:")
 
 def norm(t):
