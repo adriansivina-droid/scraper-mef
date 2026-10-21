@@ -507,3 +507,8 @@ Bajo cada título hay una línea «📍 Alcance: …» que aclara si lo que se v
 - MEF + NORMAL, todos los canones (amarillo).
 - MEF · canon gasífero (naranja; solo Cusco).
 - PERUPETRO · Canon Municipalidades (morado).
+
+**Mismas pestañas desde el botón y desde un lote (21/10/2026).** El panel «Producción fiscalizada» ahora muestra siempre las pestañas Producción, Pozos perforados, Regalías, Canon y sobrecanon y Empresas, tanto si se abre con el botón «📊 Producción fiscalizada anual y mensual» como desde la ficha de un lote. Las pestañas siguen la serie elegida:
+- **Un campo o lote:** todas las pestañas.
+- **Un departamento (p. ej. Loreto):** «Canon y sobrecanon» con las vistas del departamento (por beneficiario y por nivel de gobierno). Pozos, regalías y empresas, que son por lote, aparecen desactivadas.
+- **Perú (total):** sin pestañas.
