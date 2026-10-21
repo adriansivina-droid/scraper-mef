@@ -480,3 +480,9 @@ La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de lo
 **Tipo de letra Barlow (20/10/2026).** Todo el mapa (fichas, panel de producción, panel de estadísticas, leyenda y controles) usa Barlow de Google Fonts; los íconos no se tocan y, sin conexión a internet, cae en la letra del sistema.
 
 **Pendiente de la corrida real:** confirmar qué fuente entregó ADM2 y ADM3 (geoBoundaries o GADM), y revisar los nombres de distrito que no se emparejen.
+
+**Vista «Nivel de gobierno» en la pestaña de canon (21/10/2026).** Entre «Departamento por beneficiario» y «Municipalidades del lote». Tiene dos fuentes, con un selector:
+- **MEF · recaudado** (`PP_canon_nivel_gobierno_mef_anio.csv`): gobierno regional y gobiernos locales del departamento, tipos de canon petrolero 5 y K (desde 2007) y 4 (2003–2006). No incluye el tipo NORMAL de 2005–2006, que reúne todos los canones. No incluye el gobierno nacional, que el MEF no desagrega por departamento.
+- **PERUPETRO · transferido** (`PP_canon_distribucion_mes.csv`): los beneficiarios de la distribución agrupados en gobierno regional, municipalidades (gobiernos locales) y «universidades, institutos e IIAP». Este último grupo va junto, sin asignarle nivel de gobierno. El descuento de la Ley 29289 aparece en gris. Solo años completos.
+
+La vista también tiene tabla y descarga en CSV.
