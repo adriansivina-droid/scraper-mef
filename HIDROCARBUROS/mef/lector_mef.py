@@ -33,8 +33,15 @@ def a_numero(t):
 def _texto(td):
     return " ".join(td.get_text(" ", strip=True).split())
 
+def _abreviar(t):
+    """«Gobiernos Locales / Mancomunidades» y «Gob.Loc./Mancom.» → «gob loc manc» (botón y cabecera usan nombres distintos)."""
+    t = norm(t)
+    if "manc" in t and "gob" in t:
+        return "gob loc manc"
+    return t
+
 def misma_dim(cabecera, dim):
-    c, d = norm(cabecera), norm(dim)
+    c, d = _abreviar(cabecera), _abreviar(dim)
     return bool(c) and (c.startswith(d[:10]) or d.startswith(c[:10]))
 
 class Pagina:
@@ -158,7 +165,7 @@ class MEFIngresos:
             return None, "SIN_TABLA (sin datos para esa combinación)"
         etq = next((e for c, e, _ in padre.filas if c == cod), cod)
         if not misma_dim(pg.dim, dim):
-            return None, f"ESTADO: se pidió «{dim}» y la tabla lista «{pg.dim}»"
+            return None, f"se pidió «{dim}» y la tabla lista «{pg.dim}»"
         if validar and (len(pg.filtros) != len(padre.filtros) + 1 or norm(etq) not in norm(pg.filtros[-1][0])):
             return None, f"ESTADO: filtro no aplicado (historial: {' › '.join(f for f, _ in pg.filtros)})"
         return pg, None
@@ -233,7 +240,7 @@ class MEFIngresos:
         if err:
             return None, None, f"nivel: {err}"
         r = r_tipo + [(D_NIVEL, nivel[0])]
-        if pn.boton(D_DEPTO) is None and pn.boton(D_GOBLOC) is not None:
+        if nivel[0] == "M" and pn.boton(D_DEPTO) is None and pn.boton(D_GOBLOC) is not None:
             pg, err = self.listar(anio, r, D_GOBLOC)
             if err:
                 return None, None, f"gob. local: {err}"

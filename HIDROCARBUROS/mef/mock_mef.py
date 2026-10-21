@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 F, RU, T, N, G, D, MU = "Fuente de Financiamiento", "Rubro", "Tipo de Recurso", "Nivel de Gobierno", "Gob.Loc./Mancom.", "Departamento", "Municipalidad"
 BOTON = {"Fuente": "BtnFuente", RU: "BtnRubro", T: "BtnTipoRecurso", N: "BtnNivelGobierno", G: "BtnGobLoc", D: "BtnDepartamento", MU: "BtnMunicipalidad",
          "Mes": "BtnMes"}
+CABECERA = {G: "Gobiernos Locales / Mancomunidades"}     # el botón dice «Gob.Loc./Mancom.», la cabecera no (como en el MEF)
 MUNIS = {"01-301454": ("MUNICIPALIDAD PROVINCIAL DE REQUENA", 4819640.25), "06-301459": ("MUNICIPALIDAD DISTRITAL DE PUINAHUA", 373651.10),
          "01-301422": ("MUNICIPALIDAD PROVINCIAL DE MAYNAS - IQUITOS", 9114760.40)}
 
@@ -68,7 +69,7 @@ def pagina(anio, filtros, dim, n):
         filas = "".join(f"<tr onclick='kCod=\"{c}\";tr_clk({i}, this)'><td><input type='radio' name='grp1' value='{c}/0/0/{v:.2f}' "
                         f"onclick='kCod=\"{c}\";grp1_clk({i})'></td><td>{c}: {html.escape(nom)}</td><td>0</td><td>0</td><td>{v:,.0f}</td></tr>"
                         for i, (c, (nom, v)) in enumerate(ops.items()))
-        cuerpo = (f"<table class='MapTable'><tr><td>&nbsp;</td><td>{dim}</td><td>PIA</td><td>PIM</td><td>Recaudado</td></tr></table>"
+        cuerpo = (f"<table class='MapTable'><tr><td>&nbsp;</td><td>{CABECERA.get(dim, dim)}</td><td>PIA</td><td>PIM</td><td>Recaudado</td></tr></table>"
                   f"<table class='Data'>{filas}</table>")
     return (f"<html><body><form method='post' action='Navegar_{n}.aspx?y={anio}' id='form1'>"
             f"<input type='hidden' name='__EVENTTARGET' value=''/><input type='hidden' name='__EVENTARGUMENT' value=''/>"
