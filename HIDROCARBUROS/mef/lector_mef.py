@@ -63,6 +63,9 @@ class Pagina:
                         for i in s.find_all("input", attrs={"type": "submit"}) if i.get("name")}
         data = s.find("table", class_="Data")
         self.tiene_tabla = data is not None
+        for t in s(["script", "style"]):
+            t.decompose()
+        self.texto = " ".join(s.get_text(" ", strip=True).split())     # para el diagnóstico cuando no hay tabla
         mt = s.find("table", class_="MapTable")
         celdas = [_texto(td) for td in (mt.find("tr").find_all("td") if mt and mt.find("tr") else [])]
         self.dim = next((c for c in celdas if c and c not in ("PIA", "PIM", "Recaudado")), "")
@@ -129,25 +132,42 @@ class MEFIngresos:
             src = _html.unescape(m.group(1)) if m else f"Navegar_6.aspx?y={anio}"
         except requests.RequestException as e:
             self.log(f"   ❌ default.aspx {anio}: {e}"); return False
-        url = urljoin(f"{self.base}/", src)
-        pg, err = self._pedir("GET", url)
-        if pg is None or not pg.tiene_tabla:
-            self.log(f"   ❌ {anio}: el marco {url} no trajo la tabla ({err or 'sin tabla Data'})"); return False
+        # el marco que indica default.aspx y, si no sirve, los demás Navegar_N del año
+        candidatos = [urljoin(f"{self.base}/", src)] + [f"{self.base}/Navegar_{n}.aspx?y={anio}" for n in range(1, 8)]
+        vistos, pg = [], None
+        for url in candidatos:
+            if url in vistos:
+                continue
+            vistos.append(url)
+            pg, err = self._abrir_raiz(anio, url)
+            if pg is not None:
+                break
+            self.log(f"   · {anio}: {url.rsplit('/', 1)[-1]} → {err}")
+        if pg is None:
+            return False
         m = re.search(r"Navegar_(\d+)", url)
         self.pagina = m.group(1) if m else "?"
-        if not misma_dim(pg.dim, D_FUENTE) and pg.filas and pg.boton(D_FUENTE):
-            # al abrir, la raíz muestra solo la fila TOTAL: se elige y se pulsa «Fuente», como en la página
-            pf, err = self._postear(pg, pg.filas[0][0], D_FUENTE, validar=False)
-            if pf is None:
-                self.log(f"   ❌ {anio}: al pulsar «Fuente» desde la raíz: {err}"); return False
-            pg = pf
-        if not misma_dim(pg.dim, D_FUENTE):
-            self.log(f"   ❌ {anio}: la raíz lista «{pg.dim}», no «{D_FUENTE}» (filas: {', '.join(e for _, e, _ in pg.filas[:5]) or '–'}; "
-                     f"botones: {', '.join(pg.botones)})"); return False
         self._cache[()] = pg
         self._anio = anio
         self.log(f"🔎 {anio}: Navegar_{self.pagina}.aspx · raíz con {len(pg.filas)} fuentes")
         return True
+
+    def _abrir_raiz(self, anio, url):
+        """GET del marco y, si muestra solo la fila TOTAL, pulsa «Fuente» (como en la página). Devuelve (página de fuentes, error)."""
+        pg, err = self._pedir("GET", url, reintentos=2)
+        if pg is None:
+            return None, err
+        if not pg.tiene_tabla:
+            return None, f"sin tabla («{pg.texto[:120]}»)"
+        if not misma_dim(pg.dim, D_FUENTE) and pg.filas and pg.boton(D_FUENTE):
+            pf, err = self._postear(pg, pg.filas[0][0], D_FUENTE, validar=False)
+            if pf is None:
+                return None, f"al pulsar «Fuente»: {err}"
+            pg = pf
+        if not misma_dim(pg.dim, D_FUENTE):
+            return None, (f"la raíz lista «{pg.dim}» (filas: {', '.join(e for _, e, _ in pg.filas[:5]) or '–'}; "
+                          f"botones: {', '.join(pg.botones)})")
+        return pg, None
 
     def _postear(self, padre, cod, dim, validar=True):
         """Desde la página `padre`: elige la fila `cod` y pulsa el botón de `dim`. Valida historial y cabecera."""
@@ -162,7 +182,7 @@ class MEFIngresos:
         if pg is None:
             return None, err
         if not pg.tiene_tabla:
-            return None, "SIN_TABLA (sin datos para esa combinación)"
+            return None, f"SIN_TABLA (la página respondió: «{pg.texto[:200]}»)"
         etq = next((e for c, e, _ in padre.filas if c == cod), cod)
         if not misma_dim(pg.dim, dim):
             return None, f"se pidió «{dim}» y la tabla lista «{pg.dim}»"
@@ -243,12 +263,14 @@ class MEFIngresos:
         if nivel[0] == "M" and pn.boton(D_DEPTO) is None and pn.boton(D_GOBLOC) is not None:
             pg, err = self.listar(anio, r, D_GOBLOC)
             if err:
-                return None, None, f"gob. local: {err}"
+                return None, None, f"gob. local: {err} · botones bajo «Nivel de Gobierno»: {', '.join(pn.botones)}"
             g = self.elegir(pg, r"^M:") or (pg.filas[0] if pg.filas else None)
             if g is None:
                 return None, None, "gob. local sin filas"
             r = r + [(D_GOBLOC, g[0])]
         pd_, err = self.listar(anio, r, D_DEPTO)
+        if err and nivel[0] == "M":
+            err += f" · botones bajo «Nivel de Gobierno»: {', '.join(pn.botones)}"
         return r, pd_, (f"departamento: {err}" if err else None)
 
     def hasta_departamentos(self, anio, ruta, tipo):
