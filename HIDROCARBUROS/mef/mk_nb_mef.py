@@ -166,6 +166,8 @@ def registrar_niveles(anio, ruta, t, normal=False):
 
 for anio in range(ANIO_INICIO, ANIO_FIN + 1):
     etq_dep = "LOS 6 PETROLEROS" if TODOS else norm_may(DEPARTAMENTO.split(":", 1)[1])
+    if m.bloqueado:
+        print(f"⛔ {anio} y siguientes: no se consultan (el MEF bloqueó esta máquina)"); break
     ruta, tipos, err = m.ruta_tipos(anio)
     if err:
         print(f"⚠️ {anio}: {err}"); ctrl.append({"AÑO": anio, "DEPARTAMENTO": etq_dep, "ESTADO": f"ERROR: {err}"}); continue
