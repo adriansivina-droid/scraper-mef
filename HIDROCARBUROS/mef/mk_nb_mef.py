@@ -13,7 +13,8 @@ PERUPETRO publica el canon **por municipalidad** solo en 1993–2002 (Excel de D
 - **Desde 2007**: fuente 5 (Recursos determinados) → rubro 18 → tipos «5: Canon y sobrecanon petrolero» y «K: Sub cuenta – …» (se suman) → gobiernos locales → departamento → municipalidad.
 - **2005–2006**: fuente 01 (Canon y sobrecanon) → tipo de recurso; el detalle municipal solo está en «0: NORMAL», que reúne **todos** los canones. Con `SI_NO_HAY_PETROLERO = "Usar NORMAL"` se toma ese tipo y queda rotulado «todos los canones» en el CSV y en el mapa.
 - **2003–2004**: sin detalle por municipalidad (el canon petrolero municipal figura a nombre del Consejo Nacional de Descentralización).
-- **Resultado:** `DATA/PP_canon_municipal_mef_anio.csv` y `CONTROL/CONTROL PP canon_municipal_mef.csv` (suma de municipalidades vs. total del departamento en el MEF, y vs. el total municipal de PERUPETRO: *recaudado* y *transferido* pueden diferir por fechas de registro).
+- **Primero, la distribución por nivel de gobierno**: para cada año y tipo de recurso petrolero, lo recaudado por el gobierno nacional (E), los gobiernos locales (M) y los gobiernos regionales (R), en total país y por departamento → `DATA/PP_canon_nivel_gobierno_mef_anio.csv` (control: suma de niveles = total del tipo de recurso, en `CONTROL/CONTROL PP canon_nivel_gobierno_mef.csv`).
+- **Después, el detalle por municipalidad** (nivel M). **Resultado:** `DATA/PP_canon_municipal_mef_anio.csv` y `CONTROL/CONTROL PP canon_municipal_mef.csv` (suma de municipalidades vs. total del departamento en el MEF, y vs. el total municipal de PERUPETRO: *recaudado* y *transferido* pueden diferir por fechas de registro).
 
 **Bloque 1** importa las librerías. **Bloque 2** descarga y controla."""
 
@@ -87,7 +88,33 @@ m = MEFIngresosURL(log=print)
 print("🔎 Calibrando la consulta…")
 if not m.calibrar(min(ANIO_FIN, date.today().year)):
     raise SystemExit("❌ Ninguna variante de URL trajo la tabla de fuentes de financiamiento: el MEF cambió la página o bloqueó la consulta.")
-filas, ctrl = [], []
+filas, ctrl, niv_filas, ctrl_niv = [], [], [], []
+
+def registrar_niveles(anio, ruta, t, normal=False):
+    """Distribución del tipo de recurso por nivel de gobierno (E, M, R): total país y por departamento."""
+    etq_t = t[1] + (" (todos los canones)" if normal else "")
+    fuente = FUENTE + (" · tipo NORMAL: todos los canones, no solo el petrolero" if normal else "")
+    r_t, pn, e = m.niveles(anio, ruta, t)
+    if e:
+        ctrl_niv.append({"AÑO": anio, "TIPO_RECURSO": etq_t, "ESTADO": f"ERROR: {e}"}); return
+    suma = sum(v for _, _, v in pn.filas)
+    sin_dep = []
+    for c, et, v in pn.filas:
+        niv_filas.append({"AÑO": anio, "TIPO_RECURSO": etq_t, "NIVEL_GOBIERNO": et, "DEPARTAMENTO": "TOTAL PAÍS",
+                          "RECAUDADO_SOLES": round(v, 2), "FUENTE": fuente})
+        _, pdep, e2 = m.departamentos_de_nivel(anio, r_t, (c, et, v))
+        if pdep is None:
+            sin_dep.append(f"{et}: {e2}"); continue
+        for cd, ed, vd in pdep.filas:
+            niv_filas.append({"AÑO": anio, "TIPO_RECURSO": etq_t, "NIVEL_GOBIERNO": et,
+                              "DEPARTAMENTO": norm_may(ed.split(":", 1)[1] if ":" in ed else ed),
+                              "RECAUDADO_SOLES": round(vd, 2), "FUENTE": fuente})
+    ctrl_niv.append({"AÑO": anio, "TIPO_RECURSO": etq_t, "NIVELES": " | ".join(f"{et}: S/ {v:,.0f}" for _, et, v in pn.filas),
+                     "SUMA_NIVELES": round(suma, 2), "TOTAL_TIPO": round(t[2], 2), "DIF": round(suma - t[2], 2),
+                     "SIN_DETALLE_DEPARTAMENTO": "; ".join(sin_dep),
+                     "ESTADO": "OK" if abs(suma - t[2]) <= max(1, len(pn.filas)) else "REVISAR"})
+    print(f"   🏛️ {anio} · {etq_t}: " + " · ".join(f"{et.split(':', 1)[-1].strip().title()} S/ {v/1e6:,.2f} millones" for _, et, v in pn.filas))
+
 for anio in range(ANIO_INICIO, ANIO_FIN + 1):
     etq_dep = "TODOS" if TODOS else norm_may(DEPARTAMENTO.split(":", 1)[1])
     ruta, tipos, err = m.ruta_tipos(anio)
@@ -95,7 +122,9 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
         print(f"⚠️ {anio}: {err}"); ctrl.append({"AÑO": anio, "DEPARTAMENTO": etq_dep, "ESTADO": f"ERROR: {err}"}); continue
     resultados = []                                     # [(tipo, ruta hasta departamento, página de departamentos)]
     motivos = []
-    for t in [t for t in tipos if re.search("PETROLER", t[1], re.I)]:
+    for t in [t for t in tipos if re.search("PETROLER", t[1], re.I)]:   # 1) distribución por nivel de gobierno
+        registrar_niveles(anio, ruta, t)
+    for t in [t for t in tipos if re.search("PETROLER", t[1], re.I)]:   # 2) municipalidades (nivel M)
         r, pdep, e = m.hasta_departamentos(anio, ruta, t)
         if r: resultados.append((t, r, pdep))
         else: motivos.append(f"{t[1]}: {e}")
@@ -104,7 +133,9 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
         t0 = next((t for t in tipos if re.match(r"^0:\\s*NORMAL", t[1], re.I)), None)
         if t0:
             r, pdep, e = m.hasta_departamentos(anio, ruta, t0)
-            if r: resultados, usa_normal = [(t0, r, pdep)], True
+            if r:
+                resultados, usa_normal = [(t0, r, pdep)], True
+                registrar_niveles(anio, ruta, t0, normal=True)
             else: motivos.append(f"{t0[1]}: {e}")
     if not resultados:
         msg = "SIN DETALLE MUNICIPAL (" + "; ".join(motivos or ["sin tipo de recurso petrolero"]) + ")"
@@ -143,6 +174,29 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
         print(f"{'✅' if n else 'ℹ️'} {anio} · {DEP}: {n} municipalidades · S/ {suma/1e6:,.2f} millones"
               + (" (todos los canones)" if usa_normal else "") + (f" · PERUPETRO S/ {ref/1e6:,.2f} millones" if ref else ""))
 print("Claves usadas:", m.claves, "· página Navegar_", m.pagina)
+
+# ── Distribución por nivel de gobierno (se acumula por año) ──
+nv = pd.DataFrame(niv_filas)
+previo_nv = bajar("PP_canon_nivel_gobierno_mef_anio.csv", datos_drive)
+if previo_nv is not None and len(nv):
+    nv = pd.concat([previo_nv[~previo_nv["AÑO"].isin(set(nv["AÑO"]))], nv], ignore_index=True)
+elif previo_nv is not None:
+    nv = previo_nv
+if len(nv):
+    nv = nv.sort_values(["AÑO", "TIPO_RECURSO", "NIVEL_GOBIERNO", "DEPARTAMENTO"],
+                        key=lambda s: s.map(lambda x: ("0" if x == "TOTAL PAÍS" else "1") + str(x)) if s.name == "DEPARTAMENTO" else s)
+    p = os.path.join(ruta_local, "PP_canon_nivel_gobierno_mef_anio.csv"); nv.to_csv(p, index=False, encoding="utf-8-sig")
+    subir(p, DRIVE_FOLDER_ID, datos_drive)
+cn = pd.DataFrame(ctrl_niv)
+if len(cn):
+    cn.insert(0, "FECHA_EXTRACCION", date.today().strftime("%d/%m/%Y"))
+    previo_cn = bajar("CONTROL PP canon_nivel_gobierno_mef.csv", control_drive)
+    if previo_cn is not None:
+        cn = pd.concat([previo_cn[~previo_cn["AÑO"].isin(set(cn["AÑO"]))], cn], ignore_index=True).sort_values(["AÑO", "TIPO_RECURSO"])
+    p = os.path.join(ruta_local, "CONTROL PP canon_nivel_gobierno_mef.csv"); cn.to_csv(p, index=False, encoding="utf-8-sig")
+    subir(p, DRIVE_FOLDER_CONTROL_ID, control_drive)
+    print(f"☁️ DATA/PP_canon_nivel_gobierno_mef_anio.csv ({len(nv)} filas) · CONTROL/CONTROL PP canon_nivel_gobierno_mef.csv")
+    display(cn[cn["AÑO"].between(ANIO_INICIO, ANIO_FIN)].drop(columns=["FECHA_EXTRACCION"]))
 
 # ── Guardar (se acumula: cada corrida reemplaza los departamentos y años que vuelve a leer) ──
 nuevo = pd.DataFrame(filas)
