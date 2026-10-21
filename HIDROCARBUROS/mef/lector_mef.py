@@ -119,13 +119,14 @@ class Pagina:
         return next(((t, n) for t, n in self.botones.items() if misma_dim(t, dim)), None)
 
 class MEFIngresos:
-    def __init__(self, log=print, pausa=(0.8, 1.6), base=BASE):
+    def __init__(self, log=print, pausa=(1.5, 3.0), base=BASE):   # pausa prudente: el MEF bloquea (HTTP 403) si se consulta muy rápido
         self.log, self.pausa, self.base = log, pausa, base.rstrip("/")
         self.s = requests.Session()
         self.s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                                              "Chrome/124.0 Safari/537.36", "Accept-Language": "es-PE,es;q=0.9"})
         self.pagina = None                               # número N de Navegar_N.aspx del año abierto
         self._anio = None
+        self.bloqueado = False
         self._cache = {}                                 # (filtros…, dimensión listada) → Pagina
 
     def _pedir(self, metodo, url, datos=None, reintentos=3):
@@ -138,6 +139,8 @@ class MEFIngresos:
                     time.sleep(random.uniform(*self.pausa))
                     return Pagina(r.content, r.url), None
                 err = f"HTTP {r.status_code}"
+                if r.status_code == 403:                 # bloqueo del MEF: reintentar solo empeora
+                    return None, "HTTP 403 (BLOQUEO)"
             except requests.RequestException as e:
                 err = f"{type(e).__name__}: {e}"
             if i + 1 < reintentos:
@@ -169,6 +172,12 @@ class MEFIngresos:
             if pg is not None:
                 break
             self.log(f"   · {anio}: {url.rsplit('/', 1)[-1]} → {err}")
+            if "BLOQUEO" in (err or ""):
+                self.log("   ⛔ El MEF rechaza las consultas desde esta máquina (HTTP 403). Si la página abre en tu navegador, "
+                         "en Colab usa «Entorno de ejecución → Desconectar y borrar entorno de ejecución», vuelve a conectar y "
+                         "corre de nuevo (otra máquina, otra IP); si no, espera unas horas. Corre por tramos cortos.")
+                self.bloqueado = True
+                break
         if pg is None:
             return False
         m = re.search(r"Navegar(_\d+)?\.aspx", pg.url or url)          # tras una redirección vale la dirección final
