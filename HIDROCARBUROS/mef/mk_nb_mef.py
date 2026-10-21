@@ -11,7 +11,7 @@ PERUPETRO publica el canon **por municipalidad** solo en 1993–2002 (Excel de D
 **Cómo lee la consulta:** la consulta de ingresos funciona con botones: elegir una fila y pulsar la dimensión siguiente envía el formulario de la página (postback ASP.NET). Los filtros puestos en la URL, incluida la de «Exportar», se ignoran (probado con `Navegar_1` y `Navegar_6`, 2026). El notebook hace lo mismo que el navegador, con `requests` y sin navegador: abre `default.aspx?y=AAAA`, toma el marco `Navegar_N.aspx` del año y en cada paso envía el formulario con la fila elegida y el botón (Rubro, Tipo de Recurso, Nivel de Gobierno, Gob.Loc./Mancom., Departamento, Municipalidad). Cada paso se valida con el historial (breadcrumb) y la cabecera de la tabla. Los montos salen del valor exacto de cada fila (con céntimos).
 
 - **Desde 2007**: fuente 5 (Recursos determinados) → rubro 18 → tipos «5: Canon y sobrecanon petrolero» y «K: Sub cuenta – …» (se suman) → gobiernos locales → departamento → municipalidad.
-- **2005–2006**: fuente 01 (Canon y sobrecanon) → tipo de recurso; el detalle municipal solo está en «0: NORMAL», que reúne **todos** los canones. Desde 2007 **no** se usa «0: CANON» como respaldo: en 2008 y 2009 ese tipo da a los gobiernos locales de Loreto apenas S/ 1,18 y S/ 0,19 millones; el canon petrolero está en los tipos 5 y K. Con `SI_NO_HAY_PETROLERO = "Usar NORMAL 2005–2006"` se toma NORMAL y queda rotulado «todos los canones» en el CSV y en el mapa.
+- **2005–2006**: fuente 01 (Canon y sobrecanon) → tipo de recurso; el tipo 4 petrolero trae poco a nivel municipal (Loreto 2005: S/ 0,91 millones; 2006: S/ 0,14 millones), y el grueso está en «0: NORMAL», que reúne **todos** los canones; se suman ambos, cada fila con su rótulo. Desde 2007 **no** se usa «0: CANON» como respaldo: en 2008 y 2009 ese tipo da a los gobiernos locales de Loreto apenas S/ 1,18 y S/ 0,19 millones; el canon petrolero está en los tipos 5 y K. Con `SI_NO_HAY_PETROLERO = "Usar NORMAL 2005–2006"` se toma NORMAL y queda rotulado «todos los canones» en el CSV y en el mapa.
 - **2003–2004**: sin detalle por municipalidad (el canon petrolero municipal figura a nombre del Consejo Nacional de Descentralización).
 - **Primero, la distribución por nivel de gobierno**: para cada año y tipo de recurso petrolero, lo recaudado por el gobierno nacional (E), los gobiernos locales (M) y los gobiernos regionales (R), en total país y por departamento → `DATA/PP_canon_nivel_gobierno_mef_anio.csv` (control: suma de niveles = total del tipo de recurso, en `CONTROL/CONTROL PP canon_nivel_gobierno_mef.csv`).
 - **Después, el detalle por municipalidad** (nivel M). **Resultado:** `DATA/PP_canon_municipal_mef_anio.csv` y `CONTROL/CONTROL PP canon_municipal_mef.csv` (suma de municipalidades vs. total del departamento en el MEF, y vs. el total municipal de PERUPETRO: *recaudado* y *transferido* pueden diferir por fechas de registro).
@@ -143,56 +143,56 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
         registrar_niveles(anio, ruta, t)
     for t in [t for t in tipos if re.search("PETROLER", t[1], re.I)]:   # 2) municipalidades (nivel M)
         r, pdep, e = m.hasta_departamentos(anio, ruta, t)
-        if r: resultados.append((t, r, pdep))
+        if r: resultados.append((t, r, pdep, False))
         else: motivos.append(f"{t[1]}: {e}")
     usa_normal = False
-    if not resultados and SI_NO_HAY_PETROLERO.startswith("Usar") and anio < 2007:
-        # 2005–2006: el detalle municipal solo está en «0: NORMAL» (todos los canones). Desde 2007 NO se usa «0: CANON»:
+    if SI_NO_HAY_PETROLERO.startswith("Usar") and anio < 2007:
+        # 2005–2006: el canon municipal está sobre todo en «0: NORMAL» (todos los canones); el tipo 4 petrolero trae poco
+        # (Loreto 2005: S/ 0,91 millones sin municipalidades listadas; 2006: S/ 0,14 millones). Se suman ambos tipos, cada
+        # fila con su rótulo. Desde 2007 NO se usa «0: CANON»:
         # en 2008 y 2009 ese tipo da a los gobiernos locales de Loreto S/ 1,18 y S/ 0,19 millones (capturas del usuario),
         # mientras el canon petrolero va por los tipos 5 y K.
         t0 = next((t for t in tipos if re.match(r"^0:\\s*NORMAL\\s*$", t[1], re.I)), None)
         if t0:
             r, pdep, e = m.hasta_departamentos(anio, ruta, t0)
             if r:
-                resultados, usa_normal = [(t0, r, pdep)], True
+                resultados.append((t0, r, pdep, True)); usa_normal = True
                 registrar_niveles(anio, ruta, t0, normal=True)
             else: motivos.append(f"{t0[1]}: {e}")
     if not resultados:
         msg = "SIN DETALLE MUNICIPAL (" + "; ".join(motivos or ["sin tipo de recurso petrolero"]) + ")"
         print(f"ℹ️ {anio}: {msg}"); ctrl.append({"AÑO": anio, "DEPARTAMENTO": etq_dep, "ESTADO": msg}); continue
     if TODOS:
-        deps = sorted({(c, e) for _, _, pdep in resultados for c, e, v in pdep.filas if (v or 0) > 0})
+        deps = sorted({(c, e) for _, _, pdep, _ in resultados for c, e, v in pdep.filas if (v or 0) > 0})
     else:
         cod = DEPARTAMENTO.split(":")[0].strip()
         deps = [(cod, DEPARTAMENTO)]
     for cod_d, etq in deps:
         DEP = norm_may(etq.split(":", 1)[1] if ":" in etq else etq)
         suma = tot = 0.0; n = 0; detalle = []
-        for t, r, pdep in resultados:
+        for t, r, pdep, normal in resultados:
             dep = next(((c, e, v) for c, e, v in pdep.filas if c.lstrip("0") == cod_d.lstrip("0")), None)
             if dep is None:
                 detalle.append(f"{t[1]}: sin {DEP}"); continue
             fs, total, e = m.municipalidades(anio, r, dep)
             if fs is None:
                 detalle.append(f"{t[1]}: {e}"); continue
-            for c, et, v in fs:
-                if not re.search("MUNICIPALIDAD", et, re.I):
-                    continue
+            for c, et, v in fs:                         # todas las filas: en 2005 los nombres no siempre dicen «MUNICIPALIDAD»
                 codigo, nivel, mu, prov = nombre_municipalidad(et)
                 filas.append({"AÑO": anio, "DEPARTAMENTO": DEP, "CODIGO": codigo, "MUNICIPALIDAD_MEF": et.split(":", 1)[1].strip(),
                               "MUNICIPALIDAD": mu, "NIVEL": nivel, "PROVINCIA": prov or prov_de.get(norm_may(mu), ""),
-                              "TIPO_RECURSO": t[1] + (" (todos los canones)" if usa_normal else ""), "RECAUDADO_SOLES": round(v, 2),
-                              "FUENTE": FUENTE + (" · tipo 0 NORMAL: todos los canones, no solo el petrolero" if usa_normal else "")})
+                              "TIPO_RECURSO": t[1] + (" (todos los canones)" if normal else ""), "RECAUDADO_SOLES": round(v, 2),
+                              "FUENTE": FUENTE + (" · tipo 0 NORMAL: todos los canones, no solo el petrolero" if normal else "")})
                 suma += v; n += 1
             tot += total or 0.0
-            detalle.append(f"{t[1]}: S/ {total or 0:,.0f}")
+            detalle.append(f"{t[1]}{' (todos los canones)' if normal else ''}: S/ {total or 0:,.0f}")
         ref = pp_mun.get((DEP, anio))
         ctrl.append({"AÑO": anio, "DEPARTAMENTO": DEP, "TIPOS": " | ".join(detalle), "MUNICIPALIDADES": n,
                      "SUMA_MUNICIPALIDADES": round(suma, 2), "TOTAL_DEPARTAMENTO_MEF": round(tot, 2), "DIF": round(suma - tot, 2),
                      "PERUPETRO_MUNICIPAL": round(ref, 2) if ref else None, "MEF_SOBRE_PERUPETRO": round(suma / ref, 4) if ref else None,
                      "ESTADO": ("OK" if n and abs(suma - tot) <= max(1, n) else "REVISAR" if n else "SIN MUNICIPALIDADES")})
-        print(f"{'✅' if n else 'ℹ️'} {anio} · {DEP}: {n} municipalidades · S/ {suma/1e6:,.2f} millones"
-              + (" (todos los canones)" if usa_normal else "") + (f" · PERUPETRO S/ {ref/1e6:,.2f} millones" if ref else ""))
+        print(f"{'✅' if n else 'ℹ️'} {anio} · {DEP}: {n} filas de municipalidades · S/ {suma/1e6:,.2f} millones"
+              + (" (incluye NORMAL: todos los canones)" if usa_normal else "") + " [" + " | ".join(detalle) + "]" + (f" · PERUPETRO S/ {ref/1e6:,.2f} millones" if ref else ""))
 print(f"Última página usada: Navegar{'_' + m.pagina if m.pagina else ''}.aspx")
 
 # ── Distribución por nivel de gobierno (se acumula por año) ──
