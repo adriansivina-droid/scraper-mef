@@ -12,6 +12,7 @@ PERUPETRO publica el canon **por municipalidad** solo en 1993–2002 (Excel de D
 
 - **Desde 2007**: fuente 5 (Recursos determinados) → rubro 18 → tipos «5: Canon y sobrecanon petrolero» y «K: Sub cuenta – …» (se suman) → gobiernos locales → departamento → municipalidad.
 - **2005–2006**: fuente 01 (Canon y sobrecanon) → tipo de recurso; el tipo 4 petrolero trae poco a nivel municipal (Loreto 2005: S/ 0,91 millones; 2006: S/ 0,14 millones), y el grueso está en «0: NORMAL», que reúne **todos** los canones; se suman ambos, cada fila con su rótulo. Desde 2007 **no** se usa «0: CANON» como respaldo: en 2008 y 2009 ese tipo da a los gobiernos locales de Loreto apenas S/ 1,18 y S/ 0,19 millones; el canon petrolero está en los tipos 5 y K. Con `SI_NO_HAY_PETROLERO = "Usar NORMAL 2005–2006"` se toma NORMAL y queda rotulado «todos los canones» en el CSV y en el mapa.
+- **Cusco**: su canon es sobre todo **gasífero** (Camisea), no petrolero; para Cusco se leen también los tipos de canon gasífero del MEF (p. ej. «7: CANON GASIFERO», «M: SUB CUENTA - CANON GASIFERO, RENTA», «N: … REGALIAS»), cada fila con su tipo. Solo se aplican a Cusco.
 - **2003–2004**: sin detalle por municipalidad (el canon petrolero municipal figura a nombre del Consejo Nacional de Descentralización).
 - **Primero, la distribución por nivel de gobierno**: para cada año y tipo de recurso petrolero, lo recaudado por el gobierno nacional (E), los gobiernos locales (M) y los gobiernos regionales (R), en total país y por departamento → `DATA/PP_canon_nivel_gobierno_mef_anio.csv` (control: suma de niveles = total del tipo de recurso, en `CONTROL/CONTROL PP canon_nivel_gobierno_mef.csv`).
 - **Después, el detalle por municipalidad** (nivel M). **Resultado:** `DATA/PP_canon_municipal_mef_anio.csv` y `CONTROL/CONTROL PP canon_municipal_mef.csv` (suma de municipalidades vs. total del departamento en el MEF, y vs. el total municipal de PERUPETRO: *recaudado* y *transferido* pueden diferir por fechas de registro).
@@ -81,6 +82,12 @@ def norm_may(t):
 # departamentos con canon petrolero (los de la lista); «LOS 6 PETROLEROS» los recorre todos
 PETROLEROS = {"16": "LORETO", "25": "UCAYALI", "20": "PIURA", "24": "TUMBES", "10": "HUANUCO", "08": "CUSCO"}
 TODOS = DEPARTAMENTO.strip().upper() in ("LOS 6 PETROLEROS", "TODOS")
+# Cusco recibe sobre todo canon GASÍFERO (Camisea): para Cusco se leen también los tipos «…GASIFERO…» (solo en Cusco)
+GAS_CUSCO = TODOS or DEPARTAMENTO.strip().startswith("08")
+def es_gas(t):
+    return bool(re.search("GASIFER", t[1], re.I))
+def tipos_canon(tipos):
+    return [t for t in tipos if re.search("PETROLER", t[1], re.I) or (GAS_CUSCO and es_gas(t))]
 # referencias de PERUPETRO (si existen en DATA): total municipal por departamento y año, y provincia de cada municipalidad
 dist_pp = bajar("PP_canon_distribucion_mes.csv", datos_drive)
 mun_pp = bajar("PP_canon_municipal_mes.csv", datos_drive)
@@ -173,9 +180,9 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
         print(f"⚠️ {anio}: {err}"); ctrl.append({"AÑO": anio, "DEPARTAMENTO": etq_dep, "ESTADO": f"ERROR: {err}"}); continue
     resultados = []                                     # [(tipo, ruta hasta departamento, página de departamentos)]
     motivos = []
-    for t in [t for t in tipos if re.search("PETROLER", t[1], re.I)]:   # 1) distribución por nivel de gobierno
+    for t in tipos_canon(tipos):                        # 1) distribución por nivel de gobierno
         registrar_niveles(anio, ruta, t)
-    for t in [t for t in tipos if re.search("PETROLER", t[1], re.I)]:   # 2) municipalidades (nivel M)
+    for t in tipos_canon(tipos):                        # 2) municipalidades (nivel M)
         r, pdep, e = m.hasta_departamentos(anio, ruta, t)
         if r: resultados.append((t, r, pdep, False))
         else: motivos.append(f"{t[1]}: {e}")
@@ -206,6 +213,8 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
         DEP = norm_may(etq.split(":", 1)[1] if ":" in etq else etq)
         suma = tot = 0.0; n = 0; detalle = []
         for t, r, pdep, normal in resultados:
+            if es_gas(t) and cod_d.zfill(2) != "08":    # el canon gasífero solo se toma en Cusco
+                continue
             dep = next(((c, e, v) for c, e, v in pdep.filas if c.lstrip("0") == cod_d.lstrip("0")), None)
             if dep is None:
                 detalle.append(f"{t[1]}: sin {DEP}"); continue

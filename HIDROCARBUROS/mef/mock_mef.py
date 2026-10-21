@@ -32,6 +32,7 @@ def opciones(anio, f, dim):
         if nuevo:
             d = {"0": ("CANON", 7e8), "5": ("CANON Y SOBRECANON PETROLERO", 30e6)}
             if anio >= 2020: d["K"] = ("SUB CUENTA - CANON Y SOBRECANON PETROLERO", 60e6)
+            d["7"] = ("CANON GASIFERO", 50e6)                  # Cusco (Camisea)
             return d
         return {"0": ("NORMAL", 3e8)} if anio == 2005 else {"0": ("NORMAL", 3e8), "4": ("CANON Y SOBRECANON PETROLERO", 1.5e8)}
     if dim == N:
@@ -43,6 +44,7 @@ def opciones(anio, f, dim):
         return {"M": ("MUNICIPALIDADES", 1e6), "C": ("MANCOMUNIDADES", 0.0)} if f.get(N) == "M" else None
     if dim == D:
         if f.get(N) not in ("M", "R"): return None
+        if f.get(T) == "7": return {"08": ("CUSCO", 14308051.75), "16": ("LORETO", 1e6)}
         return {"15": ("LIMA", 5e6), "16": ("LORETO", 14308051.75 * (2 if f.get(T) == "K" else 1))}
     if dim == "Sector" and f.get(N) == "R":            # años recientes: regionales por sector → pliego
         return {"99": ("GOBIERNOS REGIONALES", 1e6)}
