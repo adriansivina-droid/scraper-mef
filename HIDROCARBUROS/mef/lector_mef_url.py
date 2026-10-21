@@ -11,8 +11,16 @@ from bs4 import BeautifulSoup
 
 BASE = "https://apps5.mineco.gob.pe/transparenciaingresos/mensual"
 PAGINAS = (3, 1, 2, 4, 5, 6, 7)                 # Navegar_N.aspx: el número cambia; se calibra
-FORMATOS = [{"nombre": "navegador", "pre": {"_tgt": "frame", "_uhc": "yes"}, "post": {}},
-            {"nombre": "simple", "pre": {}, "post": {}}]
+# Los mismos formatos que calibran los scrapers de FISCAL/ (Consulta Amigable de gasto): el navegador pide el iframe con
+# _tgt=frame&_uhc=yes y termina en ap=ActProy; se prueban también POST y las variantes sin «ap».
+FORMATOS = [
+    {"nombre": "navegador GET", "metodo": "GET", "pre": {"_tgt": "frame", "_uhc": "yes"}, "post": {"ap": "ActProy"}},
+    {"nombre": "GET + ap", "metodo": "GET", "pre": {}, "post": {"ap": "ActProy"}},
+    {"nombre": "POST + ap", "metodo": "POST", "pre": {}, "post": {"ap": "ActProy"}},
+    {"nombre": "POST original", "metodo": "POST", "pre": {}, "post": {}},
+    {"nombre": "frame sin ap", "metodo": "GET", "pre": {"_tgt": "frame", "_uhc": "yes"}, "post": {}},
+    {"nombre": "GET simple", "metodo": "GET", "pre": {}, "post": {}},
+]
 CLAVES_CONOCIDAS = {"Fuente de Financiamiento": "10", "Tipo de Recurso": "11", "Sector": "2"}
 CANDIDATAS = ["1", "37", "5", "7", "12", "13", "14", "15", "16", "17", "18", "19", "20", "3", "4", "6", "8", "9", "21", "22",
               "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "38", "39", "40"]
@@ -92,13 +100,16 @@ class MEFIngresosURL:
         err = ""
         for i in range(reintentos):
             try:
-                r = self.s.get(f"{self.base}/Navegar_{pagina}.aspx", params=p, timeout=40)
+                r = self.s.request(formato.get("metodo", "GET"), f"{self.base}/Navegar_{pagina}.aspx", params=p, timeout=40)
                 if r.status_code == 200:
                     pg = Pagina(r.content, r.url)
                     if pg.tiene_tabla:
                         time.sleep(random.uniform(*self.pausa))
                         return pg, None
-                    err = "SIN_TABLA"
+                    t = BeautifulSoup(r.content, "html.parser")
+                    tit = " ".join((t.title.get_text() if t.title else "").split())
+                    txt = " ".join(t.get_text(" ", strip=True).split())
+                    err = f"SIN_TABLA (título «{tit[:50]}», {len(r.content):,} bytes, texto: {txt[:120]!r})"
                 else:
                     err = f"HTTP {r.status_code}"
             except requests.RequestException as e:

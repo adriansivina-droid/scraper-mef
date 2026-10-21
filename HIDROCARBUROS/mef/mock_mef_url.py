@@ -45,7 +45,7 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200); self.end_headers(); self.wfile.write(b"<html><title>Consulta Amigable de Ingresos</title></html>"); return
         anio = int(dict(q).get("y", 2007)); f = {}; listar = None
         for k, v in q:
-            if k in ("0", "y", "_tgt", "_uhc"): continue
+            if k in ("0", "y", "_tgt", "_uhc", "ap"): continue
             if v == "" and listar is None: listar = k
             elif listar is None: f[k] = v
         ops = opciones(anio, f, listar) if listar else None
@@ -67,6 +67,8 @@ class H(BaseHTTPRequestHandler):
             b = (f"<html><body><table class='History'>{hist}</table><table class='MapTable'><tr><td>&nbsp;</td><td>{NOMBRES.get(listar, listar)}</td>"
                  f"<td>PIA</td><td>PIM</td><td>Recaudado</td></tr></table><table class='Data'>{filas}</table></body></html>").encode()
         self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.end_headers(); self.wfile.write(b)
+
+H.do_POST = H.do_GET
 
 if __name__ == "__main__":
     ThreadingHTTPServer(("127.0.0.1", 8766), H).serve_forever()
