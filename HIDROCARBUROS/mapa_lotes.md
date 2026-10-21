@@ -493,3 +493,8 @@ La vista también tiene tabla y descarga en CSV.
 - **Donde está el lote:** «Municipalidades del lote».
 
 Bajo cada título hay una línea «📍 Alcance: …» que aclara si lo que se ve es el lote, todo el departamento o las municipalidades. Estas últimas reciben canon por todos los lotes del departamento. La pestaña pasa a llamarse solo «Canon y sobrecanon», sin el nombre del departamento.
+
+**Desde / Hasta, fuentes en lista y botón de producción (21/10/2026).**
+- El panel de estadísticas (pozos, regalías y las cuatro vistas de canon) tiene selectores «Desde» y «Hasta», como Producción. El corte se mantiene al cambiar de vista; «↺ Toda la serie» lo quita. Afecta al gráfico, al resumen, a la tabla y al CSV.
+- En «Municipalidades del lote», la «Fuente por periodo» aparece como lista (un periodo por línea).
+- El botón «📊 Producción fiscalizada anual y mensual» pasa de la esquina inferior izquierda al selector de capas, debajo de «Productos».
