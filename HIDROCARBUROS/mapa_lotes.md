@@ -486,3 +486,10 @@ La pestaña «Canon» lee `PP_canon_departamento_anio.csv`, que ahora sale de lo
 - **PERUPETRO · transferido** (`PP_canon_distribucion_mes.csv`): los beneficiarios de la distribución agrupados en gobierno regional, municipalidades (gobiernos locales) y «universidades, institutos e IIAP». Este último grupo va junto, sin asignarle nivel de gobierno. El descuento de la Ley 29289 aparece en gris. Solo años completos.
 
 La vista también tiene tabla y descarga en CSV.
+
+**Canon ordenado por alcance (21/10/2026).** Las vistas de la pestaña «Canon y sobrecanon» se agrupan según a qué se refieren, para no confundir el lote con el departamento:
+- **Lote N:** «Generado por el lote».
+- **Departamento (todos sus lotes):** «Por beneficiario» y «Por nivel de gobierno».
+- **Donde está el lote:** «Municipalidades del lote».
+
+Bajo cada título hay una línea «📍 Alcance: …» que aclara si lo que se ve es el lote, todo el departamento o las municipalidades. Estas últimas reciben canon por todos los lotes del departamento. La pestaña pasa a llamarse solo «Canon y sobrecanon», sin el nombre del departamento.
