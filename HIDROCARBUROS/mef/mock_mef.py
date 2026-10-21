@@ -15,6 +15,11 @@ MUNIS = {"01-301454": ("MUNICIPALIDAD PROVINCIAL DE REQUENA", 4819640.25), "06-3
 
 def opciones(anio, f, dim):
     """f = {dimensión: código} ya filtrado; devuelve {código: (nombre, recaudado)} o None si no hay datos."""
+    if dim == "Mes":                                   # dos meses, cada uno con la mitad de lo anual
+        return {"1": ("ENERO", 1.0), "2": ("FEBRERO", 1.0)}
+    if "Mes" in f:
+        base = opciones(anio, {k: v for k, v in f.items() if k != "Mes"}, dim)
+        return {c: (n, v / 2) for c, (n, v) in base.items()} if base else base
     nuevo = anio >= 2007
     if dim == "":
         return {"TOTAL": ("TOTAL", 1e11)}
