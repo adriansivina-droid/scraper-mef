@@ -32,7 +32,7 @@ ANIO_INICIO = 2003  #@param {type:"integer"}
 ANIO_FIN = 2026  #@param {type:"integer"}
 SI_NO_HAY_PETROLERO = "Usar NORMAL 2005–2006 (todos los canones)"  #@param ["Usar NORMAL 2005–2006 (todos los canones)", "Dejar sin dato"]
 DETALLE = "Anual"  #@param ["Anual", "Anual y mensual"]
-DEPARTAMENTO = "16: LORETO"  #@param ["TODOS", "16: LORETO", "25: UCAYALI", "20: PIURA", "24: TUMBES", "10: HUANUCO", "08: CUSCO"]
+DEPARTAMENTO = "16: LORETO"  #@param ["LOS 6 PETROLEROS", "16: LORETO", "25: UCAYALI", "20: PIURA", "24: TUMBES", "10: HUANUCO", "08: CUSCO"]
 import os, re, unicodedata, pandas as pd
 from datetime import date
 DRIVE_FOLDER_ID = "1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq"            # DATA
@@ -78,7 +78,9 @@ datos_drive, control_drive = archivos_en(DRIVE_FOLDER_ID), archivos_en(DRIVE_FOL
 
 def norm_may(t):
     return re.sub(r"\\s+", " ", unicodedata.normalize("NFKD", str(t or "")).encode("ascii", "ignore").decode()).strip().upper()
-TODOS = DEPARTAMENTO.strip().upper() == "TODOS"
+# departamentos con canon petrolero (los de la lista); «LOS 6 PETROLEROS» los recorre todos
+PETROLEROS = {"16": "LORETO", "25": "UCAYALI", "20": "PIURA", "24": "TUMBES", "10": "HUANUCO", "08": "CUSCO"}
+TODOS = DEPARTAMENTO.strip().upper() in ("LOS 6 PETROLEROS", "TODOS")
 # referencias de PERUPETRO (si existen en DATA): total municipal por departamento y año, y provincia de cada municipalidad
 dist_pp = bajar("PP_canon_distribucion_mes.csv", datos_drive)
 mun_pp = bajar("PP_canon_municipal_mes.csv", datos_drive)
@@ -163,7 +165,7 @@ def registrar_niveles(anio, ruta, t, normal=False):
                          "ESTADO": "OK" if abs(suma_m - suma) <= max(1, len(ms) * len(pn.filas)) else "REVISAR"})
 
 for anio in range(ANIO_INICIO, ANIO_FIN + 1):
-    etq_dep = "TODOS" if TODOS else norm_may(DEPARTAMENTO.split(":", 1)[1])
+    etq_dep = "LOS 6 PETROLEROS" if TODOS else norm_may(DEPARTAMENTO.split(":", 1)[1])
     ruta, tipos, err = m.ruta_tipos(anio)
     if err:
         print(f"⚠️ {anio}: {err}"); ctrl.append({"AÑO": anio, "DEPARTAMENTO": etq_dep, "ESTADO": f"ERROR: {err}"}); continue
@@ -193,7 +195,8 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
         msg = "SIN DETALLE MUNICIPAL (" + "; ".join(motivos or ["sin tipo de recurso petrolero"]) + ")"
         print(f"ℹ️ {anio}: {msg}"); ctrl.append({"AÑO": anio, "DEPARTAMENTO": etq_dep, "ESTADO": msg}); continue
     if TODOS:
-        deps = sorted({(c, e) for _, _, pdep, _ in resultados for c, e, v in pdep.filas if (v or 0) > 0})
+        deps = sorted({(c, e) for _, _, pdep, _ in resultados for c, e, v in pdep.filas
+                       if (v or 0) > 0 and c.zfill(2) in PETROLEROS})
     else:
         cod = DEPARTAMENTO.split(":")[0].strip()
         deps = [(cod, DEPARTAMENTO)]
@@ -308,6 +311,7 @@ if MENSUAL:
 
 # ── Guardar (se acumula: cada corrida reemplaza los departamentos y años que vuelve a leer) ──
 nuevo = pd.DataFrame(filas)
+_pet = set(PETROLEROS.values())
 previo = bajar("PP_canon_municipal_mef_anio.csv", datos_drive)
 if previo is not None and len(nuevo):
     leidos = set(zip(nuevo["DEPARTAMENTO"], nuevo["AÑO"]))
@@ -316,6 +320,7 @@ if previo is not None and len(nuevo):
 elif previo is not None:
     nuevo = previo
 if len(nuevo):
+    nuevo = nuevo[nuevo["DEPARTAMENTO"].isin(_pet)]           # solo los departamentos con canon petrolero
     nuevo = nuevo.sort_values(["DEPARTAMENTO", "AÑO", "NIVEL", "MUNICIPALIDAD", "TIPO_RECURSO"], ascending=[True, True, False, True, True])
     p = os.path.join(ruta_local, "PP_canon_municipal_mef_anio.csv"); nuevo.to_csv(p, index=False, encoding="utf-8-sig")
     subir(p, DRIVE_FOLDER_ID, datos_drive)
@@ -327,6 +332,7 @@ if previo_c is not None:
     leidos_c = set(zip(c["DEPARTAMENTO"], c["AÑO"]))
     c = pd.concat([previo_c[[(d, a) not in leidos_c for d, a in zip(previo_c["DEPARTAMENTO"], previo_c["AÑO"])]], c],
                   ignore_index=True).sort_values(["AÑO", "DEPARTAMENTO"])
+c = c[c["DEPARTAMENTO"].isin(_pet | {"LOS 6 PETROLEROS", "TODOS"})]
 p = os.path.join(ruta_local, "CONTROL PP canon_municipal_mef.csv"); c.to_csv(p, index=False, encoding="utf-8-sig")
 subir(p, DRIVE_FOLDER_CONTROL_ID, control_drive)
 print(f"\\n☁️ DATA/PP_canon_municipal_mef_anio.csv ({len(nuevo)} filas) · CONTROL/CONTROL PP canon_municipal_mef.csv")
