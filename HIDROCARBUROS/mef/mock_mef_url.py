@@ -1,7 +1,9 @@
-# Simulador de la Consulta Amigable de Ingresos por URL (estructura del HTML real: MapTable, History, Data, radio «cód/PIA/PIM/rec»).
+# Simulador de la EXPORTACIÓN de la Consulta Amigable de Ingresos (Navegar_N.aspx?_tgt=xls…): tabla HTML como el .xls real
+# (History con TOTAL + filtros, MapTable con la cabecera, filas Data con onclick kCod). Como en el MEF, solo una página por año
+# aplica los filtros (2007+ = Navegar_6; hasta 2006 = Navegar_1); la otra exporta pero los ignora.
 # Claves simuladas: 10 fuente · 12 rubro · 11 tipo · 1 nivel · 37 gob.loc · 5 departamento · 7 municipalidad · 23 mes.
 # Uso: python3 mock_mef_url.py  (puerto 8766)
-import urllib.parse, html
+import urllib.parse, html, re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 NOMBRES = {"10": "Fuente de Financiamiento", "12": "Rubro", "11": "Tipo de Recurso", "1": "Nivel de Gobierno",
            "37": "Gob.Loc./Mancom.", "5": "Departamento", "7": "Municipalidad", "23": "Mes"}
@@ -9,6 +11,8 @@ MUNIS = {"01-301454": ("MUNICIPALIDAD PROVINCIAL DE REQUENA", 4819640.25), "06-3
          "01-301422": ("MUNICIPALIDAD PROVINCIAL DE MAYNAS - IQUITOS", 9114760.40)}
 
 def opciones(anio, f, k):
+    if not f and k in NOMBRES and k != "10":
+        return {"1": "X"}                                  # en la raíz toda dimensión se puede listar
     nuevo = anio >= 2007
     if k == "10":
         return {"1": "RECURSOS ORDINARIOS", "5": "RECURSOS DETERMINADOS"} if nuevo else {"00": "RECURSOS ORDINARIOS", "01": "CANON Y SOBRECANON"}
@@ -18,7 +22,7 @@ def opciones(anio, f, k):
         if nuevo:
             d = {"0": "CANON", "5": "CANON Y SOBRECANON PETROLERO"}
             if anio >= 2020: d["K"] = "SUB CUENTA - CANON Y SOBRECANON PETROLERO"
-            return d if "12" in f else None
+            return d if f.get("10") == "5" else None
         return {"0": "NORMAL"} if anio == 2005 else {"0": "NORMAL", "4": "CANON Y SOBRECANON PETROLERO"}
     if k == "1":
         if anio <= 2004: return {"E": "GOBIERNO NACIONAL"}
@@ -36,39 +40,42 @@ def opciones(anio, f, k):
         return {"1": "ENERO", "2": "FEBRERO"}
     return None
 
+def pagina_valida(anio):
+    return 6 if anio >= 2007 else 1
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qsl(u.query, keep_blank_values=True)
-        if not u.path.lower().startswith("/navegar_3.aspx"):
+        m = re.match(r"/navegar_(\d+)\.aspx", u.path.lower())
+        if not m or dict(q).get("_tgt") != "xls":
             self.send_response(200); self.end_headers(); self.wfile.write(b"<html><title>Consulta Amigable de Ingresos</title></html>"); return
-        anio = int(dict(q).get("y", 2007)); f = {}; listar = None
-        for k, v in q:
-            if k in ("0", "y", "_tgt", "_uhc", "ap"): continue
-            if v == "" and listar is None: listar = k
-            elif listar is None: f[k] = v
+        anio = int(dict(q).get("y", 2007))
+        claves = [(k, v) for k, v in q if k not in ("0", "y", "_tgt", "_uhc")]
+        vacias = [k for k, v in claves if v == ""]
+        listar = vacias[-1] if vacias else None
+        f = {k: v for k, v in claves if v != ""} if int(m.group(1)) == pagina_valida(anio) else {}
         ops = opciones(anio, f, listar) if listar else None
-        hist = "<tr><td></td><td>TOTAL</td><td>1</td><td>1</td><td>999,999</td></tr>"
+        hist = "<tr><td>TOTAL</td><td>1</td><td>1</td><td>999,999</td></tr>"
         for k, v in f.items():
             o = opciones(anio, {kk: vv for kk, vv in f.items() if kk != k}, k) or {}
             nom = o.get(v, "?"); nom = nom[0] if isinstance(nom, tuple) else nom
             tot = 14308051.75 if k == "5" else 1000
             if k == "5" and f.get("11") == "K": tot *= 2
-            hist += f"<tr><td></td><td>{NOMBRES.get(k, k)} {v}: {html.escape(nom)}</td><td>0</td><td>0</td><td>{tot:,.0f}</td></tr>"
+            hist += f"<tr><td>{NOMBRES.get(k, k)} {v}: {html.escape(nom)}</td><td>0</td><td>0</td><td>{tot:,.0f}</td></tr>"
         if ops is None:
-            b = f"<html><body><table class='History'>{hist}</table><p>sin datos</p></body></html>".encode()
+            b = f"<html><body><table class='History'>{hist}</table><p>sin datos</p></body></html>".encode("cp1252")
         else:
             filas = ""
             for c, n in ops.items():
                 nom, val = n if isinstance(n, tuple) else (n, 100.0)
-                filas += (f"<tr><td><input type='radio' name='grp1' value='{c}/0/0/{val:.2f}'></td><td>{c}: {html.escape(nom)}</td>"
+                filas += (f"<tr onclick='kCod=\"{c}\";tr_clk(0, this)'><td>{c}: {html.escape(nom)}</td>"
                           f"<td>0</td><td>0</td><td>{val:,.0f}</td></tr>")
-            b = (f"<html><body><table class='History'>{hist}</table><table class='MapTable'><tr><td>&nbsp;</td><td>{NOMBRES.get(listar, listar)}</td>"
-                 f"<td>PIA</td><td>PIM</td><td>Recaudado</td></tr></table><table class='Data'>{filas}</table></body></html>").encode()
-        self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.end_headers(); self.wfile.write(b)
-
-H.do_POST = H.do_GET
+            b = (f"<style>.x{{}}</style><body><table id='hd'><tr><td>Consulta Amigable de Ingresos (Mensual) Año de Ejecución: {anio}</td></tr></table>"
+                 f"<table class='History'>{hist}</table><table class='MapTable'><tr><td>{NOMBRES.get(listar, listar)}</td>"
+                 f"<td>PIA</td><td>PIM</td><td>Recaudado</td></tr></table><table class='Data'>{filas}</table></body>").encode("cp1252")
+        self.send_response(200); self.send_header("Content-Type", "application/vnd.ms-excel"); self.end_headers(); self.wfile.write(b)
 
 if __name__ == "__main__":
     ThreadingHTTPServer(("127.0.0.1", 8766), H).serve_forever()
