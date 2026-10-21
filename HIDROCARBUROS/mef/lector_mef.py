@@ -315,10 +315,39 @@ class MEFIngresos:
             if g is None:
                 return None, None, "gob. local sin filas"
             r = r + [(D_GOBLOC, g[0])]
+        if nivel[0] == "R" and pn.boton(D_DEPTO) is None and pn.boton(D_SECTOR) is not None:
+            return self._regionales_por_pliego(anio, r)
         pd_, err = self.listar(anio, r, D_DEPTO)
         if err and nivel[0] == "M":
             err += f" · botones bajo «Nivel de Gobierno»: {', '.join(pn.botones)}"
         return r, pd_, (f"departamento: {err}" if err else None)
+
+    def _regionales_por_pliego(self, anio, r):
+        """Años recientes: bajo «Gobiernos Regionales» no hay botón «Departamento»; se baja por Sector → Pliego
+        («GOBIERNO REGIONAL DEL DEPARTAMENTO DE LORETO») y cada pliego se asigna al departamento que nombra.
+        Devuelve (ruta, objeto con .filas [(código, «NN: DEPARTAMENTO», recaudado)], error)."""
+        ps, err = self.listar(anio, r, D_SECTOR)
+        if err:
+            return r, None, f"departamento (por sector): {err}"
+        suma, sin = {}, []
+        for c, et, v in ps.filas:
+            pp, err = self.listar(anio, r + [(D_SECTOR, c)], D_PLIEGO)
+            if err:
+                sin.append(f"{et}: {err}"); continue
+            for _, ep, vp in pp.filas:
+                dep = depto_en(ep)
+                if dep:
+                    suma[dep] = suma.get(dep, 0.0) + vp
+                elif vp:
+                    sin.append(ep)
+        if not suma:
+            return r, None, "departamento (por pliego): ningún pliego nombra un departamento" + (f" ({'; '.join(sin[:3])})" if sin else "")
+        class _Dep:
+            pass
+        out = _Dep()
+        out.filas = [(DEPTOS[d], f"{DEPTOS[d]}: {d}", v) for d, v in sorted(suma.items())]
+        out.sin_asignar = sin
+        return r, out, None
 
     def hasta_departamentos(self, anio, ruta, tipo):
         """Agrega tipo de recurso y nivel M (y gob. local si corresponde) y lista los departamentos."""
@@ -339,6 +368,18 @@ class MEFIngresos:
         if err:
             return None, None, f"municipalidad: {err}"
         return pm.filas, (pm.filtros[-1][1] if pm.filtros else None), None
+
+DEPTOS = {"AMAZONAS": "01", "ANCASH": "02", "APURIMAC": "03", "AREQUIPA": "04", "AYACUCHO": "05", "CAJAMARCA": "06",
+          "CALLAO": "07", "CUSCO": "08", "HUANCAVELICA": "09", "HUANUCO": "10", "ICA": "11", "JUNIN": "12", "LA LIBERTAD": "13",
+          "LAMBAYEQUE": "14", "LIMA": "15", "LORETO": "16", "MADRE DE DIOS": "17", "MOQUEGUA": "18", "PASCO": "19", "PIURA": "20",
+          "PUNO": "21", "SAN MARTIN": "22", "TACNA": "23", "TUMBES": "24", "UCAYALI": "25"}
+
+def depto_en(etiqueta):
+    """Departamento que nombra un pliego («453: GOBIERNO REGIONAL DEL DEPARTAMENTO DE LORETO» → LORETO)."""
+    t = " " + solo_letras(etiqueta).upper() + " "
+    hall = [d for d in DEPTOS if f" {d} " in t]
+    hall = [d for d in hall if not any(d != o and d in o for o in hall)]   # «LIMA» dentro de otro nombre no cuenta
+    return hall[0] if len(hall) == 1 else None
 
 def nombre_municipalidad(etiqueta):
     """«01-301422: MUNICIPALIDAD PROVINCIAL DE MAYNAS - IQUITOS» → (código, nivel, municipalidad, provincia)."""
