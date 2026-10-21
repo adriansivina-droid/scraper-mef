@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 BASE = "https://apps5.mineco.gob.pe/transparenciaingresos/mensual"
 D_FUENTE, D_RUBRO, D_TIPO, D_NIVEL = "Fuente de Financiamiento", "Rubro", "Tipo de Recurso", "Nivel de Gobierno"
 D_GOBLOC, D_DEPTO, D_MUNI = "Gob.Loc./Mancom.", "Departamento", "Municipalidad"
+D_SECTOR, D_PLIEGO = "Sector", "Pliego"
 _CODIGO = re.compile(r"^([\w\-\.]+)\s*:")
 
 def norm(t):
@@ -252,6 +253,21 @@ class MEFIngresos:
         r = ruta + [(D_TIPO, tipo[0])]
         pn, err = self.listar(anio, r, D_NIVEL)
         return r, pn, (f"nivel de gobierno: {err}" if err else None)
+
+    def sectores_pliegos(self, anio, ruta, tipo):
+        """Cuando la consulta no ofrece «Nivel de Gobierno» (2003): reparto del tipo por sector y pliego.
+        Devuelve ([(sector, pliego, recaudado)…], error)."""
+        r = ruta + [(D_TIPO, tipo[0])]
+        ps, err = self.listar(anio, r, D_SECTOR)
+        if err:
+            return None, f"sector: {err}"
+        salida = []
+        for c, et, v in ps.filas:
+            pp, err = self.listar(anio, r + [(D_SECTOR, c)], D_PLIEGO)
+            if err:
+                salida.append((et, "", v)); continue
+            salida += [(et, ep, vp) for _, ep, vp in pp.filas]
+        return salida, None
 
     def departamentos_de_nivel(self, anio, r_tipo, nivel):
         """Departamentos bajo un nivel de gobierno (si la página no ofrece «Departamento» pero sí «Gob.Loc./Mancom.»,

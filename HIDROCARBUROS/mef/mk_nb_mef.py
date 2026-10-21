@@ -97,6 +97,21 @@ def registrar_niveles(anio, ruta, t, normal=False):
     etq_t = t[1] + (" (todos los canones)" if normal else "")
     fuente = FUENTE + (" · tipo 0 (NORMAL/CANON): todos los canones, no solo el petrolero" if normal else "")
     r_t, pn, e = m.niveles(anio, ruta, t)
+    if e and "sin botón" in e:
+        # 2003: la consulta no tiene «Nivel de Gobierno»; se registra el reparto por sector y pliego (p. ej. todo al CND)
+        sp, e2 = m.sectores_pliegos(anio, ruta, t)
+        if sp is None:
+            ctrl_niv.append({"AÑO": anio, "TIPO_RECURSO": etq_t, "ESTADO": f"ERROR: {e} · {e2}"}); return
+        for sec, pli, v in sp:
+            niv_filas.append({"AÑO": anio, "TIPO_RECURSO": etq_t, "NIVEL_GOBIERNO": "SIN NIVEL EN LA CONSULTA · " + " › ".join(x for x in (sec, pli) if x),
+                              "DEPARTAMENTO": "TOTAL PAÍS", "RECAUDADO_SOLES": round(v, 2), "FUENTE": fuente})
+        suma = sum(v for _, _, v in sp)
+        ctrl_niv.append({"AÑO": anio, "TIPO_RECURSO": etq_t, "NIVELES": " | ".join(f"{sec} › {pli}: S/ {v:,.0f}" for sec, pli, v in sp),
+                         "SUMA_NIVELES": round(suma, 2), "TOTAL_TIPO": round(t[2], 2), "DIF": round(suma - t[2], 2),
+                         "SIN_DETALLE_DEPARTAMENTO": "la consulta de este año no tiene «Nivel de Gobierno»: reparto por sector y pliego",
+                         "ESTADO": "OK" if abs(suma - t[2]) <= max(1, len(sp)) else "REVISAR"})
+        print(f"   🏛️ {anio} · {etq_t} (sin nivel de gobierno): " + " · ".join(f"{(pli or sec).split(':', 1)[-1].strip().title()} S/ {v/1e6:,.2f} millones" for sec, pli, v in sp))
+        return
     if e:
         ctrl_niv.append({"AÑO": anio, "TIPO_RECURSO": etq_t, "ESTADO": f"ERROR: {e}"}); return
     suma = sum(v for _, _, v in pn.filas)

@@ -7,7 +7,7 @@ import urllib.parse, html, re, json, base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 F, RU, T, N, G, D, MU = "Fuente de Financiamiento", "Rubro", "Tipo de Recurso", "Nivel de Gobierno", "Gob.Loc./Mancom.", "Departamento", "Municipalidad"
 BOTON = {"Fuente": "BtnFuente", RU: "BtnRubro", T: "BtnTipoRecurso", N: "BtnNivelGobierno", G: "BtnGobLoc", D: "BtnDepartamento", MU: "BtnMunicipalidad",
-         "Mes": "BtnMes"}
+         "Mes": "BtnMes", "Sector": "BtnSector", "Pliego": "BtnPliego"}
 CABECERA = {G: "Gobiernos Locales / Mancomunidades"}     # el botón dice «Gob.Loc./Mancom.», la cabecera no (como en el MEF)
 MUNIS = {"01-301454": ("MUNICIPALIDAD PROVINCIAL DE REQUENA", 4819640.25), "06-301459": ("MUNICIPALIDAD DISTRITAL DE PUINAHUA", 373651.10),
          "01-301422": ("MUNICIPALIDAD PROVINCIAL DE MAYNAS - IQUITOS", 9114760.40)}
@@ -38,6 +38,10 @@ def opciones(anio, f, dim):
     if dim == D:
         if f.get(N) not in ("M", "R"): return None
         return {"15": ("LIMA", 5e6), "16": ("LORETO", 14308051.75 * (2 if f.get(T) == "K" else 1))}
+    if dim == "Sector":                                # 2003: sin nivel de gobierno; el petrolero va al CND (PCM)
+        return {"01": ("PRESIDENCIA CONSEJO MINISTROS", opciones(anio, f, T)[f[T]][1])} if T in f else None
+    if dim == "Pliego":
+        return {"013": ("CONSEJO NACIONAL DE DESCENTRALIZACION", opciones(anio, f, T)[f[T]][1])} if "Sector" in f else None
     if dim == MU:
         mult = 2 if f.get(T) == "K" else 1
         return {c: (n, v * mult) for c, (n, v) in MUNIS.items()} if D in f else None
@@ -47,6 +51,8 @@ def botones(anio, f, dim):
     if dim == "":
         return [N, "Fuente", RU, "Mes"]
     usados = set(f) | {dim}
+    if anio == 2003:
+        return [x for x in (T, "Sector", "Pliego") if x not in usados] + ["Mes"]
     b = [x for x in (RU, T, N, G, D, MU) if x not in usados]
     if anio >= 2020 and N in f and f.get(N) == "M" and G not in f and dim != G: b = [x for x in b if x != D]
     if dim == N and anio >= 2020: b = [x for x in b if x != D]     # en M hay que pasar por Gob.Loc. (los otros niveles no tienen departamento aquí)
