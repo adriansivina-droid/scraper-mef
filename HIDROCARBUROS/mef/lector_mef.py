@@ -227,7 +227,7 @@ class MEFIngresos:
         pg, err = self.listar(anio, [], D_FUENTE)
         if err:
             return None, [], err
-        for patron, con_rubro in ((r"^0?5:\s*RECURSOS DETERMINADOS", True), (r"^0?1:\s*CANON Y SOBRECANON", False)):
+        for patron, con_rubro in ((r"^0?5:\s*RECURSOS DETERMINADOS", True), (r"^0?1:\s*CANON\b", False)):
             f = self.elegir(pg, patron)
             if not f:
                 continue
