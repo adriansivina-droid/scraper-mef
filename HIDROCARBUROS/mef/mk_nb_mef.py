@@ -84,6 +84,9 @@ pp_mun = (dist_pp[dist_pp["TIPO_BENEFICIARIO"] == "MUNICIPALIDADES"].assign(_D=d
 prov_de = ({norm_may(m): norm_may(p) for m, p in zip(mun_pp["MUNICIPALIDAD"], mun_pp["PROVINCIA"]) if isinstance(p, str)}
            if mun_pp is not None else {})
 
+if not (2003 <= ANIO_INICIO <= ANIO_FIN <= date.today().year + 1):
+    raise SystemExit(f"❌ Revisa los años: ANIO_INICIO = {ANIO_INICIO}, ANIO_FIN = {ANIO_FIN}. "
+                     f"Deben ir de 2003 a {date.today().year} y el inicio no puede ser mayor que el fin.")
 m = MEFIngresos(log=print)
 if not m.preparar(min(ANIO_FIN, date.today().year)):
     raise SystemExit("❌ No se pudo abrir la consulta (ver el mensaje de arriba): el MEF cambió la página o bloqueó la consulta.")
@@ -210,7 +213,7 @@ if len(nuevo):
     nuevo = nuevo.sort_values(["DEPARTAMENTO", "AÑO", "NIVEL", "MUNICIPALIDAD", "TIPO_RECURSO"], ascending=[True, True, False, True, True])
     p = os.path.join(ruta_local, "PP_canon_municipal_mef_anio.csv"); nuevo.to_csv(p, index=False, encoding="utf-8-sig")
     subir(p, DRIVE_FOLDER_ID, datos_drive)
-c = pd.DataFrame(ctrl); c.insert(0, "FECHA_EXTRACCION", date.today().strftime("%d/%m/%Y"))
+c = pd.DataFrame(ctrl, columns=["AÑO", "DEPARTAMENTO", "ESTADO"] if not ctrl else None); c.insert(0, "FECHA_EXTRACCION", date.today().strftime("%d/%m/%Y"))
 previo_c = bajar("CONTROL PP canon_municipal_mef.csv", control_drive)
 if previo_c is not None:              # filas de versiones anteriores del notebook («16: LORETO», «NO INTENTADO…») se descartan
     previo_c = previo_c[~previo_c["DEPARTAMENTO"].astype(str).str.contains(":") & ~previo_c["ESTADO"].astype(str).str.startswith("NO INTENTADO")]
