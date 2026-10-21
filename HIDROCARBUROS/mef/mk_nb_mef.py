@@ -1,5 +1,5 @@
 """Genera HIDROCARBUROS/PP_MEF_Canon_Municipal.ipynb (python3 mk_nb_mef.py <salida.ipynb>).
-El notebook embebe lector_mef_url.py (lectura por URL con requests, como los scrapers de FISCAL/)."""
+El notebook embebe lector_mef_url.py (lectura de la exportación _tgt=xls por URL, con requests)."""
 import json, os, sys
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "lector_mef_url.py"), encoding="utf-8") as fh:
     lector = fh.read()
@@ -8,7 +8,7 @@ md = """# 🏛️ MEF · Canon y sobrecanon petrolero recaudado por cada municip
 
 PERUPETRO publica el canon **por municipalidad** solo en 1993–2002 (Excel de Distribución) y el año en curso (Excel de Canon Municipalidades). Desde 2003 entrega el total municipal a un intermediario (CND hasta 2006; PCM desde 2007), que hace el reparto. Este notebook completa los años que faltan con el **MEF – Consulta Amigable de Ingresos** (`apps5.mineco.gob.pe/transparenciaingresos/mensual/`), monto **recaudado** por cada municipalidad.
 
-**Cómo lee la consulta:** igual que los scrapers de `FISCAL/` (gasto): la ruta va **en la URL** (`Navegar_N.aspx?…&0=&10=<fuente>&11=<tipo>&…&y=AAAA`), con `requests`, sin navegador. La primera clave vacía es la que se lista. Claves conocidas por el `exportUrl` de la página: 10 fuente, 11 tipo de recurso, 2 sector; las demás (rubro, nivel de gobierno, departamento, municipalidad) **se descubren solas** probando claves y leyendo la cabecera de la tabla, y cada filtro se valida con el breadcrumb.
+**Cómo lee la consulta:** la navegación del MEF es por botones (postback), pero el botón **Exportar** abre una URL con toda la ruta: `Navegar_N.aspx?_tgt=xls&_uhc=yes&0=&10=<fuente>&…&<clave a listar>=&y=AAAA` (descarga una tabla HTML con extensión .xls). Se lee con `requests`, sin navegador: `0` es el TOTAL, luego van los filtros y la última clave vacía es la que se lista. El número `N` cambia según el año (en 2026 es `Navegar_6`; `Navegar_1` exporta pero **ignora los filtros**), así que en cada año se elige la página cuyo historial muestra el filtro aplicado; las claves de cada dimensión (fuente, rubro, tipo de recurso, nivel de gobierno, gob. local, departamento, municipalidad) se descubren leyendo la cabecera de cada exportación. Los montos de la exportación vienen en soles enteros.
 
 - **Desde 2007**: fuente 5 (Recursos determinados) → rubro 18 → tipos «5: Canon y sobrecanon petrolero» y «K: Sub cuenta – …» (se suman) → gobiernos locales → departamento → municipalidad.
 - **2005–2006**: fuente 01 (Canon y sobrecanon) → tipo de recurso; el detalle municipal solo está en «0: NORMAL», que reúne **todos** los canones. Con `SI_NO_HAY_PETROLERO = "Usar NORMAL"` se toma ese tipo y queda rotulado «todos los canones» en el CSV y en el mapa.
@@ -85,9 +85,8 @@ prov_de = ({norm_may(m): norm_may(p) for m, p in zip(mun_pp["MUNICIPALIDAD"], mu
            if mun_pp is not None else {})
 
 m = MEFIngresosURL(log=print)
-print("🔎 Calibrando la consulta…")
-if not m.calibrar(min(ANIO_FIN, date.today().year)):
-    raise SystemExit("❌ Ninguna variante de URL trajo la tabla de fuentes de financiamiento: el MEF cambió la página o bloqueó la consulta.")
+if not m.preparar(min(ANIO_FIN, date.today().year)):
+    raise SystemExit("❌ Ningún Navegar_N.aspx exportó la consulta aplicando los filtros: el MEF cambió la página o bloqueó la consulta.")
 filas, ctrl, niv_filas, ctrl_niv = [], [], [], []
 
 def registrar_niveles(anio, ruta, t, normal=False):
@@ -173,7 +172,7 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
                      "ESTADO": ("OK" if n and abs(suma - tot) <= max(1, n) else "REVISAR" if n else "SIN MUNICIPALIDADES")})
         print(f"{'✅' if n else 'ℹ️'} {anio} · {DEP}: {n} municipalidades · S/ {suma/1e6:,.2f} millones"
               + (" (todos los canones)" if usa_normal else "") + (f" · PERUPETRO S/ {ref/1e6:,.2f} millones" if ref else ""))
-print("Claves usadas:", m.claves, "· página Navegar_", m.pagina)
+print(f"Claves usadas: {m.claves} · última página: Navegar_{m.pagina}.aspx")
 
 # ── Distribución por nivel de gobierno (se acumula por año) ──
 nv = pd.DataFrame(niv_filas)
