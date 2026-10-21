@@ -2,6 +2,7 @@
 # default.aspx?y=AAAA trae un iframe Navegar_N.aspx (2007+ = 6; antes = 1); la raíz lista las fuentes; cada POST lleva
 # __VIEWSTATE (aquí: el estado en base64), grp1 = «código/PIA/PIM/recaudado» de la fila elegida y el botón de la dimensión.
 # default.aspx siempre apunta a Navegar_6 (como el MEF); antes de 2007 solo responde Navegar_1. Al abrir, la raíz muestra solo TOTAL con el botón «Fuente» (como el MEF). Las URL con filtros se ignoran (como en el MEF). Desde 2020 el nivel M pasa por «Gob.Loc./Mancom.» antes del departamento.
+# El POST debe llevar el año del formulario (ctl00$CPH1$DrpYear), como lo envía el navegador.
 # Uso: python3 mock_mef.py  (puerto 8766)
 import urllib.parse, html, re, json, base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -80,6 +81,7 @@ def pagina(anio, filtros, dim, n):
     return (f"<html><body><form method='post' action='Navegar_{n}.aspx?y={anio}' id='form1'>"
             f"<input type='hidden' name='__EVENTTARGET' value=''/><input type='hidden' name='__EVENTARGUMENT' value=''/>"
             f"<input type='hidden' name='__VIEWSTATE' value='{vs}'/><input type='hidden' name='__EVENTVALIDATION' value='x'/>"
+            f"<select name='ctl00$CPH1$DrpYear'><option value='2025'>2025</option><option value='{anio}' selected='selected'>{anio}</option></select>"
             f"{btn}<table class='History'>{hist}</table>{cuerpo}</form></body></html>").encode("utf-8")
 
 class H(BaseHTTPRequestHandler):
@@ -101,6 +103,8 @@ class H(BaseHTTPRequestHandler):
         st = json.loads(base64.b64decode(datos["__VIEWSTATE"]))
         n = int(re.search(r"navegar_(\d+)", u.path.lower()).group(1))
         anio, filtros, dim = st["y"], [tuple(x) for x in st["f"]], st["d"]
+        if datos.get("ctl00$CPH1$DrpYear") != str(anio):     # sin el año del formulario el MEF no arma la tabla
+            return self.responder(b"<html><body><form></form>Consulta Amigable de Ingresos - Navegador</body></html>")
         nuevo = next((v for k, v in datos.items() if k.startswith("ctl00$CPH1$Btn")), None)
         cod = (datos.get("grp1") or "").split("/")[0]
         if nuevo is None or not cod or nuevo not in botones(anio, dict(filtros), dim):

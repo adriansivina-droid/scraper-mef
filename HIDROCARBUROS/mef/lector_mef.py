@@ -59,7 +59,17 @@ class Pagina:
         s = BeautifulSoup(contenido, "html.parser")
         f = s.find("form")
         self.accion = _html.unescape(f.get("action") or "") if f else ""
-        self.ocultos = {i.get("name"): i.get("value") or "" for i in s.find_all("input", attrs={"type": "hidden"}) if i.get("name")}
+        # todos los campos que el navegador envía con el formulario: ocultos, de texto y listas (p. ej. el año, DrpYear)
+        self.ocultos = {i.get("name"): i.get("value") or "" for i in s.find_all("input")
+                        if i.get("name") and (i.get("type") or "text").lower() in ("hidden", "text")}
+        self.anio = None
+        for sel in s.find_all("select"):
+            if not sel.get("name"):
+                continue
+            op = sel.find("option", selected=True) or sel.find("option")
+            self.ocultos[sel.get("name")] = (op.get("value") if op and op.get("value") is not None else (op.get_text(strip=True) if op else ""))
+            if "year" in sel.get("name").lower() or "anio" in sel.get("name").lower():
+                self.anio = self.ocultos[sel.get("name")]
         self.botones = {" ".join((i.get("value") or "").split()): i.get("name")
                         for i in s.find_all("input", attrs={"type": "submit"}) if i.get("name")}
         data = s.find("table", class_="Data")
@@ -158,10 +168,13 @@ class MEFIngresos:
         pg, err = self._pedir("GET", url, reintentos=2)
         if pg is None:
             return None, err
-        if not pg.tiene_tabla:
-            return None, f"sin tabla («{pg.texto[:120]}»)"
-        if not misma_dim(pg.dim, D_FUENTE) and pg.filas and pg.boton(D_FUENTE):
-            pf, err = self._postear(pg, pg.filas[0][0], D_FUENTE, validar=False)
+        if pg.anio and str(pg.anio) != str(anio):
+            return None, f"la página quedó en el año {pg.anio}"
+        if not pg.tiene_tabla and not pg.boton(D_FUENTE):
+            return None, f"sin tabla («{pg.texto[:120]}»; botones: {', '.join(pg.botones) or '–'})"
+        if not misma_dim(pg.dim, D_FUENTE) and pg.boton(D_FUENTE):
+            # la raíz muestra solo TOTAL (o ninguna fila): se pulsa «Fuente», como en la página
+            pf, err = self._postear(pg, pg.filas[0][0] if pg.filas else None, D_FUENTE, validar=False)
             if pf is None:
                 return None, f"al pulsar «Fuente»: {err}"
             pg = pf
@@ -172,18 +185,21 @@ class MEFIngresos:
 
     def _postear(self, padre, cod, dim, validar=True):
         """Desde la página `padre`: elige la fila `cod` y pulsa el botón de `dim`. Valida historial y cabecera."""
-        if cod not in padre.radios:
+        if cod is not None and cod not in padre.radios:
             return None, f"la fila «{cod}» no está en «{padre.dim}»"
         b = padre.boton(dim)
         if b is None:
             return None, f"sin botón «{dim}» (botones: {', '.join(padre.botones) or '–'})"
         datos = dict(padre.ocultos)
-        datos.update({"__EVENTTARGET": "", "__EVENTARGUMENT": "", "grp1": padre.radios[cod], b[1]: b[0]})
+        datos.update({"__EVENTTARGET": "", "__EVENTARGUMENT": "", b[1]: b[0]})
+        if cod is not None:
+            datos["grp1"] = padre.radios[cod]
         pg, err = self._pedir("POST", urljoin(padre.url, padre.accion) if padre.accion else padre.url, datos)
         if pg is None:
             return None, err
         if not pg.tiene_tabla:
-            return None, f"SIN_TABLA (la página respondió: «{pg.texto[:200]}»)"
+            return None, (f"SIN_TABLA (año de la página: {pg.anio or '?'}; botones: {', '.join(pg.botones) or '–'}; "
+                          f"la página respondió: «{pg.texto[:160]}»)")
         etq = next((e for c, e, _ in padre.filas if c == cod), cod)
         if not misma_dim(pg.dim, dim):
             return None, f"se pidió «{dim}» y la tabla lista «{pg.dim}»"
