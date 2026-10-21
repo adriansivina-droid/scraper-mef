@@ -193,7 +193,7 @@ for anio in range(ANIO_INICIO, ANIO_FIN + 1):
                      "ESTADO": ("OK" if n and abs(suma - tot) <= max(1, n) else "REVISAR" if n else "SIN MUNICIPALIDADES")})
         print(f"{'✅' if n else 'ℹ️'} {anio} · {DEP}: {n} municipalidades · S/ {suma/1e6:,.2f} millones"
               + (" (todos los canones)" if usa_normal else "") + (f" · PERUPETRO S/ {ref/1e6:,.2f} millones" if ref else ""))
-print(f"Última página usada: Navegar_{m.pagina}.aspx")
+print(f"Última página usada: Navegar{'_' + m.pagina if m.pagina else ''}.aspx")
 
 # ── Distribución por nivel de gobierno (se acumula por año) ──
 nv = pd.DataFrame(niv_filas)

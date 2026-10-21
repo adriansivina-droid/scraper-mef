@@ -91,6 +91,12 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path); q = dict(urllib.parse.parse_qsl(u.query, keep_blank_values=True))
         anio = int(q.get("y", 2026)); n = 6 if anio >= 2007 else 1
+        if anio == 2003:                                   # 2003: <frame src="Navegar.aspx?y=2003">, sin número
+            if u.path.lower().startswith("/default.aspx"):
+                return self.responder(f"<html><frameset><frame name='frame0' src='Navegar.aspx?y={anio}' /></frameset></html>".encode())
+            if u.path.lower() == "/navegar.aspx":
+                return self.responder(pagina(anio, [], F, 1))
+            return self.responder(b"<html>Consulta Amigable Portal del MEF</html>")
         if u.path.lower().startswith("/default.aspx"):
             return self.responder(f"<html><iframe src='Navegar_6.aspx?y={anio}'></iframe></html>".encode())
         if u.path.lower() == f"/navegar_{n}.aspx":

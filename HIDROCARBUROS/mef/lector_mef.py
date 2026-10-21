@@ -8,7 +8,7 @@
 #   · el estado viaja en el __VIEWSTATE: cada página leída se guarda y se vuelve a enviar con otra fila para ramificar
 #     (otro departamento, otro nivel) sin repetir el camino. Cada paso se valida con el historial (breadcrumb) y la
 #     cabecera de la tabla; si una página guardada deja de servir, se rehace el camino desde la raíz;
-#   · la página Navegar_N de cada año se toma del iframe de default.aspx?y=AAAA.
+#   · la página de cada año se toma del marco de default.aspx?y=AAAA (<iframe> Navegar_N.aspx; en 2003, <frame> Navegar.aspx).
 import re, time, random, unicodedata, html as _html
 from urllib.parse import urljoin
 import requests
@@ -139,12 +139,15 @@ class MEFIngresos:
         self._anio, self._cache = None, {}
         try:
             r = self.s.get(f"{self.base}/default.aspx", params={"y": anio}, timeout=60)
-            m = re.search(r"<iframe[^>]+src=[\"']([^\"']*Navegar_\d+\.aspx[^\"']*)[\"']", r.text, re.I)
+            # <iframe> en los años recientes; <frame src="Navegar.aspx?y=2003"> (sin número) en 2003
+            m = re.search(r"<i?frame[^>]+src=[\"']([^\"']*Navegar(?:_\d+)?\.aspx[^\"']*)[\"']", r.text, re.I)
             src = _html.unescape(m.group(1)) if m else f"Navegar_6.aspx?y={anio}"
         except requests.RequestException as e:
             self.log(f"   ❌ default.aspx {anio}: {e}"); return False
         # el marco que indica default.aspx y, si no sirve, los demás Navegar_N del año
-        candidatos = [urljoin(f"{self.base}/", src)] + [f"{self.base}/Navegar_{n}.aspx?y={anio}" for n in range(1, 8)]
+        # primero el marco que usa el navegador; luego Navegar_6 (el que funcionó en 2007–2026) y los demás
+        candidatos = ([urljoin(f"{self.base}/", src), f"{self.base}/Navegar_6.aspx?y={anio}", f"{self.base}/Navegar.aspx?y={anio}"]
+                      + [f"{self.base}/Navegar_{n}.aspx?y={anio}" for n in range(1, 8)])
         vistos, pg = [], None
         for url in candidatos:
             if url in vistos:
@@ -156,11 +159,11 @@ class MEFIngresos:
             self.log(f"   · {anio}: {url.rsplit('/', 1)[-1]} → {err}")
         if pg is None:
             return False
-        m = re.search(r"Navegar_(\d+)", url)
-        self.pagina = m.group(1) if m else "?"
+        m = re.search(r"Navegar(_\d+)?\.aspx", pg.url or url)          # tras una redirección vale la dirección final
+        self.pagina = (m.group(1) or "").lstrip("_") if m else "?"
         self._cache[()] = pg
         self._anio = anio
-        self.log(f"🔎 {anio}: Navegar_{self.pagina}.aspx · raíz con {len(pg.filas)} fuentes")
+        self.log(f"🔎 {anio}: Navegar{'_' + self.pagina if self.pagina else ''}.aspx · raíz con {len(pg.filas)} fuentes")
         return True
 
     def _abrir_raiz(self, anio, url):
