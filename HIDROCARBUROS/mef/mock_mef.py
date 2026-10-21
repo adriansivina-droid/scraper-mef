@@ -1,7 +1,7 @@
 # Simulador de la Consulta Amigable de Ingresos con navegación por FORMULARIO (postback ASP.NET), como el MEF real:
 # default.aspx?y=AAAA trae un iframe Navegar_N.aspx (2007+ = 6; antes = 1); la raíz lista las fuentes; cada POST lleva
 # __VIEWSTATE (aquí: el estado en base64), grp1 = «código/PIA/PIM/recaudado» de la fila elegida y el botón de la dimensión.
-# Al abrir, la raíz muestra solo TOTAL con el botón «Fuente» (como el MEF). Las URL con filtros se ignoran (como en el MEF). Desde 2020 el nivel M pasa por «Gob.Loc./Mancom.» antes del departamento.
+# default.aspx siempre apunta a Navegar_6 (como el MEF); antes de 2007 solo responde Navegar_1. Al abrir, la raíz muestra solo TOTAL con el botón «Fuente» (como el MEF). Las URL con filtros se ignoran (como en el MEF). Desde 2020 el nivel M pasa por «Gob.Loc./Mancom.» antes del departamento.
 # Uso: python3 mock_mef.py  (puerto 8766)
 import urllib.parse, html, re, json, base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -84,7 +84,7 @@ class H(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path); q = dict(urllib.parse.parse_qsl(u.query, keep_blank_values=True))
         anio = int(q.get("y", 2026)); n = 6 if anio >= 2007 else 1
         if u.path.lower().startswith("/default.aspx"):
-            return self.responder(f"<html><iframe src='Navegar_{n}.aspx?y={anio}'></iframe></html>".encode())
+            return self.responder(f"<html><iframe src='Navegar_6.aspx?y={anio}'></iframe></html>".encode())
         if u.path.lower() == f"/navegar_{n}.aspx":
             return self.responder(pagina(anio, [], "", n))
         self.responder(b"<html>Navegador</html>")
