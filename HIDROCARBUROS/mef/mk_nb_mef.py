@@ -31,7 +31,7 @@ b2 = '''#@title Bloque 2 · Descargar y controlar { display-mode: "form" }
 ANIO_INICIO = 2003  #@param {type:"integer"}
 ANIO_FIN = 2026  #@param {type:"integer"}
 SI_NO_HAY_PETROLERO = "Usar NORMAL 2005–2006 (todos los canones)"  #@param ["Usar NORMAL 2005–2006 (todos los canones)", "Dejar sin dato"]
-DETALLE = "Anual y mensual"  #@param ["Anual", "Anual y mensual"]
+DETALLE = "Anual"  #@param ["Anual", "Anual y mensual"]
 DEPARTAMENTO = "16: LORETO"  #@param ["TODOS", "16: LORETO", "25: UCAYALI", "20: PIURA", "24: TUMBES", "10: HUANUCO", "08: CUSCO"]
 import os, re, unicodedata, pandas as pd
 from datetime import date

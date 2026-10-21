@@ -49,6 +49,10 @@ def _abreviar(t):
         return "gob loc manc"
     return t
 
+def solo_letras(t):
+    """Para comparar la fila elegida con el historial sin comillas ni signos (los meses se muestran como «1: 'Enero'»)."""
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", norm(t))).strip()
+
 def misma_dim(cabecera, dim):
     c, d = _abreviar(cabecera), _abreviar(dim)
     return bool(c) and (c.startswith(d[:10]) or d.startswith(c[:10]))
@@ -214,7 +218,7 @@ class MEFIngresos:
         etq = next((e for c, e, _ in padre.filas if c == cod), cod)
         if not misma_dim(pg.dim, dim):
             return None, f"se pidió «{dim}» y la tabla lista «{pg.dim}»"
-        if validar and (len(pg.filtros) != len(padre.filtros) + 1 or norm(etq) not in norm(pg.filtros[-1][0])):
+        if validar and (len(pg.filtros) != len(padre.filtros) + 1 or solo_letras(etq) not in solo_letras(pg.filtros[-1][0])):
             return None, f"ESTADO: filtro no aplicado (historial: {' › '.join(f for f, _ in pg.filtros)})"
         return pg, None
 
