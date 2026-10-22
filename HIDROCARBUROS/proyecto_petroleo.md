@@ -1,6 +1,6 @@
 # Proyecto Petróleo · Loreto · Resumen para continuar en otro chat
 
-Resumen ejecutivo del proyecto de producción petrolera. Sirve para retomarlo en una sesión nueva sin perder el contexto. El detalle técnico del extractor está en `HIDROCARBUROS/perupetro_produccion.md`. Última actualización: **20/10/2026**.
+Resumen ejecutivo del proyecto de producción petrolera. Sirve para retomarlo en una sesión nueva sin perder el contexto. El detalle técnico del extractor está en `HIDROCARBUROS/perupetro_produccion.md`. Última actualización: **22/10/2026**. Desde el 22/10/2026 todo se **actualiza solo cada día** con GitHub Actions (sección 11).
 
 ---
 
@@ -19,10 +19,10 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
                    │
  ┌─────────────────┼──────────────────────┬──────────────────────┐
  Producción        Mapa de lotes          Infotrade              Canon
- lote × mes        polígonos, distritos,  exportación 2709       por lote, beneficiario
- (HECHO)           indicadores (HECHO);   (scraper listo,        y municipalidad
-                   Banco de Datos         cruce pendiente)       (HECHO, Excel de
-                   (PENDIENTE)                                    PERUPETRO)
+ lote × mes        polígonos, distritos,  exportación 2709       por lote, beneficiario,
+ (HECHO)           indicadores (HECHO);   (scraper listo,        nivel de gobierno y
+                   Banco de Datos         cruce pendiente)       municipalidad (HECHO:
+                   (PENDIENTE)                                    PERUPETRO + MEF)
 ```
 
 ## 2. Dónde está todo
@@ -48,6 +48,8 @@ El plan es combinar varias fuentes que se unen por **lote**, **operador** y **a�
 | Drive · DATA | `1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq` (CSV de producción + subcarpeta `PDF` con todos los PDF descargados) |
 | Drive · CONTROL | `1TKjS2Wjpnf26oladjhqstmN5c9Irq-Aj` (control por año y `PP_CATALOGO_PDF.csv`) |
 | Geoportal PERUPETRO (mapas oficiales, WFS) | https://geoportal.perupetro.com.pe — servicio `https://geoportal.perupetro.com.pe/geoserver/wfs` (capa de lotes `cartografia_pp:lote_contrato`) |
+| Canon por municipalidad y nivel de gobierno (MEF, 2003–hoy) | `HIDROCARBUROS/PP_MEF_Canon_Municipal.ipynb` → [Colab](https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/PP_MEF_Canon_Municipal.ipynb) · código en `HIDROCARBUROS/mef/` (sección 10) |
+| Actualización automática diaria | `.github/workflows/hidrocarburos_actualizar.yml` · `HIDROCARBUROS/automatizacion/` (sección 11) |
 | Fuente de los PDF | perupetro.com.pe → Estadísticas → **Estadística Petrolera**: anuales 1994–2025 y mensuales del año en curso. La URL completa está en el Bloque 3 (`PAGINA_EST`) |
 
 **Abrir siempre desde el enlace de Colab.** Una copia guardada en Drive no recibe las correcciones nuevas.
@@ -141,6 +143,7 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 ## 6. Pendientes, en orden sugerido
 
+0. **Hecho al 22/10/2026:** canon municipal y por nivel de gobierno del MEF 2003–2026 para los 6 departamentos petroleros (sección 10); vistas nuevas del mapa (sección 10); actualización automática diaria (sección 11).
 0. **Hecho al 20/10/2026** (detalle en la sección 9 y en `mapa_lotes.md`): canon por lote, beneficiario y municipalidad (puntos 1–5); mapa de lotes con corrida real (geoportal de PERUPETRO, provincias de geoBoundaries y distritos de GADM 4.1 como respaldo), pestañas de pozos, regalías, canon y empresas, selector de año, unidades en «millones»; diccionarios Word de DATA; texto de Loreto en Word.
 1. **Mapa de lotes**: ✅ corrida real hecha (20/10/2026). Pendiente menor: la dirección de respaldo de geoBoundaries en GitHub da 404 (no afecta: entra GADM); los distritos de GADM son límites de 2022 y no los oficiales del INEI.
 2. **Otras tablas de los anuales.**
@@ -156,14 +159,19 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
      - **estado de pozos** por lote.
    - La **inversión en US$ por lote no está en los anuales**; habría que buscarla en otra fuente (memorias de PERUPETRO, MINEM).
    - **Regalías 1994–2000: no existen en los anuales.** Revisé los índices de los 7 escaneados: pasan de «Canasta» a «Canon» y «Contratos»; el cuadro «Ingresos por contratos» aparece recién en la edición 2001. Alternativas: memorias anuales de PERUPETRO de esos años, o transcribir la canasta 1994–2000 (sí está, sección 6) para tener el valor de la producción.
-3. **Cruce con Infotrade.** Exportación de crudo (partida 2709) de Loreto vs producción; operador ↔ exportador.
-4. **Banco de Datos de PERUPETRO.** El usuario tiene cuenta, para pozos y sísmica:
+3. **Canon MEF, pendientes:**
+   - Correr la **versión mensual** (`DETALLE = "Anual y mensual"`), por tramos cortos, empezando por Loreto 2008–2011. Sirve para ver si los tipos K y 5 de esos años son ingresos distintos o el mismo monto registrado dos veces, y para cotejar mes a mes con PERUPETRO.
+   - Explicar por qué el MEF (recaudado) supera a PERUPETRO (transferido) en casi todos los años (razón 0,96–1,66): fechas de registro, doble tipo o saldos.
+   - Cusco: comparar su canon gasífero del MEF con lo que reporta PERUPETRO (regalías, impuesto a la renta o ambos).
+4. **Cruce con Infotrade.** Exportación de crudo (partida 2709) de Loreto vs producción; operador ↔ exportador.
+5. **Banco de Datos de PERUPETRO.** El usuario tiene cuenta, para pozos y sísmica:
    - credenciales en **Colab → Secretos**, nunca en el código;
    - antes hay que revisar las condiciones de uso y capturar con F12 → Network las peticiones al abrir las capas Pozos/Lotes.
 
 ## 7. Cosas a tener en cuenta
 
-- **Conexión:** perupetro.com.pe está **bloqueado** desde el entorno de Claude, pero funciona desde Colab. Por eso las pruebas de Claude se hacen con PDF subidos por el usuario y simulaciones.
+- **Conexión:** perupetro.com.pe y apps5.mineco.gob.pe están **bloqueados** desde el entorno de Claude, pero funcionan desde Colab y desde GitHub Actions. Por eso las pruebas de Claude se hacen con PDF subidos por el usuario y simulaciones.
+- **MEF bloquea por exceso de consultas:** tras miles de consultas seguidas respondió **HTTP 403** a la máquina de Colab (en el navegador abría normal). El lector se detiene con un aviso; se resuelve reconectando el entorno de Colab (otra IP) o esperando unas horas. Correr por tramos cortos.
 - **Servidor lento:** PERUPETRO a veces da `ConnectTimeout`. El notebook reintenta 3 veces y, si falla, anota `ERROR DE DESCARGA`; basta con volver a ejecutar.
 - **Página de estadísticas:** incluye un documento legal (reglamento de participación ciudadana) que se excluye.
 - **Preferencias del usuario:**
@@ -185,13 +193,13 @@ Para la región, la **zona Selva Norte = Loreto**. Infotrade asigna la región p
 
 Pegar algo como:
 
-> Continúa el **Proyecto Petróleo** del repositorio `adriansivina-droid/scraper-mef`. Lee `HIDROCARBUROS/proyecto_petroleo.md` y `HIDROCARBUROS/perupetro_produccion.md`. Trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`, haz PR y merge a `main`. La sección 9 (canon) está terminada; siguientes tareas posibles en la sección 6 (cruce con Infotrade, Banco de Datos, yacimientos) o las que pida el usuario. Te subo los PDF o Excel que necesites (si no se pueden adjuntar, los subo a GitHub en una rama aparte).
+> Continúa el **Proyecto Petróleo** del repositorio `adriansivina-droid/scraper-mef`. Lee `HIDROCARBUROS/proyecto_petroleo.md` (sobre todo las secciones 10 y 11), `HIDROCARBUROS/mapa_lotes.md` y `HIDROCARBUROS/perupetro_produccion.md`. Trabaja en la rama `claude/scraper-gobiernos-regionales-kk6ecm`, haz PR y merge a `main`. Las secciones 9 (canon PERUPETRO), 10 (canon MEF) y 11 (actualización automática) están terminadas; siguientes tareas posibles en la sección 6 (versión mensual del MEF, cruce con Infotrade, Banco de Datos, yacimientos) o las que pida el usuario. Te subo los PDF o Excel que necesites (si no se pueden adjuntar, los subo a GitHub en una rama aparte).
 
 Otros proyectos del mismo repositorio:
 - `FISCAL/`: scrapers MEF Consulta Amigable (ver `FISCAL/CONTEXTO_PROYECTO.md`).
 - `EXPORT/`: scraper Infotrade y diccionario de partidas arancelarias (ver `EXPORT/exportaciones_scraper_infotrade.md`).
 
-## 9. Siguiente tarea: canon por lote, por beneficiario y por municipalidad (pendiente, 18/10/2026)
+## 9. Canon por lote, por beneficiario y por municipalidad (PERUPETRO; hecho 18–20/10/2026)
 
 **Estado:** punto 1 (descarga) implementado y verificado en Colab (19/10/2026); punto 2 (lectores) implementado y verificado con la corrida real del 19/10/2026 (tres correcciones del lector; ver `perupetro_produccion.md`); punto 3 (serie oficial desde la Distribución) implementado el 19/10/2026; punto 4 (pestaña «Canon» del mapa) implementado el 20/10/2026 y verificado en la corrida real (distritos de GADM); punto 5 (texto y evidencia) hecho el 20/10/2026.
 
@@ -229,23 +237,99 @@ Desde la sesión de Claude Code **no se puede abrir perupetro.com.pe** (el proxy
 - Archivos `PP_produccion_lote_mes_2026-2026.csv` y `PP_produccion_gas_lote_mes_2026-2026.csv` en DATA: redundantes (salen de correr solo 2026). Correr producción siempre con 1994-2026, que es el archivo que usa el mapa; propuesta pendiente: que una corrida parcial actualice también el archivo completo.
 - Excel de Determinación 2024: el Lote 8 figura con unidad «MM BTU» aunque es petróleo (error de la fuente; no afecta 2025).
 - Ley 29289: falta identificar qué deuda o proyecto se pagaba (el Excel no lo dice).
-- **Canon por municipalidad 2005–2024 (20/10/2026):** fuente encontrada con el usuario: MEF, **Consulta Amigable de Ingresos** (`https://apps5.mineco.gob.pe/transparenciaingresos/mensual/`), ruta Fuente 5 → Rubro 18 → Tipo de recurso «5: Canon y sobrecanon petrolero» y «K: Sub cuenta – …» → Nivel M → Departamento 16 → Municipalidad. Detalle por municipalidad: **2003–2004 no** (el canon petrolero municipal figura a nombre del Consejo Nacional de Descentralización; con el tipo «0: NORMAL» solo aparecen gobiernos regionales: GR Loreto 2003 S/ 107,2 millones, todos los canones, frente a S/ 98,2 millones de canon petrolero según PERUPETRO); **2005–2006 sí**, pero con otra clasificación (fuente 01 → tipo «0: NORMAL», todos los canones: municipalidades de Loreto 2005 S/ 75,0 millones frente a S/ 98,8 millones de PERUPETRO); **desde 2007** homogéneo (fuente 5 → rubro 18 → tipos 5 y K). Esto coincide con la nota de los Excel de Distribución: «distribución a municipalidades a través del CND / Secretaría de Descentralización – PCM». Lector **con `requests`, sin navegador, navegando el formulario** (21/10/2026): los filtros puestos en la URL se ignoran, también en la de «Exportar» (`_tgt=xls`). Pruebas manuales del usuario con `Navegar_1` y `Navegar_6` (2026, `0=&10=5&11=`): la exportación devolvió el total del país (S/ 105 668 millones) con los 151 tipos de recurso de todas las fuentes. Por eso el lector hace lo mismo que el navegador: abre `default.aspx?y=AAAA`, toma el marco `Navegar_N.aspx` del año (2026 = 6) y en cada paso envía el formulario ASP.NET (`__VIEWSTATE`, `__EVENTVALIDATION`, `grp1` = valor del radio de la fila elegida y el botón de la dimensión siguiente). Cada página se guarda y se reenvía para ramificar (otro nivel u otro departamento), y cada paso se valida con el historial y la cabecera. Código en `mef/lector_mef.py`, simulador `mef/mock_mef.py`. Capturas del usuario (21/10/2026): **2003** no tiene botón «Nivel de Gobierno» ni PIA/PIM. Ruta: Fuente 01 → Tipo 4 → Sector 01 PCM → Pliego 013 CND → UE 001-1069, con S/ 166 368 386; el notebook registra ese reparto por sector y pliego. **2005** (fuente «01: CANON Y SOBRECANON») y **2006** (fuente «01: CANON, SOBRECANON, REGALIAS Y PARTICIPACIONES»): con tipo 0 NORMAL, la página de nivel ofrece «Departamento». **2008–2009**: el tipo 0 CANON sí ofrece Nivel M → Departamento (Provincia / Municipalidad), pero no sirve como respaldo: los gobiernos locales de Loreto reciben solo S/ 1 178 540 (2008) y S/ 193 427 (2009). El canon petrolero va por los tipos 5 y K, así que desde 2007 no se usa el tipo 0. **2024** (tipo 0 CANON): la ruta es Nivel M → «Gob.Loc./Mancom.» M: MUNICIPALIDADES → Departamento → Municipalidad, la misma que usa el lector en los años recientes. La página principal de 2003 (`default.aspx?y=2003`) usa `<frame src="Navegar.aspx?y=2003">`, sin número; los años recientes usan `<iframe>` hacia `Navegar_N`. En 2008, Tipo K → M → Departamento muestra a Loreto con S/ 97 371 376 (captura del usuario): el detalle de 2007–2011 existe, y el lector no lo veía porque no enviaba el año del formulario (`DrpYear`). **Serie anual completa (21/10/2026, Loreto):** todos los controles en OK.
+- Canon por municipalidad 2003–hoy: resuelto con el MEF (sección 10).
 
-| Años | Detalle municipal | MEF / PERUPETRO |
+## 10. Canon por municipalidad y por nivel de gobierno (MEF, 21–22/10/2026)
+
+**Por qué el MEF.** PERUPETRO publica el canon por municipalidad solo en 1993–2002 (Excel de Distribución) y el año en curso (Canon Municipalidades). Desde 2003 entrega el total municipal a un intermediario: el CND hasta 2006 y la PCM desde 2007. El reparto se toma de la **Consulta Amigable de Ingresos** del MEF (`https://apps5.mineco.gob.pe/transparenciaingresos/mensual/`), monto **recaudado** por cada entidad.
+
+**Cómo funciona el lector** (`mef/lector_mef.py`, notebook `PP_MEF_Canon_Municipal.ipynb`, generador `mef/mk_nb_mef.py`, simulador `mef/mock_mef.py`):
+- La consulta funciona con botones (postback ASP.NET). **Los filtros en la URL se ignoran**, también en la de «Exportar» (`_tgt=xls`): devolvían el total del país.
+- El lector hace lo mismo que el navegador, con `requests`:
+  - abre `default.aspx?y=AAAA` y toma el marco del año: `<iframe>` hacia `Navegar_N.aspx` en los años recientes, `<frame src="Navegar.aspx">` en 2003;
+  - en cada paso envía el formulario con **todos sus campos**: `__VIEWSTATE`, `__EVENTVALIDATION`, el año (`DrpYear`), la fila elegida (`grp1`) y el botón de la dimensión siguiente.
+- Cada paso se valida con el historial (breadcrumb) y la cabecera. Detalles:
+  - las filas de mes traen comillas («1: 'Enero'») y se comparan sin signos;
+  - la cabecera «Gobiernos Locales / Mancomunidades» equivale al botón «Gob.Loc./Mancom.».
+- Pausa de 1,5–3 s entre consultas. Ante un **HTTP 403** (bloqueo) se detiene con un aviso.
+
+**Rutas por periodo** (confirmadas con capturas del usuario):
+
+| Años | Ruta | Detalle municipal |
 |---|---|---|
-| 2003–2004 | sin detalle | — |
+| 2003 | Fuente 01 → Tipo 4 → **Sector 01 PCM → Pliego 013 CND** (S/ 166 368 386); no hay «Nivel de Gobierno» | no |
+| 2004 | Fuente 01 → Tipo 4 → Sector → Pliego (sin nivel) | no |
+| 2005 | Fuente «01: CANON Y SOBRECANON» → Tipo 4 + **«0: NORMAL»** (todos los canones) → Nivel M → Departamento → Municipalidad | sí; NORMAL rotulado «todos los canones» |
+| 2006 | Fuente «01: CANON, SOBRECANON, REGALIAS Y PARTICIPACIONES» → igual que 2005 | sí |
+| 2007–2011 | Fuente 5 → Rubro 18 → Tipos **5** y **K** → Nivel M → Departamento → Municipalidad | sí |
+| 2012–hoy | Igual, pero Nivel M → **Gob.Loc./Mancom. «M»** → Departamento; los **gobiernos regionales** no tienen «Departamento»: Sector → **Pliego** («Gobierno Regional del Departamento de …») | sí |
+
+- El tipo «0: CANON» de 2007+ **no** se usa como respaldo: en 2008 da a los gobiernos locales de Loreto solo S/ 1 178 540; el canon petrolero va por 5 y K.
+- **Cusco** se mantiene (pedido del usuario), con su canon **gasífero** (Camisea): para Cusco se leen también los tipos «GASIFERO», cada fila con su tipo.
+- La opción «LOS 6 PETROLEROS» recorre Loreto, Ucayali, Piura, Tumbes, Huánuco y Cusco.
+
+**Salidas** (se acumulan en Drive):
+- `DATA/PP_canon_nivel_gobierno_mef_anio.csv`: niveles E, M, R, total país y por departamento; en 2003–2004, el reparto por sector y pliego. Control: `CONTROL PP canon_nivel_gobierno_mef.csv` (suma de niveles = total del tipo).
+- `DATA/PP_canon_municipal_mef_anio.csv`: municipalidad × año × tipo. Control: `CONTROL PP canon_municipal_mef.csv`, contra el total del departamento en el MEF y el total municipal de PERUPETRO.
+- **Versión mensual** (`DETALLE = "Anual y mensual"`): `PP_canon_municipal_mef_mes.csv`, `PP_canon_nivel_gobierno_mef_mes.csv` y `CONTROL PP canon_mef_mes.csv` (suma de meses = año). Programada, pero aún sin corrida real completa.
+
+**Resultados (corridas del 21–22/10/2026):** serie anual 2003–2026 de los 6 departamentos, **todos los controles en OK** (municipalidades = total del MEF, diferencias < S/ 1; niveles = total del tipo).
+
+| Loreto | Detalle municipal | MEF / PERUPETRO |
+|---|---|---|
+| 2003–2004 | sin detalle (2003: S/ 166,37 millones al CND) | — |
 | 2005 | 53 filas, S/ 75,87 millones (tipo 4 S/ 0,91 + NORMAL S/ 74,96) | 0,77 |
 | 2006 | 51 filas, S/ 168,56 millones | 1,48 |
 | 2007 | 51 filas, S/ 72,25 millones | 0,61 |
-| 2008 | 102 filas (K + 5), S/ 168,91 millones | 1,26 |
-| 2009–2026 | — | entre 0,96 y 1,66 |
+| 2008 | 102 filas (K S/ 97,37 + 5 S/ 71,54), S/ 168,91 millones | 1,26 |
+| 2009–2026 | 52–71 filas por año | entre 0,96 y 1,66 |
 
-Pendiente: ver si en 2008 los tipos K (Loreto S/ 97,37 millones) y 5 son ingresos distintos o el mismo monto registrado dos veces. **Versión mensual**: `DETALLE = "Anual y mensual"` agrega `PP_canon_municipal_mef_mes.csv` (ruta Tipo → Nivel M → [Gob. local] → Mes → Departamento → Municipalidad) y `PP_canon_nivel_gobierno_mef_mes.csv` (Tipo → Mes → Nivel); control en `CONTROL PP canon_mef_mes.csv` (suma de meses = año). **Gobiernos regionales desde 2012 (21/10/2026).** En `Navegar_6`, bajo «Gobiernos Regionales» no hay botón «Departamento», solo «Sector» y «Gob.Loc./Mancom.». Por eso la primera corrida no tuvo el nivel R por departamento desde 2012. El lector ahora baja por Sector → Pliego y asigna cada pliego al departamento que nombra («Gobierno Regional del Departamento de Loreto»). Hay que volver a correr 2012–2026. El gobierno nacional (E) solo se desagrega por departamento en 2007–2011; el mapa no lo muestra en la vista por departamento. **Cusco (21/10/2026):** se mantiene entre los 6 departamentos, con su canon **gasífero** (Camisea). Para Cusco el lector toma también los tipos de canon gasífero del MEF, cada fila con su tipo; en el mapa aparecen con la fuente «MEF … canon gasífero». Para los demás departamentos sigue solo el canon petrolero. Antes del detalle municipal registra la **distribución por nivel de gobierno** (E, M, R; total país y por departamento) → `DATA/PP_canon_nivel_gobierno_mef_anio.csv`, control `CONTROL PP canon_nivel_gobierno_mef.csv` (suma de niveles = total del tipo). Código en `HIDROCARBUROS/mef/lector_mef.py` (simulador `mef/mock_mef.py`; generador del notebook `mef/mk_nb_mef.py`) → `DATA/PP_canon_municipal_mef_anio.csv` y `CONTROL/CONTROL PP canon_municipal_mef.csv` (vs. total de Loreto en el MEF y vs. total municipal de PERUPETRO). Pendiente: primera corrida real. Primer cotejo manual 2007: tipo 5, municipalidades de Loreto S/ 72,2 millones recaudados frente a S/ 118,0 millones transferidos por PERUPETRO (a explicar con la corrida: fechas, tipo K u otros registros).
+**Pendientes:** sección 6, punto 3: 2008–2011 con K + 5, diferencias con PERUPETRO y canon gasífero de Cusco.
 
-## Actualización automática (22/10/2026)
+**Canon y gobierno nacional (aclaración del 22/10/2026).**
+- El canon petrolero va solo a beneficiarios regionales y locales.
+- El Tesoro Público recibe el saldo de las regalías que cobra PERUPETRO, después de pagar el canon y sus costos.
+- En el MEF aparece canon en el nivel «E: Gobierno Nacional» porque las universidades nacionales, el IIAP y los institutos son entidades del gobierno nacional; no es el Tesoro. Ejemplo: 2004, «Educación → U.N. de Ucayali».
 
-GitHub Actions corre los notebooks sin Colab:
-- **Diario (06:17, hora de Lima):** producción → mapas.
-- **Mensual (día 5):** además, el canon municipal del MEF del año anterior y el actual.
+**En el mapa** (`mapa_lotes.md`; pestaña «Canon y sobrecanon»):
+- Vistas agrupadas por alcance: **Lote N** (generado por el lote), **Departamento (todos sus lotes)** (por beneficiario, por nivel de gobierno) y **Donde está el lote** (municipalidades del lote). Bajo cada título hay una línea «📍 Alcance».
+- «Por nivel de gobierno» muestra **solo PERUPETRO** (transferido, beneficiarios agrupados). La opción del MEF se quitó a pedido del usuario; el recaudado del MEF por nivel queda en el CSV.
+- «Municipalidades del lote» usa el MEF en los años sin detalle de PERUPETRO. Tiene una **franja de color con la fuente de cada periodo** y líneas punteadas en cada cambio de fuente.
+- En todo el panel hay **Desde / Hasta**.
+- El botón de producción pasó al selector de capas, bajo «Productos». El panel muestra las mismas pestañas desde el botón y desde un lote.
+- El mapa volvió a sus colores anteriores; la paleta del proyecto queda solo en las estadísticas.
 
-Guarda en las mismas carpetas de Drive. Usa una credencial OAuth de Drive del usuario en el secreto `GOOGLE_DRIVE_CREDENCIAL`. No se usa una cuenta de servicio porque las cuentas de servicio no tienen espacio propio para crear archivos en un Drive personal. Detalle y pasos en `HIDROCARBUROS/automatizacion/README.md`.
+## 11. Actualización automática (22/10/2026)
+
+**GitHub Actions** corre los notebooks sin Colab y guarda en las mismas carpetas de Drive:
+
+| Cuándo | Modo | Qué corre |
+|---|---|---|
+| Todos los días, 06:17 (Lima) | `diario` | `PP_Produccion_Lotes.ipynb` → `PP_Mapa_Lotes_Plus.ipynb` (mapa simple y Plus) |
+| Día 5 de cada mes | `mensual` | lo anterior + `PP_MEF_Canon_Municipal.ipynb` (año anterior y actual, «LOS 6 PETROLEROS», anual) |
+| A mano | el que se elija | GitHub → Actions → «Hidrocarburos · actualización» → Run workflow |
+
+**Piezas:**
+- Flujo: `.github/workflows/hidrocarburos_actualizar.yml`.
+- Ejecutor: `HIDROCARBUROS/automatizacion/ejecutar_notebooks.py`. Ejecuta las celdas en orden, quita `!pip`, cambia `/content/` por una carpeta de trabajo, sustituye `google.colab` e inyecta `display`.
+- Librerías: `automatizacion/requirements.txt`.
+- Guía paso a paso: `automatizacion/README.md`.
+- **Credencial de Drive:**
+  - credencial OAuth de la cuenta del usuario, en el secreto `GOOGLE_DRIVE_CREDENCIAL`;
+  - se genera con `automatizacion/PP_Credencial_Drive.ipynb`, con el proyecto de Google Cloud «pp-automatizacion» y la app «Hidrocarburos Perú» publicada «En producción»;
+  - no se usa una cuenta de servicio, porque no tiene espacio para crear archivos en un Drive personal;
+  - el secreto del cliente se mostró una vez en una captura y se recomendó cambiarlo.
+
+**Primeras ejecuciones:**
+- **#1 (22/10/2026):** producción ✅ (44 min). El mapa ❌: el visor ArcGIS de PERUPETRO (`perupetro.maps.arcgis.com`) respondió «Invalid URL» desde GitHub. Corregido:
+  - si el visor no responde, el mapa sigue con el geoportal (WFS);
+  - si ninguna fuente de lotes responde, usa los polígonos de la corrida anterior (`DATA/MAPA/PP_lotes_indicadores.geojson`).
+- **#2 (22/10/2026): ✅ completa.** Producción 56,4 min y mapas 6,3 min, con 53 lotes y los dos HTML en DATA/MAPA (2,3 y 2,4 MB). Los mapas también se descargan como artefacto de cada ejecución (14 días).
+
+**A tener en cuenta:**
+- **Repositorio público:**
+  - GitHub Actions no tiene límite de minutos (cada corrida diaria toma ~63 min);
+  - los registros son visibles, pero no muestran la credencial;
+  - GitHub **pausa las tareas programadas tras 60 días sin cambios** en el repositorio: avisa por correo y se reactiva con «Enable workflow».
+- Si falla, GitHub avisa por correo. Si PERUPETRO o el MEF bloquean a GitHub, el paso sale ❌ y los demás siguen.
+- Pendiente: revisar las condiciones de uso del portal de PERUPETRO para la descarga automática diaria.
