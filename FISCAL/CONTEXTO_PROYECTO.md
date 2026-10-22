@@ -249,6 +249,7 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
   - Arriba de cada hoja: el total de inversión de cada nivel de gobierno (G.N., G.R., G.L.) y de los tres juntos, contra el mismo periodo del año anterior. Equivale a la vista del MEF Genérica 6-26 > Mes > Departamento (Meta) > Nivel de Gobierno.
   - Luego, los 5 mayores aumentos y las 5 mayores caídas del devengado de la genérica 2.6, **ordenados por monto en soles corrientes, no por %**.
   - Columnas: `# | Ítem | periodo anterior | periodo actual | Diferencia S/ | Var. %`. `Var. %` es referencial.
+  - Solo se listan ítems que de verdad subieron (o bajaron). Si son menos de 5, una nota lo aclara, por ejemplo "Solo 2 funciones aumentaron en este periodo".
   - Bloques por departamento: todos los niveles juntos (nivel · función), G.N., G.R. y G.L. por función, y G.L. por municipalidad.
   - Comparaciones: el último mes contra el mismo mes del año anterior, y el acumulado Ene.-Mes contra el del año anterior. La comparación contra el mes anterior se quitó a pedido del usuario; se reactiva agregando `"MES_ANTERIOR"` a `VARIACIONES_COMPARACIONES`.
   - Cada cuadro (todos los niveles, G.N., G.R., G.L. y municipalidades) trae debajo de los encabezados la fila del total de su nivel, o de los tres niveles.
