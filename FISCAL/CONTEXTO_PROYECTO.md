@@ -32,6 +32,8 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 | `DEV_Funcion_Municipalidad_LOR_SMN_UCA.ipynb` | Devengado mensual | M: Municipalidades | LOR, SMN, UCA | Depto → Función → Municipalidad |
 | `PIM_Funcion_LOR_SMN_UCA.ipynb` | PIM anual | E, M y R (los tres) | LOR, SMN, UCA | Depto (Meta) → Función, por nivel |
 | `PIM_Funcion_Municipalidad_LOR_SMN_UCA.ipynb` | PIM anual | M: Municipalidades | LOR, SMN, UCA | Depto → Función → Municipalidad |
+| `Fiscal_Scraper.ipynb` | Devengado mensual y PIM (unificado) | E, R y M | LOR, SMN, UCA | ver §12 |
+| `Fiscal_Proyectos.ipynb` | Top 5 proyectos por función (mensual) | E, R y M | LOR, SMN, UCA | Depto (Meta) → Nivel → Función → Proyecto |
 
 Para abrir cualquiera en Colab:
 `https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/FISCAL/<NOMBRE>.ipynb`
@@ -260,6 +262,14 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
   - Si a un nivel le falta algún mes de los que se comparan, la tabla dice "Sin datos para comparar" y se avisa en pantalla; no se asume 0.
   - Se sube con la API de Drive (Colab pide autorizar la cuenta, que necesita permiso de Editor). Si la subida falla, se guarda una copia en `Fiscal/Procesamiento/output/`.
   - Parámetros en el Bloque 2: `VARIACIONES_FOLDER_ID`, `VARIACIONES_TOP` y `VARIACIONES_COMPARACIONES`.
+
+- **`Fiscal_Proyectos.ipynb`** muestra los proyectos detrás de las variaciones. Genera `Proyectos variaciones AAAA-MM.xlsx` en la carpeta de Drive `PROYECTOS_FOLDER_ID` (`1aUFb4bqz3ZU6_5bbTRYl4f0V4-nX2Cy2`).
+  - Lee los CSV `DEV Funcion.*` del scraper y, por departamento y nivel, compara el último mes con el mismo mes del año anterior. Solo hace la comparación mensual.
+  - Si el total del nivel subió, toma las 5 funciones de "▲ Mayores aumentos" y consulta el año actual. Si bajó, toma las 5 de "▼ Mayores caídas" y consulta el año anterior. Usa el mismo criterio que Variaciones alarmantes.
+  - Ruta en el MEF: Genérica 6-26 > Mes > Departamento (Meta) > Nivel > Función > Proyecto (clave `31`). Guarda los 5 proyectos con mayor devengado del mes.
+  - 15: Transporte junta los proyectos de las funciones 15 y 16.
+  - No cruza proyectos entre años: un proyecto que ya no figura en el año actual aparece en la consulta del año anterior. Lo decidió el usuario.
+  - Hace unas 45 consultas al MEF; el breadcrumb valida nivel, departamento y función. Hojas: una por departamento y `DETALLE`.
 
 ---
 
