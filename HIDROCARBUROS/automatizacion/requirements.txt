@@ -1,0 +1,19 @@
+# Librerías que instalan los notebooks en Colab (líneas «!pip») más las que Colab ya trae
+pandas
+requests
+certifi
+cryptography
+beautifulsoup4
+pdfplumber
+pypdf
+xlrd
+openpyxl
+ipython
+ipywidgets
+google-api-python-client
+google-auth
+google-auth-httplib2
+geopandas
+pyogrio
+shapely
+folium
