@@ -47,3 +47,10 @@ Los notebooks corren con sus **valores por defecto**, como «Ejecutar todo» en 
   - Los demás pasos siguen, y el mapa se arma con lo que ya hay en Drive.
 - **Uso:** si el repositorio es privado, GitHub Actions tiene minutos gratis limitados al mes; si es público, no hay límite. Revisa en Settings → Billing cuánto toma cada corrida y, si hace falta, cambia el horario diario a días hábiles.
 - **Condiciones de uso:** antes de dejarlo corriendo a diario, revisa las del portal de PERUPETRO (descarga automática de sus estadísticas).
+
+## Primera ejecución (22/10/2026)
+
+- **Producción:** ✅ OK (44 min). Desde GitHub se conectó bien a PERUPETRO y a Drive.
+- **Mapas:** ❌ El visor ArcGIS de PERUPETRO (perupetro.maps.arcgis.com) respondió «Invalid URL» desde GitHub. Desde Colab sí responde.
+  - El notebook del mapa ya no se detiene por eso: sigue con el geoportal de PERUPETRO (WFS).
+  - Si hoy ninguna fuente de lotes responde, usa los polígonos de la corrida anterior guardados en `DATA/MAPA/PP_lotes_indicadores.geojson` y lo avisa en el registro.
