@@ -25,7 +25,7 @@ Los notebooks corren con sus **valores por defecto**, como «Ejecutar todo» en 
 - **Drive:** DATA, CONTROL y DATA/MAPA, igual que con Colab.
 - **GitHub, en cada ejecución:**
   - el **resumen** con cada paso y su estado (✅/❌) y los minutos que tomó;
-  - el archivo **«mapas-y-resumen»**, con los HTML de los mapas, descargable por 14 días.
+  - el archivo **«Mapa de Hidrocarburos - Perú»**: el mapa Plus en un solo HTML, descargable por 14 días. GitHub lo entrega dentro de un .zip; se descomprime y se abre con doble clic.
 - Si algo falla, GitHub te envía un correo (lo hace por defecto con las ejecuciones fallidas).
 
 ## Archivos

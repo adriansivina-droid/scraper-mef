@@ -68,14 +68,20 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: python HIDROCARBUROS/automatizacion/ejecutar_notebooks.py "${{ steps.modo.outputs.modo }}"
 
-      - name: Guardar mapas y resumen (descargables desde la ejecución)
+      - name: Preparar el mapa para descargar
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/descarga"
+          if [ -f "$RUNNER_TEMP/pp/PP_Mapa/PP_mapa_lotes_plus.html" ]; then
+            cp "$RUNNER_TEMP/pp/PP_Mapa/PP_mapa_lotes_plus.html" "$RUNNER_TEMP/descarga/Mapa de Hidrocarburos - Perú.html"
+          fi
+
+      - name: Guardar el mapa (descargable desde la ejecución)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mapas-y-resumen
-          path: |
-            ${{ runner.temp }}/pp/PP_Mapa/*.html
-            ${{ runner.temp }}/pp/resumen_actualizacion.json
+          name: Mapa de Hidrocarburos - Perú
+          path: ${{ runner.temp }}/descarga/Mapa de Hidrocarburos - Perú.html
           retention-days: 14
           if-no-files-found: ignore
 
