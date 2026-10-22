@@ -241,6 +241,21 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 
 ---
 
-## 12. Proyecto Exportaciones (Infotrade · PROMPERÚ)
+## 12. Flujo unificado: `Fiscal_Scraper` + `Fiscal_Procesamiento`
+
+- `Fiscal_Scraper.ipynb`: un solo notebook que reemplaza a los scrapers DEV/PIM de LOR-SMN-UCA. Monta Drive y guarda en `MyDrive/Fiscal/Scrapeo/output/` (DEVENGADO por nivel, PIM, CARPETA DE CONTROL).
+- `Fiscal_Procesamiento.ipynb`: lee esos CSV más `Fiscal/Procesamiento/input/IPC.xlsx` y genera `Fiscal-<Depto>_AUTO.xlsx` en `Fiscal/Procesamiento/output/`.
+- **Bloque 6 · Variaciones alarmantes** (en el Procesamiento): crea `Variaciones alarmantes AAAA-MM.xlsx` en la carpeta de Drive `VARIACIONES_FOLDER_ID` (`1LgIhySIoywZDMTGPyD9rvjiBHc1FYvDl`).
+  - Muestra los 5 mayores aumentos y las 5 mayores caídas del devengado de la genérica 2.6, **en soles corrientes, no en %**.
+  - Bloques por departamento: todos los niveles juntos (nivel · función), G.N., G.R. y G.L. por función, y G.L. por municipalidad.
+  - Comparaciones: el último mes contra el mismo mes del año anterior y contra el mes anterior, y el acumulado Ene.-Mes contra el del año anterior.
+  - Hojas: `RESUMEN` (criterio y avisos), una por departamento y `DETALLE` (todas las variaciones, con filtro).
+  - Si a un nivel le falta algún mes de los que se comparan, se omite y se avisa; no se asume 0.
+  - Se sube con la API de Drive (Colab pide autorizar la cuenta, que necesita permiso de Editor). Si la subida falla, se guarda una copia en `Fiscal/Procesamiento/output/`.
+  - Parámetros en el Bloque 2: `VARIACIONES_FOLDER_ID`, `VARIACIONES_TOP` y `VARIACIONES_COMPARACIONES`.
+
+---
+
+## 13. Proyecto Exportaciones (Infotrade · PROMPERÚ)
 
 Es un proyecto aparte, con su propio documento de contexto: **`EXPORT/exportaciones_scraper_infotrade.md`**. Allí están la API descubierta, el notebook `EXPORT/EXP_Infotrade_Exportaciones.ipynb`, las carpetas de Drive, el control y los pendientes.
