@@ -324,7 +324,7 @@ Desde la sesión de Claude Code **no se puede abrir perupetro.com.pe** (el proxy
 - **#1 (22/10/2026):** producción ✅ (44 min). El mapa ❌: el visor ArcGIS de PERUPETRO (`perupetro.maps.arcgis.com`) respondió «Invalid URL» desde GitHub. Corregido:
   - si el visor no responde, el mapa sigue con el geoportal (WFS);
   - si ninguna fuente de lotes responde, usa los polígonos de la corrida anterior (`DATA/MAPA/PP_lotes_indicadores.geojson`).
-- **#2 (22/10/2026): ✅ completa.** Producción 56,4 min y mapas 6,3 min, con 53 lotes y los dos HTML en DATA/MAPA (2,3 y 2,4 MB). Los mapas también se descargan como artefacto de cada ejecución (14 días).
+- **#2 (22/10/2026): ✅ completa.** Producción 56,4 min y mapas 6,3 min, con 53 lotes y los dos HTML en DATA/MAPA (2,3 y 2,4 MB). El mapa Plus también se descarga desde cada ejecución como **«Mapa de Hidrocarburos - Perú»** (un solo HTML, 14 días); la pestaña del navegador también lleva ese título.
 
 **A tener en cuenta:**
 - **Repositorio público:**
