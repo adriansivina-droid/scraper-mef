@@ -1,0 +1,84 @@
+# Actualización automática del Proyecto Petróleo (HIDROCARBUROS/): corre los notebooks sin Colab y guarda todo en Drive.
+#   · diario (06:17 hora de Lima): producción de PERUPETRO (incluye la diaria, canon y regalías) → mapas
+#   · mensual (el día 5): además, el canon municipal del MEF del año anterior y el actual
+#   · a mano: Actions → «Hidrocarburos · actualización» → Run workflow (eliges diario o mensual)
+# Requiere el secreto GOOGLE_DRIVE_CREDENCIAL (ver HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb).
+name: Hidrocarburos · actualización
+
+on:
+  schedule:
+    - cron: "17 11 * * *"          # 11:17 UTC = 06:17 en Lima
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "Qué actualizar"
+        type: choice
+        options: [diario, mensual]
+        default: diario
+
+concurrency:
+  group: hidrocarburos-actualizar
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: HIDROCARBUROS/automatizacion/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r HIDROCARBUROS/automatizacion/requirements.txt
+
+      - name: Credencial de Drive
+        env:
+          CRED: ${{ secrets.GOOGLE_DRIVE_CREDENCIAL }}
+        run: |
+          if [ -z "$CRED" ]; then
+            echo "::error::Falta el secreto GOOGLE_DRIVE_CREDENCIAL (ver HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb)"
+            exit 1
+          fi
+          printf '%s' "$CRED" > "$RUNNER_TEMP/drive.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/drive.json" >> "$GITHUB_ENV"
+
+      - name: Elegir modo
+        id: modo
+        env:
+          MODO_MANUAL: ${{ inputs.modo }}
+        run: |
+          M="$MODO_MANUAL"
+          if [ -z "$M" ]; then
+            if [ "$(TZ=America/Lima date +%d)" = "05" ]; then M=mensual; else M=diario; fi
+          fi
+          echo "modo=$M" >> "$GITHUB_OUTPUT"
+          echo "Modo: $M"
+
+      - name: Ejecutar notebooks
+        env:
+          PP_TRABAJO: ${{ runner.temp }}/pp
+          PYTHONUNBUFFERED: "1"
+        run: python HIDROCARBUROS/automatizacion/ejecutar_notebooks.py "${{ steps.modo.outputs.modo }}"
+
+      - name: Guardar mapas y resumen (descargables desde la ejecución)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapas-y-resumen
+          path: |
+            ${{ runner.temp }}/pp/PP_Mapa/*.html
+            ${{ runner.temp }}/pp/resumen_actualizacion.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Borrar la credencial
+        if: always()
+        run: rm -f "$RUNNER_TEMP/drive.json"
