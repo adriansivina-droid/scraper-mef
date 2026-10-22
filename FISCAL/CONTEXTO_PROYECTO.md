@@ -251,8 +251,9 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
   - Columnas: `# | Ítem | periodo anterior | periodo actual | Diferencia S/ | Var. %`. `Var. %` es referencial.
   - Bloques por departamento: todos los niveles juntos (nivel · función), G.N., G.R. y G.L. por función, y G.L. por municipalidad.
   - Comparaciones: el último mes contra el mismo mes del año anterior, y el acumulado Ene.-Mes contra el del año anterior. La comparación contra el mes anterior se quitó a pedido del usuario; se reactiva agregando `"MES_ANTERIOR"` a `VARIACIONES_COMPARACIONES`.
-  - Hojas: `RESUMEN` (criterio y avisos), una por departamento y `DETALLE` (todas las variaciones, con filtro).
-  - Si a un nivel le falta algún mes de los que se comparan, se omite y se avisa; no se asume 0.
+  - Cada cuadro (todos los niveles, G.N., G.R., G.L. y municipalidades) trae debajo de los encabezados la fila del total de su nivel, o de los tres niveles.
+  - Hojas: una por departamento y `DETALLE` (todas las variaciones, con filtro). La hoja `RESUMEN` se eliminó a pedido del usuario; los avisos de datos faltantes se muestran en pantalla al correr el bloque.
+  - Si a un nivel le falta algún mes de los que se comparan, la tabla dice "Sin datos para comparar" y se avisa en pantalla; no se asume 0.
   - Se sube con la API de Drive (Colab pide autorizar la cuenta, que necesita permiso de Editor). Si la subida falla, se guarda una copia en `Fiscal/Procesamiento/output/`.
   - Parámetros en el Bloque 2: `VARIACIONES_FOLDER_ID`, `VARIACIONES_TOP` y `VARIACIONES_COMPARACIONES`.
 
