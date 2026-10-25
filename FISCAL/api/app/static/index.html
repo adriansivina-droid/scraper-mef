@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>API Fiscal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/estilo.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="brand"><div class="brand-mark">S/</div><div><b>API Fiscal</b><span>Inversión pública · MEF</span></div></div>
+      <div class="menu" id="menu">
+        <button class="menu-btn" id="menu-btn" type="button" aria-haspopup="true" aria-expanded="false"><span class="menu-txt"><small>Sección</small><b id="menu-actual">Bases de datos</b></span><span class="chev" aria-hidden="true"></span></button>
+        <div class="menu-panel" id="menu-panel" role="menu" hidden>
+          <div class="nav-label">Descargar</div>
+          <button class="nav-item" id="nav-descargas" data-sec="descargas" role="menuitem"><b>Bases de datos</b><span>Lo que baja el scraper, en Excel</span></button>
+          <button class="nav-item" role="menuitem" disabled><b>Reportes procesados <span class="prox">pronto</span></b><span>Cuadros, variaciones y proyectos ya armados</span></button>
+          <div class="nav-label">Analizar</div>
+          <button class="nav-item" role="menuitem" disabled><b>Variaciones <span class="prox">pronto</span></b><span>Mayores aumentos y caídas del mes</span></button>
+          <button class="nav-item" role="menuitem" disabled><b>Proyectos <span class="prox">pronto</span></b><span>Qué proyectos explican el cambio</span></button>
+          <div class="nav-label">Actualizar</div>
+          <button class="nav-item" id="nav-actualizar" data-sec="actualizar" role="menuitem"><b>Actualizar base de datos</b><span>Estado actual y carga de datos</span></button>
+        </div>
+      </div>
+      <div class="topbar-meta" id="datos-hasta"></div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="wrap">
+      <header>
+        <h1 id="titulo">Bases de datos</h1>
+        <p class="lead" id="lead"></p>
+      </header>
+
+      <!-- ── Descargar bases ── -->
+      <section class="card" id="sec-descargas-opciones" aria-labelledby="t-opciones">
+        <div class="card-head"><h2 id="t-opciones">Elige qué necesitas</h2></div>
+        <div class="card-body">
+          <div class="params" id="params"></div>
+          <div class="actions">
+            <button class="btn btn-primary" id="descargar" type="button">Descargar Excel</button>
+            <span class="hint" id="nota-descarga" aria-live="polite"></span>
+          </div>
+        </div>
+      </section>
+      <section class="card" id="sec-descargas-vista" aria-labelledby="t-vista">
+        <div class="card-head"><h2 id="t-vista">Vista previa</h2></div>
+        <div class="card-body" id="vista"></div>
+      </section>
+
+      <!-- ── Actualizar base de datos ── -->
+      <section class="card" id="sec-actualizar-estado" aria-labelledby="t-estado" hidden>
+        <div class="card-head"><h2 id="t-estado">Estado actual de la base de datos</h2><span class="hint">se actualiza solo</span></div>
+        <div class="card-body" id="estado"></div>
+      </section>
+      <section class="card" id="sec-actualizar-carga" aria-labelledby="t-carga" hidden>
+        <div class="card-head"><h2 id="t-carga">Cargar archivos del scraper</h2></div>
+        <div class="card-body">
+          <p class="hint">Sube el <b>.zip de la carpeta Fiscal/Scrapeo/output</b> (en Drive: clic derecho sobre la carpeta → Descargar), CSV sueltos del scraper o <b>PIM_Funcion.xlsx</b>. Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.</p>
+          <div class="subida">
+            <input type="file" id="archivos" multiple accept=".zip,.csv,.xlsx">
+            <button class="btn btn-primary" id="cargar" type="button">Cargar a la base de datos</button>
+          </div>
+          <div id="resultado-carga" aria-live="polite"></div>
+          <p class="hint">Próximamente (fase 2): el scraper correrá aquí mismo, cada mes y a pedido, sin pasar por Colab.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const NOMBRE_MES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
+  const LSU = ["16", "22", "25"];
+  const etqMes = (ym) => ym && ym.length === 7 ? `${NOMBRE_MES[+ym.slice(5) - 1]} ${ym.slice(0, 4)}` : (ym || "—");
+  const titulo = (n) => (n.charAt(0) + n.slice(1).toLowerCase().replace(/ (\S)/g, (m, c) => " " + c.toUpperCase())).replace(/ De /g, " de ");
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const fmt = (v) => v == null ? "" : Math.round(v).toLocaleString("en-US");
+  const NIVEL_TXT = { nacional: "Nacional", regional: "Regional", locales: "Locales" };
+
+  let CAT = null, ESTADO = null, MESES = [], hojaActiva = null, abierto = null, temporizador = null, ultimaVista = null;
+  const v = { base: ["inv-dev-funcion", "inv-pim-funcion"], departamento: LSU.slice(), nivel: ["nacional", "regional", "locales"], desde: "2025-01", hasta: null, formato: "xlsx" };
+
+  async function api(url, opciones) {
+    const r = await fetch(url, opciones);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : `El servidor respondió ${r.status}.`);
+    return j;
+  }
+  const consulta = () => new URLSearchParams({ base: v.base.join(","), departamento: v.departamento.join(","), nivel: v.nivel.join(","), desde: v.desde, hasta: v.hasta }).toString();
+  const basePor = (id) => CAT.bases.find((b) => b.id === id);
+
+  // ── Listas desplegables con casillas ──
+  function opciones(id) {
+    if (id === "base") {
+      const ops = [];
+      Object.entries(CAT.grupos).forEach(([g, t]) => { ops.push(["#" + g, t]); CAT.bases.filter((b) => b.grupo === g).forEach((b) => ops.push([b.id, b.etiqueta])); });
+      return ops;
+    }
+    if (id === "departamento") return CAT.departamentos.map((d) => [d.codigo, titulo(d.nombre)]);
+    return CAT.niveles.map((n) => [n, NIVEL_TXT[n]]);
+  }
+  function resumen(id) {
+    const ops = opciones(id).filter(([k]) => !k.startsWith("#")), vals = v[id];
+    if (!vals.length) return id === "base" ? "Ninguna" : "Ninguno";
+    if (vals.length === ops.length) return id === "departamento" ? `Todos (${ops.length})` : id === "base" ? `Todas (${ops.length})` : "Todos";
+    const nombres = ops.filter(([k]) => vals.includes(k)).map(([k, t]) => id === "base" ? basePor(k).nombre : t);
+    return nombres.length <= 3 ? nombres.join(", ") : `${nombres.length} marcados`;
+  }
+  const RAPIDOS = {
+    base: () => [["Toda la inversión", CAT.bases.filter((b) => b.grupo === "inversion").map((b) => b.id)], ["Todo el gasto", CAT.bases.filter((b) => b.grupo === "gasto").map((b) => b.id)], ["Todas", CAT.bases.map((b) => b.id)], ["Ninguna", []]],
+    departamento: () => [["Todos", CAT.departamentos.map((d) => d.codigo)], ["Loreto · San Martín · Ucayali", LSU], ["Ninguno", []]],
+    nivel: () => [["Todos", CAT.niveles.slice()], ["Ninguno", []]],
+  };
+  function lista(id, etiqueta) {
+    const ops = opciones(id);
+    return `<div class="field"><span class="flabel" id="l-${id}">${etiqueta}</span><div class="ms" data-ms="${id}">
+      <button type="button" class="ms-btn" id="ms-${id}" aria-haspopup="true" aria-expanded="false" aria-labelledby="l-${id} ms-${id}"><span id="r-${id}">${esc(resumen(id))}</span><span class="chev" aria-hidden="true"></span></button>
+      <div class="ms-panel" hidden><div class="ms-quick">${RAPIDOS[id]().map(([t], i) => `<button type="button" data-rapido="${id}|${i}">${esc(t)}</button>`).join("")}</div>
+      <div class="ms-list">${ops.map(([k, t]) => k.startsWith("#") ? `<div class="ms-grupo">${esc(t)}</div>`
+        : `<label class="ms-op"><input type="checkbox" data-chk="${id}" value="${k}"${v[id].includes(k) ? " checked" : ""}><span>${esc(t)}</span></label>`).join("")}</div></div></div></div>`;
+  }
+  const selector = (id, etiqueta, ops) => `<div class="field"><label class="flabel" for="p-${id}">${etiqueta}</label><select id="p-${id}" data-p="${id}">${ops.map(([k, t]) => `<option value="${k}"${k === v[id] ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div>`;
+
+  function cerrarListas() {
+    abierto = null;
+    document.querySelectorAll(".ms-panel").forEach((p) => { p.hidden = true; });
+    document.querySelectorAll(".ms-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+  }
+  function renderParams() {
+    const meses = MESES.map((m) => [m, etqMes(m)]);
+    $("params").innerHTML = lista("base", "Bases") + lista("departamento", "Departamentos") + lista("nivel", "Nivel de Gobierno")
+      + selector("desde", "Desde", meses) + selector("hasta", "Hasta", meses)
+      + selector("formato", "Formato", [["xlsx", "Excel (.xlsx)"], ["csv", "CSV"], ["json", "JSON"]]);
+    const cambio = () => { ["base", "departamento", "nivel"].forEach((id) => { $("r-" + id).textContent = resumen(id); }); rotular(); pedirVista(); };
+    const marcar = (id, vals) => { v[id] = vals.slice(); document.querySelectorAll(`[data-chk="${id}"]`).forEach((x) => { x.checked = v[id].includes(x.value); }); cambio(); };
+    document.querySelectorAll("[data-chk]").forEach((x) => x.addEventListener("change", () => {
+      const id = x.dataset.chk; v[id] = [...document.querySelectorAll(`[data-chk="${id}"]`)].filter((c) => c.checked).map((c) => c.value); cambio(); }));
+    document.querySelectorAll("[data-rapido]").forEach((b) => b.addEventListener("click", () => { const [id, i] = b.dataset.rapido.split("|"); marcar(id, RAPIDOS[id]()[+i][1]); }));
+    document.querySelectorAll("[data-p]").forEach((s) => s.addEventListener("change", () => { v[s.dataset.p] = s.value; cambio(); }));
+    document.querySelectorAll(".ms-btn").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation(); const id = b.closest(".ms").dataset.ms, abrir = abierto !== id; cerrarListas();
+      if (abrir) { abierto = id; b.setAttribute("aria-expanded", "true"); b.nextElementSibling.hidden = false; } }));
+    document.querySelectorAll(".ms-panel").forEach((p) => p.addEventListener("click", (e) => e.stopPropagation()));
+    rotular();
+  }
+  function rotular() { $("descargar").textContent = `Descargar ${{ xlsx: "Excel", csv: "CSV", json: "JSON" }[v.formato]}`; $("nota-descarga").textContent = ""; }
+
+  // ── Vista previa (datos reales del API) ──
+  function pedirVista() {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(async () => {
+      $("vista").innerHTML = '<div class="loading"><span class="spin"></span>Buscando en la base de datos…</div>';
+      try { ultimaVista = await api("/v1/descargas/vista-previa?" + consulta()); renderVista(); $("descargar").disabled = false; }
+      catch (e) { ultimaVista = null; $("vista").innerHTML = `<div class="err-box"><b>Falta completar las opciones</b><span>${esc(e.message)}</span></div>`; $("descargar").disabled = true; }
+    }, 250);
+  }
+  function renderVista() {
+    const c = ultimaVista;
+    const a = c.archivos.find((x) => x.hoja === hojaActiva) || c.archivos[0];
+    hojaActiva = a.hoja;
+    const b = basePor(a.base), cols = a.columnas;
+    const filas = a.muestra.length ? a.muestra.map((f, i) => `<tr><th class="rn">${i + 2}</th>${cols.map((k) => {
+        const x = f[k], num = typeof x === "number";
+        return `<td class="${num ? "num" : ""}">${num && k !== "AÑO" ? fmt(x) : esc(x)}</td>`; }).join("")}</tr>`).join("")
+      : `<tr><th class="rn">2</th><td colspan="${cols.length}" class="vacia">No hay filas para estas opciones.</td></tr>`;
+    $("vista").innerHTML = `<div class="stats">
+        <div class="stat"><div class="k">Bases</div><div class="v">${c.archivos.length}</div><div class="s">${esc(c.archivos.map((x) => basePor(x.base).nombre).join(" · "))}</div></div>
+        <div class="stat"><div class="k">Filas</div><div class="v">${fmt(c.filas_total)}</div><div class="s">en total</div></div>
+        <div class="stat"><div class="k">Periodo</div><div class="v" style="font-size:22px">${esc(etqMes(v.desde))} a ${esc(etqMes(v.hasta))}</div><div class="s">las bases de PIM toman los años del rango</div></div></div>
+      ${c.avisos.map((x) => `<p class="hint">${esc(x)}</p>`).join("")}
+      <div class="xl"><div class="xl-bar"><span class="file">${esc(v.formato === "xlsx" ? c.descarga : v.formato === "csv" ? (c.archivos.length > 1 ? c.descarga.replace(".xlsx", ".zip") : "archivo .csv") : "respuesta JSON")}</span><span>${fmt(a.filas)} filas en la hoja «${esc(a.hoja)}»</span></div>
+        <div class="xl-grid"><table><colgroup><col style="width:40px">${b.anchos.map((w) => `<col style="width:${Math.round(w * 6 + 8)}px">`).join("")}</colgroup>
+          <tr class="letras"><th></th>${cols.map((_, i) => `<th>${String.fromCharCode(65 + i)}</th>`).join("")}</tr>
+          <tr><th class="rn">1</th>${cols.map((k) => `<td class="hdr">${k}</td>`).join("")}</tr>${filas}
+          ${a.filas > a.muestra.length ? `<tr><th class="rn">…</th><td colspan="${cols.length}" class="vacia">… ${fmt(a.filas - a.muestra.length)} filas más</td></tr>` : ""}</table></div>
+        <div class="xl-tabs" role="tablist">${c.archivos.map((x) => `<button type="button" role="tab" class="xl-tab" data-hoja="${esc(x.hoja)}" aria-selected="${x.hoja === a.hoja}">${esc(x.hoja)}</button>`).join("")}</div></div>`;
+    document.querySelectorAll(".xl-tab").forEach((t) => t.addEventListener("click", () => { hojaActiva = t.dataset.hoja; renderVista(); }));
+  }
+  $("descargar").addEventListener("click", () => {
+    if (!ultimaVista) return;
+    if (!ultimaVista.filas_total) { $("nota-descarga").textContent = "No hay filas para descargar con estas opciones."; return; }
+    window.location.href = `/v1/descargas?${consulta()}&formato=${v.formato}`;
+    $("nota-descarga").textContent = "Preparando el archivo… la descarga empieza en unos segundos.";
+  });
+
+  // ── Estado y carga ──
+  function datosHasta() {
+    const h = Object.values(ESTADO.bases).map((x) => x.hasta).filter((x) => x && x.length === 7).sort();
+    return h.length ? h[h.length - 1] : null;
+  }
+  function renderEstado() {
+    const hasta = datosHasta(), u = ESTADO.ultima_carga;
+    const deptos = new Set(Object.values(ESTADO.bases).flatMap((x) => x.departamentos));
+    $("datos-hasta").innerHTML = hasta ? `Datos hasta <b>${esc(etqMes(hasta))}</b>` : "Sin datos cargados";
+    $("estado").innerHTML = `<div class="stats">
+        <div class="stat"><div class="k">Datos hasta</div><div class="v">${esc(etqMes(hasta))}</div><div class="s">último mes con devengado</div></div>
+        <div class="stat"><div class="k">Departamentos</div><div class="v">${deptos.size}</div><div class="s">con alguna base cargada</div></div>
+        <div class="stat"><div class="k">Última carga</div><div class="v" style="font-size:22px">${u ? esc(new Date(u.fecha).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" })) : "—"}</div><div class="s">${u ? esc(u.origen) : "todavía no se cargó nada"}</div></div></div>
+      <div class="panel"><div class="scroll"><table>
+        <tr><th class="t">Base</th><th class="t">Grupo</th><th class="t">Datos</th><th class="t">Departamentos</th><th>Filas</th></tr>
+        ${CAT.bases.map((b) => { const x = ESTADO.bases[b.id], ds = x.departamentos;
+          return `<tr><td class="t">${esc(b.nombre)}</td><td class="t">${esc(CAT.grupos[b.grupo].split(" · ")[0])}</td>
+            <td class="t">${x.filas ? `${esc(etqMes(x.desde))} a ${esc(etqMes(x.hasta))}` : "sin datos"}</td>
+            <td class="t">${ds.length > 6 ? `${ds.length} departamentos` : ds.map((c) => titulo(CAT.departamentos.find((d) => d.codigo === c).nombre)).join(", ") || "—"}</td>
+            <td>${fmt(x.filas)}</td></tr>`; }).join("")}
+      </table></div></div>`;
+  }
+  $("cargar").addEventListener("click", async () => {
+    const archivos = $("archivos").files;
+    if (!archivos.length) { $("resultado-carga").innerHTML = '<div class="err-box"><b>Falta elegir los archivos</b><span>Elige el .zip de Scrapeo/output, CSV del scraper o PIM_Funcion.xlsx.</span></div>'; return; }
+    const datos = new FormData();
+    [...archivos].forEach((a) => datos.append("archivos", a));
+    const btn = $("cargar"); btn.disabled = true; btn.textContent = "Cargando…";
+    $("resultado-carga").innerHTML = '<div class="loading"><span class="spin"></span>Leyendo los archivos y guardando en la base de datos…</div>';
+    try {
+      const r = await api("/v1/cargas", { method: "POST", body: datos });
+      const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(basePor(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
+      $("resultado-carga").innerHTML = `<div class="${filas ? "ok-box" : "err-box"}"><b>${filas ? "Carga terminada" : "No se cargó nada"}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
+      ESTADO = await api("/v1/estado"); renderEstado();
+    } catch (e) {
+      $("resultado-carga").innerHTML = `<div class="err-box"><b>No se pudo cargar</b><span>${esc(e.message)}</span></div>`;
+    } finally { btn.disabled = false; btn.textContent = "Cargar a la base de datos"; }
+  });
+
+  // ── Secciones y menú ──
+  const SECCIONES = {
+    descargas: { titulo: "Bases de datos", lead: "Elige las bases de inversión o de gasto, los departamentos, el nivel de gobierno y el periodo. Se descarga un Excel con una hoja por base, con el mismo formato que PIM_Funcion.xlsx." },
+    actualizar: { titulo: "Actualizar base de datos", lead: "Qué hay cargado y hasta qué mes. Por ahora los datos se cargan con los archivos que genera el scraper en Colab; en la fase 2 el scraper correrá aquí." },
+  };
+  function ir(sec) {
+    cerrarListas();
+    $("titulo").textContent = SECCIONES[sec].titulo; $("lead").textContent = SECCIONES[sec].lead;
+    $("menu-actual").textContent = SECCIONES[sec].titulo;
+    ["sec-descargas-opciones", "sec-descargas-vista"].forEach((id) => { $(id).hidden = sec !== "descargas"; });
+    ["sec-actualizar-estado", "sec-actualizar-carga"].forEach((id) => { $(id).hidden = sec !== "actualizar"; });
+    document.querySelectorAll(".nav-item[data-sec]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.sec === sec)));
+    if (sec === "actualizar") api("/v1/estado").then((e) => { ESTADO = e; renderEstado(); }).catch(() => {});
+    else pedirVista();
+  }
+  const menu = (abrir) => { $("menu-panel").hidden = !abrir; $("menu-btn").setAttribute("aria-expanded", String(abrir)); };
+  $("menu-btn").addEventListener("click", (e) => { e.stopPropagation(); cerrarListas(); menu($("menu-panel").hidden); });
+  document.querySelectorAll(".nav-item[data-sec]").forEach((b) => b.addEventListener("click", () => { menu(false); ir(b.dataset.sec); }));
+  document.addEventListener("click", () => { menu(false); cerrarListas(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { menu(false); cerrarListas(); } });
+
+  (async function iniciar() {
+    try {
+      [CAT, ESTADO] = await Promise.all([api("/v1/catalogo"), api("/v1/estado")]);
+    } catch (e) {
+      $("vista").innerHTML = `<div class="err-box"><b>No se pudo conectar con el API</b><span>${esc(e.message)}</span></div>`; return;
+    }
+    const hoy = new Date(), tope = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
+    for (let a = 2020; a <= hoy.getFullYear(); a++) for (let m = 1; m <= 12; m++) { const ym = `${a}-${String(m).padStart(2, "0")}`; if (ym <= tope) MESES.push(ym); }
+    v.hasta = datosHasta() || MESES[MESES.length - 1];
+    if (v.desde > v.hasta) v.desde = v.hasta;
+    renderEstado(); renderParams();
+    ir(location.hash === "#actualizar" ? "actualizar" : "descargas");
+  })();
+})();
+</script>
+</body>
+</html>

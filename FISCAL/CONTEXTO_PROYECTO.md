@@ -273,6 +273,21 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 
 ---
 
-## 13. Proyecto Exportaciones (Infotrade · PROMPERÚ)
+## 13. API Fiscal en Railway (`FISCAL/api/`)
+
+API interna para que el equipo entre, marque y descargue las bases. Prototipo de diseño: artifact "Explorador API Fiscal" (paleta del proyecto, letra Barlow, fondo blanco). Guía de despliegue en `FISCAL/api/README.md`.
+
+- **Fase 1 (hecha):**
+  - FastAPI + Postgres de Railway, con acceso por usuario y contraseña (variables `APP_USUARIO` y `APP_CLAVE`).
+  - Descarga de 7 bases en Excel (una hoja por base, formato de `PIM_Funcion.xlsx`), CSV o JSON: inversión por función, municipalidad y fuente; PIM por función y municipalidad; gasto por genérica (con la deuda 2.8 desglosada en amortización e intereses) y por fuente.
+  - Estado de la base de datos y carga de los archivos del scraper de Colab (el `.zip` de `Scrapeo/output` o `PIM_Funcion.xlsx`).
+  - Pruebas en `FISCAL/api/tests` (SQLite y Postgres).
+- **Fase 2 (pendiente):** el scraper corre en Railway, cada mes y a pedido, y escribe directo en la base.
+- **Fase 3 (pendiente):** reportes procesados (cuadros, variaciones, proyectos) generados en Railway.
+- Decisiones del usuario: uso interno; actualización mensual; departamentos con casillas; nada de códigos técnicos a la vista; "Estado de los datos" va como tarjeta dentro de "Actualizar base de datos"; se quitó "Qué trae cada base"; el servicio de la deuda va dentro de "Gasto por genérica".
+
+---
+
+## 14. Proyecto Exportaciones (Infotrade · PROMPERÚ)
 
 Es un proyecto aparte, con su propio documento de contexto: **`EXPORT/exportaciones_scraper_infotrade.md`**. Allí están la API descubierta, el notebook `EXPORT/EXP_Infotrade_Exportaciones.ipynb`, las carpetas de Drive, el control y los pendientes.

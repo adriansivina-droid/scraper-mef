@@ -1,0 +1,67 @@
+"""Catálogo de bases que sirve el API: las mismas que producen los scrapers de FISCAL/ (CONTEXTO_PROYECTO §7 y §12)."""
+from dataclasses import dataclass, field
+
+DEPARTAMENTOS = {
+    "01": "AMAZONAS", "02": "ÁNCASH", "03": "APURÍMAC", "04": "AREQUIPA", "05": "AYACUCHO", "06": "CAJAMARCA",
+    "07": "CALLAO", "08": "CUSCO", "09": "HUANCAVELICA", "10": "HUÁNUCO", "11": "ICA", "12": "JUNÍN",
+    "13": "LA LIBERTAD", "14": "LAMBAYEQUE", "15": "LIMA", "16": "LORETO", "17": "MADRE DE DIOS", "18": "MOQUEGUA",
+    "19": "PASCO", "20": "PIURA", "21": "PUNO", "22": "SAN MARTÍN", "23": "TACNA", "24": "TUMBES", "25": "UCAYALI",
+    "98": "EXTERIOR",
+}
+
+# nivel de la URL -> código MEF (el que guardan los CSV en NIVEL_GOBIERNO y el nombre corto de sus archivos)
+NIVELES = {"nacional": "E", "regional": "R", "locales": "M"}
+NIVEL_DE_CORTO = {"GobNacional": "E", "GobRegional": "R", "Municipalidad": "M"}
+NIVEL_MEF = {"E": "E: GOBIERNO NACIONAL", "R": "R: GOBIERNOS REGIONALES", "M": "M: GOBIERNOS LOCALES"}
+NIVEL_PIM = {"E": "GOBIERNO NACIONAL", "R": "GOBIERNOS REGIONALES", "M": "GOBIERNOS LOCALES"}
+
+GRUPOS = {"inversion": "Inversión · genérica 2.6", "gasto": "Gasto total · todas las genéricas"}
+
+
+@dataclass(frozen=True)
+class Base:
+    id: str
+    grupo: str
+    etiqueta: str            # cómo se lista dentro de su grupo
+    nombre: str              # nombre único (resúmenes, avisos)
+    hoja: str                # hoja del Excel (máx. 31 caracteres)
+    columnas: list = field(default_factory=list)
+    anchos: list = field(default_factory=list)   # anchos de columna, como PIM_Funcion.xlsx
+    valor: str = "DEVENGADO"
+    periodicidad: str = "mensual"
+    usa_niveles: bool = True
+    descripcion: str = ""
+
+    @property
+    def tabla(self):
+        return "base_" + self.id.replace("-", "_")
+
+
+BASES = {b.id: b for b in [
+    Base("inv-dev-funcion", "inversion", "Devengado por función", "Inversión por función", "INV Funciones",
+         ["AÑO", "MES", "NIVEL_GOBIERNO", "DEPARTAMENTO", "ENTIDAD", "FUNCION", "DEVENGADO"], [8, 12, 24, 16, 28, 50, 13],
+         descripcion="Devengado de la genérica 2.6 por mes, departamento (Meta), nivel de gobierno y función. "
+                     "En locales es la suma de las municipalidades."),
+    Base("inv-dev-municipalidad", "inversion", "Devengado por municipalidad", "Inversión por municipalidad", "INV Municipalidades",
+         ["AÑO", "MES", "DEPARTAMENTO", "FUNCION", "MUNICIPALIDAD", "DEVENGADO"], [9.7, 12, 20, 54.6, 52, 14],
+         usa_niveles=False, descripcion="Devengado de la genérica 2.6 por mes, función y municipalidad."),
+    Base("inv-dev-fuente", "inversion", "Devengado por fuente de financiamiento", "Inversión por fuente", "INV Fuentes",
+         ["AÑO", "MES", "NIVEL_GOBIERNO", "DEPARTAMENTO", "GENERICA", "COD_FUENTE", "FUENTE", "DEVENGADO"], [9.7, 12, 26, 20, 10, 12, 44, 14],
+         descripcion="Devengado de la genérica 2.6 por mes, nivel de gobierno y fuente de financiamiento."),
+    Base("inv-pim-funcion", "inversion", "PIM por función", "PIM por función", "PIM Funciones",
+         ["AÑO", "DEPARTAMENTO", "NIVEL DE GOBIERNO", "FUNCION", "PIM"], [9.7, 41.6, 23.6, 54.6, 12.3],
+         valor="PIM", periodicidad="anual", descripcion="PIM anual de la genérica 2.6 por departamento, nivel de gobierno y función."),
+    Base("inv-pim-municipalidad", "inversion", "PIM por municipalidad", "PIM por municipalidad", "PIM Municipalidades",
+         ["AÑO", "DEPARTAMENTO", "FUNCION", "MUNICIPALIDAD", "PIM"], [9.7, 41.6, 54.6, 52, 12.3],
+         valor="PIM", periodicidad="anual", usa_niveles=False, descripcion="PIM anual de la genérica 2.6 por función y municipalidad."),
+    Base("gasto-dev-generica", "gasto", "Devengado por genérica (incluye la deuda desglosada)", "Gasto por genérica", "GASTO Genéricas",
+         ["AÑO", "MES", "NIVEL_GOBIERNO", "DEPARTAMENTO", "COD_GENERICA", "GENERICA", "DESGLOSE", "DEVENGADO"], [8, 12, 24, 16, 14, 46, 24, 14],
+         descripcion="Devengado de todas las genéricas. La 2.8 Servicio de la deuda viene en AMORTIZACIÓN e INTERESES Y "
+                     "COMISIONES, así la suma de la hoja sigue siendo el gasto total."),
+    Base("gasto-dev-fuente", "gasto", "Devengado por fuente de financiamiento", "Gasto por fuente", "GASTO Fuentes",
+         ["AÑO", "MES", "NIVEL_GOBIERNO", "DEPARTAMENTO", "GENERICA", "COD_FUENTE", "FUENTE", "DEVENGADO"], [9.7, 12, 26, 20, 10, 12, 44, 14],
+         descripcion="Devengado total (todas las genéricas) por mes, nivel de gobierno y fuente de financiamiento."),
+]}
+
+# columnas internas para filtrar (no salen en las descargas)
+INTERNAS = ["_anio", "_mes", "_depto", "_nivel"]
