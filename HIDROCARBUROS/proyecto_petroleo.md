@@ -305,7 +305,7 @@ Desde la sesión de Claude Code **no se puede abrir perupetro.com.pe** (el proxy
 
 | Cuándo | Modo | Qué corre |
 |---|---|---|
-| Todos los días, 06:17 (Lima) | `diario` | `PP_Produccion_Lotes.ipynb` → `PP_Mapa_Lotes_Plus.ipynb` (mapa simple y Plus) |
+| Todos los días, 07:00 (Lima) | `diario` | `PP_Produccion_Lotes.ipynb` → `PP_Mapa_Lotes_Plus.ipynb` (mapa simple y Plus) |
 | Día 5 de cada mes | `mensual` | lo anterior + `PP_MEF_Canon_Municipal.ipynb` (año anterior y actual, «LOS 6 PETROLEROS», anual) |
 | A mano | el que se elija | GitHub → Actions → «Hidrocarburos · actualización» → Run workflow |
 

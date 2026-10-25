@@ -1,5 +1,5 @@
 # Actualización automática del Proyecto Petróleo (HIDROCARBUROS/): corre los notebooks sin Colab y guarda todo en Drive.
-#   · diario (06:17 hora de Lima): producción de PERUPETRO (incluye la diaria, canon y regalías) → mapas
+#   · diario (07:00 hora de Lima): producción de PERUPETRO (incluye la diaria, canon y regalías) → mapas
 #   · mensual (el día 5): además, el canon municipal del MEF del año anterior y el actual
 #   · a mano: Actions → «Hidrocarburos · actualización» → Run workflow (eliges diario o mensual)
 # Requiere el secreto GOOGLE_DRIVE_CREDENCIAL (ver HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb).
@@ -7,7 +7,7 @@ name: Hidrocarburos · actualización
 
 on:
   schedule:
-    - cron: "17 11 * * *"          # 11:17 UTC = 06:17 en Lima
+    - cron: "0 12 * * *"           # 12:00 UTC = 07:00 en Lima (GitHub puede demorar unos minutos en arrancar)
   workflow_dispatch:
     inputs:
       modo:

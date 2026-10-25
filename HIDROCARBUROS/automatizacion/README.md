@@ -4,7 +4,7 @@ Corre los notebooks del proyecto **sin abrir Colab**, todos los días, y guarda 
 
 | Cuándo | Modo | Qué corre |
 |---|---|---|
-| Todos los días, 06:17 (hora de Lima) | `diario` | `PP_Produccion_Lotes.ipynb` (producción mensual y diaria, pozos, regalías, canon de PERUPETRO) → `PP_Mapa_Lotes_Plus.ipynb` (mapa simple y Plus) |
+| Todos los días, 07:00 (hora de Lima) | `diario` | `PP_Produccion_Lotes.ipynb` (producción mensual y diaria, pozos, regalías, canon de PERUPETRO) → `PP_Mapa_Lotes_Plus.ipynb` (mapa simple y Plus) |
 | El día 5 de cada mes | `mensual` | lo anterior + `PP_MEF_Canon_Municipal.ipynb` (año anterior y actual, «LOS 6 PETROLEROS», anual) |
 | Cuando quieras | el que elijas | GitHub → **Actions → «Hidrocarburos · actualización» → Run workflow** |
 
