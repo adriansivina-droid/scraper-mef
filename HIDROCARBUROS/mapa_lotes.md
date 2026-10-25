@@ -512,3 +512,5 @@ Bajo cada título hay una línea «📍 Alcance: …» que aclara si lo que se v
 - **Un campo o lote:** todas las pestañas.
 - **Un departamento (p. ej. Loreto):** «Canon y sobrecanon» con las vistas del departamento (por beneficiario y por nivel de gobierno). Pozos, regalías y empresas, que son por lote, aparecen desactivadas.
 - **Perú (total):** sin pestañas.
+
+**Guardar como imagen (25/10/2026).** Todos los gráficos tienen el botón **«🖼 Imagen»**: el panel de producción (junto a «Tabla» y «CSV») y las pestañas Pozos, Regalías, Canon (sus cuatro vistas) y Empresas. Descarga un PNG en alta resolución (2×) con el título, la línea de alcance y el resumen, la leyenda, el gráfico y la nota de fuente; en «Municipalidades del lote» incluye la franja de fuentes y la lista «Fuente por periodo». El botón no aparece cuando se ve la tabla.
