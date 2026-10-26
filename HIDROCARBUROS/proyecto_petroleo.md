@@ -298,6 +298,7 @@ Desde la sesión de Claude Code **no se puede abrir perupetro.com.pe** (el proxy
 - En todo el panel hay **Desde / Hasta**.
 - El botón de producción pasó al selector de capas, bajo «Productos». El panel muestra las mismas pestañas desde el botón y desde un lote.
 - El mapa volvió a sus colores anteriores; la paleta del proyecto queda solo en las estadísticas.
+- **Comparar lotes (26/10/2026):** botón «📊 Comparar lotes» en el selector de capas y «➕ Comparar con otros lotes» en la ficha. Compara varios lotes en barras por año con el cuadro de datos debajo. Variables: producción fiscalizada, canon y sobrecanon generado, y su distribución por departamento. Apilado por lote, por empresa o con barras lado a lado. Descarga en imagen (PNG) y CSV. Detalle en `mapa_lotes.md`.
 
 ## 11. Actualización automática (22/10/2026)
 
