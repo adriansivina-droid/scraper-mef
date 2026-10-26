@@ -557,3 +557,10 @@ El mapa (colores de los lotes) no cambia.
 - El CSV lleva el mismo título, el cuadro y las notas.
 
 **«Comparar lotes» en millones de barriles (26/10/2026).** La producción se muestra por defecto en **millones de barriles** (un decimal). El selector «Unidad» también ofrece miles de barriles y barriles por día. En gas natural, las mismas opciones son miles de millones de pies³, millones de pies³ y millones de pies³ por día.
+
+**«Comparar lotes» con los meses cerrados del reporte diario (26/10/2026).** La estadística mensual de PERUPETRO llega con retraso (por ejemplo, hasta junio). El comparador completa el año con los **meses cerrados** del reporte diario, como julio a setiembre, sumando sus días. El mes en curso del reporte diario no entra, porque se vería más bajo.
+- La nota de referencia lo dice; por ejemplo: «* 2026: corresponde al periodo acumulado enero-setiembre (julio-setiembre: suma de los reportes diarios de PERUPETRO, meses cerrados)».
+- Con «Barriles por día», el promedio usa los días de todos esos meses.
+- Por empresa: los meses del reporte diario se asignan al operador del lote si tenía uno solo; si no, van a «Sin operador identificado». La nota lo explica.
+- La fuente pasa a decir «estadística mensual y reportes diarios».
+- Los meses se escriben «setiembre», como en el Perú.
