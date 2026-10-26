@@ -95,6 +95,37 @@ runtime Docker, plan Starter, Health Check Path `/salud` y las tres variables de
 Cada cambio fusionado a `main` se vuelve a desplegar solo. `railway.json` queda por si Railway vuelve a abrir registros;
 el `Dockerfile` sirve en cualquier servicio que corra contenedores.
 
+## Pesca desde Drive (automático)
+
+Basta con dejar los Excel que manda cada DIREPRO en su carpeta de crudos de Drive: el API los carga solo **cada día a
+las 7:30 a. m.** (GitHub Actions, `.github/workflows/pesca_drive.yml`) o **al instante** con el botón «Sincronizar
+ahora» de «Actualizar base de datos». Solo procesa los archivos nuevos o modificados (con «Volver a procesar todos»,
+todos). Solo lee: nunca escribe ni borra en Drive.
+
+| Base | Carpeta de crudos |
+|---|---|
+| Pesca Loreto | `1FRKRjpHi_KX5twCCafYiHedPuQPscWqj` |
+| Pesca San Martín | `1Kkwys70cT3Z4ia5T7tO6CmNuQX-mSKWT` |
+| Pesca Ucayali | `1AEEvAfbtJwbkW773mKg-BIsDwjigjCg9` |
+
+**Configurar (una vez, después de desplegar en Render):**
+1. **Credencial de Drive en Render.** Es la misma que usa el flujo de hidrocarburos (secreto `GOOGLE_DRIVE_CREDENCIAL`
+   de GitHub). GitHub no deja volver a ver un secreto, así que si ya no tienes el archivo, genera otra con
+   `HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb` (la anterior sigue sirviendo). En Render → servicio →
+   **Environment** → variable `GOOGLE_DRIVE_CREDENCIAL` → pega todo el contenido de `credencial_drive.json` → guardar.
+   La cuenta con la que se generó debe poder ver las tres carpetas de crudos. Nunca pegues la credencial en un chat.
+2. **Secretos en GitHub** (repositorio → Settings → Secrets and variables → Actions → New repository secret):
+   - `ESTUDIOS_API_URL`: la dirección del servicio (`https://estudios-bcrp-iqt.onrender.com` o la que te dio Render);
+   - `ESTUDIOS_API_USUARIO` y `ESTUDIOS_API_CLAVE`: los valores de `APP_USUARIO` y `APP_CLAVE` (Render → Environment).
+   Mientras falten, el flujo diario solo deja un aviso y no falla.
+3. **Primera carga:** deja también en las carpetas de San Martín y Ucayali sus LONG históricos (`SMN_PESCA_LONG.xlsx`,
+   `UCA_PESCA_LONG.xlsx`), o súbelos una vez en la página: de ahí sale la clasificación de especies. Los notebooks de
+   `PESCA/` ignoran esos LONG en las carpetas de crudos.
+4. Prueba con «Sincronizar ahora», o en GitHub: Actions → «Pesca · sincronizar desde Drive» → Run workflow.
+
+Las carpetas se pueden cambiar sin tocar el código con las variables `DRIVE_CRUDOS_LORETO`, `DRIVE_CRUDOS_SAN_MARTIN` y
+`DRIVE_CRUDOS_UCAYALI`.
+
 ## Endpoints
 
 Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`.
@@ -107,6 +138,8 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/descargas/vista-previa` | Primeras filas y conteo de lo que se descargaría |
 | GET | `/v1/descargas` | El archivo: `formato=xlsx` (una hoja por base), `csv` (un `.zip` si son varias) o `json` (paginado) |
 | POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output`, `PIM_Funcion.xlsx` o los Excel de pesca |
+| GET | `/v1/drive` | Si Drive está conectado, sus carpetas y la última sincronización |
+| POST | `/v1/drive/sincronizar` | Carga los Excel nuevos o modificados de las carpetas de crudos (`todo=true`: todos) |
 | GET | `/docs` | Documentación interactiva |
 
 Parámetros de las descargas: `base=inv-dev-funcion,inv-pim-funcion`, `departamento=16,22,25`,

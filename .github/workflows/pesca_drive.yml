@@ -1,0 +1,63 @@
+# Pesca desde Drive: cada día le pide al API (Render) que cargue los Excel nuevos o modificados de las carpetas de
+# crudos de las DIREPRO (Loreto, San Martín y Ucayali). Es lo mismo que el botón «Sincronizar ahora» de la página.
+#   · diario (07:30 hora de Lima)
+#   · a mano: Actions → «Pesca · sincronizar desde Drive» → Run workflow (puedes volver a procesar todo)
+# Requiere los secretos ESTUDIOS_API_URL (https://….onrender.com), ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE
+# (los de Render: variables APP_USUARIO y APP_CLAVE). Pasos en FISCAL/api/README.md.
+name: Pesca · sincronizar desde Drive
+
+on:
+  schedule:
+    - cron: "30 12 * * *"          # 12:30 UTC = 07:30 en Lima (GitHub puede demorar unos minutos en arrancar)
+  workflow_dispatch:
+    inputs:
+      todo:
+        description: "Volver a procesar todos los archivos (no solo los nuevos)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: pesca-drive
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Sincronizar
+        env:
+          URL: ${{ secrets.ESTUDIOS_API_URL }}
+          USUARIO: ${{ secrets.ESTUDIOS_API_USUARIO }}
+          CLAVE: ${{ secrets.ESTUDIOS_API_CLAVE }}
+          TODO: ${{ inputs.todo || false }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$USUARIO" ] || [ -z "$CLAVE" ]; then
+            echo "::warning::Faltan los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO o ESTUDIOS_API_CLAVE (ver FISCAL/api/README.md). No se sincronizó."
+            exit 0
+          fi
+          # Render puede tardar en responder la primera consulta: hasta 3 intentos
+          for intento in 1 2 3; do
+            codigo=$(curl -sS -o respuesta.json -w '%{http_code}' --max-time 900 -u "$USUARIO:$CLAVE" -X POST \
+                     "${URL%/}/v1/drive/sincronizar?todo=${TODO}&origen=GitHub%20Actions") || codigo=000
+            [ "$codigo" = "200" ] && break
+            echo "Intento $intento: el API respondió $codigo"; sleep 30
+          done
+          python3 - <<'PY'
+          import json
+          try:
+              r = json.load(open("respuesta.json"))
+          except Exception:
+              r = {"detail": open("respuesta.json").read()[:500]}
+          if "detail" in r:
+              print(f"::error::{r['detail']}")
+              raise SystemExit(1)
+          print("Archivos:", ", ".join(a["nombre"] for a in r.get("archivos", [])) or "ninguno nuevo")
+          for base, x in r.get("bases", {}).items():
+              print(f"  {base}: {x['filas']} filas · {x['periodos'][0]} a {x['periodos'][-1]}")
+          for a in r.get("avisos", []):
+              print(f"::notice::{a}")
+          PY

@@ -177,7 +177,8 @@ def leer_archivos(raiz):
         # se queda el último archivo leído: así una carga nunca duplica filas
         ultimo = df.groupby(INTERNAS)["_archivo"].transform("max")
         if (df["_archivo"] != ultimo).any():
-            avisos.append(f"{b.nombre}: algunos periodos venían en más de un archivo; se usó el último.")
+            avisos.append(f"{b.nombre}: algunos periodos venían en más de un archivo; " +
+                          ("se usó el crudo (gana al LONG) o, entre crudos, el último." if b.grupo == "pesca" else "se usó el último."))
             bases[base_id] = df[df["_archivo"] == ultimo]
     return {k: v for k, v in bases.items() if v is not None}, avisos
 

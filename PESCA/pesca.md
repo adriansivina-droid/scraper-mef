@@ -156,6 +156,9 @@ notebook los crea solo con lo que traen los crudos, pero sin el histórico no sa
   encontró.
 - Una especie nueva entra sola como «Otros» (o como «Zúngaro»). Si el crudo la escribe distinto que el Cuadro Nº 07, se
   agrega a `CORRECCIONES`.
+- **En el API, automático:** el API lee las mismas carpetas de crudos y carga lo nuevo cada día a las 7:30 a. m. (y al
+  instante con «Sincronizar ahora»). Configuración en `FISCAL/api/README.md`, «Pesca desde Drive». Los notebooks
+  siguen sirviendo para tener el LONG en Drive y los cuadros de Loreto.
 - **En el API** (`FISCAL/api`, sección «Actualizar base de datos»): se pueden subir directamente los Excel de las DIREPRO,
   sin pasar por Colab, o los LONG que generan estos notebooks. La primera vez hay que subir los LONG históricos de San
   Martín y Ucayali, porque de ahí sale la clasificación de especies. El API repite la lógica de los notebooks en

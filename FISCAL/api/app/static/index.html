@@ -59,6 +59,10 @@
         <div class="card-head"><h2 id="t-estado">Estado actual de la base de datos</h2><span class="hint">se actualiza solo</span></div>
         <div class="card-body" id="estado"></div>
       </section>
+      <section class="card" id="sec-actualizar-drive" aria-labelledby="t-drive" hidden>
+        <div class="card-head"><h2 id="t-drive">Pesca desde Drive</h2><span class="hint">también corre solo, cada día</span></div>
+        <div class="card-body" id="drive"></div>
+      </section>
       <section class="card" id="sec-actualizar-carga" aria-labelledby="t-carga" hidden>
         <div class="card-head"><h2 id="t-carga">Cargar archivos</h2></div>
         <div class="card-body">
@@ -226,13 +230,47 @@
     $("resultado-carga").innerHTML = '<div class="loading"><span class="spin"></span>Leyendo los archivos y guardando en la base de datos…</div>';
     try {
       const r = await api("/v1/cargas", { method: "POST", body: datos });
-      const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(basePor(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
-      $("resultado-carga").innerHTML = `<div class="${filas ? "ok-box" : "err-box"}"><b>${filas ? "Carga terminada" : "No se cargó nada"}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
+      const cargado = Object.keys(r.bases).length > 0;
+      $("resultado-carga").innerHTML = resultado(r, cargado ? "Carga terminada" : "No se cargó nada", cargado);
       ESTADO = await api("/v1/estado"); renderEstado();
     } catch (e) {
       $("resultado-carga").innerHTML = `<div class="err-box"><b>No se pudo cargar</b><span>${esc(e.message)}</span></div>`;
     } finally { btn.disabled = false; btn.textContent = "Cargar a la base de datos"; }
   });
+
+  // ── Pesca desde Drive ──
+  const REGION = { "pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali" };
+  const fecha = (f) => new Date(f).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
+  function resultado(r, titulo, ok) {
+    const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(basePor(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
+    return `<div class="${ok ? "ok-box" : "err-box"}"><b>${esc(titulo)}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
+  }
+  function renderDrive(d) {
+    if (!d.configurado) {
+      $("drive").innerHTML = `<div class="err-box"><b>Falta conectar Drive</b><span>Agrega la variable GOOGLE_DRIVE_CREDENCIAL en Render (la misma credencial del flujo de hidrocarburos). Pasos en FISCAL/api/README.md.</span></div>`;
+      return;
+    }
+    const u = d.ultima, archivos = u ? u.resumen.archivos || [] : [];
+    $("drive").innerHTML = `<p class="hint">Deja los Excel que manda cada DIREPRO en su carpeta: ${Object.entries(d.carpetas).map(([b, id]) => `<a href="https://drive.google.com/drive/folders/${encodeURIComponent(id)}" target="_blank" rel="noopener">${esc(REGION[b])}</a>`).join(" · ")}. Se cargan solos cada día (7:30 a. m.); con el botón, al instante. Solo se procesan los archivos nuevos o modificados.</p>
+      <p class="hint">Última sincronización: ${u ? `<b>${esc(fecha(u.fecha))}</b> (${esc(u.origen)}) · ${archivos.length ? `${archivos.length} archivo(s): ${esc(archivos.map((a) => a.nombre).join(", "))}` : "sin archivos nuevos"}` : "todavía ninguna"}.</p>
+      <div class="subida"><label class="hint"><input type="checkbox" id="drive-todo"> Volver a procesar todos los archivos</label>
+        <button class="btn btn-primary" id="sincronizar" type="button">Sincronizar ahora</button></div>
+      <div id="resultado-drive" aria-live="polite"></div>`;
+    $("sincronizar").addEventListener("click", async () => {
+      const btn = $("sincronizar"); btn.disabled = true; btn.textContent = "Sincronizando…";
+      $("resultado-drive").innerHTML = '<div class="loading"><span class="spin"></span>Revisando las carpetas de Drive…</div>';
+      try {
+        const r = await api(`/v1/drive/sincronizar?todo=${$("drive-todo").checked}`, { method: "POST" });
+        const cargado = Object.keys(r.bases).length > 0;
+        const html = resultado(r, !r.archivos.length ? "Todo estaba al día" : cargado ? "Sincronización terminada" : "Los archivos nuevos no se pudieron cargar", cargado || !r.archivos.length);
+        [ESTADO, d] = await Promise.all([api("/v1/estado"), api("/v1/drive")]); renderEstado(); renderDrive(d);
+        $("resultado-drive").innerHTML = html;
+      } catch (e) {
+        $("resultado-drive").innerHTML = `<div class="err-box"><b>No se pudo sincronizar</b><span>${esc(e.message)}</span></div>`;
+        btn.disabled = false; btn.textContent = "Sincronizar ahora";
+      }
+    });
+  }
 
   // ── Secciones y menú ──
   const SECCIONES = {
@@ -244,9 +282,12 @@
     $("titulo").textContent = SECCIONES[sec].titulo; $("lead").textContent = SECCIONES[sec].lead;
     $("menu-actual").textContent = SECCIONES[sec].titulo;
     ["sec-descargas-opciones", "sec-descargas-vista"].forEach((id) => { $(id).hidden = sec !== "descargas"; });
-    ["sec-actualizar-estado", "sec-actualizar-carga"].forEach((id) => { $(id).hidden = sec !== "actualizar"; });
+    ["sec-actualizar-estado", "sec-actualizar-drive", "sec-actualizar-carga"].forEach((id) => { $(id).hidden = sec !== "actualizar"; });
     document.querySelectorAll(".nav-item[data-sec]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.sec === sec)));
-    if (sec === "actualizar") api("/v1/estado").then((e) => { ESTADO = e; renderEstado(); }).catch(() => {});
+    if (sec === "actualizar") {
+      api("/v1/estado").then((e) => { ESTADO = e; renderEstado(); }).catch(() => {});
+      api("/v1/drive").then(renderDrive).catch((e) => { $("drive").innerHTML = `<div class="err-box"><b>No se pudo consultar Drive</b><span>${esc(e.message)}</span></div>`; });
+    }
     else pedirVista();
   }
   const menu = (abrir) => { $("menu-panel").hidden = !abrir; $("menu-btn").setAttribute("aria-expanded", String(abrir)); };
