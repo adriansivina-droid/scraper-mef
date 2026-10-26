@@ -514,3 +514,21 @@ Bajo cada título hay una línea «📍 Alcance: …» que aclara si lo que se v
 - **Perú (total):** sin pestañas.
 
 **Guardar como imagen (25/10/2026).** Todos los gráficos tienen el botón **«🖼 Imagen»**: el panel de producción (junto a «Tabla» y «CSV») y las pestañas Pozos, Regalías, Canon (sus cuatro vistas) y Empresas. Descarga un PNG en alta resolución (2×) con el título, la línea de alcance y el resumen, la leyenda, el gráfico y la nota de fuente; en «Municipalidades del lote» incluye la franja de fuentes y la lista «Fuente por periodo». El botón no aparece cuando se ve la tabla.
+
+**Comparar lotes (26/10/2026).** El botón **«📊 Comparar lotes»** está en el selector de capas, debajo de «Producción fiscalizada anual y mensual». La ficha de cada lote tiene **«➕ Comparar con otros lotes»**, que agrega ese lote a la comparación. El panel dibuja barras por año con el **cuadro de datos debajo**, alineado con cada barra: una fila por serie con su color, la fila TOTAL, un decimal con coma y el año en curso como «2026*».
+- **Variable:**
+  - **Producción fiscalizada**: líquidos totales, petróleo, LGN y condensado o gas natural; en miles de barriles (o millones de pies cúbicos) por año, o en promedio por día.
+  - **Canon y sobrecanon generado**: millones de US$; PERUPETRO, «Canon Petrolero», determinación.
+  - **Distribución del canon**: la parte del canon generado que va a cada departamento (Loreto, Ucayali, Piura, Tumbes…).
+- **Apilar por:**
+  - Producción y canon: **Lote**, **Empresa operadora** (los lotes elegidos se suman) y **Lote (barras lado a lado)**.
+  - Distribución: **Departamento que lo recibe** (los lotes se suman) y **Lote y departamento (barras lado a lado)**.
+- **Lotes:** «＋ Agregar lotes» abre la lista agrupada por departamento, con buscador. Cada lote elegido aparece como etiqueta y se quita con «×». Al abrir sin elección previa, el panel parte de los 3 lotes con más producción en el último año completo. Los lotes sin datos de la variable elegida aparecen desactivados.
+- **Desde / Hasta:** por defecto, los últimos 8 años.
+- **Descargas:** «🖼 Imagen» guarda un PNG con el título, el gráfico, el cuadro y la nota de fuente. «⬇ CSV» guarda el mismo cuadro, con separador «;» y coma decimal.
+- **Datos:**
+  - La producción sale de las mismas series del panel de producción: la serie del lote o, si el campo tiene un solo lote, la del campo.
+  - Por empresa se usa el operador registrado en la producción fiscalizada de cada mes. Lo que no tiene operador va a «Sin operador identificado», que solo se muestra si tiene valor.
+  - El canon por empresa es una **aproximación**. PERUPETRO publica el canon por lote, no por empresa. Si en un año el lote tuvo más de un operador, su canon se reparte según la producción fiscalizada de cada uno ese año; la nota del gráfico lo dice.
+  - El año en curso tiene los meses de la estadística mensual (producción) o los meses con dato (canon); la nota lo indica.
+- **Archivos:** el generador es `comparar.html` (inyectado por el Bloque 4). El panel lee `window.ppProd` (series de producción, más `lc`: lote → campo) y `window.ppActDatos` (canon por lote, `cl`).
