@@ -24,7 +24,7 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 - `FISCAL/`: scrapers del MEF (este documento, los notebooks y `docs/`).
 - `EXPORT/`: proyecto de exportaciones de Infotrade (notebook y su `.md`).
 - `EMPLEO/`: scraper del empleo formal por región y actividad (Power BI del MTPE), con su `empleo.md`.
-- `PESCA/`: LONG mensual de pesca de Loreto desde el Excel de DIREPRO (VBP a precios de 2007), con su `pesca.md`.
+- `PESCA/`: LONG mensual de pesca de Loreto, San Martín y Ucayali desde los Excel de DIREPRO (VBP a precios de 2007), con su `pesca.md`.
 
 | Notebook | Dato | Nivel de gobierno | Regiones | Ruta de consulta |
 |---|---|---|---|---|
