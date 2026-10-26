@@ -566,3 +566,10 @@ El mapa (colores de los lotes) no cambia.
 - Los meses se escriben «setiembre», como en el Perú.
 
 **«Comparar lotes»: PNG 4× y descarga en SVG (26/10/2026).** «🖼 Imagen» guarda el PNG a 4× (unos 2.300 px de ancho). El botón nuevo **«⬇ SVG»** guarda el gráfico con su cuadro en formato vectorial, que en PowerPoint se ve nítido a cualquier tamaño (Insertar → Imágenes). El SVG lleva la letra Barlow incrustada; si PowerPoint no la usa, muestra la letra instalada en la computadora (Barlow, si está instalada; si no, Arial).
+
+**«Comparar lotes»: canon recibido por el departamento (26/10/2026).** Nueva variable **«Canon recibido por el departamento (beneficiarios)»**, con los mismos datos y colores que la pestaña «Canon y sobrecanon» del lote: PERUPETRO, «Canon por año», distribución, en millones de S/.
+- Aquí se eligen **departamentos** en lugar de lotes, con «＋ Elegir departamentos». De partida se toman los departamentos de los lotes elegidos; si no hay ninguno, Loreto.
+- **Apilar por:** Beneficiario · Nivel de gobierno (gobierno regional, gobiernos locales, y universidades, institutos e IIAP juntos) · Departamento · Departamento y beneficiario (barras lado a lado).
+- Los años completos salen de la serie por beneficiario. El año en curso suma los meses de pago con dato; la nota lo indica, por ejemplo «enero-julio».
+- «Descuento: pago de deuda (Ley 29289)» va en gris, con su nota, como en la pestaña.
+- El título de referencia, las notas, el CSV, la imagen y el SVG funcionan igual que en las otras variables.
