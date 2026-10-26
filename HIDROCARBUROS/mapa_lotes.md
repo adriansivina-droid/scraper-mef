@@ -573,3 +573,9 @@ El mapa (colores de los lotes) no cambia.
 - Los años completos salen de la serie por beneficiario. El año en curso suma los meses de pago con dato; la nota lo indica, por ejemplo «enero-julio».
 - «Descuento: pago de deuda (Ley 29289)» va en gris, con su nota, como en la pestaña.
 - El título de referencia, las notas, el CSV, la imagen y el SVG funcionan igual que en las otras variables.
+
+**Canon recibido: opción de excluir el descuento de la Ley 29289 y título nuevo (26/10/2026).**
+- En la variable «Canon recibido por el departamento», el selector **«Descuento Ley 29289: Incluir / Excluir»** quita esa fila del gráfico y del total. El total pasa a ser lo que llegó a los beneficiarios.
+- Al excluirlo, la nota de referencia dice cuánto se dejó fuera en el periodo; por ejemplo, «S/ 204,4 millones en 2015-2023» en Loreto.
+- Por defecto se incluye, como en la pestaña del lote: así el total coincide con el canon asignado al departamento.
+- El título de referencia pasa a «Loreto: Transferencias de canon y sobrecanon petrolero según beneficiario, 2015-2026» (o «según nivel de gobierno»).
