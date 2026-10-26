@@ -555,3 +555,5 @@ El mapa (colores de los lotes) no cambia.
   - **Arriba:** el título sugerido, como «Lotes 95, 8 y Z-69: Producción fiscalizada de petróleo por empresa operadora, 2019-2026», y la unidad entre paréntesis, como «(Miles de barriles)». Botón **«📋 Copiar título»**.
   - **Abajo:** las notas, como «* 2026: corresponde al periodo acumulado enero-junio.», y la fuente. Botón **«📋 Copiar notas»**.
 - El CSV lleva el mismo título, el cuadro y las notas.
+
+**«Comparar lotes» en millones de barriles (26/10/2026).** La producción se muestra por defecto en **millones de barriles** (un decimal). El selector «Unidad» también ofrece miles de barriles y barriles por día. En gas natural, las mismas opciones son miles de millones de pies³, millones de pies³ y millones de pies³ por día.
