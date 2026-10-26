@@ -24,14 +24,34 @@ cada DIREPRO manda un Excel mensual que se lleva a una tabla larga (LONG) y, de 
 | Especies principales (`*_OK`) | Las 35 del Cuadro Nº 07 (Indicadores del sector pesquero); el resto, Otros | Boquichico, Camarón gigante, Gamitana, Paco, Paiche, Tilapia; el resto, Otras | Bagre, Boquichico, Chiu Chiu, Palometa, Ractacara, Sardina; el resto, Otros |
 | Estados con VBP | fresco, salpreso, seco salado y ornamentales | fresco (salpreso y seco salado van en 0) | fresco y seco salado (ornamentales en 0) |
 
+## Carpeta en Drive
+
+Todo vive en la carpeta **PESCA** de Drive (`PESCA_FOLDER_ID = 1wJP-N4A6AjHto__hJmWx-EE21nKiNB5i`). Los notebooks la
+leen y escriben por su ID (API de Drive, como `subir_xlsx_a_drive` de Fiscal; piden autorizar la cuenta la primera vez)
+y crean solos lo que falte:
+
+```
+PESCA/
+├── LORETO/       CRUDOS/ · RESPALDOS/ · LOR_PESCA_LONG.xlsx
+├── SAN MARTÍN/   CRUDOS/ · RESPALDOS/ · SMN_PESCA_LONG.xlsx
+└── UCAYALI/      CRUDOS/ · RESPALDOS/ · UCA_PESCA_LONG.xlsx
+```
+
+- **CRUDOS:** aquí se dejan los Excel que manda cada DIREPRO. Pueden quedarse: volver a procesarlos no duplica nada.
+  En Ucayali, si hay varias versiones del acumulado del año, gana la última por nombre (`…_202601-202609` sobre
+  `…_202601-202608`).
+- **RESPALDOS:** antes de reemplazar un LONG, el notebook copia aquí el anterior como
+  `<nombre>_respaldo_<fecha_hora>.xlsx`.
+- La primera corrida con la carpeta vacía solo crea las subcarpetas y avisa que faltan los crudos.
+
 ## Loreto: `Pesca_Loreto_Long.ipynb`
 
 Abrir en Colab:
 https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/PESCA/Pesca_Loreto_Long.ipynb
 
-1. **Bloque 1 · Parámetros.** `CARPETA_CRUDOS` (los Excel de DIREPRO en Drive), `RUTA_LONG` (el histórico, que se crea
-   si no existe), `FUENTE`, `PRECIOS`, `ESPECIES_07`, `ESPECIES_FRESCO`, `ESPECIES_CUADRO` y `CORRECCIONES`. Con `SUBIR_A_MANO = True` pide los archivos con
-   un botón.
+1. **Bloque 1 · Parámetros.** `PESCA_FOLDER_ID`, `FUENTE`, `PRECIOS`, `ESPECIES_07`, `ESPECIES_FRESCO`,
+   `ESPECIES_CUADRO` y `CORRECCIONES`. Con `SUBIR_A_MANO = True` pide los archivos con un botón y los guarda en
+   `PESCA/LORETO/CRUDOS`.
 2. **Bloque 2 · Funciones.** Para cada crudo:
    - lee el mes del rótulo `PERIODO : FEBRERO - 2026`;
    - ubica las hojas por nombre (`Desemb_Fres`, `Desemb_salpr`, `Desemb_secosalad`, o las `Extrac_*`);
@@ -45,7 +65,7 @@ https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/mai
      destino: exportación → «Mercado externo», nacional → «Mercado interno» y stock remanente y/o mortandad, en miles
      de unidades (la suma es el ingreso). Se detiene en la fila TOTAL, así que no lee la tabla de principales especies
      que viene debajo.
-3. **Bloque 3 · Generar.** Monta Drive, procesa todos los crudos de la carpeta (consumo y ornamentales juntos) y
+3. **Bloque 3 · Generar.** Baja los crudos de `PESCA/LORETO/CRUDOS`, procesa todos (consumo y ornamentales juntos) y
    reemplaza en el histórico los meses que traen, cada tipo por separado (el resto se conserva, y recargar no duplica). Guarda tres hojas, con un mes por
    columna en los cuadros:
    - `LOR_PESCA`: el LONG;
@@ -98,7 +118,7 @@ Reproduce los LONG que ya se armaban a mano. Probado contra ellos:
   volúmenes. En agosto y setiembre el LONG anterior tenía los volúmenes redondeados a enteros; el notebook usa las
   cifras exactas del crudo (por ejemplo, fresco de agosto: 473,618 t en vez de 472).
 
-1. **Bloque 1 · Parámetros.** Carpeta de crudos y ruta del LONG de cada región, y los precios.
+1. **Bloque 1 · Parámetros.** `PESCA_FOLDER_ID` y los precios.
 2. **Bloque 2 · Funciones.**
    - **San Martín** (un archivo por mes, en kg): el mes sale del nombre del archivo (`SMN_PESCA_2026-08.xlsx`,
      porque el crudo no lo trae adentro).
@@ -114,15 +134,14 @@ Reproduce los LONG que ya se armaban a mano. Probado contra ellos:
      LONG histórico, así que siguen exactamente tu criterio. Una especie que nunca apareció se avisa y recibe un
      valor por defecto: en San Martín, la principal de su origen o «Otras»; en Ucayali, el nombre en formato título
      y, en fresco y agregado, «Otros». Conviene revisarla y corregirla en el LONG; desde entonces queda aprendida.
-3. **Bloques 3 y 4 · Generar.** Montan Drive, procesan todos los crudos de cada carpeta y reemplazan los periodos que
-   traen: el mes en San Martín, el año completo en Ucayali. El periodo reemplazado queda en el mismo lugar del archivo
-   y el resto se conserva en su orden. Antes de guardar, copian el LONG anterior como `<nombre>_respaldo_<fecha>.xlsx`,
-   porque el archivo nuevo solo trae la hoja de datos y una hoja `VBP` (por mes y estado o tipo): las tablas dinámicas
-   que tuviera (Hoja1, Hoja2) quedan en el respaldo.
+3. **Bloques 3 y 4 · Generar.** Bajan los crudos de `PESCA/SAN MARTÍN/CRUDOS` y `PESCA/UCAYALI/CRUDOS`, los procesan
+   todos y reemplazan los periodos que traen: el mes en San Martín, el año completo en Ucayali. El periodo reemplazado
+   queda en el mismo lugar del archivo y el resto se conserva en su orden. El archivo nuevo solo trae la hoja de datos y
+   una hoja `VBP` (por mes y estado o tipo): las tablas dinámicas que tuviera (Hoja1, Hoja2) quedan en el respaldo.
 
-La primera vez, copia tus LONG actuales a las rutas del Bloque 1 (`SMN_PESCA_LONG.xlsx` y `UCA_PESCA_LONG.xlsx`, con
-sus hojas `SMN_PESCA` y `UCA_PESCA`). Si no existen, el notebook los crea solo con lo que traen los crudos, pero sin el
-histórico no sabe tu clasificación de especies.
+La primera vez, sube tus LONG actuales a `PESCA/SAN MARTÍN/SMN_PESCA_LONG.xlsx` y `PESCA/UCAYALI/UCA_PESCA_LONG.xlsx`
+(con sus hojas `SMN_PESCA` y `UCA_PESCA`; corre antes el notebook una vez para que cree las carpetas). Si no están, el
+notebook los crea solo con lo que traen los crudos, pero sin el histórico no sabe tu clasificación de especies.
 
 ## Cuidados
 
