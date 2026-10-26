@@ -1,4 +1,4 @@
-"""API Fiscal: descarga de las bases de los scrapers del MEF (fase 1). Corre en Railway con `uvicorn app.main:app`."""
+"""Departamento de estudios BCRP-IQT: API para descargar las bases de los scrapers del MEF (fase 1). Corre con `uvicorn app.main:app`."""
 import json
 import os
 import re
@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from . import archivos, carga, db
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
-app = FastAPI(title="API Fiscal", version="1.0", docs_url="/docs", redoc_url=None)
+app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
 _basic = HTTPBasic(auto_error=False)
 ESTATICOS = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=ESTATICOS), name="static")   # solo estilos: los datos siempre piden clave
@@ -29,7 +29,7 @@ def acceso(cred: HTTPBasicCredentials | None = Depends(_basic)):
         return
     usuario = os.environ.get("APP_USUARIO", "fiscal")
     if cred is None or not (secrets.compare_digest(cred.username, usuario) and secrets.compare_digest(cred.password, clave)):
-        raise HTTPException(401, "Usuario o contraseña incorrectos.", headers={"WWW-Authenticate": 'Basic realm="API Fiscal"'})
+        raise HTTPException(401, "Usuario o contraseña incorrectos.", headers={"WWW-Authenticate": 'Basic realm="Departamento de estudios BCRP-IQT"'})
 
 
 def _lista(valor, validos, nombre):

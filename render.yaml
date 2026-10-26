@@ -1,0 +1,20 @@
+# Despliegue del API "Departamento de estudios BCRP-IQT" (FISCAL/api) en Render.
+# La base de datos es Postgres en Neon: su cadena de conexión se pega en DATABASE_URL al crear el servicio.
+services:
+  - type: web
+    name: estudios-bcrp-iqt
+    runtime: docker
+    rootDir: FISCAL/api
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: virginia
+    healthCheckPath: /salud
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_USUARIO
+        value: estudios
+      - key: APP_CLAVE
+        generateValue: true
