@@ -1,7 +1,8 @@
 # PESCA · Producción pesquera de Loreto, San Martín y Ucayali
 
 Alimenta la sección de **pesca** de las síntesis regionales (producción pesquera y su anexo). Los datos no se scrapean:
-cada DIREPRO manda un Excel mensual que se lleva a una tabla larga (LONG) con el mismo esquema y, de ahí, al VBP.
+cada DIREPRO manda un Excel mensual que se lleva a una tabla larga (LONG) y, de ahí, al VBP. Dos notebooks:
+`Pesca_Loreto_Long.ipynb` (Loreto) y `Pesca_SMN_UCA_Long.ipynb` (San Martín y Ucayali).
 
 **VBP = VOLUMEN (t) × precio base 2007** (miles de soles por tonelada), en miles de soles de 2007:
 
@@ -19,7 +20,7 @@ cada DIREPRO manda un Excel mensual que se lleva a una tabla larga (LONG) con el
 | Archivo | `CONSUMO_<MES>_-_<AÑO>-OPP.xlsx` y `P._ORNAMENTALES_<MES>_-_OPP_<AÑO>.xlsx` (DIREPRO Loreto, OPP), **un mes** por archivo | `SMN_PESCA_<AÑO>-<MES>.xlsx`, un mes | `ESTADISTICA_PESQUERA_DIREPRO_UCA_<AÑOMES>-<AÑOMES>.xlsx`, **acumulado del año**, un mes por columna |
 | Forma | Un cuadro por estado: N° · Especie · 8 localidades · Total, con la fila Total arriba | Una hoja: procedencia (acuicultura / continental), especie y una columna por estado, **en kg** | Hojas `TOTAL FRESCO` y `TOTAL SECOSALADO` (especie × mes, en t) y ornamentales (unidades) |
 | Qué se toma | **Desembarque**: hojas `Desemb_Fres`, `Desemb_salpr` y `Desemb_secosalad` (Cuadros 06–08); ornamentales: hoja `POR ESPECIES` | Volumen por estado | Desembarque (Cuadro 01) |
-| LONG | `LOR_PESCA_LONG.xlsx`, hoja `LOR_PESCA` (este notebook) | `SMN_PESCA_LONG`, hoja `SMN_PESCA` | `UCA_PESCA_LONG`, hoja `UCA_PESCA` |
+| LONG | `LOR_PESCA_LONG.xlsx`, hoja `LOR_PESCA` (`Pesca_Loreto_Long.ipynb`) | `SMN_PESCA_LONG.xlsx`, hoja `SMN_PESCA` (`Pesca_SMN_UCA_Long.ipynb`) | `UCA_PESCA_LONG.xlsx`, hoja `UCA_PESCA` (`Pesca_SMN_UCA_Long.ipynb`) |
 | Especies principales (`*_OK`) | Las 35 del Cuadro Nº 07 (Indicadores del sector pesquero); el resto, Otros | Boquichico, Camarón gigante, Gamitana, Paco, Paiche, Tilapia; el resto, Otras | Bagre, Boquichico, Chiu Chiu, Palometa, Ractacara, Sardina; el resto, Otros |
 | Estados con VBP | fresco, salpreso, seco salado y ornamentales | fresco (salpreso y seco salado van en 0) | fresco y seco salado (ornamentales en 0) |
 
@@ -85,6 +86,43 @@ el Cuadro Nº 07, «Otros» suma 16,229 t.
 
 Ornamentales de setiembre de 2025: 396,249 miles de unidades (322,727 al mercado externo y 73,522 al interno, sin
 stock), con un VBP de 409,286 miles de S/ de 2007.
+
+## San Martín y Ucayali: `Pesca_SMN_UCA_Long.ipynb`
+
+Abrir en Colab:
+https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/PESCA/Pesca_SMN_UCA_Long.ipynb
+
+Reproduce los LONG que ya se armaban a mano. Probado contra ellos:
+- **San Martín, agosto de 2026:** las 57 filas salen idénticas al LONG existente, volumen y VBP incluidos.
+- **Ucayali, 2026:** las 2 602 filas tienen las mismas especies y clasificaciones, y de enero a julio los mismos
+  volúmenes. En agosto y setiembre el LONG anterior tenía los volúmenes redondeados a enteros; el notebook usa las
+  cifras exactas del crudo (por ejemplo, fresco de agosto: 473,618 t en vez de 472).
+
+1. **Bloque 1 · Parámetros.** Carpeta de crudos y ruta del LONG de cada región, y los precios.
+2. **Bloque 2 · Funciones.**
+   - **San Martín** (un archivo por mes, en kg): el mes sale del nombre del archivo (`SMN_PESCA_2026-08.xlsx`,
+     porque el crudo no lo trae adentro).
+     - Especies de San Martín: una fila por especie y estado con volumen. `ORIGEN` es Acuicultura (acuicultura
+       continental) o Extracción de ríos (continental), y `ESTADO_OK` junta fresco y fresco refrigerado.
+     - Lo que llega de otros departamentos (Pucallpa, Loreto, Piura, Chiclayo, Lima, Trujillo…): una fila por
+       procedencia y estado con su total, con `DEPARTAMENTO = Otros` y `ESPECIE` = CONTINENTAL o MARÍTIMO.
+     - VBP: solo para lo de San Martín; lo de otros departamentos va en 0.
+   - **Ucayali** (acumulado del año, en t): lee los cuadros `TOTAL FRESCO`, `TOTAL SECOSALADO`, `TOTAL DE PESCADO`
+     (TIPO = AGREGADO) y `ORNAMENTALES` (unidades; solo las celdas con datos). Los meses salen de los encabezados
+     (`2026-01-01`…). VBP: fresco y seco salado; agregado y ornamentales van en 0, como en el LONG anterior.
+   - **Especies:** `ESPECIE_OK` (San Martín) y `ESPECIES_CORREGIDO` / `ESPECIES_OK` (Ucayali) se toman del propio
+     LONG histórico, así que siguen exactamente tu criterio. Una especie que nunca apareció se avisa y recibe un
+     valor por defecto: en San Martín, la principal de su origen o «Otras»; en Ucayali, el nombre en formato título
+     y, en fresco y agregado, «Otros». Conviene revisarla y corregirla en el LONG; desde entonces queda aprendida.
+3. **Bloques 3 y 4 · Generar.** Montan Drive, procesan todos los crudos de cada carpeta y reemplazan los periodos que
+   traen: el mes en San Martín, el año completo en Ucayali. El periodo reemplazado queda en el mismo lugar del archivo
+   y el resto se conserva en su orden. Antes de guardar, copian el LONG anterior como `<nombre>_respaldo_<fecha>.xlsx`,
+   porque el archivo nuevo solo trae la hoja de datos y una hoja `VBP` (por mes y estado o tipo): las tablas dinámicas
+   que tuviera (Hoja1, Hoja2) quedan en el respaldo.
+
+La primera vez, copia tus LONG actuales a las rutas del Bloque 1 (`SMN_PESCA_LONG.xlsx` y `UCA_PESCA_LONG.xlsx`, con
+sus hojas `SMN_PESCA` y `UCA_PESCA`). Si no existen, el notebook los crea solo con lo que traen los crudos, pero sin el
+histórico no sabe tu clasificación de especies.
 
 ## Cuidados
 
