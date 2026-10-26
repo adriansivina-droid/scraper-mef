@@ -1,0 +1,132 @@
+"""Sincroniza la pesca desde Drive: baja los Excel nuevos o modificados de las carpetas de crudos de cada DIREPRO y los
+carga como si se hubieran subido en la página. Lo usan el botón «Sincronizar desde Drive» y GitHub Actions
+(.github/workflows/pesca_drive.yml).
+
+Credencial: variable GOOGLE_DRIVE_CREDENCIAL con el JSON de HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb
+(tipo authorized_user, la misma que usa el flujo de hidrocarburos) o el de una cuenta de servicio con acceso a las
+carpetas. Solo se lee: el API nunca escribe ni borra en Drive.
+"""
+import json
+import os
+import threading
+from datetime import datetime, timezone
+from pathlib import Path
+
+from sqlalchemy import text
+
+from . import carga, db
+
+# carpeta de crudos de cada base de pesca (PESCA/pesca.md); se pueden cambiar con variables de entorno
+CARPETAS = {
+    "pesca-loreto": os.environ.get("DRIVE_CRUDOS_LORETO", "1FRKRjpHi_KX5twCCafYiHedPuQPscWqj"),
+    "pesca-san-martin": os.environ.get("DRIVE_CRUDOS_SAN_MARTIN", "1Kkwys70cT3Z4ia5T7tO6CmNuQX-mSKWT"),
+    "pesca-ucayali": os.environ.get("DRIVE_CRUDOS_UCAYALI", "1AEEvAfbtJwbkW773mKg-BIsDwjigjCg9"),
+}
+API = "https://www.googleapis.com/drive/v3/files"
+_en_curso = threading.Lock()
+
+
+class SincronizacionEnCurso(Exception):
+    pass
+
+
+def configurado():
+    return bool(os.environ.get("GOOGLE_DRIVE_CREDENCIAL", "").strip())
+
+
+class LectorDrive:
+    """Lista y baja archivos de Drive con la credencial (solo lectura)."""
+
+    def __init__(self, credencial_json):
+        import google.auth
+        from google.auth.transport.requests import AuthorizedSession
+        info = json.loads(credencial_json)
+        alcance = ["https://www.googleapis.com/auth/drive.readonly"] if info.get("type") == "service_account" else None
+        cred, _ = google.auth.load_credentials_from_dict(info, scopes=alcance)
+        self.sesion = AuthorizedSession(cred)
+
+    def listar(self, carpeta):
+        """[{id, name, modifiedTime}] de los .xlsx de la carpeta."""
+        archivos, pagina = [], None
+        while True:
+            params = {"q": f"'{carpeta}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'",
+                      "fields": "nextPageToken,files(id,name,modifiedTime)", "pageSize": 1000,
+                      "supportsAllDrives": "true", "includeItemsFromAllDrives": "true"}
+            if pagina:
+                params["pageToken"] = pagina
+            r = self.sesion.get(API, params=params, timeout=60)
+            r.raise_for_status()
+            j = r.json()
+            archivos += j.get("files", [])
+            pagina = j.get("nextPageToken")
+            if not pagina:
+                return [a for a in archivos if a["name"].lower().endswith(".xlsx") and not a["name"].startswith("~$")]
+
+    def bajar(self, file_id):
+        r = self.sesion.get(f"{API}/{file_id}", params={"alt": "media", "supportsAllDrives": "true"}, timeout=300)
+        r.raise_for_status()
+        return r.content
+
+
+def _tablas():
+    with db.motor().begin() as cx:
+        cx.execute(text("CREATE TABLE IF NOT EXISTS drive_archivos (file_id TEXT PRIMARY KEY, nombre TEXT, base TEXT, "
+                        "modificado TEXT, fecha TEXT)"))
+        cx.execute(text("CREATE TABLE IF NOT EXISTS drive_sincronizaciones (fecha TEXT, origen TEXT, resumen TEXT)"))
+
+
+def _vistos():
+    with db.motor().connect() as cx:
+        return dict(cx.execute(text("SELECT file_id, modificado FROM drive_archivos")).all())
+
+
+def ultima():
+    """La última sincronización (también las que no encontraron nada nuevo), o None."""
+    _tablas()
+    with db.motor().connect() as cx:
+        r = cx.execute(text("SELECT fecha, origen, resumen FROM drive_sincronizaciones ORDER BY fecha DESC LIMIT 1")).first()
+    return None if r is None else {"fecha": r[0], "origen": r[1], "resumen": json.loads(r[2])}
+
+
+def _nombre_unico(nombre, usados):
+    """Dos carpetas pueden tener archivos con el mismo nombre: se distinguen sin perder el AAAA-MM del nombre."""
+    if nombre not in usados:
+        return nombre
+    p, i = Path(nombre), 2
+    while f"{p.stem} ({i}){p.suffix}" in usados:
+        i += 1
+    return f"{p.stem} ({i}){p.suffix}"
+
+
+def sincronizar(origen="botón de la página", todo=False, lector=None):
+    """Carga los Excel nuevos o modificados (todos, con todo=True) de las carpetas de crudos. Devuelve el resumen."""
+    if not _en_curso.acquire(blocking=False):
+        raise SincronizacionEnCurso("Ya hay una sincronización en curso; espera a que termine.")
+    try:
+        _tablas()
+        lector = lector or LectorDrive(os.environ["GOOGLE_DRIVE_CREDENCIAL"])
+        vistos = {} if todo else _vistos()
+        nuevos = [(base_id, a) for base_id, carpeta in CARPETAS.items() for a in lector.listar(carpeta)
+                  if vistos.get(a["id"]) != a["modifiedTime"]]
+        if nuevos:
+            usados, archivos = set(), []
+            for _, a in nuevos:
+                nombre = _nombre_unico(a["name"], usados)
+                usados.add(nombre)
+                archivos.append((nombre, lector.bajar(a["id"])))
+            resumen = carga.cargar(f"Drive ({origen}): {', '.join(a['name'] for _, a in nuevos)}"[:250], archivos)
+        else:
+            resumen = {"bases": {}, "avisos": ["No hay archivos nuevos ni modificados en las carpetas de Drive."]}
+        resumen["archivos"] = [{"base": b, "nombre": a["name"]} for b, a in nuevos]
+        ahora = datetime.now(timezone.utc).isoformat(timespec="microseconds")   # ordena las sincronizaciones
+        with db.motor().begin() as cx:
+            # un archivo que no se pudo leer también queda visto: se vuelve a intentar si cambia o con todo=True
+            for base_id, a in nuevos:
+                cx.execute(text("DELETE FROM drive_archivos WHERE file_id = :i"), {"i": a["id"]})
+                cx.execute(text("INSERT INTO drive_archivos (file_id, nombre, base, modificado, fecha) VALUES (:i, :n, :b, :m, :f)"),
+                           {"i": a["id"], "n": a["name"], "b": base_id, "m": a["modifiedTime"], "f": ahora})
+            cx.execute(text("INSERT INTO drive_sincronizaciones (fecha, origen, resumen) VALUES (:f, :o, :r)"),
+                       {"f": ahora, "o": origen, "r": json.dumps(resumen, ensure_ascii=False)})
+        return resumen
+    finally:
+        _en_curso.release()

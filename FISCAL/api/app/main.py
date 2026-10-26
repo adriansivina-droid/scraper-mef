@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import archivos, carga, db
+from . import archivos, carga, db, drive
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -164,3 +164,22 @@ async def cargas(archivos_subidos: list[UploadFile] = File(..., alias="archivos"
             raise HTTPException(413, f"Lo subido pasa de {MAX_CARGA_MB} MB.")
         contenido.append((a.filename or "archivo", datos))
     return carga.cargar(f"subida del {date.today().isoformat()}: {', '.join(n for n, _ in contenido)[:200]}", contenido)
+
+
+@app.get("/v1/drive", dependencies=[Depends(acceso)])
+def drive_estado():
+    """Si la sincronización con Drive está configurada, sus carpetas y la última sincronización."""
+    return {"configurado": drive.configurado(), "carpetas": drive.CARPETAS, "ultima": drive.ultima()}
+
+
+@app.post("/v1/drive/sincronizar", dependencies=[Depends(acceso)])
+def drive_sincronizar(todo: bool = False, origen: str = Query("botón de la página", max_length=60)):
+    """Carga los Excel nuevos o modificados de las carpetas de crudos de pesca en Drive (todos, con todo=true)."""
+    if not drive.configurado():
+        raise HTTPException(503, "Falta la credencial de Drive (variable GOOGLE_DRIVE_CREDENCIAL en Render).")
+    try:
+        return drive.sincronizar(origen=origen, todo=todo)
+    except drive.SincronizacionEnCurso as e:
+        raise HTTPException(409, str(e))
+    except Exception as e:                       # credencial vencida, carpeta sin permiso, Drive caído…
+        raise HTTPException(502, f"No se pudo leer Drive: {e}")

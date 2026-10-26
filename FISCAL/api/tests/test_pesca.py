@@ -173,3 +173,59 @@ def test_excel_de_pesca(cliente):
 def test_excel_que_no_es_de_pesca(cliente):
     r = subir(cliente, **{"otro.xlsx": _libro({"Hoja1": [["A", "B"], [1, 2]]})})
     assert r["bases"] == {} and any("ni un Excel de pesca" in a for a in r["avisos"])
+
+
+class DriveFalsa:
+    """Imita LectorDrive: {carpeta: {file_id: (nombre, modificado, bytes)}}."""
+    def __init__(self, carpetas):
+        self.carpetas, self.bajados = carpetas, []
+
+    def listar(self, carpeta):
+        return [{"id": i, "name": n, "modifiedTime": m} for i, (n, m, _) in self.carpetas.get(carpeta, {}).items()]
+
+    def bajar(self, file_id):
+        self.bajados.append(file_id)
+        return next(c[file_id][2] for c in self.carpetas.values() if file_id in c)
+
+
+@pytest.fixture()
+def drive_falsa(cliente, monkeypatch):
+    from app import drive
+    falsa = DriveFalsa({drive.CARPETAS["pesca-loreto"]: {"L1": ("CONSUMO_FEBRERO_-_2026-OPP.xlsx", "2026-03-10T10:00:00Z", loreto_consumo())},
+                        drive.CARPETAS["pesca-san-martin"]: {"S1": ("SMN_PESCA_2026-08.xlsx", "2026-09-05T10:00:00Z", smn_crudo())},
+                        drive.CARPETAS["pesca-ucayali"]: {}})
+    monkeypatch.setenv("GOOGLE_DRIVE_CREDENCIAL", "{}")
+    monkeypatch.setattr(drive, "LectorDrive", lambda credencial: falsa)
+    return falsa
+
+
+def test_drive_sin_credencial(cliente, monkeypatch):
+    monkeypatch.delenv("GOOGLE_DRIVE_CREDENCIAL", raising=False)
+    assert cliente.get("/v1/drive").json()["configurado"] is False
+    assert cliente.post("/v1/drive/sincronizar").status_code == 503
+
+
+def test_drive_sincroniza_solo_lo_nuevo(cliente, drive_falsa):
+    from app import drive
+    r = cliente.post("/v1/drive/sincronizar").json()
+    assert sorted(r["bases"]) == ["pesca-loreto", "pesca-san-martin"] and len(r["archivos"]) == 2
+    assert cliente.get("/v1/estado").json()["bases"]["pesca-san-martin"]["hasta"] == "2026-08"
+    r = cliente.post("/v1/drive/sincronizar").json()                         # nada cambió: no baja nada
+    assert r["bases"] == {} and r["archivos"] == [] and drive_falsa.bajados == ["L1", "S1"]
+    # DIREPRO corrige el archivo de Loreto y llega uno nuevo de Ucayali
+    drive_falsa.carpetas[drive.CARPETAS["pesca-loreto"]]["L1"] = ("CONSUMO_FEBRERO_-_2026-OPP.xlsx", "2026-03-20T10:00:00Z", loreto_consumo(boquichico=30.0))
+    drive_falsa.carpetas[drive.CARPETAS["pesca-ucayali"]]["U1"] = ("ESTADISTICA_UCA_2026.xlsx", "2026-10-01T10:00:00Z", uca_crudo())
+    r = cliente.post("/v1/drive/sincronizar?origen=GitHub Actions").json()
+    assert sorted(a["nombre"] for a in r["archivos"]) == ["CONSUMO_FEBRERO_-_2026-OPP.xlsx", "ESTADISTICA_UCA_2026.xlsx"]
+    assert datos(cliente, "pesca-loreto", "16").query("ESPECIE == 'Boquichico'").VOLUMEN.tolist() == [30.0]
+    e = cliente.get("/v1/drive").json()
+    assert e["configurado"] and e["ultima"]["origen"] == "GitHub Actions" and len(e["carpetas"]) == 3
+    r = cliente.post("/v1/drive/sincronizar?todo=true").json()                # volver a procesar todo
+    assert len(r["archivos"]) == 3
+
+
+def test_drive_mismo_nombre_en_dos_carpetas(cliente, drive_falsa):
+    from app import drive
+    drive_falsa.carpetas[drive.CARPETAS["pesca-ucayali"]]["X"] = ("SMN_PESCA_2026-08.xlsx", "2026-10-01T10:00:00Z", uca_crudo())
+    r = cliente.post("/v1/drive/sincronizar").json()
+    assert sorted(r["bases"]) == ["pesca-loreto", "pesca-san-martin", "pesca-ucayali"]
