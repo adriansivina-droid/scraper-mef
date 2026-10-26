@@ -18,29 +18,30 @@ Objetivo a largo plazo: que el API arme la **Síntesis de Actividad Económica**
 (estructura tomada de los informes de junio de 2026). Cada sección sería un módulo con el mismo esquema que Fiscal:
 scraper (o carga de una plantilla) → base de datos → descargas en Excel → cuadros y anexos.
 
-| Sección | Cuadros y anexos | Fuente (según los informes) | Cómo se obtiene | Estado |
+| Sección | Cuadros y anexos | Fuente (según los informes) | Cómo entra al API | Estado |
 |---|---|---|---|---|
 | Resumen · otros indicadores | Cuadro 1 | SBS, MEF, DIREPRO y empresas | se arma con los demás módulos | al final |
-| Agropecuario | producción (t), superficie sembrada (ha) · Anexo 1 | MIDAGRI; GERDAGRI Loreto, DRAU Ucayali, DRA San Martín | MIDAGRI por web; las direcciones regionales, por plantilla | falta |
-| Pesca (Ucayali) | producción pesquera · Anexo 2 | DIREPRO Ucayali | plantilla | falta |
-| Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions); precio por plantilla | scraper listo |
-| Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | plantilla (no es pública) | falta |
-| Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE, Planilla Electrónica (PLAME y T-Registro) | web del MTPE | falta |
-| Exportaciones | por grupo de productos · Anexo | SUNAT | scraper en `EXPORT/` (Infotrade) | scraper listo |
-| Importaciones (Loreto) | FOB por uso o destino, aduana de Iquitos · Anexo | SUNAT | web de SUNAT | falta |
-| Crédito, depósitos y morosidad | saldos, crédito por tipo sin BN ni Agrobanco · Anexos | SBS y AFP (Carpeta de Información del Sistema Financiero) | web de la SBS | falta |
+| Agropecuario | producción (t), superficie sembrada (ha) · Anexo 1 | MIDAGRI y direcciones regionales | **archivo mensual** que recibe el equipo | falta |
+| Pesca (Ucayali) | producción pesquera · Anexo 2 | DIREPRO Ucayali | **archivo mensual** | falta |
+| Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions); precio por archivo | scraper listo |
+| Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | **archivo mensual** | falta |
+| Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | **archivo mensual** (el equipo ya tiene un scraper propio) | falta |
+| Exportaciones | por grupo de productos · Anexo | SUNAT | **archivo mensual** | falta |
+| Importaciones (Loreto) | FOB por uso o destino, aduana de Iquitos · Anexo | SUNAT | **archivo mensual** | falta |
+| Crédito, depósitos y morosidad | saldos, crédito por tipo sin BN ni Agrobanco · Anexos | SBS y AFP | scraper (web de la SBS) | falta |
 | Gasto corriente no financiero | por nivel, mes y acumulado, var. % real · Anexos de ejecución por nivel | MEF, Consulta Amigable | `Fiscal_Scraper` + API | **en el API** (fase 1) |
 | Inversión pública | por nivel, var. % real y avance del PIM · Anexos de inversión por nivel | MEF, Consulta Amigable | `Fiscal_Scraper` + API | **en el API** (fase 1) |
 
-Lo que no es público (DIREPRO, encuesta BCRP a empresas, direcciones regionales de agricultura, precio Reuters) entra por
-**plantillas de Excel** que el equipo sube en la página; el resto se baja solo.
+Seis secciones llegan **en archivos mensuales** que el equipo ya recibe (exportaciones, empleo, importaciones,
+agropecuario, manufactura y pesca): entran por la página, en «Actualizar base de datos», igual que hoy los CSV del
+scraper. Solo quedan como scrapers el MEF (hecho), PERUPETRO (hecho) y la SBS.
 
-**Arquitectura:** Render sirve la página y las descargas; Neon guarda los datos; los scrapers corren en **GitHub Actions**
-(como hoy los de hidrocarburos) y escriben directo en Neon. Así el servidor web sigue siendo el más barato.
+**Arquitectura:** Render sirve la página y las descargas; Neon guarda los datos; los scrapers (MEF, SBS, PERUPETRO)
+corren en **GitHub Actions** y escriben directo en Neon; los archivos mensuales se suben en la página.
 
-**Orden propuesto:** (1) desplegar Fiscal y sus fases 2 y 3 (scraper en GitHub Actions y reportes); (2) sumar
-hidrocarburos y exportaciones, que ya tienen scraper; (3) SBS (crédito, depósitos y morosidad), MTPE (empleo), MIDAGRI e
-importaciones; (4) plantillas para lo no público; (5) un botón que genere los cuadros y anexos del mes por región.
+**Orden propuesto:** (1) desplegar Fiscal y sus fases 2 y 3 (scraper en GitHub Actions y reportes); (2) carga de los
+seis archivos mensuales, con el formato en que llegan; (3) hidrocarburos (scraper listo) y SBS; (4) un botón que genere
+los cuadros y anexos del mes por región.
 
 ## Bases
 
