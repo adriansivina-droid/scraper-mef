@@ -23,6 +23,7 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 **Estructura del repositorio:**
 - `FISCAL/`: scrapers del MEF (este documento, los notebooks y `docs/`).
 - `EXPORT/`: proyecto de exportaciones de Infotrade (notebook y su `.md`).
+- `EMPLEO/`: scraper del empleo formal por región y actividad (Power BI del MTPE), con su `empleo.md`.
 
 | Notebook | Dato | Nivel de gobierno | Regiones | Ruta de consulta |
 |---|---|---|---|---|

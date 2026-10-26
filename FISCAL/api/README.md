@@ -25,7 +25,7 @@ scraper (o carga de una plantilla) → base de datos → descargas en Excel → 
 | Pesca (Ucayali) | producción pesquera · Anexo 2 | DIREPRO Ucayali | **archivo mensual** | falta |
 | Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions); precio por archivo | scraper listo |
 | Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | **archivo mensual** | falta |
-| Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | **archivo mensual** (el equipo ya tiene un scraper propio) | falta |
+| Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | **archivo mensual**, que genera el scraper de `EMPLEO/` (Power BI del MTPE) | falta |
 | Exportaciones | por grupo de productos · Anexo | SUNAT | **archivo mensual** | falta |
 | Importaciones (Loreto) | FOB por uso o destino, aduana de Iquitos · Anexo | SUNAT | **archivo mensual** | falta |
 | Crédito, depósitos y morosidad | saldos, crédito por tipo sin BN ni Agrobanco · Anexos | SBS y AFP | scraper (web de la SBS) | falta |
