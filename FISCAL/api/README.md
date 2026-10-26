@@ -1,4 +1,4 @@
-# API Fiscal · Railway
+# Departamento de estudios BCRP-IQT · API
 
 API interna para descargar las bases que bajan los scrapers del MEF (Consulta Amigable). Una página permite marcar
 **bases, departamentos, nivel de gobierno y periodo** y descargar un Excel con una hoja por base, con el formato de
@@ -9,8 +9,8 @@ API interna para descargar las bases que bajan los scrapers del MEF (Consulta Am
 | Fase | Qué incluye | Estado |
 |---|---|---|
 | 1 | Página, descarga de las 7 bases (Excel, CSV o JSON), estado de la base de datos y carga de los archivos que genera el scraper de Colab | **lista** |
-| 2 | El scraper corre en Railway, cada mes y a pedido, y escribe directo en la base de datos | pendiente |
-| 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en Railway | pendiente |
+| 2 | El scraper corre en el servidor (Render), cada mes y a pedido, y escribe directo en la base de datos | pendiente |
+| 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en el servidor | pendiente |
 
 ## Bases
 
@@ -24,22 +24,31 @@ API interna para descargar las bases que bajan los scrapers del MEF (Consulta Am
 | Gasto total | `gasto-dev-generica` | GASTO Genéricas | `DEV Generica.*`, con la 2.8 reemplazada por su desglose de `DEV Deuda.*` |
 | | `gasto-dev-fuente` | GASTO Fuentes | `DEV Fuente.*` |
 
-## Desplegar en Railway (una sola vez)
+## Desplegar en Render + Neon (una sola vez)
 
-1. Entra a <https://railway.com>, crea una cuenta con GitHub y elige un plan (Hobby alcanza para empezar).
-2. **New Project → Deploy from GitHub repo →** `adriansivina-droid/scraper-mef`.
-3. En el servicio que se crea: **Settings → Source → Root Directory = `FISCAL/api`**. Railway detecta el `Dockerfile` y `railway.json`.
-4. En el mismo proyecto: **New → Database → PostgreSQL**. Railway crea la base de datos.
-5. En el servicio del API, pestaña **Variables**, agrega:
-   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (referencia a la base del paso 4)
-   - `APP_USUARIO` = el usuario del equipo (por ejemplo `fiscal`)
-   - `APP_CLAVE` = una contraseña larga
-6. **Settings → Networking → Generate Domain**. Esa es la dirección de la página (`https://….up.railway.app`).
-7. Abre la dirección, entra con el usuario y la contraseña, ve a **Actualizar base de datos** y sube el `.zip` de
-   `Fiscal/Scrapeo/output` (en Drive: clic derecho sobre la carpeta → Descargar) y, si quieres el histórico 2020-2026,
-   `PIM_Funcion.xlsx`.
+Render corre el API (plan Starter, unos US$7 al mes) y Neon guarda la base Postgres (plan gratuito, que alcanza para
+este volumen). Railway quedó descartado porque tiene cerrado el registro de cuentas nuevas.
 
-Cada vez que se fusiona un cambio a `main`, Railway vuelve a desplegar solo.
+**1. Base de datos en Neon**
+1. Entra a <https://neon.com>, crea una cuenta (con GitHub o correo) y un proyecto llamado `estudios-bcrp-iqt`,
+   región **AWS US East (N. Virginia)**.
+2. En **Connection details** copia la cadena de conexión (empieza con `postgresql://` y termina en `?sslmode=require`).
+
+**2. API en Render**
+1. Entra a <https://render.com>, crea una cuenta con GitHub y autoriza el acceso **solo** a `adriansivina-droid/scraper-mef`.
+2. **New → Blueprint →** elige `scraper-mef`. Render lee `render.yaml` (en la raíz del repositorio) y propone el servicio
+   `estudios-bcrp-iqt` con la carpeta `FISCAL/api`.
+3. Cuando pida `DATABASE_URL`, pega la cadena de Neon. `APP_USUARIO` queda en `estudios` y `APP_CLAVE` se genera sola
+   (la ves en **Environment** del servicio).
+4. **Apply.** Al terminar, la dirección aparece arriba del servicio (`https://estudios-bcrp-iqt.onrender.com` o parecida).
+5. Entra con el usuario y la contraseña, ve a **Actualizar base de datos** y sube el `.zip` de `Fiscal/Scrapeo/output`
+   y `PIM_Funcion.xlsx`.
+
+Si Render no reconoce el Blueprint, se crea a mano: **New → Web Service → scraper-mef**, Root Directory `FISCAL/api`,
+runtime Docker, plan Starter, Health Check Path `/salud` y las tres variables de arriba.
+
+Cada cambio fusionado a `main` se vuelve a desplegar solo. `railway.json` queda por si Railway vuelve a abrir registros;
+el `Dockerfile` sirve en cualquier servicio que corra contenedores.
 
 ## Endpoints
 
