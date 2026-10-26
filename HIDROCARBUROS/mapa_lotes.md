@@ -542,3 +542,16 @@ Bajo cada título hay una línea «📍 Alcance: …» que aclara si lo que se v
 - «Comparar lotes»: «Sin operador identificado» en blanco con borde.
 
 El mapa (colores de los lotes) no cambia.
+
+**«Comparar lotes»: imagen para diapositiva (26/10/2026).** Formato pedido por el usuario, tomando como modelo un cuadro del BCRP:
+- **«🖼 Imagen»** descarga **solo el gráfico con su cuadro**, sin título ni notas, porque el título se pone a mano en PowerPoint.
+- La imagen se descarga en PNG a 3× (alta resolución), con fondo blanco y la letra Barlow incrustada; sin conexión usa Arial.
+- Estilo de la imagen:
+  - barras delgadas con borde azul noche;
+  - eje con letra pequeña gris;
+  - cuadro con la fila de años, una fila por serie con su color y la fila TOTAL;
+  - bordes grises finos.
+- En el panel quedan dos recuadros **«Referencia (no va en la imagen)»**:
+  - **Arriba:** el título sugerido, como «Lotes 95, 8 y Z-69: Producción fiscalizada de petróleo por empresa operadora, 2019-2026», y la unidad entre paréntesis, como «(Miles de barriles)». Botón **«📋 Copiar título»**.
+  - **Abajo:** las notas, como «* 2026: corresponde al periodo acumulado enero-junio.», y la fuente. Botón **«📋 Copiar notas»**.
+- El CSV lleva el mismo título, el cuadro y las notas.
