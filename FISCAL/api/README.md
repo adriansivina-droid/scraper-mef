@@ -14,24 +14,33 @@ API interna para descargar las bases que bajan los scrapers del MEF (Consulta Am
 
 ## Hoja de ruta: el informe completo
 
-El objetivo a largo plazo es que el API cubra la síntesis de actividad económica de la región, con el orden de su índice.
-Cada sección sería un módulo con el mismo esquema que Fiscal: scraper → base de datos → descargas en Excel → cuadros.
+Objetivo a largo plazo: que el API arme la **Síntesis de Actividad Económica** mensual de Loreto, San Martín y Ucayali
+(estructura tomada de los informes de junio de 2026). Cada sección sería un módulo con el mismo esquema que Fiscal:
+scraper (o carga de una plantilla) → base de datos → descargas en Excel → cuadros y anexos.
 
-| Sección del informe | Fuente probable | Estado |
-|---|---|---|
-| I. Actividad productiva · 1.1 Agropecuario | MIDAGRI | falta |
-| I. Actividad productiva · 1.2 Hidrocarburos | PERUPETRO | scraper en `HIDROCARBUROS/` (diario con GitHub Actions) |
-| I. Actividad productiva · 2.1 Manufactura | PRODUCE | falta |
-| II. Aspectos laborales · Empleo | MTPE | falta |
-| III. Sector externo · Exportaciones | Infotrade / PROMPERÚ (SUNAT) | scraper en `EXPORT/` |
-| III. Sector externo · Importaciones | SUNAT | falta |
-| IV. Crédito y depósitos | SBS | falta |
-| V. Presupuesto · Gasto corriente no financiero e Inversión pública | MEF, Consulta Amigable | en el API (fase 1) |
-| Anexos | cuadros de cada sección | al final |
+| Sección | Cuadros y anexos | Fuente (según los informes) | Cómo se obtiene | Estado |
+|---|---|---|---|---|
+| Resumen · otros indicadores | Cuadro 1 | SBS, MEF, DIREPRO y empresas | se arma con los demás módulos | al final |
+| Agropecuario | producción (t), superficie sembrada (ha) · Anexo 1 | MIDAGRI; GERDAGRI Loreto, DRAU Ucayali, DRA San Martín | MIDAGRI por web; las direcciones regionales, por plantilla | falta |
+| Pesca (Ucayali) | producción pesquera · Anexo 2 | DIREPRO Ucayali | plantilla | falta |
+| Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions); precio por plantilla | scraper listo |
+| Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | plantilla (no es pública) | falta |
+| Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE, Planilla Electrónica (PLAME y T-Registro) | web del MTPE | falta |
+| Exportaciones | por grupo de productos · Anexo | SUNAT | scraper en `EXPORT/` (Infotrade) | scraper listo |
+| Importaciones (Loreto) | FOB por uso o destino, aduana de Iquitos · Anexo | SUNAT | web de SUNAT | falta |
+| Crédito, depósitos y morosidad | saldos, crédito por tipo sin BN ni Agrobanco · Anexos | SBS y AFP (Carpeta de Información del Sistema Financiero) | web de la SBS | falta |
+| Gasto corriente no financiero | por nivel, mes y acumulado, var. % real · Anexos de ejecución por nivel | MEF, Consulta Amigable | `Fiscal_Scraper` + API | **en el API** (fase 1) |
+| Inversión pública | por nivel, var. % real y avance del PIM · Anexos de inversión por nivel | MEF, Consulta Amigable | `Fiscal_Scraper` + API | **en el API** (fase 1) |
 
-Orden propuesto: (1) terminar Fiscal (despliegue, fases 2 y 3); (2) sumar al API hidrocarburos y exportaciones, que ya
-tienen scraper; (3) fuentes nuevas: SBS, MTPE, MIDAGRI, PRODUCE e importaciones; (4) un botón que genere los cuadros y
-anexos del mes. Las fuentes de las secciones que faltan están por confirmar con el equipo.
+Lo que no es público (DIREPRO, encuesta BCRP a empresas, direcciones regionales de agricultura, precio Reuters) entra por
+**plantillas de Excel** que el equipo sube en la página; el resto se baja solo.
+
+**Arquitectura:** Render sirve la página y las descargas; Neon guarda los datos; los scrapers corren en **GitHub Actions**
+(como hoy los de hidrocarburos) y escriben directo en Neon. Así el servidor web sigue siendo el más barato.
+
+**Orden propuesto:** (1) desplegar Fiscal y sus fases 2 y 3 (scraper en GitHub Actions y reportes); (2) sumar
+hidrocarburos y exportaciones, que ya tienen scraper; (3) SBS (crédito, depósitos y morosidad), MTPE (empleo), MIDAGRI e
+importaciones; (4) plantillas para lo no público; (5) un botón que genere los cuadros y anexos del mes por región.
 
 ## Bases
 
