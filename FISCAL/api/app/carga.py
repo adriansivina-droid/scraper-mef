@@ -1,9 +1,11 @@
-"""Lee lo que producen los scrapers (CSV de Fiscal/Scrapeo/output, o PIM_Funcion.xlsx) y lo convierte a las bases del catálogo.
+"""Lee lo que producen los scrapers (CSV de Fiscal/Scrapeo/output, o PIM_Funcion.xlsx) y los Excel de pesca, y lo convierte a
+las bases del catálogo.
 
 Se reconocen los archivos por su nombre, el mismo que usan Fiscal_Scraper y los scrapers anteriores:
   DEV Funcion.<Nivel> AAAA - Mes MM - ….csv   DEV InvFuente.<Nivel> …   DEV Generica.<Nivel> …   DEV Deuda.<Nivel> …
   DEV Fuente.<Nivel> …   PIM Funcion AAAA - ….csv   PIM Funcion.Municipalidad AAAA - ….csv
-Los archivos CONTROL y LOG se ignoran.
+Los archivos CONTROL y LOG se ignoran. Los Excel de pesca (crudos de las DIREPRO o LONG de los notebooks) se reconocen
+por sus hojas: ver pesca.py.
 """
 import io
 import os
@@ -15,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import db
+from . import db, pesca
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -92,11 +94,19 @@ def leer_archivos(raiz):
     """-> {base_id: DataFrame con las columnas de la base + columnas internas}, avisos."""
     raiz = Path(raiz)
     por_bloque, avisos = {}, []
-    pim, pim_muni = [], []
+    pim, pim_muni, de_pesca = [], [], []
     for n_archivo, ruta in enumerate(sorted(raiz.rglob("*"))):
         if not ruta.is_file() or ruta.name.startswith(("CONTROL", "LOG", ".")):
             continue
         if ruta.suffix.lower() == ".xlsx":
+            try:
+                es_pesca = pesca.reconocer(ruta)
+            except Exception:                         # no es un Excel legible
+                avisos.append(f"{ruta.name}: no se pudo abrir como Excel; se ignoró.")
+                continue
+            if es_pesca:
+                de_pesca.append((n_archivo, ruta, *es_pesca))
+                continue
             hoja = pd.read_excel(ruta, sheet_name=0)
             if list(hoja.columns[:5]) == BASES["inv-pim-funcion"].columnas:
                 hoja = hoja.dropna(how="all")
@@ -104,7 +114,7 @@ def leer_archivos(raiz):
                 hoja["_archivo"] = n_archivo
                 pim.append(hoja)
             else:
-                avisos.append(f"{ruta.name}: no tiene las columnas de PIM_Funcion.xlsx; se ignoró.")
+                avisos.append(f"{ruta.name}: no es PIM_Funcion.xlsx ni un Excel de pesca; se ignoró.")
             continue
         if ruta.suffix.lower() != ".csv":
             continue
@@ -148,6 +158,10 @@ def leer_archivos(raiz):
         bases["inv-pim-funcion"] = df
     if pim_muni:
         bases["inv-pim-municipalidad"] = pd.concat(pim_muni, ignore_index=True).assign(_nivel="")
+    if de_pesca:
+        de_la_pesca, avisos_pesca = pesca.leer(de_pesca, db.leer_todo)
+        bases.update(de_la_pesca)
+        avisos += avisos_pesca
 
     for base_id, df in bases.items():
         faltan = [c for c in BASES[base_id].columnas if c not in df.columns]
@@ -190,7 +204,7 @@ def cargar(origen, archivos):
         resumen["bases"][base_id] = {"filas": filas, "departamentos": sorted(df["_depto"].unique().tolist()),
                                      "periodos": sorted({f"{a}" if m == 0 else f"{a}-{m:02d}" for a, m in zip(df["_anio"], df["_mes"])})}
     if not bases:
-        resumen["avisos"].append("No se encontró ningún archivo de los scrapers en lo que subiste.")
+        resumen["avisos"].append("No se encontró ningún archivo de los scrapers ni de pesca en lo que subiste.")
     db.registrar_carga(origen, resumen)
     return resumen
 

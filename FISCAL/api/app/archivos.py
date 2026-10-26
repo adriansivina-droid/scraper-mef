@@ -24,7 +24,7 @@ def excel(tablas):
             ws.append(list(fila))
         col_valor = b.columnas.index(b.valor) + 1
         for (celda,) in ws.iter_rows(min_row=1, min_col=col_valor, max_col=col_valor):
-            celda.number_format = "#,##0"
+            celda.number_format = b.formato_valor
         for i, ancho in enumerate(b.anchos):
             ws.column_dimensions[chr(65 + i)].width = ancho
     salida = io.BytesIO()

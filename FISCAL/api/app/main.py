@@ -1,4 +1,4 @@
-"""Departamento de estudios BCRP-IQT: API para descargar las bases de los scrapers del MEF (fase 1). Corre con `uvicorn app.main:app`."""
+"""Departamento de estudios BCRP-IQT: API para descargar las bases de los scrapers del MEF y de pesca (DIREPRO). Corre con `uvicorn app.main:app`."""
 import json
 import os
 import re
@@ -70,11 +70,20 @@ def _tablas(bases, deptos, niveles, desde, hasta):
 def _avisos(bases, deptos):
     disp, avisos = db.disponibilidad(), []
     for b in bases:
-        sin = [d for d in deptos if d not in disp[b]["departamentos"]]
+        propios = [d for d in deptos if not BASES[b].departamentos or d in BASES[b].departamentos]
+        if not propios:
+            avisos.append(f"{BASES[b].nombre}: solo tiene datos de {', '.join(DEPARTAMENTOS[d].title() for d in BASES[b].departamentos)}.")
+            continue
+        sin = [d for d in propios if d not in disp[b]["departamentos"]]
         if sin:
             nombres = f"{len(sin)} departamentos" if len(sin) > 6 else ", ".join(DEPARTAMENTOS[d].title() for d in sin)
             avisos.append(f"{BASES[b].nombre}: sin datos para {nombres}.")
     return avisos
+
+
+def _prefijo(bases):
+    grupos = {BASES[b].grupo for b in bases}
+    return "bases_pesca" if grupos == {"pesca"} else "bases_fiscal" if "pesca" not in grupos else "bases"
 
 
 def _sufijo(deptos):
@@ -101,7 +110,8 @@ def catalogo():
     return {"grupos": GRUPOS,
             "bases": [{"id": b.id, "grupo": b.grupo, "etiqueta": b.etiqueta, "nombre": b.nombre, "hoja": b.hoja,
                        "columnas": b.columnas, "anchos": b.anchos, "valor": b.valor, "periodicidad": b.periodicidad,
-                       "usa_niveles": b.usa_niveles, "descripcion": b.descripcion} for b in BASES.values()],
+                       "usa_niveles": b.usa_niveles, "descripcion": b.descripcion, "departamentos": list(b.departamentos)}
+                      for b in BASES.values()],
             "departamentos": [{"codigo": c, "nombre": n} for c, n in DEPARTAMENTOS.items()],
             "niveles": list(NIVELES)}
 
@@ -118,7 +128,7 @@ def vista_previa(base: str = "", departamento: str = "", nivel: str = "", desde:
     return {"archivos": [{"base": b, "hoja": BASES[b].hoja, "filas": len(df), "columnas": BASES[b].columnas,
                           "muestra": _registros(df.head(filas))} for b, df in tablas.items()],
             "filas_total": sum(len(df) for df in tablas.values()),
-            "descarga": f"bases_fiscal_{desde}_{hasta}.xlsx", "avisos": _avisos(bases, deptos)}
+            "descarga": f"{_prefijo(bases)}_{desde}_{hasta}.xlsx", "avisos": _avisos(bases, deptos)}
 
 
 @app.get("/v1/descargas", dependencies=[Depends(acceso)])
@@ -131,13 +141,13 @@ def descargas(base: str = "", departamento: str = "", nivel: str = "", desde: st
         return JSONResponse({b: {"filas": len(df), "pagina": pagina, "datos": _registros(df.iloc[ini:ini + tamano])}
                              for b, df in tablas.items()})
     if formato == "xlsx":
-        nombre = f"bases_fiscal_{desde}_{hasta}.xlsx"
+        nombre = f"{_prefijo(bases)}_{desde}_{hasta}.xlsx"
         contenido, tipo = archivos.excel(tablas), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     elif len(tablas) == 1:
         b = bases[0]
         nombre, contenido, tipo = f"{BASES[b].hoja} {desde}_{hasta} - {_sufijo(deptos)}.csv", archivos.csv(tablas[b]), "text/csv"
     else:
-        nombre = f"bases_fiscal_{desde}_{hasta}.zip"
+        nombre = f"{_prefijo(bases)}_{desde}_{hasta}.zip"
         contenido = archivos.zip_csv(tablas, lambda b: f"{BASES[b].hoja} {desde}_{hasta} - {_sufijo(deptos)}.csv")
         tipo = "application/zip"
     return Response(contenido, media_type=tipo, headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
@@ -145,7 +155,7 @@ def descargas(base: str = "", departamento: str = "", nivel: str = "", desde: st
 
 @app.post("/v1/cargas", dependencies=[Depends(acceso)])
 async def cargas(archivos_subidos: list[UploadFile] = File(..., alias="archivos")):
-    """Carga los CSV del scraper (sueltos o la carpeta Scrapeo/output en un .zip) o PIM_Funcion.xlsx."""
+    """Carga los CSV del scraper (sueltos o la carpeta Scrapeo/output en un .zip), PIM_Funcion.xlsx o los Excel de pesca."""
     contenido, total = [], 0
     for a in archivos_subidos:
         datos = await a.read()
