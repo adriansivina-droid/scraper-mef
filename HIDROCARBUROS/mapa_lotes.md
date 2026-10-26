@@ -579,3 +579,12 @@ El mapa (colores de los lotes) no cambia.
 - Al excluirlo, la nota de referencia dice cuánto se dejó fuera en el periodo; por ejemplo, «S/ 204,4 millones en 2015-2023» en Loreto.
 - Por defecto se incluye, como en la pestaña del lote: así el total coincide con el canon asignado al departamento.
 - El título de referencia pasa a «Loreto: Transferencias de canon y sobrecanon petrolero según beneficiario, 2015-2026» (o «según nivel de gobierno»).
+
+**«Comparar lotes»: cuadro «mes y acumulado» (26/10/2026).** En la variable «Producción fiscalizada», el selector **«Formato»** ofrece **«Cuadro: mes y acumulado del año»**, al estilo de los cuadros del BCRP:
+- **Columnas:** estructura porcentual del año anterior · último mes con dato (año anterior, año actual y variación %) · acumulado de enero a ese mes (año anterior, año actual y variación %).
+- **Filas:** un lote por fila y el TOTAL en banda azul. Con lotes de varios departamentos, cada departamento lleva su subtotal en negrita.
+- **Unidad:** miles de barriles; en gas, millones de pies³. El producto se elige en «Producto»; por ejemplo, «Petróleo».
+- El último mes puede venir de los **meses cerrados del reporte diario**; la nota lo dice, por ejemplo «Julio-setiembre de 2026: suma de los reportes diarios de PERUPETRO (meses cerrados)».
+- La estructura % es la participación de cada lote en la producción del año anterior del conjunto de lotes del cuadro.
+- «🖼 Imagen» y «⬇ SVG» guardan solo el cuadro. El título y las notas se copian aparte. El CSV lleva el mismo cuadro.
+- Con este formato se ocultan «Apilar por», «Desde/Hasta» y «Unidad», que no aplican.
