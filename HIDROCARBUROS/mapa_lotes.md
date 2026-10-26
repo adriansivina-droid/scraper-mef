@@ -532,3 +532,13 @@ Bajo cada título hay una línea «📍 Alcance: …» que aclara si lo que se v
   - El canon por empresa es una **aproximación**. PERUPETRO publica el canon por lote, no por empresa. Si en un año el lote tuvo más de un operador, su canon se reparte según la producción fiscalizada de cada uno ese año; la nota del gráfico lo dice.
   - El año en curso tiene los meses de la estadística mensual (producción) o los meses con dato (canon); la nota lo indica.
 - **Archivos:** el generador es `comparar.html` (inyectado por el Bloque 4). El panel lee `window.ppProd` (series de producción, más `lc`: lote → campo) y `window.ppActDatos` (canon por lote, `cl`).
+
+**Gris en lugar de naranja en las estadísticas (26/10/2026).** A pedido del usuario, para mantener la armonía visual, el tercer color de la paleta de estadísticas pasa a ser el **gris azulado #CCD3DF** en lugar del naranja #DD6140. El orden queda: azul noche, turquesa, gris azulado, amarillo y luego los complementarios. El naranja queda al final y solo aparece si hay más de 9 series. Cambios:
+- Gráficos de comparación, empresas, municipalidades, departamentos y canon por lote: el gris pasa al tercer lugar y el naranja al último.
+- Regalías: condensado en gris.
+- Beneficiarios: universidades en gris y «Otros» en morado (#5A5A9E).
+- Franja de fuentes: «MEF · canon gasífero» en negro.
+- «Comparar con» del panel de producción: la segunda serie es turquesa (el gris claro se pierde en una línea).
+- «Comparar lotes»: «Sin operador identificado» en blanco con borde.
+
+El mapa (colores de los lotes) no cambia.
