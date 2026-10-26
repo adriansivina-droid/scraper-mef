@@ -22,7 +22,7 @@ scraper (o carga de una plantilla) → base de datos → descargas en Excel → 
 |---|---|---|---|---|
 | Resumen · otros indicadores | Cuadro 1 | SBS, MEF, DIREPRO y empresas | se arma con los demás módulos | al final |
 | Agropecuario | producción (t), superficie sembrada (ha) · Anexo 1 | MIDAGRI y direcciones regionales | **archivo mensual** que recibe el equipo | falta |
-| Pesca (Ucayali) | producción pesquera · Anexo 2 | DIREPRO Ucayali | **archivo mensual** | falta |
+| Pesca | producción pesquera y VBP · Anexo 2 | DIREPRO Loreto, San Martín y Ucayali | **archivo mensual**, llevado a LONG (Loreto con `PESCA/Pesca_Loreto_Long.ipynb`) | LONG listo, falta en el API |
 | Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions); precio por archivo | scraper listo |
 | Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | **archivo mensual** | falta |
 | Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | **archivo mensual**, que genera el scraper de `EMPLEO/` (Power BI del MTPE) | falta |
