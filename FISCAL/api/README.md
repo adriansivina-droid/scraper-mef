@@ -12,6 +12,27 @@ API interna para descargar las bases que bajan los scrapers del MEF (Consulta Am
 | 2 | El scraper corre en el servidor (Render), cada mes y a pedido, y escribe directo en la base de datos | pendiente |
 | 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en el servidor | pendiente |
 
+## Hoja de ruta: el informe completo
+
+El objetivo a largo plazo es que el API cubra la síntesis de actividad económica de la región, con el orden de su índice.
+Cada sección sería un módulo con el mismo esquema que Fiscal: scraper → base de datos → descargas en Excel → cuadros.
+
+| Sección del informe | Fuente probable | Estado |
+|---|---|---|
+| I. Actividad productiva · 1.1 Agropecuario | MIDAGRI | falta |
+| I. Actividad productiva · 1.2 Hidrocarburos | PERUPETRO | scraper en `HIDROCARBUROS/` (diario con GitHub Actions) |
+| I. Actividad productiva · 2.1 Manufactura | PRODUCE | falta |
+| II. Aspectos laborales · Empleo | MTPE | falta |
+| III. Sector externo · Exportaciones | Infotrade / PROMPERÚ (SUNAT) | scraper en `EXPORT/` |
+| III. Sector externo · Importaciones | SUNAT | falta |
+| IV. Crédito y depósitos | SBS | falta |
+| V. Presupuesto · Gasto corriente no financiero e Inversión pública | MEF, Consulta Amigable | en el API (fase 1) |
+| Anexos | cuadros de cada sección | al final |
+
+Orden propuesto: (1) terminar Fiscal (despliegue, fases 2 y 3); (2) sumar al API hidrocarburos y exportaciones, que ya
+tienen scraper; (3) fuentes nuevas: SBS, MTPE, MIDAGRI, PRODUCE e importaciones; (4) un botón que genere los cuadros y
+anexos del mes. Las fuentes de las secciones que faltan están por confirmar con el equipo.
+
 ## Bases
 
 | Grupo | Base (`base=`) | Hoja del Excel | Viene de |

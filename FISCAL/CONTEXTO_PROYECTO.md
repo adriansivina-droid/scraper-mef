@@ -285,6 +285,7 @@ API interna para que el equipo entre, marque y descargue las bases. Prototipo de
   - Pruebas en `FISCAL/api/tests` (SQLite y Postgres).
 - **Fase 2 (pendiente):** el scraper corre en el servidor, cada mes y a pedido, y escribe directo en la base.
 - **Fase 3 (pendiente):** reportes procesados (cuadros, variaciones, proyectos) generados en el servidor.
+- **Objetivo a largo plazo:** que el API cubra el informe completo de la región (actividad productiva, empleo, sector externo, crédito y depósitos, presupuesto y anexos). Hoja de ruta en `FISCAL/api/README.md`.
 - Decisiones del usuario: uso interno; actualización mensual; departamentos con casillas; nada de códigos técnicos a la vista; "Estado de los datos" va como tarjeta dentro de "Actualizar base de datos"; se quitó "Qué trae cada base"; el servicio de la deuda va dentro de "Gasto por genérica".
 
 ---
