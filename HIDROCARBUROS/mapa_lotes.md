@@ -564,3 +564,5 @@ El mapa (colores de los lotes) no cambia.
 - Por empresa: los meses del reporte diario se asignan al operador del lote si tenía uno solo; si no, van a «Sin operador identificado». La nota lo explica.
 - La fuente pasa a decir «estadística mensual y reportes diarios».
 - Los meses se escriben «setiembre», como en el Perú.
+
+**«Comparar lotes»: PNG 4× y descarga en SVG (26/10/2026).** «🖼 Imagen» guarda el PNG a 4× (unos 2.300 px de ancho). El botón nuevo **«⬇ SVG»** guarda el gráfico con su cuadro en formato vectorial, que en PowerPoint se ve nítido a cualquier tamaño (Insertar → Imágenes). El SVG lleva la letra Barlow incrustada; si PowerPoint no la usa, muestra la letra instalada en la computadora (Barlow, si está instalada; si no, Arial).
