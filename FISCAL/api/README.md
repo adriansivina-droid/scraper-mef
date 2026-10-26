@@ -1,14 +1,15 @@
 # Departamento de estudios BCRP-IQT · API
 
-API interna para descargar las bases que bajan los scrapers del MEF (Consulta Amigable). Una página permite marcar
-**bases, departamentos, nivel de gobierno y periodo** y descargar un Excel con una hoja por base, con el formato de
-`PIM_Funcion.xlsx`.
+API interna para descargar las bases que bajan los scrapers del MEF (Consulta Amigable) y las de **pesca** (DIREPRO de
+Loreto, San Martín y Ucayali). Una página permite marcar **bases, departamentos, nivel de gobierno y periodo** y
+descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 
 ## Estado del proyecto
 
 | Fase | Qué incluye | Estado |
 |---|---|---|
-| 1 | Página, descarga de las 7 bases (Excel, CSV o JSON), estado de la base de datos y carga de los archivos que genera el scraper de Colab | **lista** |
+| 1 | Página, descarga de las 7 bases del MEF (Excel, CSV o JSON), estado de la base de datos y carga de los archivos que genera el scraper de Colab | **lista** |
+| Pesca | Las 3 bases de pesca, cargadas con los Excel mensuales de las DIREPRO (o los LONG de los notebooks de `PESCA/`) | **lista** |
 | 2 | El scraper corre en el servidor (Render), cada mes y a pedido, y escribe directo en la base de datos | pendiente |
 | 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en el servidor | pendiente |
 
@@ -22,7 +23,7 @@ scraper (o carga de una plantilla) → base de datos → descargas en Excel → 
 |---|---|---|---|---|
 | Resumen · otros indicadores | Cuadro 1 | SBS, MEF, DIREPRO y empresas | se arma con los demás módulos | al final |
 | Agropecuario | producción (t), superficie sembrada (ha) · Anexo 1 | MIDAGRI y direcciones regionales | **archivo mensual** que recibe el equipo | falta |
-| Pesca | producción pesquera y VBP · Anexo 2 | DIREPRO Loreto, San Martín y Ucayali | **archivo mensual**, llevado a LONG con los notebooks de `PESCA/` (Loreto; San Martín y Ucayali) | LONG listo, falta en el API |
+| Pesca | producción pesquera y VBP · Anexo 2 | DIREPRO Loreto, San Martín y Ucayali | **archivo mensual**: el Excel de cada DIREPRO se sube en la página (o el LONG de los notebooks de `PESCA/`) | **en el API** |
 | Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions); precio por archivo | scraper listo |
 | Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | **archivo mensual** | falta |
 | Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | **archivo mensual**, que genera el scraper de `EMPLEO/` (Power BI del MTPE) | falta |
@@ -54,6 +55,19 @@ los cuadros y anexos del mes por región.
 | | `inv-pim-municipalidad` | PIM Municipalidades | `PIM Funcion.Municipalidad AAAA - ….csv` |
 | Gasto total | `gasto-dev-generica` | GASTO Genéricas | `DEV Generica.*`, con la 2.8 reemplazada por su desglose de `DEV Deuda.*` |
 | | `gasto-dev-fuente` | GASTO Fuentes | `DEV Fuente.*` |
+| Pesca | `pesca-loreto` | PESCA Loreto | Excel de DIREPRO Loreto (consumo: hojas `Desemb_*`; ornamentales: hoja `POR ESPECIES`) o `LOR_PESCA_LONG.xlsx` |
+| | `pesca-san-martin` | PESCA San Martín | `SMN_PESCA_AAAA-MM.xlsx` (el mes sale del nombre) o `SMN_PESCA_LONG.xlsx` |
+| | `pesca-ucayali` | PESCA Ucayali | `ESTADISTICA_PESQUERA_DIREPRO_UCA_….xlsx` (acumulado del año) o `UCA_PESCA_LONG.xlsx` |
+
+**Pesca** (detalle en `PESCA/pesca.md`; `app/pesca.py` repite la lógica de los notebooks de `PESCA/`):
+- Cada base tiene las columnas del LONG de su región, con el VBP en miles de soles de 2007 (`#,##0.000` en el Excel).
+  No usan el nivel de gobierno y solo tienen datos de su departamento.
+- Los Excel se reconocen por sus hojas. Un crudo se convierte al LONG al subirlo; si en la misma carga viene también el
+  LONG con ese periodo, gana el crudo.
+- San Martín y Ucayali clasifican las especies con lo que ya está en la base de datos (o con el LONG que se sube junto).
+  Por eso, **la primera vez hay que subir sus LONG históricos**; una especie que no estaba se avisa.
+- Loreto reemplaza el consumo y los ornamentales por separado: subir uno no borra el otro.
+- Ucayali llega con los 12 meses del año: los meses en cero después del último con datos no se guardan.
 
 ## Desplegar en Render + Neon (una sola vez)
 
@@ -92,7 +106,7 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/estado` | Por base: filas, departamentos y periodo cargado; última carga |
 | GET | `/v1/descargas/vista-previa` | Primeras filas y conteo de lo que se descargaría |
 | GET | `/v1/descargas` | El archivo: `formato=xlsx` (una hoja por base), `csv` (un `.zip` si son varias) o `json` (paginado) |
-| POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output` o `PIM_Funcion.xlsx` |
+| POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output`, `PIM_Funcion.xlsx` o los Excel de pesca |
 | GET | `/docs` | Documentación interactiva |
 
 Parámetros de las descargas: `base=inv-dev-funcion,inv-pim-funcion`, `departamento=16,22,25`,

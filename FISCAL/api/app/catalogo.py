@@ -15,7 +15,8 @@ NIVEL_DE_CORTO = {"GobNacional": "E", "GobRegional": "R", "Municipalidad": "M"}
 NIVEL_MEF = {"E": "E: GOBIERNO NACIONAL", "R": "R: GOBIERNOS REGIONALES", "M": "M: GOBIERNOS LOCALES"}
 NIVEL_PIM = {"E": "GOBIERNO NACIONAL", "R": "GOBIERNOS REGIONALES", "M": "GOBIERNOS LOCALES"}
 
-GRUPOS = {"inversion": "Inversión · genérica 2.6", "gasto": "Gasto total · todas las genéricas"}
+GRUPOS = {"inversion": "Inversión · genérica 2.6", "gasto": "Gasto total · todas las genéricas",
+          "pesca": "Pesca · DIREPRO, VBP a precios de 2007"}
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,8 @@ class Base:
     periodicidad: str = "mensual"
     usa_niveles: bool = True
     descripcion: str = ""
+    departamentos: tuple = ()                   # si la base es de algunos departamentos (vacío: todos)
+    formato_valor: str = "#,##0"
 
     @property
     def tabla(self):
@@ -61,6 +64,20 @@ BASES = {b.id: b for b in [
     Base("gasto-dev-fuente", "gasto", "Devengado por fuente de financiamiento", "Gasto por fuente", "GASTO Fuentes",
          ["AÑO", "MES", "NIVEL_GOBIERNO", "DEPARTAMENTO", "GENERICA", "COD_FUENTE", "FUENTE", "DEVENGADO"], [9.7, 12, 26, 20, 10, 12, 44, 14],
          descripcion="Devengado total (todas las genéricas) por mes, nivel de gobierno y fuente de financiamiento."),
+    # Pesca (PESCA/pesca.md): el LONG de cada región, con sus columnas; VBP en miles de soles de 2007
+    Base("pesca-loreto", "pesca", "Loreto · desembarque y peces ornamentales", "Pesca Loreto", "PESCA Loreto",
+         ["AÑO", "MES", "DEPARTAMENTO", "FUENTE", "ESTADO", "DESTINO", "ESPECIE", "ESPECIE_CORREGIDA", "ESPECIE_OK",
+          "ESPECIE_CUADRO", "UNIDAD", "VOLUMEN", "VBP"], [8, 6, 12, 26, 14, 28, 30, 30, 22, 20, 18, 12, 12],
+         valor="VBP", usa_niveles=False, departamentos=("16",), formato_valor="#,##0.000",
+         descripcion="DIREPRO Loreto: desembarque por estado y especie (t) y peces ornamentales por destino (miles de unidades)."),
+    Base("pesca-san-martin", "pesca", "San Martín · producción por origen y estado", "Pesca San Martín", "PESCA San Martín",
+         ["AÑO", "MES", "DEPARTAMENTO", "ORIGEN", "ESTADO", "ESTADO_OK", "ESPECIE", "ESPECIE_OK", "VOLUMEN", "VBP"],
+         [8, 6, 14, 20, 22, 14, 22, 18, 12, 12], valor="VBP", usa_niveles=False, departamentos=("22",), formato_valor="#,##0.000",
+         descripcion="DIREPRO San Martín: volumen (t) por origen, estado y especie; lo que llega de otros departamentos va como Otros."),
+    Base("pesca-ucayali", "pesca", "Ucayali · desembarque y peces ornamentales", "Pesca Ucayali", "PESCA Ucayali",
+         ["AÑO", "MES", "TIPO", "ESPECIES", "ESPECIES_CORREGIDO", "ESPECIES_OK", "VOLUMEN", "VBP"],
+         [8, 6, 14, 30, 30, 22, 12, 12], valor="VBP", usa_niveles=False, departamentos=("25",), formato_valor="#,##0.000",
+         descripcion="DIREPRO Ucayali: desembarque fresco, seco salado y total (t) y peces ornamentales (unidades)."),
 ]}
 
 # columnas internas para filtrar (no salen en las descargas)

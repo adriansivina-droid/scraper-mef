@@ -86,6 +86,15 @@ def leer(base_id, deptos, niveles, desde, hasta):
     return df[b.columnas].reset_index(drop=True)
 
 
+def leer_todo(base_id):
+    """Todas las filas de una base, sin columnas internas (None si está vacía)."""
+    b = BASES[base_id]
+    if not existe(b.tabla):
+        return None
+    with motor().connect() as cx:
+        return pd.read_sql(text(f'SELECT * FROM "{b.tabla}"'), cx)[b.columnas]
+
+
 def disponibilidad():
     """Por base: departamentos cargados, primer y último periodo y número de filas."""
     salida = {}
