@@ -4,13 +4,10 @@ services:
   - type: web
     name: estudios-bcrp-iqt
     runtime: docker
-    rootDir: FISCAL/api
-    dockerContext: .
-    dockerfilePath: ./Dockerfile
+    rootDir: FISCAL/api        # el Dockerfile y el contexto de Docker son los de esta carpeta (valor por defecto)
     plan: starter
     region: virginia
-    healthCheckPath: /salud
-    autoDeploy: true
+    healthCheckPath: /salud    # cada cambio en main se vuelve a desplegar solo (valor por defecto)
     envVars:
       - key: DATABASE_URL
         sync: false
