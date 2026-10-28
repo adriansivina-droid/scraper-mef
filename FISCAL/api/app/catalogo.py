@@ -18,7 +18,8 @@ NIVEL_PIM = {"E": "GOBIERNO NACIONAL", "R": "GOBIERNOS REGIONALES", "M": "GOBIER
 GRUPOS = {"inversion": "Inversión · genérica 2.6", "gasto": "Gasto total · todas las genéricas",
           "pesca": "Pesca · DIREPRO, VBP a precios de 2007",
           "empleo": "Empleo · MTPE, Planilla Electrónica",
-          "hidrocarburos": "Hidrocarburos · PERUPETRO"}
+          "hidrocarburos": "Hidrocarburos · PERUPETRO",
+          "comercio": "Exportaciones e importaciones · ESTAD (SUNAT)"}
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,17 @@ BASES = {b.id: b for b in [
          ["AÑO", "MES", "DEPARTAMENTO", "CANON_MM_SOLES"], [8, 6, 18, 16], valor="CANON_MM_SOLES", usa_niveles=False,
          reemplaza_periodo=True, formato_valor="#,##0.00",
          descripcion="PERUPETRO: canon y sobrecanon petrolero transferido a cada departamento por mes (millones de soles)."),
+    # Exportaciones (EXPORT/info_export.md): el ESTAD de cada región, en largo; FOB en miles de US$
+    Base("expo-estad", "comercio", "Exportaciones por grupo de productos (ESTAD)", "Exportaciones", "EXPORTACIONES",
+         ["AÑO", "MES", "DEPARTAMENTO", "ORDEN", "NIVEL", "TIPO", "GRUPO", "RUBRO", "FOB"], [8, 6, 14, 8, 10, 30, 28, 32, 12],
+         valor="FOB", usa_niveles=False, departamentos=("16", "22", "25"),
+         descripcion="ESTAD de Loreto (15.Export), San Martín (14.XLS) y Ucayali (15.XLS): exportaciones FOB por mes y fila del "
+                     "cuadro (total, tipo, grupo y producto), en miles de US$."),
+    Base("impo-estad", "comercio", "Importaciones por uso o destino (ESTAD, aduana de Iquitos)", "Importaciones", "IMPORTACIONES",
+         ["AÑO", "MES", "DEPARTAMENTO", "ORDEN", "NIVEL", "TIPO", "GRUPO", "RUBRO", "FOB"], [8, 6, 14, 8, 10, 30, 28, 34, 12],
+         valor="FOB", usa_niveles=False, departamentos=("16",),
+         descripcion="ESTAD de Loreto (16.Import): importaciones FOB por la aduana de Iquitos según uso o destino económico, "
+                     "en miles de US$."),
 ]}
 
 # columnas internas para filtrar (no salen en las descargas)

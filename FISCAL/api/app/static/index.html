@@ -73,10 +73,10 @@
       lead: "Despachos de cemento en la región, indicador adelantado de la construcción.", cuadros: ["Despachos de cemento (t)"] },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
       lead: "Trabajadores asalariados privados formales por rama de actividad económica.", cuadros: "empleo" },
-    expo: { t: "Exportaciones", estado: "parcial", fuente: "SUNAT", entra: "Archivo mensual (selector de partidas de EXPORT)",
-      lead: "Exportaciones tradicionales y no tradicionales por grupo de productos.", cuadros: ["Exportaciones por grupo de productos (FOB)"] },
-    impo: { t: "Importaciones", estado: "falta", fuente: "SUNAT, aduana de Iquitos", entra: "Archivo mensual",
-      lead: "Importaciones por la aduana de Iquitos según uso o destino económico.", cuadros: ["Importaciones FOB por uso o destino"] },
+    expo: { t: "Exportaciones", fuente: "SUNAT · ESTAD de la región (miles de US$)", entra: "Subiendo en la página el ESTAD de la región", bases: () => ["expo-estad"], actualizar: "estad",
+      lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos.", cuadros: "exportaciones" },
+    impo: { t: "Importaciones", fuente: "SUNAT · ESTAD de Loreto, aduana de Iquitos", entra: "Subiendo en la página el ESTAD de Loreto", bases: () => ["impo-estad"], actualizar: "estad",
+      lead: "Importaciones por la aduana de Iquitos según uso o destino económico (FOB), desde el ESTAD de Loreto.", cuadros: "importaciones" },
     credito: { t: "Crédito", estado: "falta", fuente: "SBS", entra: "Scraper de la web de la SBS, por construir",
       lead: "Saldos de crédito del sistema financiero por tipo, sin Banco de la Nación ni Agrobanco, y morosidad.", cuadros: ["Crédito por tipo", "Tasa de morosidad"] },
     depositos: { t: "Depósitos", estado: "falta", fuente: "SBS y AFP", entra: "Scraper de la web de la SBS, por construir",
@@ -85,7 +85,7 @@
       lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion", extra: ["Contraste", "Archivos"] },
     inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => INV, actualizar: "mef",
       lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos", "Contraste", "Archivos"] },
-    anexos: { t: "Anexos", fuente: "Todos los sectores", entra: "Se generan solos con los datos de cada sector", bases: (r) => ["gasto-dev-generica", "inv-dev-funcion", "empleo", "hidro-produccion", r.pesca],
+    anexos: { t: "Anexos", fuente: "Todos los sectores", entra: "Se generan solos con los datos de cada sector", bases: (r) => ["gasto-dev-generica", "inv-dev-funcion", "empleo", "hidro-produccion", "expo-estad", r.pesca],
       lead: "Cuadros estadísticos del final del informe, uno por sector, con el formato de la síntesis: listos para copiar o descargar.", cuadros: "anexos" },
   };
   const cap = (titulo, items) => ({ titulo, items });
@@ -454,6 +454,47 @@
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
   }
 
+  // ── Exportaciones (e importaciones de Loreto), desde el ESTAD ──
+  async function cuadrosExpo(r, caja, flujo) {
+    const clave = `ex-${flujo}-${grupo}`, st = estadoEjec(clave), expo = flujo === "expo";
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
+    try {
+      const c = (await api(`/v1/cuadros/exportaciones?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo, flujo })}`)).cuadros;
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay ${expo ? "exportaciones" : "importaciones"} de ${esc(r.nombre)} en la página.</b><span>Sube el ESTAD de la región en «Actualizar».</span></div>`; return; }
+      const a = c.anio, b = c.comparar, mes = c.titulo_mes, m3 = mes.slice(0, 3), d = c.dec, R = r.nombre.toUpperCase();
+      const nd = (v) => v == null ? "" : v.toLocaleString("es-PE", { minimumFractionDigits: d, maximumFractionDigits: d });
+      const vs = (v) => v == null ? "-" : pct(v), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
+      const tot = c.sintesis[c.sintesis.length - 1];
+      const filas = c.sintesis.map((f) => `<tr class="${f.total ? "total" : f.nivel === 0 ? "fuerte" : ""}"><td style="padding-left:${10 + f.nivel * 16}px">${esc(f.nombre)}</td><td class="n">${f.estructura == null ? "" : pct(f.estructura)}</td>
+        <td class="n">${nd(f.mes_b)}</td><td class="n">${nd(f.mes_a)}</td><td class="n ${cls(f.var_mes)}">${vs(f.var_mes)}</td><td class="n">${f.contrib_mes == null ? "" : pct(f.contrib_mes)}</td>
+        <td class="n">${nd(f.acum_b)}</td><td class="n">${nd(f.acum_a)}</td><td class="n ${cls(f.var_acum)}">${vs(f.var_acum)}</td><td class="n">${f.contrib_acum == null ? "" : pct(f.contrib_acum)}</td></tr>`).join("");
+      const exactas = c.sintesis.filter((f) => f.var_exacta_mes !== f.var_mes || f.var_exacta_acum !== f.var_acum);
+      const ax = c.anexo, grupos = [];
+      ax.columnas.forEach((x) => { const k = x.total ? "Total" : x.anio; if (!grupos.length || grupos[grupos.length - 1][0] !== k) grupos.push([k, 1]); else grupos[grupos.length - 1][1]++; });
+      const anexo = `<details class="caja"><summary><b>Anexo · ${esc(R)}: ${expo ? "exportaciones por grupo de productos" : "importaciones según uso o destino económico"}</b> (millones de US$, 13 meses)</summary>
+        <div class="scroll"><table><tr><th></th>${grupos.map(([k, n]) => `<th colspan="${n}" style="text-align:center">${esc(k)}</th>`).join("")}</tr>
+          <tr><th></th>${ax.columnas.map((x) => `<th class="n${x.total ? " tot" : ""}">${esc(x.etq)}</th>`).join("")}</tr>
+          ${ax.filas.map((f) => `<tr class="${f.tipo === "grupo" ? "fuerte" : ""}"><td style="padding-left:${10 + f.ind * 14}px;white-space:nowrap">${esc(f.nombre)}</td>${f.valores.map((v, j) => `<td class="n${ax.columnas[j].total ? " tot" : ""}">${fmt1(v)}</td>`).join("")}</tr>`).join("")}</table></div></details>`;
+      const graficos = expo ? itemsExpo(c, R, {}).filter((it) => it.tipo === "GRÁFICO").map((it) => `<div class="caja"><div class="bcrp-prev">${it.svg("")}</div></div>`).join("") : "";
+      caja.innerHTML = `<div class="fila controles"><label class="campo" for="${clave}-p">Mes<select id="${clave}-p">${[...c.meses].reverse().map((m) => `<option value="${m}"${m === c.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
+          <button class="btn" type="button" id="${clave}-x">Descargar en Excel</button><span class="nota">ESTAD con datos hasta ${esc(etqMes(c.ultimo))}</span></div>
+        <div class="stats tiles">
+          <div class="stat"><small>${expo ? "Exportaciones" : "Importaciones"} · ${esc(mes)} ${a}</small><b>US$ ${nd(tot.mes_a)} mill.</b>${delta(tot.var_mes)}<span>${esc(mes.toLowerCase())} ${b}: ${nd(tot.mes_b)}</span></div>
+          <div class="stat"><small>Ene.-${m3}. ${a}</small><b>US$ ${nd(tot.acum_a)} mill.</b>${delta(tot.var_acum)}<span>Ene.-${m3}. ${b}: ${nd(tot.acum_b)}</span></div>
+          ${expo && c.principales.acumulado.partes.length ? `<div class="stat"><small>Principal producto · Ene.-${m3}.</small><b>${esc(c.principales.acumulado.partes[0].nombre)}</b><span>${pct(c.principales.acumulado.partes[0].valor / c.principales.acumulado.total * 100)} % del total</span></div>` : ""}
+        </div>
+        <div class="caja cuadro-sintesis"><h3 style="text-align:center">${esc(R)}: ${expo ? "EXPORTACIONES POR GRUPO DE PRODUCTOS" : "IMPORTACIONES FOB SEGÚN USO O DESTINO ECONÓMICO"}</h3><p style="text-align:center;margin:0 auto">(Valor FOB en millones de USD)</p>
+          <div class="scroll"><table><tr><th rowspan="2">Tipo</th><th class="n">Estructura %</th><th colspan="2" class="n" style="text-align:center">${esc(mes)}</th><th rowspan="2" class="n">Var. %</th><th rowspan="2" class="n">Contrib.</th><th colspan="2" class="n" style="text-align:center">Enero - ${esc(mes)}</th><th rowspan="2" class="n">Var. %</th><th rowspan="2" class="n">Contrib.</th></tr>
+            <tr><th class="n">${b}</th><th class="n">${b}</th><th class="n">${a}</th><th class="n">${b}</th><th class="n">${a}</th></tr>${filas}</table></div>
+          <p class="nota">${expo ? `Regla del cuadro de la síntesis: ${d} decimal${d > 1 ? "es" : ""}, total = suma de los tipos redondeados, variaciones con las cifras redondeadas. Contribución: puntos porcentuales de la variación del total.` : "Millones de US$ con 1 decimal."}</p>
+          ${exactas.length ? `<p class="nota">Para redactar (con los miles de US$ del ESTAD): ${exactas.map((f) => `${esc(f.nombre)} ${vs(f.var_exacta_mes)} % en el mes y ${vs(f.var_exacta_acum)} % en el acumulado`).join("; ")}.</p>` : ""}</div>
+        ${graficos}
+        ${anexo}`;
+      $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; cuadrosExpo(r, caja, flujo); });
+      $(`${clave}-x`).addEventListener("click", () => { window.location.href = `/v1/cuadros/exportaciones?${new URLSearchParams({ departamento: r.cod, periodo: c.periodo, flujo, formato: "xlsx" })}`; });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
+  }
+
   async function cuadrosEjecucion(sector, r, caja) {
     const clave = `ej-${sector}-${grupo}`, st = estadoEjec(clave);
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
@@ -581,9 +622,9 @@
   const BCRP_TAB = "Cuadros y gráficos BCRP";
   // numeración de la síntesis de junio 2026 (se puede cambiar en cada cuadro)
   const NUM_BCRP = {
-    lor: { pesca: {}, hidro: { c: 4, g: 1, a: [2] }, empleo: { c: 6, g: 4, a: [5] }, gasto: { c: 11, a: [8, 9, 10] }, inversion: { c: 12, g: 8, a: [11, 12, 13] } },
-    smn: { pesca: {}, hidro: {}, empleo: { c: 4, g: 3 }, gasto: { c: 9, a: [5, 6, 7] }, inversion: { c: 10, g: 7, a: [8, 9, 10] } },
-    uca: { pesca: { c: 4, a: [2] }, hidro: { c: 5, g: 1, a: [3] }, empleo: { c: 7, g: 3 }, gasto: { c: 12, a: [7, 8, 9] }, inversion: { c: 13, g: 7, a: [10, 11, 12] } },
+    lor: { pesca: {}, hidro: { c: 4, g: 1, a: [2] }, empleo: { c: 6, g: 4, a: [5] }, expo: { c: 7, a: [6] }, impo: { a: [7] }, gasto: { c: 11, a: [8, 9, 10] }, inversion: { c: 12, g: 8, a: [11, 12, 13] } },
+    smn: { pesca: {}, hidro: {}, empleo: { c: 4, g: 3 }, expo: { c: 5, a: [4] }, gasto: { c: 9, a: [5, 6, 7] }, inversion: { c: 10, g: 7, a: [8, 9, 10] } },
+    uca: { pesca: { c: 4, a: [2] }, hidro: { c: 5, g: 1, a: [3] }, empleo: { c: 7, g: 3 }, expo: { c: 8, a: [6] }, gasto: { c: 12, a: [7, 8, 9] }, inversion: { c: 13, g: 7, a: [10, 11, 12] } },
   };
   const numBcrp = {};                                              // lo que el usuario escribió, por cuadro
   const B = window.BCRP, n0 = (v) => B.num(v, 0), n1 = (v) => B.num(v, 1), v1 = B.var1;
@@ -689,12 +730,43 @@
     return items;
   }
 
+  // exportaciones: el cuadro de la síntesis (Cuadro N° 7/5/8), el anexo y los gráficos de las SERIES (ENLACE ESTAD)
+  function itemsExpo(c, R, N) {
+    const a = c.anio, b = c.comparar, mes = c.titulo_mes, items = [], d = c.dec, expo = c.flujo === "expo", nd = (v) => B.num(v, d);
+    const tit = expo ? `${R}: EXPORTACIONES POR GRUPO DE PRODUCTOS` : `${R}: IMPORTACIONES FOB SEGÚN USO O DESTINO ECONÓMICO - ADUANA DE IQUITOS`;
+    const corte = `1/ Cifras preliminares y depuradas a ${etqMes(c.ultimo).toLowerCase()}.`;
+    items.push({ clave: "c", tipo: "CUADRO", num: N.c, nombre: tit, svg: (n) => B.cuadro({ numero: n, titulo: tit, llamada: "1/", unidad: "(Valor FOB en millones de USD)",
+      cab: [[{ t: "TIPO" }, { t: "Estructura %" }, { t: mes, span: 3, linea: true }, { t: `Enero-${mes}`, span: 3, linea: true }], [{ t: "" }, { t: b }, { t: b }, { t: a }, { t: "Var. %" }, { t: b }, { t: a }, { t: "Var. %" }]],
+      filas: c.sintesis.map((f) => ({ c: [f.nivel === 0 && f.nombre.startsWith("OTRAS") ? `${f.nombre} 2/` : f.nombre, n1(f.estructura), nd(f.mes_b), nd(f.mes_a), v1(f.var_mes), nd(f.acum_b), nd(f.acum_a), v1(f.var_acum)],
+        b: f.nivel === 0, ind: f.nivel, sep: f.nivel === 0 && !f.total, total: f.total })),
+      notas: [corte, ...(expo ? ["2/ Incluye reparación de bienes de capital, manufacturas de plástico, partes de aeronaves, entre otros."] : []), "Fuente: SUNAT."] }) });
+    const pie = (c.notas_estad || []).filter((x) => /^[23]\//.test(x));
+    items.push({ clave: "a0", tipo: "ANEXO", num: (N.a || [])[0], nombre: tit, svg: (n) => B.anexo({ numero: n, titulo: tit, llamada: "1/", unidad: "(Valor FOB - Millones de USD)",
+      columnas: c.anexo.columnas, dec: 1, filas: c.anexo.filas, notas: ["1/ Cifras preliminares.", ...(expo ? pie : []), "Fuente: SUNAT."] }) });
+    if (!expo) return items;
+    const va = c.variacion_anual.filter((x) => x.var != null), m3 = mes.slice(0, 3).toLowerCase();
+    if (va.length) items.push({ clave: "g1", tipo: "GRÁFICO", num: N.g, nombre: `${R}: VARIACIÓN DE LAS EXPORTACIONES`, svg: (n) => B.barras({ numero: n, titulo: `${R}: EXPORTACIONES`,
+      unidad: grupo === "uca" ? `(Variación % enero-${mes.toLowerCase()} respecto a similar periodo del año anterior)` : "(Variación % respecto al año anterior)", dec: 1, tope: grupo === "lor" ? 250 : null,
+      puntos: va.map((x) => ({ etq: x.etq, valor: x.var })), notas: [...(grupo === "uca" ? [] : [`* Enero-${mes.toLowerCase()}.`]), "Fuente: SUNAT."] }) });
+    const nt = c.no_tradicionales, mm = (p) => p.map((x) => ({ nombre: x.nombre, valor: x.valor }));
+    if (nt && (nt.anterior.partes.length || nt.actual.partes.length)) items.push({ clave: "g2", tipo: "GRÁFICO", num: N.g2, nombre: `${R}: PRINCIPALES PRODUCTOS NO TRADICIONALES`, svg: (n) => B.circulares({ numero: n,
+      titulo: `${R}: PRINCIPALES PRODUCTOS NO TRADICIONALES EXPORTADOS`, unidad: "(Estructura % del valor FOB)",
+      circulos: [{ subtitulo: `Enero-diciembre ${b}`, partes: mm(nt.anterior.partes) }, { subtitulo: `Enero-${mes.toLowerCase()} ${a}`, partes: mm(nt.actual.partes) }], notas: ["Fuente: SUNAT."] }) });
+    const pr = c.principales, mil = (p) => p.map((x) => ({ nombre: x.nombre, valor: x.valor / 1000 }));
+    if (pr.acumulado.partes.length) items.push({ clave: "g3", tipo: "GRÁFICO", num: N.g3, nombre: `${R}: PRINCIPALES PRODUCTOS EXPORTADOS, ENERO-${mes.toUpperCase()}`, svg: (n) => B.hbarras({ numero: n,
+      titulo: `${R}: PRINCIPALES PRODUCTOS EXPORTADOS, ENERO-${mes.toUpperCase()} ${a}`, unidad: "(Valor FOB en millones de USD)", dec: d, partes: mil(pr.acumulado.partes), notas: ["Fuente: SUNAT."] }) });
+    if (pr.mes.partes.length) items.push({ clave: "g4", tipo: "GRÁFICO", num: N.g4, nombre: `${R}: PRINCIPALES PRODUCTOS EXPORTADOS, ${mes.toUpperCase()}`, svg: (n) => B.hbarras({ numero: n,
+      titulo: `${R}: PRINCIPALES PRODUCTOS EXPORTADOS, ${mes.toUpperCase()} ${a}`, unidad: "(Valor FOB en millones de USD)", dec: d, partes: mil(pr.mes.partes), notas: ["Fuente: SUNAT."] }) });
+    return items;
+  }
+
   const URL_BCRP = (sid, r, periodo) => {
     const qp = periodo ? `&periodo=${periodo}` : "";
     return { pesca: `/v1/cuadros/pesca?departamento=${r.cod}${qp}`, hidro: `/v1/cuadros/hidrocarburos?departamento=${r.cod}${qp}`, empleo: `/v1/cuadros/empleo?departamento=${r.cod}${qp}`,
-      gasto: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=gasto&anexos=true${qp}`, inversion: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=inversion&anexos=true${qp}` }[sid];
+      gasto: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=gasto&anexos=true${qp}`, inversion: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=inversion&anexos=true${qp}`,
+      expo: `/v1/cuadros/exportaciones?departamento=${r.cod}${qp}`, impo: `/v1/cuadros/exportaciones?departamento=${r.cod}&flujo=impo${qp}` }[sid];
   };
-  const itemsBCRP = (sid, c, R, N) => sid === "pesca" ? itemsPesca(c, R, N) : sid === "hidro" ? itemsHidro(c, R, N) : sid === "empleo" ? itemsEmpleo(c, R, N) : itemsEjecucion(sid, c, R, N, c.ultimo);
+  const itemsBCRP = (sid, c, R, N) => sid === "expo" || sid === "impo" ? itemsExpo(c, R, N) : sid === "pesca" ? itemsPesca(c, R, N) : sid === "hidro" ? itemsHidro(c, R, N) : sid === "empleo" ? itemsEmpleo(c, R, N) : itemsEjecucion(sid, c, R, N, c.ultimo);
 
   // galería: cada cuadro con su número (editable), Copiar / SVG / PNG; un ítem sin svg es un pendiente (texto)
   function galeriaBCRP(caja, clave, items, controles) {
@@ -742,9 +814,9 @@
     manu2: "Producción manufacturera · variación porcentual", expo: "Exportaciones por grupo de productos (SUNAT)", impo: "Importaciones FOB según uso o destino económico - Aduana de Iquitos",
     credito: "Crédito (SBS)", depositos: "Depósitos (SBS)", morosidad: "Tasa de morosidad (SBS)" };
   const ANEXOS_SINTESIS = {
-    lor: [["agro"], ["hidro", 0], ["manu1"], ["manu2"], ["empleo", 0], ["expo"], ["impo"], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
-    smn: [["agro"], ["manu1"], ["manu2"], ["expo"], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
-    uca: [["agro"], ["pesca", 0], ["hidro", 0], ["manu1"], ["manu2"], ["expo"], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+    lor: [["agro"], ["hidro", 0], ["manu1"], ["manu2"], ["empleo", 0], ["expo", 0], ["impo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+    smn: [["agro"], ["manu1"], ["manu2"], ["expo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+    uca: [["agro"], ["pesca", 0], ["hidro", 0], ["manu1"], ["manu2"], ["expo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
   };
   async function anexosBCRP(r, caja) {
     const clave = `anx-${grupo}`, st = estadoEjec(clave), R = r.nombre.toUpperCase(), lista = ANEXOS_SINTESIS[grupo] || [];
@@ -918,6 +990,7 @@
         <iframe class="mapa" src="/v1/hidrocarburos/mapa" title="Mapa de lotes de hidrocarburos" sandbox="allow-scripts allow-popups allow-downloads allow-modals" loading="lazy"></iframe></div>`;
     else if (t === "Cuadros" && s.cuadros === "ejecucion") panel = `<div id="cuadros-ejec" data-sector="${id}"></div>`;
     else if (t === "Cuadros" && s.cuadros === "pesca") panel = '<div id="cuadros-pesca"></div>';
+    else if (t === "Cuadros" && (s.cuadros === "exportaciones" || s.cuadros === "importaciones")) panel = `<div id="cuadros-expo" data-flujo="${s.cuadros === "exportaciones" ? "expo" : "impo"}"></div>`;
     else if (t === "Variaciones alarmantes") panel = '<div id="variaciones"></div>';
     else if (t === "Proyectos") panel = '<div id="proyectos"></div>';
     else if (t === "Archivos") panel = '<div id="archivos-fiscal"></div>';
@@ -929,6 +1002,7 @@
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
       : s.actualizar === "hidro" ? `<div><div class="caja"><h3>PERUPETRO → página</h3><div id="hidro-caja"></div></div>${cajaSubida("sub-hidro", "Los CSV de producción o canon (PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv). Traen la serie completa y reemplazan lo cargado.")}</div>`
       : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página.`)
+      : s.actualizar === "estad" ? cajaSubida("sub-estad", `El libro ESTAD de ${esc(r.nombre)} tal como está (${{ lor: "ESTADLO.xlsx: hojas 15.Export e 16.Import", smn: "ESTADSMN.xlsx: hoja 14.XLS", uca: "ESTADUCA.xlsx: hoja 15.XLS" }[grupo]}). La página lee solo las columnas de cada mes (no las de Var.% ni los acumulados del final) y reemplaza los meses que trae.`)
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
       : `<div class="vacio-caja"><b>Cómo entrará: ${esc(s.entra.toLowerCase())}.</b><span>Cuando se construya, aquí estarán su actualización y la carga del archivo del mes de ${esc(r.nombre)}.</span></div>`;
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
@@ -969,7 +1043,7 @@
     } else if (id === "act-mef") cuerpo = cajaScraper("mef");
     else if (id === "act-empleo") cuerpo = cajaScraper("empleo");
     else if (id === "act-hidro") cuerpo = '<div class="caja"><h3>Hidrocarburos: PERUPETRO → página</h3><div id="hidro-caja"></div></div>';
-    else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "Cualquier archivo que entienda la página: el .zip de Fiscal/Scrapeo/output, CSV del scraper o PIM_Funcion.xlsx (MEF); los Excel de las DIREPRO o los LONG de los notebooks (pesca); o el Excel del scraper de empleo. La página reconoce de qué sector y región es cada uno. Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.");
+    else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "Cualquier archivo que entienda la página: el .zip de Fiscal/Scrapeo/output, CSV del scraper o PIM_Funcion.xlsx (MEF); los Excel de las DIREPRO o los LONG de los notebooks (pesca); el Excel del scraper de empleo o el ESTAD de una región (exportaciones e importaciones). La página reconoce de qué sector y región es cada uno. Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.");
     else if (id === "estado") {
       const u = ESTADO.ultima_carga;
       cuerpo = `<div class="stats"><div class="stat"><small>Datos hasta</small><b>${esc(etqMes(datosHasta()))}</b><span>último mes con datos</span></div>
@@ -1008,12 +1082,13 @@
     document.querySelectorAll("#sector .dep").forEach((c) => c.addEventListener("change", () => { paneles.mefDeps = [...document.querySelectorAll(".dep")].filter((x) => x.checked).map((x) => x.value); vistaPrevia("p-mef"); }));
     if ($("el-vista")) atarEmpleoLong();
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
-    ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca"].forEach(atarSubida);
+    ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
     if ($("hidro-caja")) cajaHidro($("hidro-caja"));
     if ($("cuadros-empleo")) cuadrosEmpleo(REG[grupo], $("cuadros-empleo"));
     if ($("cuadros-hidro")) cuadrosHidro(REG[grupo], $("cuadros-hidro"));
     if ($("cuadros-pesca")) cuadrosPesca(REG[grupo], $("cuadros-pesca"));
+    if ($("cuadros-expo")) cuadrosExpo(REG[grupo], $("cuadros-expo"), $("cuadros-expo").dataset.flujo);
     if ($("cuadros-ejec")) cuadrosEjecucion($("cuadros-ejec").dataset.sector, REG[grupo], $("cuadros-ejec"));
     if ($("variaciones")) variacionesAlarmantes(REG[grupo], $("variaciones"));
     if ($("proyectos")) proyectosVariaciones(REG[grupo], $("proyectos"));

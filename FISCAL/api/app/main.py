@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import almacen, archivos, bcrp_excel, carga, controles, db, ejecucion, empleo, hidrocarburos, ipc, mef, pesca_cuadros
+from . import almacen, archivos, bcrp_excel, carga, controles, db, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, mef, pesca_cuadros
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -367,10 +367,10 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
 
 @app.post("/v1/bcrp/excel", dependencies=[Depends(acceso)])
 def bcrp_excel_(cuerpo: dict = Body(...)):
-    """Excel de un cuadro de «Cuadros y gráficos BCRP» con el formato de la síntesis: {tipo: cuadro|anexo|barras, spec, nombre}."""
+    """Excel de un cuadro de «Cuadros y gráficos BCRP» con el formato de la síntesis: {tipo: cuadro|anexo|barras|circular|hbarras, spec, nombre}."""
     tipo, spec = cuerpo.get("tipo"), cuerpo.get("spec")
-    if tipo not in ("cuadro", "anexo", "barras") or not isinstance(spec, dict):
-        raise HTTPException(422, "Falta el tipo (cuadro, anexo o barras) o los datos del cuadro.")
+    if tipo not in ("cuadro", "anexo", "barras", "circular", "hbarras") or not isinstance(spec, dict):
+        raise HTTPException(422, "Falta el tipo (cuadro, anexo, barras, circular o hbarras) o los datos del cuadro.")
     try:
         contenido = bcrp_excel.libro(tipo, spec)
     except (KeyError, TypeError, ValueError) as e:
@@ -412,6 +412,23 @@ def cuadro_pesca(departamento: str = Query(..., pattern=r"^(16|22|25)$"), period
         return Response(pesca_cuadros.excel(region, c), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(f"Pesca {region} {c['periodo']} vs {c['comparar']}.xlsx"))
     c.pop("_formato", None)
+    return {"region": region, "cuadros": c}
+
+
+@app.get("/v1/cuadros/exportaciones", dependencies=[Depends(acceso)])
+def cuadro_exportaciones(departamento: str = Query(..., pattern=r"^(16|22|25)$"), periodo: str = Query("", pattern=r"^(\d{4}-\d{2})?$"),
+                         flujo: str = Query("expo", pattern="^(expo|impo)$"), formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Exportaciones (o importaciones de Loreto) desde el ESTAD: cuadro de la síntesis, anexo y gráficos."""
+    if flujo == "impo" and departamento != "16":
+        raise HTTPException(422, "Las importaciones (aduana de Iquitos) solo están en el ESTAD de Loreto.")
+    region = _ejecucion(departamento, periodo, "")
+    df = db.leer(f"{flujo}-estad", [departamento], [], "1990-01", "2100-12")
+    c = expo_cuadros.cuadros(departamento, df, periodo or None, flujo)
+    if c is None:
+        return {"region": region, "cuadros": None}
+    if formato == "xlsx":
+        return Response(expo_cuadros.excel(region, c), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"{'Exportaciones' if flujo == 'expo' else 'Importaciones'} {region} {c['periodo']}.xlsx"))
     return {"region": region, "cuadros": c}
 
 
