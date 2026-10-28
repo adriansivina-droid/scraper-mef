@@ -155,6 +155,16 @@ def ipc_xlsx(serie, ruta):
     return len(serie)
 
 
+def ipc_al_dia():
+    """Antes de procesar, el IPC de Lima del BCRP (si no responde, se usa el cargado en la página)."""
+    from app import ipc
+    try:
+        return ipc.actualizar_bcrp()
+    except Exception as e:
+        cargado = ipc.estado()
+        return f"IPC de Lima: el BCRP no respondió ({e}); se usa el cargado ({cargado['fuente']}, hasta {cargado['hasta']})."
+
+
 def guardar(carpeta_salida):
     """Guarda en la base los .xlsx de Procesamiento/output. Devuelve sus nombres."""
     from app import db
@@ -168,6 +178,7 @@ def guardar(carpeta_salida):
 def main():
     lineas, ok, t0 = [f"## Procesamiento fiscal · {datetime.now():%d/%m/%Y %H:%M}\n"], True, time.time()
     try:
+        lineas.append(f"- {ipc_al_dia()}")
         with tempfile.TemporaryDirectory() as tmp:
             raiz = Path(tmp) / "Fiscal"
             hechas = preparar(raiz)

@@ -130,36 +130,23 @@ en el notebook, el servidor usa el cambio.
 3. Render → servicio → **Environment** → **Add Environment Variable** → `GITHUB_ACCIONES_TOKEN` = el token → guardar.
    Nunca lo pegues en un chat. Cuando venza, el botón avisará «el token no es válido o venció»: se genera otro igual.
 
-## Pesca desde Drive (automático)
+## Todo en la página (Drive solo para hidrocarburos)
 
-Basta con dejar los Excel que manda cada DIREPRO en su carpeta de crudos de Drive: el API los carga solo **cada día a
-las 7:30 a. m.** (GitHub Actions, `.github/workflows/pesca_drive.yml`) o **al instante** con el botón «Sincronizar
-ahora» de «Actualizar base de datos». Solo procesa los archivos nuevos o modificados (con «Volver a procesar todos»,
-todos). Solo lee: nunca escribe ni borra en Drive.
+La página guarda todo en su base de datos y usa GitHub Actions solo para lo que necesita un servidor aparte (los
+scrapers del MEF y de empleo, los notebooks fiscales). Drive ya no hace falta, salvo para hidrocarburos:
 
-| Base | Carpeta de crudos |
-|---|---|
-| Pesca Loreto | `1FRKRjpHi_KX5twCCafYiHedPuQPscWqj` |
-| Pesca San Martín | `1Kkwys70cT3Z4ia5T7tO6CmNuQX-mSKWT` |
-| Pesca Ucayali | `1AEEvAfbtJwbkW773mKg-BIsDwjigjCg9` |
-
-**Configurar (una vez, después de desplegar en Render):**
-1. **Credencial de Drive en Render.** Es la misma que usa el flujo de hidrocarburos (secreto `GOOGLE_DRIVE_CREDENCIAL`
-   de GitHub). GitHub no deja volver a ver un secreto, así que si ya no tienes el archivo, genera otra con
-   `HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb` (la anterior sigue sirviendo). En Render → servicio →
-   **Environment** → variable `GOOGLE_DRIVE_CREDENCIAL` → pega todo el contenido de `credencial_drive.json` → guardar.
-   La cuenta con la que se generó debe poder ver las tres carpetas de crudos. Nunca pegues la credencial en un chat.
-2. **Secretos en GitHub** (repositorio → Settings → Secrets and variables → Actions → New repository secret):
-   - `ESTUDIOS_API_URL`: la dirección del servicio (`https://estudios-bcrp-iqt.onrender.com` o la que te dio Render);
-   - `ESTUDIOS_API_USUARIO` y `ESTUDIOS_API_CLAVE`: los valores de `APP_USUARIO` y `APP_CLAVE` (Render → Environment).
-   Mientras falten, el flujo diario solo deja un aviso y no falla.
-3. **Primera carga:** deja también en las carpetas de San Martín y Ucayali sus LONG históricos (`SMN_PESCA_LONG.xlsx`,
-   `UCA_PESCA_LONG.xlsx`), o súbelos una vez en la página: de ahí sale la clasificación de especies. Los notebooks de
-   `PESCA/` ignoran esos LONG en las carpetas de crudos.
-4. Prueba con «Sincronizar ahora», o en GitHub: Actions → «Drive · sincronizar pesca e hidrocarburos» → Run workflow.
-
-Las carpetas se pueden cambiar sin tocar el código con las variables `DRIVE_CRUDOS_LORETO`, `DRIVE_CRUDOS_SAN_MARTIN` y
-`DRIVE_CRUDOS_UCAYALI`.
+- **Pesca:** el Excel que manda cada DIREPRO (o el LONG / la base histórica) se sube en la página: pestaña
+  «Actualizar» del sector pesca de cada región, o «Las tres regiones → Subir archivos». Queda guardado en la base.
+- **IPC de Lima:** se trae solo del BCRP (al abrir los cuadros de ejecución si le falta el mes anterior, a lo más una
+  vez al día, y antes de cada procesamiento fiscal). Si el BCRP no responde, se sube `IPC.xlsx` en la página.
+- **Notebooks fiscales:** sus Excel quedan en la pestaña «Archivos» (ver Ejecución del presupuesto).
+- **Hidrocarburos:** el flujo `hidrocarburos_actualizar.yml` sigue guardando su DATA en Drive; la página la toma de
+  allí cada día a las 7:30 y 9:00 a. m. (`.github/workflows/pesca_drive.yml`, «Drive · sincronizar hidrocarburos») o
+  con «Sincronizar ahora». Requiere la variable `GOOGLE_DRIVE_CREDENCIAL` en Render (la misma credencial del flujo de
+  hidrocarburos, generada con `HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb`) y los secretos de GitHub
+  `ESTUDIOS_API_URL`, `ESTUDIOS_API_USUARIO` y `ESTUDIOS_API_CLAVE`. Nunca pegues credenciales en un chat.
+- **Cargar archivos sin abrir la página:** `.github/workflows/cargar_archivos.yml` sube a la página los archivos de la
+  carpeta `cargas/` de una rama aparte.
 
 ## Empleo (MTPE)
 
@@ -260,8 +247,8 @@ En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
   deja el scraper; la deuda desglosada vuelve a `DEV Deuda`) y el `IPC.xlsx`, con el IPC cargado en la página. Sus
   Excel (`Fiscal-<Depto>_AUTO.xlsx` y «Variaciones alarmantes AAAA-MM.xlsx») se guardan en la base y se descargan en la
   pestaña **Archivos** de Gasto corriente e Inversión pública.
-- **IPC de Lima** (variación real): se trae de la API del BCRP en cada sincronización con Drive (serie `IPC_SERIE_BCRP`,
-  por defecto `PN38705PM` y, de respaldo, `PN01270PM`). Si no responde, usa el `IPC.xlsx` de Drive, o el que se suba en la página. Sin IPC, los
+- **IPC de Lima** (variación real): se trae solo de la API del BCRP (serie `IPC_SERIE_BCRP`, por defecto `PN38705PM`
+  y, de respaldo, `PN01270PM`). Si no responde, se usa el `IPC.xlsx` que se suba en la página. Sin IPC, los
   cuadros muestran la variación nominal y lo avisan.
 
 ## Endpoints
@@ -277,7 +264,7 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/descargas` | El archivo: `formato=xlsx` (una hoja por base), `csv` (un `.zip` si son varias) o `json` (paginado) |
 | POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output`, `PIM_Funcion.xlsx`, los Excel de pesca o el de empleo |
 | GET | `/v1/drive` | Si Drive está conectado, sus carpetas y la última sincronización |
-| POST | `/v1/drive/sincronizar` | Carga los archivos nuevos o modificados de Drive: crudos de pesca y CSV de hidrocarburos (`todo=true`: todos) |
+| POST | `/v1/drive/sincronizar` | Carga los archivos nuevos o modificados de la carpeta DATA de hidrocarburos en Drive (`todo=true`: todos) |
 | GET | `/v1/mef` | Si el botón del MEF está configurado y las últimas corridas del scraper en GitHub |
 | POST | `/v1/mef/actualizar` | Lanza el scraper del MEF en GitHub Actions (`desde`, `hasta` AAAA-MM opcionales; `prueba=true`) |
 | GET | `/v1/empleo` | Si el botón de empleo está configurado y las últimas corridas de su scraper |

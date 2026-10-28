@@ -61,7 +61,7 @@
       lead: "Principales hechos de importancia y el Cuadro 1 (otros indicadores) del mes.", cuadros: ["Principales hechos de importancia", "Cuadro 1 · Otros indicadores"] },
     agro: { t: "Sector agropecuario", estado: "falta", fuente: "MIDAGRI y direcciones regionales de agricultura", entra: "Archivo mensual",
       lead: "Producción de los principales cultivos y crianzas, y avance de siembras de la campaña.", cuadros: ["Producción agropecuaria (t)", "Superficie sembrada (ha)", "Anexo de producción agrícola"] },
-    pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Drive, cada día a las 7:30 a. m., o subiendo el Excel", bases: (r) => [r.pesca], actualizar: "drive",
+    pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Subiendo en la página el Excel que envía DIREPRO", bases: (r) => [r.pesca], actualizar: "subir",
       lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: "pesca" },
     hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Scraper diario de PERUPETRO (7:00 a. m.) → Drive → página (7:30 y 9:00 a. m.)",
       bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "drive-hidro", cuadros: "hidrocarburos", mapa: true,
@@ -97,7 +97,7 @@
     tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-drive", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
   const C = { panorama: "Panorama de las tres regiones", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
-              "act-empleo": "Scraper de empleo", "act-drive": "Drive: pesca e hidrocarburos", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
+              "act-empleo": "Scraper de empleo", "act-drive": "Drive: hidrocarburos", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
   const CORTO = { [V]: "V. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
 
@@ -474,7 +474,7 @@
       const fila = (f) => `<tr class="${f.nombre === "Total" ? "total" : ""}"><td>${esc(f.nombre)}</td><td class="n">${mill(f.mes_b)}</td><td class="n">${mill(f.mes_a)}</td><td class="n ${vm(f) == null ? "" : vm(f) >= 0 ? "sube" : "baja"}">${pct(vm(f))}</td>
         <td class="n">${mill(f.acum_b)}</td><td class="n">${mill(f.acum_a)}</td><td class="n ${va(f) == null ? "" : va(f) >= 0 ? "sube" : "baja"}">${pct(va(f))}</td>${inv ? `<td class="n">${mill(f.pim)}</td><td>${avanceBarra(f.avance, parejo)}</td>` : ""}</tr>`;
       const titulo = inv ? "INVERSIÓN PÚBLICA" : "GASTO CORRIENTE NO FINANCIERO";
-      const nota = `${real ? "Var. % real: deflactada con el IPC de Lima" + (j.ipc && j.ipc.fuente ? ` (${esc(j.ipc.fuente)})` : "") : "Var. % nominal: falta el IPC de Lima (se trae del BCRP en cada sincronización con Drive, o sube IPC.xlsx)"}. Millones de soles corrientes.`;
+      const nota = `${real ? "Var. % real: deflactada con el IPC de Lima" + (j.ipc && j.ipc.fuente ? ` (${esc(j.ipc.fuente)})` : "") : "Var. % nominal: falta el IPC de Lima (se trae solo del BCRP; si no responde, sube IPC.xlsx en «Subir archivos»)"}. Millones de soles corrientes.`;
       const comp = c.participacion, sumaP = comp.reduce((s, p) => s + (p.valor || 0), 0);
       caja.innerHTML = `${selectorEjec(c, clave, `<button class="btn" type="button" id="${clave}-x">Descargar en Excel</button>`)}
         ${tiles}
@@ -693,7 +693,7 @@
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
       : s.actualizar === "drive-hidro" ? `<div class="grid2"><div class="caja"><h3>Carpeta DATA del Proyecto Petróleo</h3><div id="drive-caja" data-base="hidrocarburos"></div></div>${cajaSubida("sub-hidro", "Los CSV de la carpeta DATA: PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv. Traen la serie completa y reemplazan lo cargado.")}</div>`
-      : s.actualizar === "drive" ? `<div class="grid2"><div class="caja"><h3>Carpeta de crudos de ${esc(r.nombre)}</h3><div id="drive-caja" data-base="${r.pesca}"></div></div>${cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG del notebook.`)}</div>`
+      : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página: ya no hace falta ponerlo en Drive.`)
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
       : `<div class="vacio-caja"><b>Cómo entrará: ${esc(s.entra.toLowerCase())}.</b><span>Cuando se construya, aquí estarán su actualización y la carga del archivo del mes de ${esc(r.nombre)}.</span></div>`;
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
@@ -733,7 +733,7 @@
         <div class="caja"><h3>Empleo</h3>${panelBases("p-cempleo", ["empleo"], { deptos: () => LSU, marcar: 1 })}</div>`;
     } else if (id === "act-mef") cuerpo = cajaScraper("mef");
     else if (id === "act-empleo") cuerpo = cajaScraper("empleo");
-    else if (id === "act-drive") cuerpo = '<div class="caja"><h3>Carpetas de Drive: crudos de las DIREPRO y DATA de hidrocarburos</h3><div id="drive-caja"></div></div>';
+    else if (id === "act-drive") cuerpo = '<div class="caja"><h3>Carpeta DATA de hidrocarburos en Drive</h3><p>Lo único que la página aún toma de Drive: los CSV y el mapa que el flujo de hidrocarburos deja en su carpeta DATA. La pesca se sube en la página y el IPC se trae del BCRP.</p><div id="drive-caja"></div></div>';
     else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "Cualquier archivo que entienda la página: el .zip de Fiscal/Scrapeo/output, CSV del scraper o PIM_Funcion.xlsx (MEF); los Excel de las DIREPRO o los LONG de los notebooks (pesca); o el Excel del scraper de empleo. La página reconoce de qué sector y región es cada uno. Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.");
     else if (id === "estado") {
       const u = ESTADO.ultima_carga;

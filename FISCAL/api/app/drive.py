@@ -1,9 +1,11 @@
-"""Sincroniza desde Drive la pesca y los hidrocarburos: baja los archivos nuevos o modificados y los carga como si se
-hubieran subido en la página.
-  · Pesca: los Excel de las carpetas de crudos de cada DIREPRO.
-  · Hidrocarburos: de la carpeta DATA del Proyecto Petróleo (HIDROCARBUROS/perupetro_produccion.md), solo la producción
-    de líquidos y de gas por lote (el CSV más reciente de cada uno) y el canon por departamento. Lo usan el botón «Sincronizar desde Drive» y GitHub Actions
-(.github/workflows/pesca_drive.yml).
+"""Sincroniza desde Drive los hidrocarburos: baja los archivos nuevos o modificados y los carga como si se hubieran
+subido en la página. De la carpeta DATA del Proyecto Petróleo (HIDROCARBUROS/perupetro_produccion.md), solo la
+producción de líquidos, de gas y diaria por lote (el CSV más reciente de cada uno), el canon por departamento y el mapa
+de lotes. Lo usan el botón «Sincronizar ahora» y GitHub Actions (.github/workflows/pesca_drive.yml).
+
+La página ya no depende de Drive para lo demás: la pesca se sube en la página, el IPC se trae del BCRP
+(ipc.actualizar_bcrp) y los Excel de los notebooks fiscales se guardan en la base. Drive queda solo mientras el flujo de
+hidrocarburos guarde allí su DATA.
 
 Credencial: variable GOOGLE_DRIVE_CREDENCIAL con el JSON de HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb
 (tipo authorized_user, la misma que usa el flujo de hidrocarburos) o el de una cuenta de servicio con acceso a las
@@ -17,17 +19,12 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from . import carga, db, hidrocarburos, ipc
+from . import carga, db, hidrocarburos
 
-# carpeta de crudos de cada base de pesca (PESCA/pesca.md); se pueden cambiar con variables de entorno
-CARPETAS = {
-    "pesca-loreto": os.environ.get("DRIVE_CRUDOS_LORETO", "1FRKRjpHi_KX5twCCafYiHedPuQPscWqj"),
-    "pesca-san-martin": os.environ.get("DRIVE_CRUDOS_SAN_MARTIN", "1Kkwys70cT3Z4ia5T7tO6CmNuQX-mSKWT"),
-    "pesca-ucayali": os.environ.get("DRIVE_CRUDOS_UCAYALI", "1AEEvAfbtJwbkW773mKg-BIsDwjigjCg9"),
-    "hidrocarburos": os.environ.get("DRIVE_HIDROCARBUROS_DATA", "1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq"),
-}
+# carpeta DATA del Proyecto Petróleo; se puede cambiar con una variable de entorno
+CARPETAS = {"hidrocarburos": os.environ.get("DRIVE_HIDROCARBUROS_DATA", "1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq")}
 MAPAS = ("PP_mapa_lotes_plus.html", "PP_mapa_lotes.html")   # el primero que haya, en ese orden
-REGION = {"pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali", "hidrocarburos": "Hidrocarburos"}
+REGION = {"hidrocarburos": "Hidrocarburos"}
 API = "https://www.googleapis.com/drive/v3/files"
 _en_curso = threading.Lock()
 
@@ -87,13 +84,6 @@ class LectorDrive:
         f = r.json().get("files", [])
         return f[0]["id"] if f else None
 
-    def buscar(self, nombre):
-        """Archivos con ese nombre en todo lo que ve la cuenta: [{id, name, modifiedTime}]."""
-        r = self.sesion.get(API, params={"q": f"name = '{nombre}' and trashed = false", "fields": "files(id,name,modifiedTime)",
-                                         "supportsAllDrives": "true", "includeItemsFromAllDrives": "true", "corpora": "allDrives"}, timeout=60)
-        r.raise_for_status()
-        return r.json().get("files", [])
-
     def bajar(self, file_id):
         r = self.sesion.get(f"{API}/{file_id}", params={"alt": "media", "supportsAllDrives": "true"}, timeout=300)
         r.raise_for_status()
@@ -130,9 +120,7 @@ def _nombre_unico(nombre, usados):
     return f"{p.stem} ({i}){p.suffix}"
 
 
-def _listar(lector, base_id, carpeta):
-    if base_id != "hidrocarburos":
-        return lector.listar(carpeta)
+def _listar(lector, carpeta):
     # de cada tipo, solo el más reciente (en DATA pueden quedar CSV de corridas con otro rango de años)
     ultimos = {}
     for a in lector.listar(carpeta, hidrocarburos.tipo):
@@ -149,37 +137,15 @@ def _listar(lector, base_id, carpeta):
     return list(ultimos.values())
 
 
-def _ipc(lector):
-    """IPC de Lima para las variaciones reales: del BCRP; si no responde, el IPC.xlsx de Drive, pero solo si llega más
-    lejos que el que ya está cargado (p. ej., uno subido a mano en la página)."""
-    try:
-        return ipc.actualizar_bcrp()
-    except Exception as e:
-        motivo = f"el BCRP no respondió o no está al día ({e})"
-    cargado = ipc.estado()
-    try:
-        hallados = lector.buscar("IPC.xlsx") if hasattr(lector, "buscar") else []
-        if hallados:
-            a = max(hallados, key=lambda x: x["modifiedTime"])
-            s = ipc.de_excel(lector.bajar(a["id"]))
-            if not cargado["hasta"] or max(s) > cargado["hasta"]:
-                return f"IPC de Lima: {motivo}; se usó IPC.xlsx de Drive ({ipc.guardar(s, 'IPC.xlsx de Drive')} meses, hasta {max(s)})."
-    except Exception as e:
-        motivo += f"; no se pudo leer IPC.xlsx de Drive ({e})"
-    if cargado["hasta"]:
-        return f"IPC de Lima: {motivo}; se mantiene el cargado ({cargado['fuente']}, hasta {cargado['hasta']})."
-    return f"IPC de Lima: {motivo} y no hay IPC cargado; las variaciones quedan en términos nominales."
-
-
 def sincronizar(origen="botón de la página", todo=False, lector=None):
-    """Carga los Excel nuevos o modificados (todos, con todo=True) de las carpetas de crudos. Devuelve el resumen."""
+    """Carga los archivos nuevos o modificados (todos, con todo=True) de la carpeta DATA. Devuelve el resumen."""
     if not _en_curso.acquire(blocking=False):
         raise SincronizacionEnCurso("Ya hay una sincronización en curso; espera a que termine.")
     try:
         _tablas()
         lector = lector or LectorDrive(os.environ["GOOGLE_DRIVE_CREDENCIAL"])
         vistos = {} if todo else _vistos()
-        listados = {base_id: _listar(lector, base_id, carpeta) for base_id, carpeta in CARPETAS.items()}
+        listados = {base_id: _listar(lector, carpeta) for base_id, carpeta in CARPETAS.items()}
         nuevos = [(base_id, a) for base_id, lista in listados.items() for a in lista if vistos.get(a["id"]) != a["modifiedTime"]]
         mapas = [a for _, a in nuevos if a["name"] in MAPAS]
         datos = [(b, a) for b, a in nuevos if a["name"] not in MAPAS]
@@ -200,7 +166,6 @@ def sincronizar(origen="botón de la página", todo=False, lector=None):
                                                f"(archivos en cada carpeta · {hay})."]}
         if mapas:
             resumen["avisos"].append(f"Mapa de lotes de hidrocarburos actualizado ({mapas[0]['name']}).")
-        resumen["avisos"].append(_ipc(lector))
         resumen["archivos"] = [{"base": b, "nombre": a["name"]} for b, a in nuevos]
         resumen["carpetas"] = {b: len(lista) for b, lista in listados.items()}
         ahora = datetime.now(timezone.utc).isoformat(timespec="microseconds")   # ordena las sincronizaciones

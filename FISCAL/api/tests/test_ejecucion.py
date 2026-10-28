@@ -225,3 +225,18 @@ def test_deuda_desglosada_vuelve_al_formato_del_scraper():
     generica, deuda = ps.generica_y_deuda(gen)
     assert generica["DEVENGADO"].tolist() == [10.0, 10.0] and "DESGLOSE" not in generica
     assert deuda["CLASIFICACION"].tolist() == ["AMORTIZACION", "INTERESES Y COMISIONES"] and deuda["DEVENGADO"].sum() == 9.0
+
+
+def test_ipc_se_refresca_solo(cliente, monkeypatch):  # noqa: F811
+    """Sin Drive: al IPC al que le falta el mes anterior se lo trae del BCRP, a lo más una vez por día."""
+    llamadas = []
+    monkeypatch.setattr(ipc, "actualizar_bcrp", lambda: llamadas.append(1))
+    monkeypatch.setattr(ipc, "_ultimo_intento", [0.0])
+    ipc.guardar({"2026-08": 110.0}, "prueba")
+    assert ipc.refrescar(hoy=date(2026, 10, 28)) is True and ipc.refrescar(hoy=date(2026, 10, 28)) is False
+    ipc.guardar({"2026-09": 111.0}, "prueba")
+    monkeypatch.setattr(ipc, "_ultimo_intento", [0.0])
+    assert ipc.refrescar(hoy=date(2026, 10, 28)) is False          # ya llega a setiembre
+    import time
+    time.sleep(0.2)
+    assert llamadas == [1]
