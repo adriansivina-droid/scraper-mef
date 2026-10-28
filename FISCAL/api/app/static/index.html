@@ -60,7 +60,7 @@
         <div class="card-body" id="estado"></div>
       </section>
       <section class="card" id="sec-actualizar-mef" aria-labelledby="t-mef" hidden>
-        <div class="card-head"><h2 id="t-mef">Datos del MEF</h2><span class="hint">corre solo los días 6 y 21 de cada mes</span></div>
+        <div class="card-head"><h2 id="t-mef">Datos del MEF</h2><span class="hint">corre solo los días 2 y 21 de cada mes</span></div>
         <div class="card-body" id="mef"></div>
       </section>
       <section class="card" id="sec-actualizar-drive" aria-labelledby="t-drive" hidden>
@@ -281,7 +281,7 @@
     : c.resultado === "success" ? "✅ terminó bien" : c.resultado === "cancelled" ? "⏹ cancelada" : "❌ falló";
   function renderMef(m) {
     if (!m.configurado) {
-      $("mef").innerHTML = `<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render. Mientras tanto, el scraper corre solo los días 6 y 21, o lo lanzas en GitHub (Actions → «Fiscal · scraper del MEF»). Pasos en FISCAL/api/README.md.</span></div>`;
+      $("mef").innerHTML = `<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render. Mientras tanto, el scraper corre solo los días 2 y 21, o lo lanzas en GitHub (Actions → «Fiscal · scraper del MEF»). Pasos en FISCAL/api/README.md.</span></div>`;
       return;
     }
     const filas = m.corridas.map((c) => `<tr><td class="t">${esc(fecha(c.inicio))}</td><td class="t">${esc(c.titulo)}</td><td class="t">${c.origen === "schedule" ? "programada" : "a mano"}</td>
