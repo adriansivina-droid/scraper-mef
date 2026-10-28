@@ -150,20 +150,25 @@ def _listar(lector, base_id, carpeta):
 
 
 def _ipc(lector):
-    """IPC de Lima para las variaciones reales: del BCRP; si no responde, el IPC.xlsx más reciente de Drive."""
+    """IPC de Lima para las variaciones reales: del BCRP; si no responde, el IPC.xlsx de Drive, pero solo si llega más
+    lejos que el que ya está cargado (p. ej., uno subido a mano en la página)."""
     try:
         return ipc.actualizar_bcrp()
     except Exception as e:
-        motivo = f"el BCRP no respondió ({type(e).__name__})"
+        motivo = f"el BCRP no respondió o no está al día ({e})"
+    cargado = ipc.estado()
     try:
         hallados = lector.buscar("IPC.xlsx") if hasattr(lector, "buscar") else []
         if hallados:
             a = max(hallados, key=lambda x: x["modifiedTime"])
             s = ipc.de_excel(lector.bajar(a["id"]))
-            return f"IPC de Lima: {motivo}; se usó IPC.xlsx de Drive ({ipc.guardar(s, 'IPC.xlsx de Drive')} meses, hasta {max(s)})."
+            if not cargado["hasta"] or max(s) > cargado["hasta"]:
+                return f"IPC de Lima: {motivo}; se usó IPC.xlsx de Drive ({ipc.guardar(s, 'IPC.xlsx de Drive')} meses, hasta {max(s)})."
     except Exception as e:
-        return f"IPC de Lima: {motivo} y no se pudo leer IPC.xlsx de Drive ({e})."
-    return f"IPC de Lima: {motivo} y no hay IPC.xlsx en Drive; las variaciones quedan en términos nominales."
+        motivo += f"; no se pudo leer IPC.xlsx de Drive ({e})"
+    if cargado["hasta"]:
+        return f"IPC de Lima: {motivo}; se mantiene el cargado ({cargado['fuente']}, hasta {cargado['hasta']})."
+    return f"IPC de Lima: {motivo} y no hay IPC cargado; las variaciones quedan en términos nominales."
 
 
 def sincronizar(origen="botón de la página", todo=False, lector=None):
