@@ -240,3 +240,25 @@ def test_ipc_se_refresca_solo(cliente, monkeypatch):  # noqa: F811
     import time
     time.sleep(0.2)
     assert llamadas == [1]
+
+
+def test_anexos_de_la_sintesis(datos):
+    """Anexos 8 a 13 de la síntesis: 13 meses por nivel (desde el mismo mes del año anterior) con el total Ene.-Dic."""
+    g = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=gasto&anexos=true").json()["cuadros"]["anexos"]
+    assert [x["nivel"] for x in g] == ["DEL GOBIERNO NACIONAL", "DEL GOBIERNO REGIONAL", "DE LOS GOBIERNOS LOCALES"]
+    cols = g[0]["columnas"]
+    assert [c["etq"] for c in cols][:5] == ["Set.", "Oct.", "Nov.", "Dic.", "Ene.-Dic."] and cols[-1] == {"etq": "Set.", "anio": 2026} and len(cols) == 14
+    filas = {f["nombre"]: f for f in g[0]["filas"]}
+    corr = filas["GASTOS CORRIENTES"]["valores"]
+    assert corr[0] == 15.0 and corr[4] == 12 * 15.0 and corr[-1] == 17.0          # personal 100 + bienes 50 (2026: 110 + 60) × 100 mil
+    assert filas["Adquisición de activos no financieros"]["valores"][0] == 77.7 and filas["GASTOS NO FINANCIEROS"]["valores"][0] == 92.7
+    i = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&anexos=true").json()["cuadros"]["anexos"]
+    assert [f["nombre"] for f in i[0]["filas"]] == ["Transporte y Comunicaciones", "TOTAL DE INVERSIONES"]
+    assert "anexos" not in datos.get("/v1/cuadros/ejecucion?departamento=16&sector=gasto").json()["cuadros"]
+
+
+def test_pagina_carga_los_cuadros_bcrp(datos):
+    """La pestaña «Cuadros y gráficos BCRP» usa static/bcrp.js, servido con su versión (para no quedar en caché vieja)."""
+    html = datos.get("/").text
+    assert 'src="/static/bcrp.js?v=' in html and "Cuadros y gráficos BCRP" in html
+    assert "window.BCRP" in datos.get("/static/bcrp.js").text

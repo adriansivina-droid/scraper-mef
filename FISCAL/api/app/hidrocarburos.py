@@ -194,10 +194,12 @@ def cuadros(prod, canon, periodo=None):
                        key=lambda l: (-suma(l, ventanas["acum"]), -suma(l, ventanas["acum_anterior"]), l))
         if not lotes:
             continue
-        filas = []
+        filas, anio_ant = [], list(range((a - 1) * 100 + 1, (a - 1) * 100 + 13))
         for l in lotes + ["Total"]:
             v = {w: (tot(ps) if l == "Total" else suma(l, ps)) for w, ps in ventanas.items()}
-            filas.append({"lote": l, **{w: round(x, 3) for w, x in v.items()},
+            # estructura porcentual: participación del lote en la producción del año anterior completo (cuadro de la síntesis)
+            estructura = round((tot(anio_ant) if l == "Total" else suma(l, anio_ant)) / tot(anio_ant) * 100, 1) if tot(anio_ant) else None
+            filas.append({"lote": l, **{w: round(x, 3) for w, x in v.items()}, "estructura": estructura,
                           "var_mes": _var(v["mes_anterior"], v["mes"]), "var_acum": _var(v["acum_anterior"], v["acum"])})
         bloques.append({"producto": nombre, "unidad": unidad, "filas": filas})
         periodos = [q for q in t.index if q <= p]

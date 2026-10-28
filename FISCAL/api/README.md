@@ -253,6 +253,18 @@ En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
   y, de respaldo, `PN01270PM`). Si no responde, se usa el `IPC.xlsx` que se suba en la página. Sin IPC, los
   cuadros muestran la variación nominal y lo avisan.
 
+## Cuadros y gráficos BCRP
+
+En cada sector con cuadros (pesca, hidrocarburos, empleo, gasto corriente e inversión pública) la pestaña **«Cuadros y
+gráficos BCRP»** arma los cuadros, gráficos y anexos de la síntesis con su formato (tomado de las síntesis de junio
+2026): Arial, filetes horizontales, miles con espacio y decimales con coma, notas de fuente y elaboración; los gráficos,
+barras celestes con borde azul y el mismo mes de cada año en blanco («J.24 J A S … J.25»); los anexos, horizontales,
+con la cabecera gris, los 13 meses y el total Ene.-Dic. del año anterior, y los rótulos repetidos a la derecha.
+Cada uno se **copia** como imagen (para pegar en Word con Ctrl+V) o se descarga en **SVG** (vectorial) o **PNG**. La
+numeración viene de la síntesis de junio 2026 y se puede cambiar en cada uno. Lo dibuja `app/static/bcrp.js`; los
+anexos de ejecución salen de `/v1/cuadros/ejecucion?anexos=true` (13 meses por nivel de gobierno: gasto no financiero
+por genérica, inversión por función).
+
 ## Endpoints
 
 Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`.

@@ -212,3 +212,11 @@ tr.fuerte td { font-weight: 700; }
 table.c07 td, table.c07 th { padding: 5px 6px; font-size: 12px; }
 table.c07 .tot { background: var(--panel); font-weight: 700; }
 details.caja > summary { cursor: pointer; }
+
+/* Cuadros y gráficos BCRP: vista previa tal como se pegará en el informe (fondo blanco, tamaño real) */
+.bcrp-item .bcrp-num input { width: 4.5em; }
+.bcrp-prev { background: #fff; border: 1px solid var(--hair); border-radius: 8px; padding: 12px; margin-top: 10px; overflow-x: auto; }
+.bcrp-prev svg { display: block; margin: 0 auto; max-width: none; }
+.bcrp-msj { min-height: 1.2em; font-size: 13px; margin-top: 6px; }
+.bcrp-msj.ok { color: var(--teal); }
+.bcrp-msj.mal { color: var(--error); }
