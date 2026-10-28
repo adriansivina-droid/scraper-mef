@@ -44,6 +44,42 @@ def depto_de(region):
     return _DEPTO_DE_REGION.get(_clave(region))
 
 
+# ── Formato LONG del scraper (descarga por regiones) ──
+# los 26 ámbitos del tablero del MTPE, en el orden del selector del notebook (sin el total «Perú», que no se guarda)
+REGIONES = ["Amazonas", "Áncash", "Apurímac", "Arequipa", "Ayacucho", "Cajamarca", "Callao", "Cusco", "Huancavelica",
+            "Huánuco", "Ica", "Junín", "La Libertad", "Lambayeque", "Lima Metropolitana", "Lima Provincias", "Loreto",
+            "Madre de Dios", "Moquegua", "Pasco", "Piura", "Puno", "San Martín", "Tacna", "Tumbes", "Ucayali"]
+# grupos de la página (macrorregiones); la descarga acepta cualquier combinación de regiones
+GRUPOS_REGIONES = {
+    "Sucursal Iquitos (Loreto, San Martín, Ucayali)": ["Loreto", "San Martín", "Ucayali"],
+    "Oriente": ["Amazonas", "Loreto", "San Martín", "Ucayali"],
+    "Norte": ["Cajamarca", "La Libertad", "Lambayeque", "Piura", "Tumbes"],
+    "Centro": ["Áncash", "Ayacucho", "Huancavelica", "Huánuco", "Ica", "Junín", "Pasco"],
+    "Sur": ["Apurímac", "Arequipa", "Cusco", "Madre de Dios", "Moquegua", "Puno", "Tacna"],
+    "Lima y Callao": ["Callao", "Lima Metropolitana", "Lima Provincias"],
+}
+
+
+def region_de(texto):
+    """Nombre de la región (de REGIONES) a partir de su nombre o clave sin tildes; None si no es una."""
+    return {_clave(r): r for r in REGIONES}.get(_clave(texto))
+
+
+def long(df, regiones):
+    """Filas de las regiones pedidas en el formato del Excel del scraper, ordenadas como él."""
+    claves = {_clave(r) for r in regiones}
+    df = df[df["REGIÓN"].map(_clave).isin(claves)][COLUMNAS]
+    return df.sort_values(["REGIÓN", "ACTIVIDAD_ECONOMICA", "AÑO", "MES"]).reset_index(drop=True)
+
+
+def nombre_long(regiones):
+    """Mismo nombre que pone el notebook: Loreto_empleo.xlsx, Loreto_San_Martín_Ucayali_empleo.xlsx, 26_regiones_empleo.xlsx."""
+    regiones = [r for r in REGIONES if r in regiones]
+    if len(regiones) <= 3:
+        return f"{'_'.join(r.replace(' ', '_') for r in regiones)}_empleo.xlsx"
+    return f"{len(regiones)}_regiones_empleo.xlsx"
+
+
 def reconocer(ruta):
     """True si el Excel tiene las columnas del scraper de empleo."""
     columnas = {str(c).strip().upper() for c in pd.read_excel(ruta, sheet_name=0, nrows=0).columns}

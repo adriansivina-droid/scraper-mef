@@ -84,3 +84,24 @@ def test_cuadro_en_excel(cliente):
     assert ws["A1"].value == "LORETO: TRABAJADORES ASALARIADOS PRIVADOS FORMALES"
     assert [c.value for c in ws[4]] == ["Rama de actividad", "Abril 2025", "Abril 2026", "Var. %", "Dic. 2025", "Abr. 2026", "Var. %"]
     assert [c.value for c in ws[12]][:4] == ["Total", 38274, 39678, 3.7]
+
+
+def test_long_como_el_scraper(cliente):
+    r = cliente.get("/v1/descargas/empleo?regiones=Loreto")
+    assert 'filename="Loreto_empleo.xlsx"' in r.headers["content-disposition"]
+    df = pd.read_excel(io.BytesIO(r.content))
+    assert list(df.columns) == ["AÑO", "MES", "REGIÓN", "ACTIVIDAD_ECONOMICA", "EMPLEO"] and len(df) == 21
+    assert list(df["ACTIVIDAD_ECONOMICA"].iloc[:3]) == ["Agrícola"] * 3 and list(df["MES"].iloc[:3]) == [4, 12, 4]
+
+
+def test_long_grupos_y_todas(cliente):
+    j = cliente.get("/v1/descargas/empleo?regiones=lima metropolitana,LORETO&formato=json").json()
+    assert j["archivo"] == "Lima_Metropolitana_Loreto_empleo.xlsx" and j["filas"] == 22 and j["sin_datos"] == []
+    j = cliente.get("/v1/descargas/empleo?regiones=todas&desde=2026-01&formato=json").json()
+    assert j["archivo"] == "26_regiones_empleo.xlsx" and j["filas"] == 9 and j["desde"] == j["hasta"] == "2026-04"
+    assert "Ucayali" in j["sin_datos"] and "Loreto" not in j["sin_datos"]
+    assert cliente.get("/v1/descargas/empleo?regiones=Perú").status_code == 422
+    r = cliente.get("/v1/descargas/empleo?regiones=Loreto,San Martin,Ucayali&formato=csv")
+    assert "filename*=UTF-8''Loreto_San_Mart%C3%ADn_Ucayali_empleo.csv" in r.headers["content-disposition"]
+    cat = cliente.get("/v1/catalogo").json()["empleo"]
+    assert len(cat["regiones"]) == 26 and all(set(g) <= set(cat["regiones"]) for g in cat["grupos"].values())

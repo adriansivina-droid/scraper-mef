@@ -1,10 +1,13 @@
 """Departamento de estudios BCRP-IQT: API para descargar las bases de los scrapers del MEF y de pesca (DIREPRO). Corre con `uvicorn app.main:app`."""
+import io
 import json
 import os
 import re
 import secrets
+import unicodedata
 from datetime import date
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -57,6 +60,12 @@ def _filtros(base, departamento, nivel, desde, hasta):
         raise HTTPException(422, f"El periodo está al revés: desde={desde} es posterior a hasta={hasta}.")
     orden = [b for b in BASES if b in bases]              # las hojas salen siempre en el orden del catálogo
     return orden, deptos, niveles
+
+
+def _adjunto(nombre):
+    """Encabezado de descarga; los nombres con tildes («San Martín») van también en UTF-8 (RFC 5987)."""
+    plano = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
+    return {"Content-Disposition": f"attachment; filename=\"{plano}\"; filename*=UTF-8''{quote(nombre)}"}
 
 
 def _registros(df):
@@ -113,7 +122,8 @@ def catalogo():
                        "usa_niveles": b.usa_niveles, "descripcion": b.descripcion, "departamentos": list(b.departamentos)}
                       for b in BASES.values()],
             "departamentos": [{"codigo": c, "nombre": n} for c, n in DEPARTAMENTOS.items()],
-            "niveles": list(NIVELES)}
+            "niveles": list(NIVELES),
+            "empleo": {"regiones": empleo.REGIONES, "grupos": empleo.GRUPOS_REGIONES}}
 
 
 @app.get("/v1/estado", dependencies=[Depends(acceso)])
@@ -150,7 +160,7 @@ def descargas(base: str = "", departamento: str = "", nivel: str = "", desde: st
         nombre = f"{_prefijo(bases)}_{desde}_{hasta}.zip"
         contenido = archivos.zip_csv(tablas, lambda b: f"{BASES[b].hoja} {desde}_{hasta} - {_sufijo(deptos)}.csv")
         tipo = "application/zip"
-    return Response(contenido, media_type=tipo, headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+    return Response(contenido, media_type=tipo, headers=_adjunto(nombre))
 
 
 @app.post("/v1/cargas", dependencies=[Depends(acceso)])
@@ -233,6 +243,44 @@ def empleo_actualizar(regiones: str = Query("LOR,SMN,UCA", pattern="^(LOR,SMN,UC
     return {"lanzado": True, "regiones": regiones}
 
 
+@app.get("/v1/descargas/empleo", dependencies=[Depends(acceso)])
+def descarga_empleo(regiones: str = "todas", desde: str = "", hasta: str = "",
+                    formato: str = Query("xlsx", pattern="^(xlsx|csv|json)$"), filas: int = Query(10, ge=0, le=100)):
+    """Empleo en el formato LONG del scraper (AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO), una hoja.
+
+    regiones: nombres separados por comas (con o sin tildes: «Loreto,San Martin,Lima Metropolitana») o «todas».
+    desde/hasta AAAA-MM opcionales (vacío = todo lo cargado). formato=json da el conteo y una muestra de `filas` filas.
+    """
+    if regiones.strip().lower() == "todas":
+        pedidas = list(empleo.REGIONES)
+    else:
+        pedidas, malas = [], []
+        for r in (x.strip() for x in regiones.split(",") if x.strip()):
+            (pedidas.append(empleo.region_de(r)) if empleo.region_de(r) else malas.append(r))
+        if malas or not pedidas:
+            raise HTTPException(422, f"Región no válida: {', '.join(malas) or '(ninguna)'}. Usa los nombres de /v1/catalogo (empleo.regiones) o «todas».")
+    for p in (desde, hasta):
+        if p and not _RE_PERIODO.match(p):
+            raise HTTPException(422, f"Periodo no válido: {p!r} (formato AAAA-MM).")
+    if desde and hasta and desde > hasta:
+        raise HTTPException(422, f"El periodo está al revés: desde={desde} es posterior a hasta={hasta}.")
+    deptos = sorted({empleo.depto_de(r) for r in pedidas})
+    df = empleo.long(db.leer("empleo", deptos, [], desde or "1990-01", hasta or "2100-12"), pedidas)
+    nombre = empleo.nombre_long(pedidas)
+    if formato == "json":
+        con_datos, p = set(df["REGIÓN"].map(empleo.region_de)), df["AÑO"] * 100 + df["MES"]
+        mes = lambda x: f"{x // 100}-{x % 100:02d}" if len(df) else None
+        return {"archivo": nombre, "filas": len(df), "columnas": empleo.COLUMNAS, "muestra": _registros(df.head(filas)),
+                "desde": mes(p.min()), "hasta": mes(p.max()), "sin_datos": [r for r in pedidas if r not in con_datos]}
+    if formato == "csv":
+        return Response(archivos.csv(df), media_type="text/csv",
+                        headers=_adjunto(nombre[:-5] + ".csv"))
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False)                      # igual que el notebook: una hoja, sin formato
+    return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers=_adjunto(nombre))
+
+
 @app.get("/v1/cuadros/empleo", dependencies=[Depends(acceso)])
 def cuadro_empleo(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "",
                   formato: str = Query("json", pattern="^(json|xlsx)$")):
@@ -252,5 +300,5 @@ def cuadro_empleo(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: s
     if formato == "xlsx":
         nombre = f"Empleo {region} {c['periodo']}.xlsx"
         return Response(empleo.excel(region, c), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+                        headers=_adjunto(nombre))
     return {"region": region, "cuadros": c}
