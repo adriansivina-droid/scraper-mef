@@ -28,6 +28,9 @@ MESES_CORTOS = ["Ene.", "Feb.", "Mar.", "Abr.", "May.", "Jun.", "Jul.", "Ago.", 
 GENERICAS = [("Personal y obligaciones sociales", r"personal"), ("Pensiones y prestaciones sociales", r"pension"),
              ("Bienes y servicios", r"bienes y servicios"), ("Donaciones y transferencias", r"donaciones"),
              ("Otros gastos corrientes", r"otros gastos")]
+# genéricas del gasto de capital (tipo 6), para el anexo de ejecución del presupuesto (gastos no financieros)
+CAPITAL = [("Donaciones y transferencias", r"donaciones"), ("Adquisición de activos no financieros", r"activos no financieros"),
+           ("Otros gastos de capital", r"otros gastos")]
 TOP = 5
 FUENTE = "Fuente: MEF, Consulta Amigable. Elaboración: BCRP, Sucursal Iquitos. Departamento de Estudios Económicos."
 
@@ -73,6 +76,66 @@ def panel_gasto(gen):
     return pd.DataFrame({"P": g["AÑO"].astype(int) * 100 + g["MES"].map(_mes), "NIVEL": g["NIVEL_GOBIERNO"].map(nivel_de),
                          "ITEM": [_generica(c, e) for c, e in zip(g["COD_GENERICA"], g["GENERICA"])],
                          "MONTO": pd.to_numeric(g["DEVENGADO"], errors="coerce").fillna(0)}).dropna(subset=["NIVEL"])
+
+
+def panel_no_financiero(gen):
+    """Gasto no financiero (corriente y de capital, sin la deuda) con TIPO 5 / 6, para los anexos de la síntesis."""
+    if gen is None or gen.empty:
+        return pd.DataFrame(columns=["P", "NIVEL", "TIPO", "ITEM", "MONTO"])
+    tipo = gen["COD_GENERICA"].astype(str).str.strip().str[0]
+    g = gen[tipo.isin(["5", "6"])]
+    tipo = tipo[tipo.isin(["5", "6"])]
+
+    def capital(etq):
+        t = re.sub(r"^[\w\-\.]+\s*:\s*", "", _norm(etq))
+        return next((n for n, r in CAPITAL if re.search(r, t)), "Otros gastos de capital")
+    return pd.DataFrame({"P": g["AÑO"].astype(int) * 100 + g["MES"].map(_mes), "NIVEL": g["NIVEL_GOBIERNO"].map(nivel_de), "TIPO": tipo,
+                         "ITEM": [_generica(c, e) if t == "5" else capital(e) for c, e, t in zip(g["COD_GENERICA"], g["GENERICA"], tipo)],
+                         "MONTO": pd.to_numeric(g["DEVENGADO"], errors="coerce").fillna(0)}).dropna(subset=["NIVEL"])
+
+
+def _nombre_funcion(f):
+    """«22: EDUCACION» -> «Educación» (como en los anexos de la síntesis)."""
+    t = re.sub(r"^\d+\s*:\s*", "", str(f)).strip().lower()
+    t = {"transporte": "transporte y comunicaciones"}.get(t, t)
+    acentos = {"educacion": "educación", "energia": "energía", "mineria": "minería", "proteccion": "protección", "prevision": "previsión",
+               "planeamiento, gestion": "planeamiento, gestión", "publico": "público", "comunicaciones": "comunicaciones"}
+    for a, b in acentos.items():
+        t = t.replace(a, b)
+    return " ".join(w if w in ("y", "de", "del", "la", "las", "los") else w.capitalize() for w in t.split())
+
+
+def anexos(sector, panel, p):
+    """Anexos de la síntesis por nivel de gobierno: 13 meses (el mismo mes del año anterior al mes del informe), con el
+    total Ene.-Dic. del año anterior, en millones de soles. Gasto: panel_no_financiero (por genérica); inversión: por función."""
+    a, m, b = p // 100, p % 100, p // 100 - 1
+    cols = [{"etq": MESES_CORTOS[k - 1], "anio": b, "P": b * 100 + k} for k in range(m, 13)]
+    cols += [{"etq": "Ene.-Dic.", "anio": "Total", "total": [b * 100 + k for k in range(1, 13)]}]
+    cols += [{"etq": MESES_CORTOS[k - 1], "anio": a, "P": a * 100 + k} for k in range(1, m + 1)]
+
+    def valores(df):
+        s = df.groupby("P")["MONTO"].sum() / 1e6
+        return [round(float(s[s.index.isin(c["total"])].sum() if "total" in c else s.get(c["P"], 0)), 3) for c in cols]
+    salida = []
+    for n, nombre in NIVELES.items():
+        d = panel[panel["NIVEL"] == n]
+        filas = []
+        if sector == "gasto":
+            filas.append({"nombre": "GASTOS NO FINANCIEROS", "tipo": "titulo", "valores": valores(d)})
+            for t, titulo_, lista in (("5", "GASTOS CORRIENTES", GENERICAS), ("6", "GASTOS DE CAPITAL", CAPITAL)):
+                dt = d[d["TIPO"] == t]
+                filas.append({"nombre": titulo_, "tipo": "grupo", "valores": valores(dt)})
+                filas += [{"nombre": g, "tipo": "item", "valores": valores(dt[dt["ITEM"] == g])} for g, _ in lista]
+        else:
+            items = sorted({i for i in d["ITEM"]}, key=lambda f: (int(re.match(r"^(\d+)", f).group(1)) if re.match(r"^\d+", f) else 99, f))
+            for i in items:
+                v = valores(d[d["ITEM"] == i])
+                if any(x for x in v):
+                    filas.append({"nombre": _nombre_funcion(i), "tipo": "item", "valores": v})
+            filas.append({"nombre": "TOTAL DE INVERSIONES", "tipo": "total", "valores": valores(d)})
+        salida.append({"nivel": {"E": "DEL GOBIERNO NACIONAL", "R": "DEL GOBIERNO REGIONAL", "M": "DE LOS GOBIERNOS LOCALES"}[n],
+                       "columnas": [{"etq": c["etq"], "anio": c["anio"]} for c in cols], "filas": filas})
+    return salida
 
 
 def panel_inversion(fun):

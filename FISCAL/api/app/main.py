@@ -116,6 +116,7 @@ def inicio():
     # página nueva con estilos viejos guardados en caché
     version = int((ESTATICOS / "estilo.css").stat().st_mtime)
     html = (ESTATICOS / "index.html").read_text(encoding="utf-8").replace('href="/static/estilo.css"', f'href="/static/estilo.css?v={version}"')
+    html = html.replace('src="/static/bcrp.js"', f'src="/static/bcrp.js?v={int((ESTATICOS / "bcrp.js").stat().st_mtime)}"')
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
@@ -332,7 +333,7 @@ def _panel_inversion(departamento):
 
 @app.get("/v1/cuadros/ejecucion", dependencies=[Depends(acceso)])
 def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector: str = Query("gasto", pattern="^(gasto|inversion)$"),
-                     periodo: str = "", comparar: str = "", formato: str = Query("json", pattern="^(json|xlsx)$")):
+                     periodo: str = "", comparar: str = "", formato: str = Query("json", pattern="^(json|xlsx)$"), anexos: bool = False):
     """Gasto corriente no financiero o inversión pública de un departamento: mes y acumulado de un año contra otro
     (comparar = año; por defecto el anterior), por nivel y por genérica o función, con variación real (IPC de Lima),
     avance del PIM (inversión) y series para los gráficos. formato=xlsx incluye las variaciones alarmantes (inversión)."""
@@ -351,6 +352,9 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
         raise HTTPException(422, str(e))
     if c is None:
         return {"region": region, "cuadros": None, "ipc": ipc.estado()}
+    if anexos:          # los anexos de la síntesis (13 meses por nivel de gobierno), para «Cuadros y gráficos BCRP»
+        base = ejecucion.panel_no_financiero(db.leer("gasto-dev-generica", [departamento], niveles, "1990-01", "2100-12")) if sector == "gasto" else panel
+        c["anexos"] = ejecucion.anexos(sector, base, int(c["periodo"].replace("-", "")))
     if formato == "xlsx":
         v = None
         if sector == "inversion":
