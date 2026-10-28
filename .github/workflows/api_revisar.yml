@@ -1,0 +1,48 @@
+# Revisión rápida del API publicado (solo lectura): qué hay cargado en cada base, el IPC y si los cuadros de
+# ejecución salen con variación real. Sirve para comprobar una carga sin entrar a la página.
+#   · a mano: Actions → «API · revisar» → Run workflow
+# Usa los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE (los mismos de la sincronización con Drive).
+name: API · revisar
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Consultar el API
+        env:
+          URL: ${{ secrets.ESTUDIOS_API_URL }}
+          USUARIO: ${{ secrets.ESTUDIOS_API_USUARIO }}
+          CLAVE: ${{ secrets.ESTUDIOS_API_CLAVE }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, urllib.request
+          url, auth = os.environ["URL"].rstrip("/"), base64.b64encode(f"{os.environ['USUARIO']}:{os.environ['CLAVE']}".encode()).decode()
+          def get(ruta):
+              for intento in range(3):
+                  try:
+                      r = urllib.request.urlopen(urllib.request.Request(url + ruta, headers={"Authorization": "Basic " + auth}), timeout=120)
+                      return json.load(r)
+                  except Exception as e:
+                      ultimo = e
+              return {"error": str(ultimo)}
+          ipc = get("/v1/ipc")
+          print(f"IPC: {ipc}")
+          e = get("/v1/estado")
+          for b, x in e.get("bases", {}).items():
+              print(f"  {b:24s} {x['filas']:>8} filas · {x['desde']} a {x['hasta']} · deptos {','.join(x['departamentos'][:6])}{'…' if len(x['departamentos']) > 6 else ''}")
+          for d in ("16", "22", "25"):
+              for s in ("gasto", "inversion"):
+                  c = get(f"/v1/cuadros/ejecucion?departamento={d}&sector={s}")
+                  q = c.get("cuadros") or {}
+                  t = (q.get("niveles") or [{}])[-1]
+                  print(f"  ejecución {d} {s:9s}: periodo {q.get('periodo')} · real={q.get('real')} · var acum real {t.get('var_acum')} · nominal {t.get('var_acum_nominal')}{' · ' + c['error'] if 'error' in c else ''}")
+              p = get(f"/v1/proyectos?departamento={d}")
+              print(f"  proyectos {d}: {p.get('periodo')} · niveles {len(p.get('proyectos') or [])}")
+          PY
