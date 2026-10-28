@@ -107,6 +107,11 @@ en el notebook, el servidor usa el cambio.
 - **A mano:** botón «Actualizar desde el MEF» en «Actualizar base de datos» (eliges el periodo; vacío = año en curso),
   o en GitHub: Actions → «Fiscal · scraper del MEF» → Run workflow. La prueba rápida (un mes, solo Loreto) no carga
   nada en la base.
+- **Departamentos:** el detalle municipal (`DEV Funcion.Municipalidad`, base «Inversión por municipalidad»), el PIM por
+  función y el PIM por función y municipalidad se bajan para **los 25 departamentos** (`DEPARTAMENTOS_NACIONAL` en el
+  BLOQUE 2 del notebook); el resto de bloques, para Loreto, San Martín y Ucayali. Todo se descarga con el formato de
+  `PIM_Funcion.xlsx`. Con 25 departamentos una corrida de un año completo toma unas 2 a 3 horas: para periodos largos,
+  conviene un año por corrida (el límite de GitHub es de 6 horas por corrida).
 - Los CSV de cada corrida quedan como artefacto en GitHub por 30 días (incluidos los CONTROL y LOG).
 - Requiere el secreto `DATABASE_URL` en GitHub (la misma cadena de Neon). `FISCAL/automatizacion/prueba_mef.py`
   (flujo «Fiscal · prueba de conexión al MEF») comprueba que el MEF responde desde GitHub.

@@ -35,7 +35,7 @@ permissions:
 jobs:
   raspar:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 355                 # máximo de GitHub: 360 (con 25 departamentos, mejor un año por corrida)
     steps:
       - uses: actions/checkout@v4
 
