@@ -295,3 +295,11 @@ API interna para que el equipo entre, marque y descargue las bases. Prototipo de
 ## 14. Proyecto Exportaciones (Infotrade · PROMPERÚ)
 
 Es un proyecto aparte, con su propio documento de contexto: **`EXPORT/exportaciones_scraper_infotrade.md`**. Allí están la API descubierta, el notebook `EXPORT/EXP_Infotrade_Exportaciones.ipynb`, las carpetas de Drive, el control y los pendientes.
+
+## Fase 2 · scraper del MEF en el servidor
+
+`Fiscal_Scraper.ipynb` también corre sin Colab en GitHub Actions (`.github/workflows/fiscal_scraper.yml`, días 6 y 21, o
+el botón «Actualizar desde el MEF» del API) mediante `FISCAL/automatizacion/scraper_servidor.py`, que ejecuta las celdas
+del notebook y carga `Scrapeo/output` en la base de datos del API (Neon). Al editar el notebook, mantener en el BLOQUE 2
+las variables `PRUEBA_RAPIDA`, `AÑO_INICIO`, `MES_INICIO`, `AÑO_FIN` y `MES_FIN` (el servidor las fija) y la ruta
+`/content/drive/MyDrive/Fiscal`. Detalle en `FISCAL/api/README.md`.

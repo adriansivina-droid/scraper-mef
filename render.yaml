@@ -19,3 +19,6 @@ services:
       # GOOGLE_DRIVE_CREDENCIAL del flujo de hidrocarburos); sin ella, el botón «Sincronizar ahora» avisa que falta
       - key: GOOGLE_DRIVE_CREDENCIAL
         sync: false
+      # botón «Actualizar desde el MEF»: token fine-grained de GitHub, solo este repositorio, Actions lectura y escritura
+      - key: GITHUB_ACCIONES_TOKEN
+        sync: false

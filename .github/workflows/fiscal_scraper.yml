@@ -1,0 +1,72 @@
+# Fase 2 · scraper del MEF en el servidor: corre FISCAL/Fiscal_Scraper.ipynb sin Colab y carga lo que baja en la base de
+# datos del API (Neon), igual que subir el .zip de Scrapeo/output en la página.
+#   · cada mes, los días 6 y 21 (06:00 hora de Lima): año en curso hasta el último mes cerrado (el MEF ajusta los meses
+#     anteriores, por eso se vuelve a bajar todo el año)
+#   · a mano: Actions → «Fiscal · scraper del MEF» → Run workflow (eliges el periodo) o el botón «Actualizar desde el MEF»
+# Requiere el secreto DATABASE_URL. Los CSV quedan como artefacto de la corrida (30 días).
+name: Fiscal · scraper del MEF
+run-name: "Scraper del MEF · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
+
+on:
+  schedule:
+    - cron: "0 11 6,21 * *"        # 11:00 UTC = 06:00 en Lima
+  workflow_dispatch:
+    inputs:
+      desde:
+        description: "Desde (AAAA-MM). Vacío: enero del año en curso"
+        type: string
+        default: ""
+      hasta:
+        description: "Hasta (AAAA-MM). Vacío: último mes cerrado"
+        type: string
+        default: ""
+      prueba:
+        description: "Prueba rápida (solo el mes «desde» y Loreto; no carga en la base)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: fiscal-scraper
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  raspar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r FISCAL/api/requirements.txt beautifulsoup4==4.12.3 tqdm==4.67.1
+
+      - name: Raspar el MEF y cargar en la base de datos
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DESDE: ${{ inputs.desde }}
+          HASTA: ${{ inputs.hasta }}
+          PRUEBA: ${{ inputs.prueba }}
+          FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
+        run: |
+          args=()
+          [ -n "$DESDE" ] && args+=(--desde "$DESDE")
+          [ -n "$HASTA" ] && args+=(--hasta "$HASTA")
+          [ "$PRUEBA" = "true" ] && args+=(--prueba)
+          python FISCAL/automatizacion/scraper_servidor.py "${args[@]}"
+
+      - name: Guardar los CSV como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrapeo-output
+          path: ${{ runner.temp }}/fiscal/Fiscal/Scrapeo/output
+          retention-days: 30
+          if-no-files-found: ignore

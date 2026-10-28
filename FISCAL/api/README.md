@@ -10,7 +10,7 @@ descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 |---|---|---|
 | 1 | Página, descarga de las 7 bases del MEF (Excel, CSV o JSON), estado de la base de datos y carga de los archivos que genera el scraper de Colab | **lista** |
 | Pesca | Las 3 bases de pesca, cargadas con los Excel mensuales de las DIREPRO (o los LONG de los notebooks de `PESCA/`) | **lista** |
-| 2 | El scraper corre en el servidor (Render), cada mes y a pedido, y escribe directo en la base de datos | pendiente |
+| 2 | El scraper del MEF corre solo (GitHub Actions, días 6 y 21) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
 | 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en el servidor | pendiente |
 
 ## Hoja de ruta: el informe completo
@@ -95,6 +95,30 @@ runtime Docker, plan Starter, Health Check Path `/salud` y las tres variables de
 Cada cambio fusionado a `main` se vuelve a desplegar solo. `railway.json` queda por si Railway vuelve a abrir registros;
 el `Dockerfile` sirve en cualquier servicio que corra contenedores.
 
+## Scraper del MEF en el servidor (fase 2)
+
+`.github/workflows/fiscal_scraper.yml` corre **el mismo `Fiscal_Scraper.ipynb` de Colab** sin Colab
+(`FISCAL/automatizacion/scraper_servidor.py`: lee sus celdas, reemplaza Drive por una carpeta de trabajo y fija el
+periodo) y carga `Scrapeo/output` en la base de datos con la misma lógica que subir el `.zip`. Si cambias el scraper
+en el notebook, el servidor usa el cambio.
+
+- **Solo:** los días 6 y 21 de cada mes a las 6:00 a. m.: año en curso hasta el último mes cerrado (el MEF sigue
+  ajustando los meses anteriores, por eso se vuelve a bajar todo el año).
+- **A mano:** botón «Actualizar desde el MEF» en «Actualizar base de datos» (eliges el periodo; vacío = año en curso),
+  o en GitHub: Actions → «Fiscal · scraper del MEF» → Run workflow. La prueba rápida (un mes, solo Loreto) no carga
+  nada en la base.
+- Los CSV de cada corrida quedan como artefacto en GitHub por 30 días (incluidos los CONTROL y LOG).
+- Requiere el secreto `DATABASE_URL` en GitHub (la misma cadena de Neon). `FISCAL/automatizacion/prueba_mef.py`
+  (flujo «Fiscal · prueba de conexión al MEF») comprueba que el MEF responde desde GitHub.
+
+**El botón** no raspa en Render: le pide a GitHub que lance la corrida y muestra sus últimas corridas. Necesita un token:
+1. GitHub → tu foto → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
+2. **Token name:** `estudios-bcrp-iqt`; **Expiration:** la más larga que permita (o sin vencimiento); **Repository
+   access:** *Only select repositories* → `scraper-mef`; **Permissions → Repository permissions → Actions:** *Read and
+   write* (Metadata queda en *Read-only* sola). **Generate token** y cópialo.
+3. Render → servicio → **Environment** → **Add Environment Variable** → `GITHUB_ACCIONES_TOKEN` = el token → guardar.
+   Nunca lo pegues en un chat. Cuando venza, el botón avisará «el token no es válido o venció»: se genera otro igual.
+
 ## Pesca desde Drive (automático)
 
 Basta con dejar los Excel que manda cada DIREPRO en su carpeta de crudos de Drive: el API los carga solo **cada día a
@@ -140,6 +164,8 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output`, `PIM_Funcion.xlsx` o los Excel de pesca |
 | GET | `/v1/drive` | Si Drive está conectado, sus carpetas y la última sincronización |
 | POST | `/v1/drive/sincronizar` | Carga los Excel nuevos o modificados de las carpetas de crudos (`todo=true`: todos) |
+| GET | `/v1/mef` | Si el botón del MEF está configurado y las últimas corridas del scraper en GitHub |
+| POST | `/v1/mef/actualizar` | Lanza el scraper del MEF en GitHub Actions (`desde`, `hasta` AAAA-MM opcionales; `prueba=true`) |
 | GET | `/docs` | Documentación interactiva |
 
 Parámetros de las descargas: `base=inv-dev-funcion,inv-pim-funcion`, `departamento=16,22,25`,
