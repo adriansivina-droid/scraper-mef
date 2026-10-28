@@ -105,8 +105,9 @@ def hijos(padre):
     return [{"id": i, "name": n, "mimeType": m, "modifiedTime": f, "size": t} for i, n, m, f, t in filas]
 
 
-def crear(nombre, padre, contenido=None, mime=None, id_=None):
-    """Archivo (o carpeta si contenido es None y mime es de carpeta). Devuelve su id."""
+def crear(nombre, padre, contenido=None, mime=None, id_=None, modificado=None):
+    """Archivo (o carpeta si contenido es None y mime es de carpeta). Devuelve su id. modificado: la fecha original
+    (la migración conserva la de Drive; si no, ahora)."""
     _tabla()
     if contenido is not None and padre in _carpetas_en_disco():
         ruta = _disco() / padre / Path(nombre).name
@@ -119,8 +120,16 @@ def crear(nombre, padre, contenido=None, mime=None, id_=None):
         cx.execute(text("INSERT INTO almacen (id, nombre, padre, mime, contenido, tamano, modificado) "
                         "VALUES (:i, :n, :p, :m, :c, :t, :f)"),
                    {"i": id_, "n": nombre, "p": padre, "m": mime or "application/octet-stream",
-                    "c": None if contenido is None else _codificar(contenido), "t": len(contenido or b""), "f": _ahora()})
+                    "c": None if contenido is None else _codificar(contenido), "t": len(contenido or b""), "f": modificado or _ahora()})
     return id_
+
+
+def fijar_modificado(id_, modificado):
+    if not modificado:
+        return
+    _tabla()
+    with db.motor().begin() as cx:
+        cx.execute(text("UPDATE almacen SET modificado = :f WHERE id = :i"), {"f": modificado, "i": id_})
 
 
 def reemplazar(id_, contenido, nombre=None):
@@ -310,7 +319,7 @@ def sincronizar(origen="botón de la página", todo=False, lector=None):
         with db.motor().connect() as cx:
             vistos = {} if todo else dict(cx.execute(text("SELECT file_id, modificado FROM almacen_vistos")).all())
         lista = _a_cargar(lector)
-        nuevos = [a for a in lista if vistos.get(a["id"]) != a["modifiedTime"]]
+        nuevos = lista if todo else [a for a in lista if vistos.get(a["id"]) != a["modifiedTime"]]
         mapas = [a for a in nuevos if a["name"] in MAPAS]
         datos = [a for a in nuevos if a["name"] not in MAPAS]
         for a in mapas:                                 # el mapa no es una base: se guarda tal cual para la página

@@ -87,9 +87,10 @@ def main():
                 continue
             if modo == "copiar":
                 if a["id"] in ya and ya[a["id"]]["kb"] == round(int(a.get("size") or 0) / 1024):
+                    almacen.fijar_modificado(a["id"], a.get("modifiedTime"))   # la fecha de Drive (elige el CSV más reciente)
                     saltados += 1
                     continue
-                almacen.crear(a["name"], padre, bajar(drive, a["id"]), a["mimeType"], id_=a["id"])
+                almacen.crear(a["name"], padre, bajar(drive, a["id"]), a["mimeType"], id_=a["id"], modificado=a.get("modifiedTime"))
                 copiados += 1
                 print(f"  ✔ {ruta}/{a['name']} ({mb:.1f} MB)", flush=True)
         lineas += [f"| {r} | {x[0]} | {x[1]:.1f}{' · ' + x[2] if len(x) > 2 else ''} |" for r, x in sorted(por_carpeta.items())]
@@ -101,6 +102,7 @@ def main():
         lineas.append("- En la página: " + ", ".join(f"{k}: {v['archivos']} archivos, {v['mb']} MB comprimidos"
                                                        for k, v in almacen.resumen().items()))
         r = almacen.sincronizar(origen="migración desde Drive", todo=True)
+        lineas.append("- Archivos cargados en las bases: " + ", ".join(a["nombre"] for a in r["archivos"]))
         lineas += [f"- Cargado: {b} ({x['filas']} filas, {x['periodos'][0]} a {x['periodos'][-1]})" for b, x in r["bases"].items()]
         lineas += [f"- {a}" for a in r["avisos"]]
     texto = "\n".join(lineas)

@@ -259,3 +259,15 @@ def test_pdf_de_perupetro_van_a_disco(cliente, tmp_path, monkeypatch):
     assert [a["nombre"] for a in almacen.arbol()] == ["PDF"]                           # en la base solo queda la carpeta
     with pytest.raises(FileNotFoundError):
         almacen.leer(f"disco:{pdf}/../../secreto")
+
+
+def test_se_carga_el_csv_mas_reciente_segun_su_fecha_original(cliente):
+    """La migración conserva la fecha de Drive: de dos CSV de producción se carga el modificado más recientemente,
+    aunque se haya copiado antes."""
+    from app import almacen
+    a = csvs()
+    almacen.crear("PP_produccion_lote_mes_1994-2026.csv", almacen.CARPETA_DATA, a["PP_produccion_lote_mes_1994-2026.csv"],
+                  modificado="2026-10-28T12:40:00Z")
+    almacen.crear("PP_produccion_lote_mes_2026-2026.csv", almacen.CARPETA_DATA, b"x", modificado="2026-03-01T00:00:00Z")
+    r = almacen.sincronizar(origen="migración desde Drive", todo=True)
+    assert [x["nombre"] for x in r["archivos"]] == ["PP_produccion_lote_mes_1994-2026.csv"] and "hidro-produccion" in r["bases"]
