@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import db, pesca
+from . import db, empleo, pesca
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -94,7 +94,7 @@ def leer_archivos(raiz):
     """-> {base_id: DataFrame con las columnas de la base + columnas internas}, avisos."""
     raiz = Path(raiz)
     por_bloque, avisos = {}, []
-    pim, pim_muni, de_pesca = [], [], []
+    pim, pim_muni, de_pesca, de_empleo = [], [], [], []
     for n_archivo, ruta in enumerate(sorted(raiz.rglob("*"))):
         if not ruta.is_file() or ruta.name.startswith(("CONTROL", "LOG", ".")):
             continue
@@ -107,6 +107,9 @@ def leer_archivos(raiz):
             if es_pesca:
                 de_pesca.append((n_archivo, ruta, *es_pesca))
                 continue
+            if empleo.reconocer(ruta):
+                de_empleo.append((n_archivo, ruta))
+                continue
             hoja = pd.read_excel(ruta, sheet_name=0)
             if list(hoja.columns[:5]) == BASES["inv-pim-funcion"].columnas:
                 hoja = hoja.dropna(how="all")
@@ -114,7 +117,7 @@ def leer_archivos(raiz):
                 hoja["_archivo"] = n_archivo
                 pim.append(hoja)
             else:
-                avisos.append(f"{ruta.name}: no es PIM_Funcion.xlsx ni un Excel de pesca; se ignoró.")
+                avisos.append(f"{ruta.name}: no es PIM_Funcion.xlsx ni un Excel de pesca o de empleo; se ignoró.")
             continue
         if ruta.suffix.lower() != ".csv":
             continue
@@ -158,6 +161,11 @@ def leer_archivos(raiz):
         bases["inv-pim-funcion"] = df
     if pim_muni:
         bases["inv-pim-municipalidad"] = pd.concat(pim_muni, ignore_index=True).assign(_nivel="")
+    if de_empleo:
+        df, avisos_empleo = empleo.leer(de_empleo)
+        if not df.empty:
+            bases["empleo"] = df
+        avisos += avisos_empleo
     if de_pesca:
         de_la_pesca, avisos_pesca = pesca.leer(de_pesca, db.leer_todo)
         bases.update(de_la_pesca)

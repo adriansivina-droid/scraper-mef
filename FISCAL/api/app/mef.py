@@ -1,6 +1,7 @@
-"""Fase 2: el botón «Actualizar desde el MEF» lanza el scraper en GitHub Actions (.github/workflows/fiscal_scraper.yml) y
-muestra sus últimas corridas. El scraper no corre en Render: dura varios minutos y GitHub lo hace gratis; al terminar
-carga los datos en la misma base de datos (FISCAL/automatizacion/scraper_servidor.py).
+"""Scrapers lanzados desde la página: «Actualizar desde el MEF» (.github/workflows/fiscal_scraper.yml) y «Actualizar
+empleo» (empleo_scraper.yml) piden una corrida a GitHub Actions y muestran sus últimas corridas. Los scrapers no corren
+en Render: duran varios minutos y GitHub lo hace gratis; al terminar cargan los datos en la misma base de datos
+(FISCAL/automatizacion/scraper_servidor.py y EMPLEO/automatizacion/empleo_servidor.py).
 
 Necesita GITHUB_ACCIONES_TOKEN: un token de GitHub (fine-grained) con acceso solo a este repositorio y permiso
 Actions: lectura y escritura. Pasos en FISCAL/api/README.md.
@@ -11,8 +12,13 @@ import re
 import requests
 
 REPO = os.environ.get("GITHUB_REPO", "adriansivina-droid/scraper-mef")
-FLUJO = "fiscal_scraper.yml"
-API = f"https://api.github.com/repos/{REPO}/actions/workflows/{FLUJO}"
+FLUJOS = {"mef": "fiscal_scraper.yml", "empleo": "empleo_scraper.yml"}   # scrapers que se lanzan desde la página
+
+
+def _api(nombre):
+    return f"https://api.github.com/repos/{REPO}/actions/workflows/{FLUJOS[nombre]}"
+
+
 _PERIODO = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
@@ -35,22 +41,22 @@ def _fallo(r):
     return ErrorGitHub(f"GitHub rechazó la solicitud: {motivo}.")
 
 
-def lanzar(desde="", hasta="", prueba=False):
-    """Pide a GitHub una corrida del scraper. desde/hasta vacíos: año en curso hasta el último mes cerrado."""
+def lanzar(desde="", hasta="", prueba=False, nombre="mef", inputs=None):
+    """Pide a GitHub una corrida del scraper. MEF: desde/hasta vacíos = año en curso hasta el último mes cerrado."""
     for p in (desde, hasta):
         if p and not _PERIODO.match(p):
             raise ValueError(f"Periodo no válido: {p!r} (formato AAAA-MM).")
     if desde and hasta and desde > hasta:
         raise ValueError(f"El periodo está al revés: {desde} es posterior a {hasta}.")
-    r = requests.post(f"{API}/dispatches", headers=_encabezados(), timeout=30,
-                      json={"ref": "main", "inputs": {"desde": desde, "hasta": hasta, "prueba": bool(prueba)}})
+    entradas = inputs if inputs is not None else {"desde": desde, "hasta": hasta, "prueba": bool(prueba)}
+    r = requests.post(f"{_api(nombre)}/dispatches", headers=_encabezados(), timeout=30, json={"ref": "main", "inputs": entradas})
     if r.status_code != 204:
         raise _fallo(r)
 
 
-def corridas(cuantas=5):
+def corridas(cuantas=5, nombre="mef"):
     """Últimas corridas: estado, resultado, quién la lanzó (programada o a mano) y enlace."""
-    r = requests.get(f"{API}/runs", headers=_encabezados(), params={"per_page": cuantas}, timeout=30)
+    r = requests.get(f"{_api(nombre)}/runs", headers=_encabezados(), params={"per_page": cuantas}, timeout=30)
     if r.status_code != 200:
         raise _fallo(r)
     return [{"estado": c["status"], "resultado": c.get("conclusion"), "origen": c["event"], "inicio": c["created_at"],

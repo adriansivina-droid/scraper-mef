@@ -3,363 +3,433 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Departamento de estudios BCRP-IQT</title>
+<title>Departamento de Estudios Económicos BCRP-IQT</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600&family=Geist+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/estilo.css">
 </head>
 <body>
-<div class="app">
-  <header class="topbar">
-    <div class="topbar-in">
-      <div class="brand"><div class="brand-mark">S/</div><div><b>Departamento de estudios</b><span>BCRP-IQT · Inversión, gasto (MEF) y pesca (DIREPRO)</span></div></div>
-      <div class="menu" id="menu">
-        <button class="menu-btn" id="menu-btn" type="button" aria-haspopup="true" aria-expanded="false"><span class="menu-txt"><small>Sección</small><b id="menu-actual">Bases de datos</b></span><span class="chev" aria-hidden="true"></span></button>
-        <div class="menu-panel" id="menu-panel" role="menu" hidden>
-          <div class="nav-label">Descargar</div>
-          <button class="nav-item" id="nav-descargas" data-sec="descargas" role="menuitem"><b>Bases de datos</b><span>MEF y pesca, en Excel</span></button>
-          <button class="nav-item" role="menuitem" disabled><b>Reportes procesados <span class="prox">pronto</span></b><span>Cuadros, variaciones y proyectos ya armados</span></button>
-          <div class="nav-label">Analizar</div>
-          <button class="nav-item" role="menuitem" disabled><b>Variaciones <span class="prox">pronto</span></b><span>Mayores aumentos y caídas del mes</span></button>
-          <button class="nav-item" role="menuitem" disabled><b>Proyectos <span class="prox">pronto</span></b><span>Qué proyectos explican el cambio</span></button>
-          <div class="nav-label">Actualizar</div>
-          <button class="nav-item" id="nav-actualizar" data-sec="actualizar" role="menuitem"><b>Actualizar base de datos</b><span>Estado actual y carga de datos</span></button>
-        </div>
-      </div>
-      <div class="topbar-meta" id="datos-hasta"></div>
+<header class="top">
+  <div class="brand"><div class="mark">S/</div><div><b>Departamento de Estudios Económicos</b><span>BCRP · Sucursal Iquitos · Síntesis de Actividad Económica</span></div></div>
+  <nav class="grupos" id="grupos" aria-label="Regiones"></nav>
+  <div class="hasta" id="datos-hasta"></div>
+</header>
+
+<div class="selector-movil"><label class="campo" for="sel-movil">Sección</label><select id="sel-movil"></select></div>
+
+<div class="marco" id="marco">
+  <nav class="indice" aria-label="Índice">
+    <div class="ind-cab"><h2 id="indice-t">Índice</h2><button class="ocultar" type="button" id="ocultar">Ocultar</button></div>
+    <div id="indice"></div>
+    <div class="leyenda" id="leyenda">
+      <span><i class="dot ok"></i>Con datos en la página</span>
+      <span><i class="dot vacio"></i>Conectado, falta cargar o conectar</span>
+      <span><i class="dot falta"></i>Por construir</span>
     </div>
-  </header>
-
-  <main class="main">
-    <div class="wrap">
-      <header>
-        <h1 id="titulo">Bases de datos</h1>
-        <p class="lead" id="lead"></p>
-      </header>
-
-      <!-- ── Descargar bases ── -->
-      <section class="card" id="sec-descargas-opciones" aria-labelledby="t-opciones">
-        <div class="card-head"><h2 id="t-opciones">Elige qué necesitas</h2></div>
-        <div class="card-body">
-          <div class="params" id="params"></div>
-          <div class="actions">
-            <button class="btn btn-primary" id="descargar" type="button">Descargar Excel</button>
-            <span class="hint" id="nota-descarga" aria-live="polite"></span>
-          </div>
-        </div>
-      </section>
-      <section class="card" id="sec-descargas-vista" aria-labelledby="t-vista">
-        <div class="card-head"><h2 id="t-vista">Vista previa</h2></div>
-        <div class="card-body" id="vista"></div>
-      </section>
-
-      <!-- ── Actualizar base de datos ── -->
-      <section class="card" id="sec-actualizar-estado" aria-labelledby="t-estado" hidden>
-        <div class="card-head"><h2 id="t-estado">Estado actual de la base de datos</h2><span class="hint">se actualiza solo</span></div>
-        <div class="card-body" id="estado"></div>
-      </section>
-      <section class="card" id="sec-actualizar-mef" aria-labelledby="t-mef" hidden>
-        <div class="card-head"><h2 id="t-mef">Datos del MEF</h2><span class="hint">corre solo los días 2 y 21 de cada mes</span></div>
-        <div class="card-body" id="mef"></div>
-      </section>
-      <section class="card" id="sec-actualizar-drive" aria-labelledby="t-drive" hidden>
-        <div class="card-head"><h2 id="t-drive">Pesca desde Drive</h2><span class="hint">también corre solo, cada día</span></div>
-        <div class="card-body" id="drive"></div>
-      </section>
-      <section class="card" id="sec-actualizar-carga" aria-labelledby="t-carga" hidden>
-        <div class="card-head"><h2 id="t-carga">Cargar archivos</h2></div>
-        <div class="card-body">
-          <p class="hint"><b>MEF:</b> el <b>.zip de la carpeta Fiscal/Scrapeo/output</b> (en Drive: clic derecho sobre la carpeta → Descargar), CSV sueltos del scraper o <b>PIM_Funcion.xlsx</b>.</p>
-          <p class="hint"><b>Pesca:</b> los Excel del mes tal como llegan de cada DIREPRO (Loreto: consumo y ornamentales; San Martín: <code>SMN_PESCA_AAAA-MM.xlsx</code>; Ucayali: el acumulado del año) o los LONG de los notebooks de pesca. La primera vez, sube los LONG de San Martín y Ucayali: de ahí se toma la clasificación de especies.</p>
-          <p class="hint">Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.</p>
-          <div class="subida">
-            <input type="file" id="archivos" multiple accept=".zip,.csv,.xlsx">
-            <button class="btn btn-primary" id="cargar" type="button">Cargar a la base de datos</button>
-          </div>
-          <div id="resultado-carga" aria-live="polite"></div>
-        </div>
-      </section>
-    </div>
-  </main>
+  </nav>
+  <main class="sector" id="sector" tabindex="-1"><div class="cuerpo"><div class="loading"><span class="spin"></span>Cargando…</div></div></main>
 </div>
 
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  const NOMBRE_MES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
-  const LSU = ["16", "22", "25"];
-  const etqMes = (ym) => ym && ym.length === 7 ? `${NOMBRE_MES[+ym.slice(5) - 1]} ${ym.slice(0, 4)}` : (ym || "—");
-  const titulo = (n) => (n.charAt(0) + n.slice(1).toLowerCase().replace(/ (\S)/g, (m, c) => " " + c.toUpperCase())).replace(/ De /g, " de ");
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const fmt = (v) => v == null ? "" : Math.round(v).toLocaleString("en-US");
-  const fmt3 = (v) => v == null ? "" : v.toLocaleString("en-US", { maximumFractionDigits: 3 });
-  const NIVEL_TXT = { nacional: "Nacional", regional: "Regional", locales: "Locales" };
-
-  let CAT = null, ESTADO = null, MESES = [], hojaActiva = null, abierto = null, temporizador = null, ultimaVista = null;
-  const v = { base: ["inv-dev-funcion", "inv-pim-funcion"], departamento: LSU.slice(), nivel: ["nacional", "regional", "locales"], desde: "2025-01", hasta: null, formato: "xlsx" };
-
+  const NOMBRE_MES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
+  const etqMes = (ym) => ym && ym.length === 7 ? `${NOMBRE_MES[+ym.slice(5) - 1]} ${ym.slice(0, 4)}` : (ym || "—");
+  const fmt = (v) => v == null ? "" : Math.round(v).toLocaleString("es-PE");
+  const fmt3 = (v) => v == null ? "" : v.toLocaleString("es-PE", { maximumFractionDigits: 3 });
+  const pct = (v) => v == null ? "n.d." : v.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const fecha = (f) => new Date(f).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
+  const titulo = (n) => (n.charAt(0) + n.slice(1).toLowerCase().replace(/ (\S)/g, (m, c) => " " + c.toUpperCase())).replace(/ De /g, " de ");
   async function api(url, opciones) {
     const r = await fetch(url, opciones);
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : `El servidor respondió ${r.status}.`);
     return j;
   }
-  const consulta = () => new URLSearchParams({ base: v.base.join(","), departamento: v.departamento.join(","), nivel: v.nivel.join(","), desde: v.desde, hasta: v.hasta }).toString();
-  const basePor = (id) => CAT.bases.find((b) => b.id === id);
 
-  // ── Listas desplegables con casillas ──
-  function opciones(id) {
-    if (id === "base") {
-      const ops = [];
-      Object.entries(CAT.grupos).forEach(([g, t]) => { ops.push(["#" + g, t]); CAT.bases.filter((b) => b.grupo === g).forEach((b) => ops.push([b.id, b.etiqueta])); });
-      return ops;
-    }
-    if (id === "departamento") return CAT.departamentos.map((d) => [d.codigo, titulo(d.nombre)]);
-    return CAT.niveles.map((n) => [n, NIVEL_TXT[n]]);
-  }
-  function resumen(id) {
-    const ops = opciones(id).filter(([k]) => !k.startsWith("#")), vals = v[id];
-    if (!vals.length) return id === "base" ? "Ninguna" : "Ninguno";
-    if (vals.length === ops.length) return id === "departamento" ? `Todos (${ops.length})` : id === "base" ? `Todas (${ops.length})` : "Todos";
-    const nombres = ops.filter(([k]) => vals.includes(k)).map(([k, t]) => id === "base" ? basePor(k).nombre : t);
-    return nombres.length <= 3 ? nombres.join(", ") : `${nombres.length} marcados`;
-  }
-  const RAPIDOS = {
-    base: () => [["Toda la inversión", CAT.bases.filter((b) => b.grupo === "inversion").map((b) => b.id)], ["Todo el gasto", CAT.bases.filter((b) => b.grupo === "gasto").map((b) => b.id)], ["Toda la pesca", CAT.bases.filter((b) => b.grupo === "pesca").map((b) => b.id)], ["Todas", CAT.bases.map((b) => b.id)], ["Ninguna", []]],
-    departamento: () => [["Todos", CAT.departamentos.map((d) => d.codigo)], ["Loreto · San Martín · Ucayali", LSU], ["Ninguno", []]],
-    nivel: () => [["Todos", CAT.niveles.slice()], ["Ninguno", []]],
+  // ── Regiones, sectores e índices (síntesis de junio 2026) ──
+  const REG = { lor: { nombre: "Loreto", corto: "LOR", cod: "16", pesca: "pesca-loreto" },
+                smn: { nombre: "San Martín", corto: "SMN", cod: "22", pesca: "pesca-san-martin" },
+                uca: { nombre: "Ucayali", corto: "UCA", cod: "25", pesca: "pesca-ucayali" } };
+  const LSU = ["16", "22", "25"];
+  const INV = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-dev-fuente", "inv-pim-funcion", "inv-pim-municipalidad"];
+  const GASTO = ["gasto-dev-generica", "gasto-dev-fuente"];
+  const S = {
+    resumen: { t: "Resumen ejecutivo", estado: "falta", fuente: "Todos los sectores del informe", entra: "Se arma con los demás sectores",
+      lead: "Principales hechos de importancia y el Cuadro 1 (otros indicadores) del mes.", cuadros: ["Principales hechos de importancia", "Cuadro 1 · Otros indicadores"] },
+    agro: { t: "Sector agropecuario", estado: "falta", fuente: "MIDAGRI y direcciones regionales de agricultura", entra: "Archivo mensual",
+      lead: "Producción de los principales cultivos y crianzas, y avance de siembras de la campaña.", cuadros: ["Producción agropecuaria (t)", "Superficie sembrada (ha)", "Anexo de producción agrícola"] },
+    pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Drive, cada día a las 7:30 a. m., o subiendo el Excel", bases: (r) => [r.pesca], actualizar: "drive",
+      lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: ["Producción pesquera (VBP a precios de 2007)", "Cuadro Nº 07 · Indicadores del sector pesquero (Loreto)"] },
+    hidro: { t: "Sector hidrocarburos", estado: "parcial", fuente: "PERUPETRO; precio del crudo, Reuters", entra: "Scraper diario (7:00 a. m.) que guarda en Drive",
+      lead: "Producción fiscalizada de petróleo por lote, canon y regalías. El scraper ya corre todos los días; falta mostrar sus datos aquí.", cuadros: ["Producción de petróleo crudo por lote (barriles)", "Canon y regalías"] },
+    manu: { t: "Sector manufactura", estado: "falta", fuente: "DIREPRO y encuesta BCRP a empresas industriales", entra: "Archivo mensual",
+      lead: "Índice de volumen físico de la manufactura.", cuadros: ["Índice de volumen físico", "Anexo de producción manufacturera"] },
+    cemento: { t: "Despachos de cemento", estado: "falta", fuente: "Empresas cementeras", entra: "Archivo mensual",
+      lead: "Despachos de cemento en la región, indicador adelantado de la construcción.", cuadros: ["Despachos de cemento (t)"] },
+    empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
+      lead: "Trabajadores asalariados privados formales por rama de actividad económica.", cuadros: "empleo" },
+    expo: { t: "Exportaciones", estado: "parcial", fuente: "SUNAT", entra: "Archivo mensual (selector de partidas de EXPORT)",
+      lead: "Exportaciones tradicionales y no tradicionales por grupo de productos.", cuadros: ["Exportaciones por grupo de productos (FOB)"] },
+    impo: { t: "Importaciones", estado: "falta", fuente: "SUNAT, aduana de Iquitos", entra: "Archivo mensual",
+      lead: "Importaciones por la aduana de Iquitos según uso o destino económico.", cuadros: ["Importaciones FOB por uso o destino"] },
+    credito: { t: "Crédito", estado: "falta", fuente: "SBS", entra: "Scraper de la web de la SBS, por construir",
+      lead: "Saldos de crédito del sistema financiero por tipo, sin Banco de la Nación ni Agrobanco, y morosidad.", cuadros: ["Crédito por tipo", "Tasa de morosidad"] },
+    depositos: { t: "Depósitos", estado: "falta", fuente: "SBS y AFP", entra: "Scraper de la web de la SBS, por construir",
+      lead: "Saldos de depósitos del sistema financiero por tipo.", cuadros: ["Depósitos por tipo"] },
+    gasto: { t: "Gasto corriente no financiero", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => GASTO, actualizar: "mef",
+      lead: "Gasto corriente no financiero por nivel de gobierno, mes y acumulado.", cuadros: ["Gasto corriente no financiero por nivel (mes y acumulado, var. % real)", "Anexos de ejecución por nivel de gobierno"] },
+    inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => INV, actualizar: "mef",
+      lead: "Inversión pública por nivel de gobierno y avance de su PIM.", cuadros: ["Inversión pública por nivel y avance del PIM", "Anexos de inversión por nivel de gobierno"], extra: ["Variaciones alarmantes", "Proyectos"] },
+    anexos: { t: "Anexos", estado: "falta", fuente: "Todos los sectores", entra: "Se generan con los demás sectores",
+      lead: "Cuadros estadísticos del final del informe, uno por sector.", cuadros: ["Un anexo por cada sector del índice"] },
   };
-  function lista(id, etiqueta) {
-    const ops = opciones(id);
-    return `<div class="field"><span class="flabel" id="l-${id}">${etiqueta}</span><div class="ms" data-ms="${id}">
-      <button type="button" class="ms-btn" id="ms-${id}" aria-haspopup="true" aria-expanded="false" aria-labelledby="l-${id} ms-${id}"><span id="r-${id}">${esc(resumen(id))}</span><span class="chev" aria-hidden="true"></span></button>
-      <div class="ms-panel" hidden><div class="ms-quick">${RAPIDOS[id]().map(([t], i) => `<button type="button" data-rapido="${id}|${i}">${esc(t)}</button>`).join("")}</div>
-      <div class="ms-list">${ops.map(([k, t]) => k.startsWith("#") ? `<div class="ms-grupo">${esc(t)}</div>`
-        : `<label class="ms-op"><input type="checkbox" data-chk="${id}" value="${k}"${v[id].includes(k) ? " checked" : ""}><span>${esc(t)}</span></label>`).join("")}</div></div></div></div>`;
-  }
-  const selector = (id, etiqueta, ops) => `<div class="field"><label class="flabel" for="p-${id}">${etiqueta}</label><select id="p-${id}" data-p="${id}">${ops.map(([k, t]) => `<option value="${k}"${k === v[id] ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div>`;
+  const cap = (titulo, items) => ({ titulo, items });
+  const V = "V. Ejecución del presupuesto de gastos del Gobierno General";
+  const comunes = [cap("II. Aspectos laborales", ["empleo"]), null, cap("IV. Crédito y depósitos", ["credito", "depositos"]), cap(V, ["gasto", "inversion"])];
+  const GRUPOS = {
+    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[2], comunes[3], { id: "anexos" }] },
+    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "manu", "cemento"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
+    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
+    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["bases-mef", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-drive", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
+  };
+  const C = { panorama: "Panorama de las tres regiones", "bases-mef": "MEF · 25 departamentos", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
+              "act-empleo": "Scraper de empleo", "act-drive": "Pesca desde Drive", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
+  const CORTO = { [V]: "V. Ejecución del presupuesto" };
+  const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
 
-  function cerrarListas() {
-    abierto = null;
-    document.querySelectorAll(".ms-panel").forEach((p) => { p.hidden = true; });
-    document.querySelectorAll(".ms-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+  let CAT = null, ESTADO = null, MESES = [], grupo = "lor", id = "resumen";
+  const pestana = {}, abiertos = new Set(), paneles = {};
+  const base = (b) => CAT.bases.find((x) => x.id === b);
+  const planos = (g) => GRUPOS[g].indice.flatMap((e) => e.items ? e.items : [e.id]);
+  const nombre = (sid) => GRUPOS[grupo].comun ? C[sid] : S[sid].t;
+  function estadoDe(sid, r) {
+    const s = S[sid];
+    if (!s.bases) return s.estado;
+    return s.bases(r).some((b) => ESTADO.bases[b] && ESTADO.bases[b].departamentos.includes(r.cod)) ? "ok" : "vacio";
   }
-  function renderParams() {
-    const meses = MESES.map((m) => [m, etqMes(m)]);
-    $("params").innerHTML = lista("base", "Bases") + lista("departamento", "Departamentos") + lista("nivel", "Nivel de Gobierno")
-      + selector("desde", "Desde", meses) + selector("hasta", "Hasta", meses)
-      + selector("formato", "Formato", [["xlsx", "Excel (.xlsx)"], ["csv", "CSV"], ["json", "JSON"]]);
-    const cambio = () => { ["base", "departamento", "nivel"].forEach((id) => { $("r-" + id).textContent = resumen(id); }); rotular(); pedirVista(); };
-    const marcar = (id, vals) => { v[id] = vals.slice(); document.querySelectorAll(`[data-chk="${id}"]`).forEach((x) => { x.checked = v[id].includes(x.value); }); cambio(); };
-    document.querySelectorAll("[data-chk]").forEach((x) => x.addEventListener("change", () => {
-      const id = x.dataset.chk; v[id] = [...document.querySelectorAll(`[data-chk="${id}"]`)].filter((c) => c.checked).map((c) => c.value); cambio(); }));
-    document.querySelectorAll("[data-rapido]").forEach((b) => b.addEventListener("click", () => { const [id, i] = b.dataset.rapido.split("|"); marcar(id, RAPIDOS[id]()[+i][1]); }));
-    document.querySelectorAll("[data-p]").forEach((s) => s.addEventListener("change", () => { v[s.dataset.p] = s.value; cambio(); }));
-    document.querySelectorAll(".ms-btn").forEach((b) => b.addEventListener("click", (e) => {
-      e.stopPropagation(); const id = b.closest(".ms").dataset.ms, abrir = abierto !== id; cerrarListas();
-      if (abrir) { abierto = id; b.setAttribute("aria-expanded", "true"); b.nextElementSibling.hidden = false; } }));
-    document.querySelectorAll(".ms-panel").forEach((p) => p.addEventListener("click", (e) => e.stopPropagation()));
-    rotular();
-  }
-  function rotular() { $("descargar").textContent = `Descargar ${{ xlsx: "Excel", csv: "CSV", json: "JSON" }[v.formato]}`; $("nota-descarga").textContent = ""; }
+  const ETIQ = { ok: "Con datos en la página", vacio: "Conectado, sin datos cargados", parcial: "Dato listo, falta conectarlo", falta: "Por construir" };
 
-  // ── Vista previa (datos reales del API) ──
-  function pedirVista() {
+  // ── Grupos e índice desplegable ──
+  function pintarGrupos() {
+    const g = { lor: ["Loreto", "LOR"], smn: ["San Martín", "SMN"], uca: ["Ucayali", "UCA"], tres: ["Las tres regiones", "LOR · SMN · UCA"] };
+    $("grupos").innerHTML = Object.entries(g).map(([k, [n, c]]) => `<button type="button" data-grupo="${k}" aria-pressed="${k === grupo}">${esc(n)}<small>${esc(c)}</small></button>`).join("");
+    document.querySelectorAll("[data-grupo]").forEach((b) => b.addEventListener("click", () => { location.hash = `${b.dataset.grupo}-${planos(b.dataset.grupo)[0]}`; }));
+  }
+  function pintarIndice() {
+    const g = GRUPOS[grupo], r = REG[grupo];
+    $("indice-t").textContent = g.comun ? "Común a las tres regiones" : `Índice · ${r.nombre}`;
+    $("leyenda").hidden = !!g.comun;
+    const dot = (sid) => g.comun ? "" : `<span class="dot ${estadoDe(sid, r)}"></span>`;
+    const item = (sid) => `<button class="it" data-ir="${grupo}-${sid}" aria-current="${sid === id ? "page" : "false"}">${esc(nombre(sid))}${dot(sid)}</button>`;
+    $("indice").innerHTML = g.indice.map((e, i) => {
+      if (!e.items) return `<div class="cap"><button class="it solo" data-ir="${grupo}-${e.id}" aria-current="${e.id === id ? "page" : "false"}"><i>${esc(e.num || "")}</i>${esc(nombre(e.id))}${dot(e.id)}</button></div>`;
+      const [rom, ...resto] = (CORTO[e.titulo] || e.titulo).split(". "), num = /^[IVX]+$/.test(rom), clave = `${grupo}:${i}`;
+      const abierto = abiertos.has(clave) || e.items.includes(id);
+      return `<div class="cap"><button class="cap-b" type="button" data-cap="${clave}" aria-expanded="${abierto}"><i>${num ? rom : ""}</i>${esc(num ? resto.join(". ") : e.titulo)}<span class="flecha"></span></button>
+        <div class="cap-items"${abierto ? "" : " hidden"}>${e.items.map(item).join("")}</div></div>`;
+    }).join("");
+    $("sel-movil").innerHTML = g.indice.flatMap((e) => e.items ? e.items.map((sid) => [sid, e.titulo.split(".")[0] + " · "]) : [[e.id, ""]])
+      .map(([sid, p]) => `<option value="${grupo}-${sid}"${sid === id ? " selected" : ""}>${esc(p + nombre(sid))}</option>`).join("");
+    document.querySelectorAll("#indice [data-ir]").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.ir; }));
+    document.querySelectorAll("#indice [data-cap]").forEach((b) => b.addEventListener("click", () => {
+      const abrir = b.getAttribute("aria-expanded") !== "true";
+      b.setAttribute("aria-expanded", String(abrir)); b.nextElementSibling.hidden = !abrir;
+      abrir ? abiertos.add(b.dataset.cap) : abiertos.delete(b.dataset.cap);
+    }));
+  }
+
+  // ── Panel de descarga de bases (sector, MEF 25 departamentos, comparativas) ──
+  function panelBases(clave, bases, opc) {
+    const p = paneles[clave] = paneles[clave] || { marcadas: bases.slice(0, opc.marcar || 2), desde: opc.desde || MESES[Math.max(0, MESES.length - 9)], hasta: MESES[MESES.length - 1], nivel: "todos", formato: "xlsx", hoja: null };
+    p.bases = bases; p.deptos = opc.deptos;
+    const conNivel = bases.some((b) => base(b).usa_niveles);
+    const filas = bases.map((b, i) => { const x = base(b), e = ESTADO.bases[b];
+      return `<tr><td><input type="checkbox" id="${clave}-b${i}" data-base="${b}" ${p.marcadas.includes(b) ? "checked" : ""}></td>
+        <td><label for="${clave}-b${i}"><b>${esc(x.nombre)}</b></label></td><td>${esc(x.descripcion)}</td>
+        ${opc.alcance ? `<td><span class="alcance ${NACIONAL.includes(b) ? "nac" : "reg"}">${NACIONAL.includes(b) ? "los 25" : "LOR · SMN · UCA"}</span></td>` : ""}
+        <td>${e.filas ? `${esc(etqMes(e.desde))} – ${esc(etqMes(e.hasta))}` : "sin datos"}</td><td class="n">${fmt(e.filas)}</td></tr>`; }).join("");
+    const opMeses = (sel) => MESES.map((m) => `<option value="${m}"${m === sel ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("");
+    return `<div class="scroll"><table><tr><th></th><th>Base</th><th>Contenido</th>${opc.alcance ? "<th>Departamentos</th>" : ""}<th>Datos</th><th class="n">Filas</th></tr>${filas}</table></div>
+      <div class="fila"><label class="campo" for="${clave}-d">Desde<select id="${clave}-d">${opMeses(p.desde)}</select></label>
+        <label class="campo" for="${clave}-h">Hasta<select id="${clave}-h">${opMeses(p.hasta)}</select></label>
+        ${conNivel ? `<label class="campo" for="${clave}-n">Nivel de gobierno<select id="${clave}-n">${[["todos", "Los tres"], ["nacional", "Nacional"], ["regional", "Regional"], ["locales", "Locales"]].map(([v, t]) => `<option value="${v}"${v === p.nivel ? " selected" : ""}>${t}</option>`).join("")}</select></label>` : ""}
+        <label class="campo" for="${clave}-f">Formato<select id="${clave}-f"><option value="xlsx">Excel (.xlsx)</option><option value="csv"${p.formato === "csv" ? " selected" : ""}>CSV</option></select></label>
+        <button class="btn" type="button" id="${clave}-bajar">Descargar</button></div>
+      <p class="nota">El Excel trae una hoja por base, con el formato de PIM_Funcion.xlsx. Las bases de PIM toman los años del rango.</p>
+      <div id="${clave}-vista"></div>`;
+  }
+  function consultaPanel(clave) {
+    const p = paneles[clave];
+    const niveles = p.nivel === "todos" ? "nacional,regional,locales" : p.nivel;
+    return new URLSearchParams({ base: p.marcadas.join(","), departamento: p.deptos().join(","), nivel: niveles, desde: p.desde, hasta: p.hasta }).toString();
+  }
+  function atarPanel(clave) {
+    const p = paneles[clave];
+    if (!p || !$(`${clave}-d`)) return;
+    const cambio = () => {
+      p.marcadas = [...document.querySelectorAll(`[id^="${clave}-b"][data-base]`)].filter((c) => c.checked).map((c) => c.dataset.base);
+      p.desde = $(`${clave}-d`).value; p.hasta = $(`${clave}-h`).value; p.formato = $(`${clave}-f`).value;
+      if ($(`${clave}-n`)) p.nivel = $(`${clave}-n`).value;
+      vistaPrevia(clave);
+    };
+    document.querySelectorAll(`[id^="${clave}-"]`).forEach((el) => { if (el.tagName === "SELECT" || el.type === "checkbox") el.addEventListener("change", cambio); });
+    $(`${clave}-bajar`).addEventListener("click", () => {
+      if (!p.marcadas.length) { $(`${clave}-vista`).innerHTML = '<div class="err-box"><b>Marca al menos una base</b></div>'; return; }
+      window.location.href = `/v1/descargas?${consultaPanel(clave)}&formato=${p.formato}`;
+    });
+    p.recargar = cambio;
+    vistaPrevia(clave);
+  }
+  let temporizador = null;
+  function vistaPrevia(clave) {
+    const p = paneles[clave], caja = $(`${clave}-vista`);
+    if (!caja) return;
+    if (!p.marcadas.length || !p.deptos().length) { caja.innerHTML = `<p class="nota">Marca al menos una base${p.deptos().length ? "" : " y un departamento"} para ver la vista previa.</p>`; return; }
+    if (p.desde > p.hasta) { caja.innerHTML = '<div class="err-box"><b>El periodo está al revés</b><span>«Desde» es posterior a «Hasta».</span></div>'; return; }
     clearTimeout(temporizador);
     temporizador = setTimeout(async () => {
-      $("vista").innerHTML = '<div class="loading"><span class="spin"></span>Buscando en la base de datos…</div>';
-      try { ultimaVista = await api("/v1/descargas/vista-previa?" + consulta()); renderVista(); $("descargar").disabled = false; }
-      catch (e) { ultimaVista = null; $("vista").innerHTML = `<div class="err-box"><b>Falta completar las opciones</b><span>${esc(e.message)}</span></div>`; $("descargar").disabled = true; }
+      caja.innerHTML = '<div class="loading"><span class="spin"></span>Buscando en la base de datos…</div>';
+      try {
+        const v = await api(`/v1/descargas/vista-previa?${consultaPanel(clave)}&filas=8`);
+        const a = v.archivos.find((x) => x.hoja === p.hoja) || v.archivos[0];
+        p.hoja = a.hoja;
+        const pesca = base(a.base).grupo === "pesca";
+        const filas = a.muestra.length ? a.muestra.map((f) => `<tr>${a.columnas.map((k) => { const x = f[k], num = typeof x === "number";
+          return `<td class="${num ? "n" : ""}">${num && k !== "AÑO" && k !== "MES" ? (pesca ? fmt3(x) : fmt(x)) : esc(x)}</td>`; }).join("")}</tr>`).join("")
+          : `<tr><td colspan="${a.columnas.length}">No hay filas para estas opciones.</td></tr>`;
+        caja.innerHTML = `<div class="fila" style="justify-content:space-between;align-items:center"><b>Vista previa · ${fmt(v.filas_total)} filas en total</b>
+            <div class="hojas">${v.archivos.map((x) => `<button type="button" data-hoja="${esc(x.hoja)}" aria-pressed="${x.hoja === a.hoja}">${esc(x.hoja)} · ${fmt(x.filas)}</button>`).join("")}</div></div>
+          ${v.avisos.map((x) => `<p class="nota">${esc(x)}</p>`).join("")}
+          <div class="scroll"><table><tr>${a.columnas.map((k) => `<th>${esc(k)}</th>`).join("")}</tr>${filas}</table></div>`;
+        caja.querySelectorAll("[data-hoja]").forEach((b) => b.addEventListener("click", () => { p.hoja = b.dataset.hoja; vistaPrevia(clave); }));
+      } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar la vista previa</b><span>${esc(e.message)}</span></div>`; }
     }, 250);
   }
-  function renderVista() {
-    const c = ultimaVista;
-    const a = c.archivos.find((x) => x.hoja === hojaActiva) || c.archivos[0];
-    hojaActiva = a.hoja;
-    const b = basePor(a.base), cols = a.columnas;
-    const filas = a.muestra.length ? a.muestra.map((f, i) => `<tr><th class="rn">${i + 2}</th>${cols.map((k) => {
-        const x = f[k], num = typeof x === "number";
-        return `<td class="${num ? "num" : ""}">${num && k !== "AÑO" ? (b.grupo === "pesca" ? fmt3(x) : fmt(x)) : esc(x)}</td>`; }).join("")}</tr>`).join("")
-      : `<tr><th class="rn">2</th><td colspan="${cols.length}" class="vacia">No hay filas para estas opciones.</td></tr>`;
-    $("vista").innerHTML = `<div class="stats">
-        <div class="stat"><div class="k">Bases</div><div class="v">${c.archivos.length}</div><div class="s">${esc(c.archivos.map((x) => basePor(x.base).nombre).join(" · "))}</div></div>
-        <div class="stat"><div class="k">Filas</div><div class="v">${fmt(c.filas_total)}</div><div class="s">en total</div></div>
-        <div class="stat"><div class="k">Periodo</div><div class="v" style="font-size:22px">${esc(etqMes(v.desde))} a ${esc(etqMes(v.hasta))}</div><div class="s">las bases de PIM toman los años del rango</div></div></div>
-      ${c.avisos.map((x) => `<p class="hint">${esc(x)}</p>`).join("")}
-      <div class="xl"><div class="xl-bar"><span class="file">${esc(v.formato === "xlsx" ? c.descarga : v.formato === "csv" ? (c.archivos.length > 1 ? c.descarga.replace(".xlsx", ".zip") : "archivo .csv") : "respuesta JSON")}</span><span>${fmt(a.filas)} filas en la hoja «${esc(a.hoja)}»</span></div>
-        <div class="xl-grid"><table><colgroup><col style="width:40px">${b.anchos.map((w) => `<col style="width:${Math.round(w * 6 + 8)}px">`).join("")}</colgroup>
-          <tr class="letras"><th></th>${cols.map((_, i) => `<th>${String.fromCharCode(65 + i)}</th>`).join("")}</tr>
-          <tr><th class="rn">1</th>${cols.map((k) => `<td class="hdr">${k}</td>`).join("")}</tr>${filas}
-          ${a.filas > a.muestra.length ? `<tr><th class="rn">…</th><td colspan="${cols.length}" class="vacia">… ${fmt(a.filas - a.muestra.length)} filas más</td></tr>` : ""}</table></div>
-        <div class="xl-tabs" role="tablist">${c.archivos.map((x) => `<button type="button" role="tab" class="xl-tab" data-hoja="${esc(x.hoja)}" aria-selected="${x.hoja === a.hoja}">${esc(x.hoja)}</button>`).join("")}</div></div>`;
-    document.querySelectorAll(".xl-tab").forEach((t) => t.addEventListener("click", () => { hojaActiva = t.dataset.hoja; renderVista(); }));
-  }
-  $("descargar").addEventListener("click", () => {
-    if (!ultimaVista) return;
-    if (!ultimaVista.filas_total) { $("nota-descarga").textContent = "No hay filas para descargar con estas opciones."; return; }
-    window.location.href = `/v1/descargas?${consulta()}&formato=${v.formato}`;
-    $("nota-descarga").textContent = "Preparando el archivo… la descarga empieza en unos segundos.";
-  });
 
-  // ── Estado y carga ──
-  function datosHasta() {
-    const h = Object.values(ESTADO.bases).map((x) => x.hasta).filter((x) => x && x.length === 7).sort();
-    return h.length ? h[h.length - 1] : null;
-  }
-  function renderEstado() {
-    const hasta = datosHasta(), u = ESTADO.ultima_carga;
-    const deptos = new Set(Object.values(ESTADO.bases).flatMap((x) => x.departamentos));
-    $("datos-hasta").innerHTML = hasta ? `Datos hasta <b>${esc(etqMes(hasta))}</b>` : "Sin datos cargados";
-    $("estado").innerHTML = `<div class="stats">
-        <div class="stat"><div class="k">Datos hasta</div><div class="v">${esc(etqMes(hasta))}</div><div class="s">último mes con datos</div></div>
-        <div class="stat"><div class="k">Departamentos</div><div class="v">${deptos.size}</div><div class="s">con alguna base cargada</div></div>
-        <div class="stat"><div class="k">Última carga</div><div class="v" style="font-size:22px">${u ? esc(new Date(u.fecha).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" })) : "—"}</div><div class="s">${u ? esc(u.origen) : "todavía no se cargó nada"}</div></div></div>
-      <div class="panel"><div class="scroll"><table>
-        <tr><th class="t">Base</th><th class="t">Grupo</th><th class="t">Datos</th><th class="t">Departamentos</th><th>Filas</th></tr>
-        ${CAT.bases.map((b) => { const x = ESTADO.bases[b.id], ds = x.departamentos;
-          return `<tr><td class="t">${esc(b.nombre)}</td><td class="t">${esc(CAT.grupos[b.grupo].split(" · ")[0])}</td>
-            <td class="t">${x.filas ? `${esc(etqMes(x.desde))} a ${esc(etqMes(x.hasta))}` : "sin datos"}</td>
-            <td class="t">${ds.length > 6 ? `${ds.length} departamentos` : ds.map((c) => titulo(CAT.departamentos.find((d) => d.codigo === c).nombre)).join(", ") || "—"}</td>
-            <td>${fmt(x.filas)}</td></tr>`; }).join("")}
-      </table></div></div>`;
-  }
-  $("cargar").addEventListener("click", async () => {
-    const archivos = $("archivos").files;
-    if (!archivos.length) { $("resultado-carga").innerHTML = '<div class="err-box"><b>Falta elegir los archivos</b><span>Elige el .zip de Scrapeo/output, CSV del scraper, PIM_Funcion.xlsx o los Excel de pesca.</span></div>'; return; }
-    const datos = new FormData();
-    [...archivos].forEach((a) => datos.append("archivos", a));
-    const btn = $("cargar"); btn.disabled = true; btn.textContent = "Cargando…";
-    $("resultado-carga").innerHTML = '<div class="loading"><span class="spin"></span>Leyendo los archivos y guardando en la base de datos…</div>';
+  // ── Cuadros de empleo (los de la síntesis) ──
+  async function cuadrosEmpleo(r, caja, periodo) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
     try {
-      const r = await api("/v1/cargas", { method: "POST", body: datos });
-      const cargado = Object.keys(r.bases).length > 0;
-      $("resultado-carga").innerHTML = resultado(r, cargado ? "Carga terminada" : "No se cargó nada", cargado);
-      ESTADO = await api("/v1/estado"); renderEstado();
-    } catch (e) {
-      $("resultado-carga").innerHTML = `<div class="err-box"><b>No se pudo cargar</b><span>${esc(e.message)}</span></div>`;
-    } finally { btn.disabled = false; btn.textContent = "Cargar a la base de datos"; }
-  });
-
-  // ── Pesca desde Drive ──
-  const REGION = { "pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali" };
-  const fecha = (f) => new Date(f).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
-  function resultado(r, titulo, ok) {
-    const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(basePor(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
-    return `<div class="${ok ? "ok-box" : "err-box"}"><b>${esc(titulo)}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
+      const j = await api(`/v1/cuadros/empleo?departamento=${r.cod}${periodo ? `&periodo=${periodo}` : ""}`), c = j.cuadros;
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay datos de empleo de ${esc(r.nombre)}.</b><span>Lanza el scraper de empleo o sube el Excel en la pestaña «Actualizar».</span></div>`; return; }
+      const e = ESTADO.bases.empleo, meses = MESES.filter((m) => m >= (e.desde || "") && m <= c.ultimo);
+      const num = { lor: "N° 6", smn: "N° 4", uca: "N° 7" }[grupo], mes = c.titulo_mes, a = c.anio;
+      const cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
+      const cuadro = c.cuadro.map((f) => `<tr class="${f.rama === "Total" ? "total" : ""}"><td>${esc(f.rama)}</td><td class="n">${fmt(f.mes_anterior)}</td><td class="n">${fmt(f.mes)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td><td class="n">${fmt(f.diciembre)}</td><td class="n">${fmt(f.mes)}</td><td class="n ${cls(f.var_dic)}">${pct(f.var_dic)}</td></tr>`).join("");
+      const g = c.grafico.filter((x) => x.var != null), max = Math.max(1, ...g.map((x) => Math.abs(x.var))), W = 760, H = 220, y0 = 110, bw = W / Math.max(g.length, 1);
+      const barras = g.map((x, i) => { const h = Math.abs(x.var) / max * 90, y = x.var >= 0 ? y0 - h : y0;
+        return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${y}" width="${bw * 0.64}" height="${Math.max(h, 1)}"></rect>
+          <text class="val" x="${i * bw + bw / 2}" y="${x.var >= 0 ? y - 4 : y + h + 11}" text-anchor="middle">${pct(x.var)}</text>
+          <text x="${i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${esc(x.periodo.split(" ")[0])}</text>`; }).join("");
+      const anexo = c.anexo.map((f) => `<tr><td>${esc(f.periodo)}</td>${["Agricultura", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "Total"].map((k) => `<td class="n ${cls(f[k])}">${pct(f[k])}</td>`).join("")}</tr>`).join("");
+      caja.innerHTML = `<div class="fila"><label class="campo" for="emp-p">Mes del informe<select id="emp-p">${meses.slice().reverse().map((m) => `<option value="${m}"${m === c.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
+          <button class="btn" type="button" id="emp-xlsx">Descargar los cuadros en Excel</button></div>
+        <div class="caja"><h3>Cuadro ${num} · ${esc(r.nombre.toUpperCase())}: TRABAJADORES ASALARIADOS PRIVADOS FORMALES</h3><p>(Número de trabajadores)</p>
+          <div class="scroll"><table><tr><th>Rama de actividad</th><th class="n">${mes} ${a - 1}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Dic. ${a - 1}</th><th class="n">${mes.slice(0, 3)}. ${a}</th><th class="n">Var. %</th></tr>${cuadro}</table></div>
+          <p class="nota">Fuente: Planilla Electrónica – PLAME y T-Registro. «Otros» es la actividad «No precisa» del MTPE.</p></div>
+        <div class="caja"><h3>Gráfico · Variación % respecto a similar mes del año anterior</h3>
+          ${g.length ? `<div class="scroll"><svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Variación porcentual interanual del total"><line class="eje" x1="0" x2="${W}" y1="${y0}" y2="${y0}"></line>${barras}</svg></div>` : '<p class="nota">Hace falta al menos un año de datos para la variación interanual.</p>'}</div>
+        <div class="caja"><h3>${grupo === "lor" ? "Anexo 5 · " : ""}Trabajadores por sectores económicos</h3><p>(Variación % con respecto al mismo mes del año anterior)</p>
+          <div class="scroll"><table><tr><th>Mes</th><th class="n">Agricultura</th><th class="n">Minería</th><th class="n">Manufactura</th><th class="n">Construcción</th><th class="n">Comercio</th><th class="n">Servicios</th><th class="n">Total</th></tr>${anexo}</table></div></div>`;
+      $("emp-p").addEventListener("change", (ev) => cuadrosEmpleo(r, caja, ev.target.value));
+      $("emp-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/empleo?departamento=${r.cod}&periodo=${c.periodo}&formato=xlsx`; });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
   }
-  function renderDrive(d) {
-    if (!d.configurado) {
-      $("drive").innerHTML = `<div class="err-box"><b>Falta conectar Drive</b><span>Agrega la variable GOOGLE_DRIVE_CREDENCIAL en Render (la misma credencial del flujo de hidrocarburos). Pasos en FISCAL/api/README.md.</span></div>`;
-      return;
-    }
-    const u = d.ultima, archivos = u ? u.resumen.archivos || [] : [];
-    $("drive").innerHTML = `<p class="hint">Deja los Excel que manda cada DIREPRO en su carpeta: ${Object.entries(d.carpetas).map(([b, id]) => `<a href="https://drive.google.com/drive/folders/${encodeURIComponent(id)}" target="_blank" rel="noopener">${esc(REGION[b])}</a>`).join(" · ")}. Se cargan solos cada día (7:30 a. m.); con el botón, al instante. Solo se procesan los archivos nuevos o modificados.</p>
-      <p class="hint">Última sincronización: ${u ? `<b>${esc(fecha(u.fecha))}</b> (${esc(u.origen)}) · ${archivos.length ? `${archivos.length} archivo(s): ${esc(archivos.map((a) => a.nombre).join(", "))}` : "sin archivos nuevos"}` : "todavía ninguna"}.</p>
-      <div class="subida"><label class="hint"><input type="checkbox" id="drive-todo"> Volver a procesar todos los archivos</label>
-        <button class="btn btn-primary" id="sincronizar" type="button">Sincronizar ahora</button></div>
-      <div id="resultado-drive" aria-live="polite"></div>`;
-    $("sincronizar").addEventListener("click", async () => {
-      const btn = $("sincronizar"); btn.disabled = true; btn.textContent = "Sincronizando…";
-      $("resultado-drive").innerHTML = '<div class="loading"><span class="spin"></span>Revisando las carpetas de Drive…</div>';
-      try {
-        const r = await api(`/v1/drive/sincronizar?todo=${$("drive-todo").checked}`, { method: "POST" });
-        const cargado = Object.keys(r.bases).length > 0;
-        const html = resultado(r, !r.archivos.length ? "Todo estaba al día" : cargado ? "Sincronización terminada" : "Los archivos nuevos no se pudieron cargar", cargado || !r.archivos.length);
-        [ESTADO, d] = await Promise.all([api("/v1/estado"), api("/v1/drive")]); renderEstado(); renderDrive(d);
-        $("resultado-drive").innerHTML = html;
-      } catch (e) {
-        $("resultado-drive").innerHTML = `<div class="err-box"><b>No se pudo sincronizar</b><span>${esc(e.message)}</span></div>`;
-        btn.disabled = false; btn.textContent = "Sincronizar ahora";
-      }
+
+  // ── Carga de archivos, Drive y scrapers de GitHub ──
+  function resultado(r, tit, ok) {
+    const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(base(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
+    return `<div class="${ok ? "ok-box" : "err-box"}"><b>${esc(tit)}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
+  }
+  function cajaSubida(clave, texto) {
+    return `<div class="caja"><h3>Subir archivos a mano</h3><p>${texto}</p><div class="fila"><input type="file" id="${clave}-arch" multiple accept=".zip,.csv,.xlsx">
+      <button class="btn" type="button" id="${clave}-subir">Cargar a la base de datos</button></div><div id="${clave}-res" aria-live="polite"></div></div>`;
+  }
+  function atarSubida(clave) {
+    if (!$(`${clave}-subir`)) return;
+    $(`${clave}-subir`).addEventListener("click", async () => {
+      const archivos = $(`${clave}-arch`).files, res = $(`${clave}-res`);
+      if (!archivos.length) { res.innerHTML = '<div class="err-box"><b>Falta elegir los archivos</b></div>'; return; }
+      const datos = new FormData(); [...archivos].forEach((a) => datos.append("archivos", a));
+      const btn = $(`${clave}-subir`); btn.disabled = true; btn.textContent = "Cargando…";
+      res.innerHTML = '<div class="loading"><span class="spin"></span>Leyendo los archivos y guardando en la base de datos…</div>';
+      try { const r = await api("/v1/cargas", { method: "POST", body: datos }); const ok = Object.keys(r.bases).length > 0;
+        ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); res.innerHTML = resultado(r, ok ? "Carga terminada" : "No se cargó nada", ok);
+      } catch (e) { res.innerHTML = `<div class="err-box"><b>No se pudo cargar</b><span>${esc(e.message)}</span></div>`; }
+      finally { btn.disabled = false; btn.textContent = "Cargar a la base de datos"; }
     });
   }
-
-  // ── Datos del MEF (scraper en GitHub Actions) ──
+  const ESTADO_CORRIDA = (c) => c.estado !== "completed" ? (c.estado === "queued" ? '<span class="chip vacio">en cola</span>' : '<span class="chip vacio">corriendo</span>')
+    : c.resultado === "success" ? '<span class="chip ok">terminó bien</span>' : c.resultado === "cancelled" ? '<span class="chip falta">cancelada</span>' : '<span class="chip error">falló</span>';
   let sondeo = null;
-  const ESTADO_CORRIDA = (c) => c.estado !== "completed" ? (c.estado === "queued" ? "⏳ en cola" : "🔄 corriendo")
-    : c.resultado === "success" ? "✅ terminó bien" : c.resultado === "cancelled" ? "⏹ cancelada" : "❌ falló";
-  function renderMef(m) {
-    if (!m.configurado) {
-      $("mef").innerHTML = `<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render. Mientras tanto, el scraper corre solo los días 2 y 21, o lo lanzas en GitHub (Actions → «Fiscal · scraper del MEF»). Pasos en FISCAL/api/README.md.</span></div>`;
-      return;
-    }
-    const filas = m.corridas.map((c) => `<tr><td class="t">${esc(fecha(c.inicio))}</td><td class="t">${esc(c.titulo)}</td><td class="t">${c.origen === "schedule" ? "programada" : "a mano"}</td>
-      <td class="t">${ESTADO_CORRIDA(c)}</td><td class="t"><a href="${esc(c.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("");
-    $("mef").innerHTML = `<p class="hint">El scraper baja de Consulta Amigable las 7 bases (Loreto, San Martín y Ucayali) y las carga aquí. Tarda varios minutos; puedes cerrar la página. Vacío = año en curso hasta el último mes cerrado.</p>
-      <div class="subida"><label class="hint">Desde <input type="month" id="mef-desde"></label><label class="hint">Hasta <input type="month" id="mef-hasta"></label>
-        <label class="hint"><input type="checkbox" id="mef-prueba"> Prueba rápida (un mes, solo Loreto, no carga)</label>
-        <button class="btn btn-primary" id="mef-lanzar" type="button">Actualizar desde el MEF</button></div>
-      <div id="resultado-mef" aria-live="polite"></div>
-      ${m.error ? `<div class="err-box"><b>No se pudo consultar GitHub</b><span>${esc(m.error)}</span></div>` : ""}
-      ${filas ? `<div class="panel"><div class="scroll"><table><tr><th class="t">Inicio</th><th class="t">Periodo</th><th class="t">Cómo</th><th class="t">Estado</th><th class="t"></th></tr>${filas}</table></div></div>` : '<p class="hint">Todavía no hay corridas.</p>'}`;
-    $("mef-lanzar").addEventListener("click", async () => {
-      const btn = $("mef-lanzar"); btn.disabled = true; btn.textContent = "Lanzando…";
-      const q = new URLSearchParams({ desde: $("mef-desde").value, hasta: $("mef-hasta").value, prueba: $("mef-prueba").checked });
-      try {
-        await api(`/v1/mef/actualizar?${q}`, { method: "POST" });
-        $("resultado-mef").innerHTML = '<div class="ok-box"><b>Scraper lanzado</b><span>GitHub lo empieza en unos segundos. Esta tabla se actualiza sola; al terminar, la tabla de estado mostrará los meses nuevos.</span></div>';
-        vigilarMef();
-      } catch (e) {
-        $("resultado-mef").innerHTML = `<div class="err-box"><b>No se pudo lanzar</b><span>${esc(e.message)}</span></div>`;
-      } finally { btn.disabled = false; btn.textContent = "Actualizar desde el MEF"; }
-    });
+  function cajaScraper(cual) {
+    const mef = cual === "mef";
+    return `<div class="caja" id="scr-${cual}"><h3>${mef ? "Scraper del MEF" : "Scraper de empleo (MTPE)"}</h3>
+      <p>${mef ? "Baja de Consulta Amigable las 7 bases del MEF (detalle municipal y PIM de los 25 departamentos; lo demás, Loreto, San Martín y Ucayali) y las carga aquí. Corre solo los días 2 y 21 de cada mes, a las 6:00 a. m."
+        : "Baja del tablero de Power BI del MTPE los trabajadores formales por actividad y los carga aquí. Corre solo los días 2 y 21 de cada mes, a las 7:30 a. m."} Tarda varios minutos: puedes cerrar la página.</p>
+      <div class="fila">${mef ? `<label class="campo" for="mef-d">Desde<input type="month" id="mef-d"></label><label class="campo" for="mef-h">Hasta<input type="month" id="mef-h"></label>
+          <label class="chk"><input type="checkbox" id="mef-prueba"> Prueba rápida (un mes, solo Loreto, no carga)</label>`
+        : `<label class="campo" for="emp-reg">Regiones<select id="emp-reg"><option value="LOR,SMN,UCA">Loreto · San Martín · Ucayali</option><option value="TODAS">Todas las regiones</option></select></label>`}
+        <button class="btn" type="button" id="${cual}-lanzar">${mef ? "Actualizar desde el MEF" : "Actualizar empleo"}</button></div>
+      <p class="nota">${mef ? "Vacío = año en curso hasta el último mes cerrado. Con 25 departamentos, un año completo toma unas 2 a 3 horas: para periodos largos, un año por corrida." : ""}</p>
+      <div id="${cual}-res" aria-live="polite"></div><div id="${cual}-corridas"><div class="loading"><span class="spin"></span>Consultando GitHub…</div></div></div>`;
   }
-  function vigilarMef() {
-    clearInterval(sondeo);
-    let vueltas = 0;
-    const vuelta = async () => {
-      if (++vueltas > 90 || $("sec-actualizar-mef").hidden) { clearInterval(sondeo); return; }   // hasta 30 min
+  async function atarScraper(cual) {
+    if (!$(`${cual}-lanzar`)) return;
+    const url = cual === "mef" ? "/v1/mef" : "/v1/empleo";
+    const pintar = async () => {
+      const caja = $(`${cual}-corridas`); if (!caja) return null;
       try {
-        const m = await api("/v1/mef"), aviso = $("resultado-mef") ? $("resultado-mef").innerHTML : "";
-        renderMef(m); if ($("resultado-mef")) $("resultado-mef").innerHTML = aviso;
-        if (m.corridas.length && m.corridas[0].estado === "completed" && vueltas > 1) {
-          clearInterval(sondeo); ESTADO = await api("/v1/estado"); renderEstado();
-        }
-      } catch (e) { /* se reintenta en la próxima vuelta */ }
+        const m = await api(url);
+        if (!m.configurado) { caja.innerHTML = '<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render (pasos en FISCAL/api/README.md). Mientras tanto, corre solo en las fechas programadas.</span></div>'; $(`${cual}-lanzar`).disabled = true; return m; }
+        caja.innerHTML = (m.error ? `<div class="err-box"><b>No se pudo consultar GitHub</b><span>${esc(m.error)}</span></div>` : "")
+          + (m.corridas.length ? `<div class="scroll"><table><tr><th>Inicio</th><th>Corrida</th><th>Cómo</th><th>Estado</th><th></th></tr>${m.corridas.map((c) => `<tr><td>${esc(fecha(c.inicio))}</td><td>${esc(c.titulo)}</td><td>${c.origen === "schedule" ? "programada" : "a mano"}</td><td>${ESTADO_CORRIDA(c)}</td><td><a href="${esc(c.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("")}</table></div>` : '<p class="nota">Todavía no hay corridas.</p>');
+        return m;
+      } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar GitHub</b><span>${esc(e.message)}</span></div>`; return null; }
     };
-    setTimeout(vuelta, 4000);                // la corrida nueva aparece enseguida; luego cada 20 s
-    sondeo = setInterval(vuelta, 20000);
+    const vigilar = () => {
+      clearInterval(sondeo); let vueltas = 0;
+      const vuelta = async () => { if (++vueltas > 90 || !$(`${cual}-corridas`)) { clearInterval(sondeo); return; }
+        const m = await pintar(); if (m && m.corridas.length && m.corridas[0].estado === "completed" && vueltas > 1) { clearInterval(sondeo); ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); } };
+      setTimeout(vuelta, 4000); sondeo = setInterval(vuelta, 20000);
+    };
+    $(`${cual}-lanzar`).addEventListener("click", async () => {
+      const btn = $(`${cual}-lanzar`), res = $(`${cual}-res`); btn.disabled = true;
+      const q = cual === "mef" ? `/v1/mef/actualizar?${new URLSearchParams({ desde: $("mef-d").value, hasta: $("mef-h").value, prueba: $("mef-prueba").checked })}`
+        : `/v1/empleo/actualizar?regiones=${encodeURIComponent($("emp-reg").value)}`;
+      try { await api(q, { method: "POST" }); res.innerHTML = '<div class="ok-box"><b>Scraper lanzado</b><span>GitHub lo empieza en unos segundos. La tabla se actualiza sola y, al terminar, los datos nuevos aparecen en la página.</span></div>'; vigilar(); }
+      catch (e) { res.innerHTML = `<div class="err-box"><b>No se pudo lanzar</b><span>${esc(e.message)}</span></div>`; }
+      finally { btn.disabled = false; }
+    });
+    const m = await pintar(); if (m && m.corridas.some((c) => c.estado !== "completed")) vigilar();
+  }
+  async function cajaDrive(caja, soloBase) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Consultando Drive…</div>';
+    try {
+      const d = await api("/v1/drive");
+      if (!d.configurado) { caja.innerHTML = '<div class="err-box"><b>Falta conectar Drive</b><span>Agrega la variable GOOGLE_DRIVE_CREDENCIAL en Render (la misma credencial del flujo de hidrocarburos). Pasos en FISCAL/api/README.md.</span></div>'; return; }
+      const u = d.ultima, archivos = u ? u.resumen.archivos || [] : [], cuenta = u && u.resumen.carpetas ? u.resumen.carpetas : {};
+      const RN = { "pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali" };
+      const carpetas = Object.entries(d.carpetas).filter(([b]) => !soloBase || b === soloBase);
+      caja.innerHTML = `<p>Deja los Excel que manda la DIREPRO en su carpeta de crudos: se cargan solos cada día a las 7:30 a. m. y al instante con el botón. Solo se procesan los archivos nuevos o modificados.</p>
+        <div class="scroll"><table><tr><th>Carpeta de crudos</th><th class="n">Excel en la última revisión</th></tr>${carpetas.map(([b, cid]) => `<tr><td><a href="https://drive.google.com/drive/folders/${encodeURIComponent(cid)}" target="_blank" rel="noopener">${esc(RN[b])}</a></td><td class="n">${cuenta[b] ?? "—"}</td></tr>`).join("")}</table></div>
+        <p class="nota">Última sincronización: ${u ? `${esc(fecha(u.fecha))} (${esc(u.origen)}) · ${archivos.length ? `${archivos.length} archivo(s): ${esc(archivos.map((a) => a.nombre).join(", "))}` : "sin archivos nuevos"}` : "todavía ninguna"}.</p>
+        <div class="fila"><label class="chk"><input type="checkbox" id="drive-todo"> Volver a procesar todos los archivos</label><button class="btn" type="button" id="drive-sinc">Sincronizar ahora</button></div><div id="drive-res" aria-live="polite"></div>`;
+      $("drive-sinc").addEventListener("click", async () => {
+        const btn = $("drive-sinc"); btn.disabled = true; btn.textContent = "Sincronizando…";
+        $("drive-res").innerHTML = '<div class="loading"><span class="spin"></span>Revisando las carpetas de Drive…</div>';
+        try { const r = await api(`/v1/drive/sincronizar?todo=${$("drive-todo").checked}`, { method: "POST" }); const ok = Object.keys(r.bases).length > 0;
+          const html = resultado(r, !r.archivos.length ? "Todo estaba al día" : ok ? "Sincronización terminada" : "Los archivos nuevos no se pudieron cargar", ok || !r.archivos.length);
+          ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); await cajaDrive(caja, soloBase); $("drive-res").innerHTML = html;
+        } catch (e) { $("drive-res").innerHTML = `<div class="err-box"><b>No se pudo sincronizar</b><span>${esc(e.message)}</span></div>`; btn.disabled = false; btn.textContent = "Sincronizar ahora"; }
+      });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar Drive</b><span>${esc(e.message)}</span></div>`; }
+  }
+  const irComun = (sid, texto) => `<a data-ir="tres-${sid}">${texto}</a>`;
+
+  // ── Página de un sector de una región ──
+  function sectorRegion() {
+    const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
+    const tabs = ["Datos", "Cuadros", "Actualizar", ...(s.extra || [])];
+    const t = pestana[grupo + id] || (s.cuadros === "empleo" ? "Cuadros" : "Datos");
+    const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
+    const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
+    let panel = "";
+    if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
+      : `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(s.t.toLowerCase())} en la página.</b><span>Fuente: ${esc(s.fuente)}. Entrará como: ${esc(s.entra.toLowerCase())}.</span></div>`;
+    else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>'
+      : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
+    else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
+      : s.actualizar === "drive" ? `<div class="grid2"><div class="caja"><h3>Carpeta de crudos de ${esc(r.nombre)}</h3><div id="drive-caja"></div></div>${cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG del notebook.`)}</div>`
+      : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
+      : `<div class="vacio-caja"><b>Cómo entrará: ${esc(s.entra.toLowerCase())}.</b><span>Cuando se construya, aquí estarán su actualización y la carga del archivo del mes de ${esc(r.nombre)}.</span></div>`;
+    else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
+    return `<div><div class="ruta"><b>${esc(r.nombre)}</b>${capitulo ? `<span>›</span><span>${esc(capitulo.titulo)}</span>` : ""}</div><h1>${esc(s.t)}</h1><p class="lead">${esc(s.lead)}</p></div>
+      <div class="ficha"><div><small>Estado</small><span class="chip ${est}">${ETIQ[est]}</span></div><div><small>Fuente</small><b>${esc(s.fuente)}</b></div>
+        <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div><div><small>Datos hasta</small><b>${hasta ? esc(etqMes(hasta)) : "—"}</b></div></div>
+      <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}">${esc(x)}${(x === "Cuadros" && s.cuadros !== "empleo") || (s.extra || []).includes(x) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
+      <div class="panel" role="tabpanel">${panel}</div>`;
   }
 
-  // ── Secciones y menú ──
-  const SECCIONES = {
-    descargas: { titulo: "Bases de datos", lead: "Elige las bases de inversión, gasto o pesca, los departamentos, el nivel de gobierno (solo MEF) y el periodo. Se descarga un Excel con una hoja por base, con el mismo formato que PIM_Funcion.xlsx." },
-    actualizar: { titulo: "Actualizar base de datos", lead: "Qué hay cargado y hasta qué mes. Los datos del MEF los baja el scraper en el servidor (solo, dos veces al mes, o con el botón); los de pesca, desde las carpetas de Drive. También se pueden subir archivos a mano." },
-  };
-  function ir(sec) {
-    cerrarListas();
-    $("titulo").textContent = SECCIONES[sec].titulo; $("lead").textContent = SECCIONES[sec].lead;
-    $("menu-actual").textContent = SECCIONES[sec].titulo;
-    ["sec-descargas-opciones", "sec-descargas-vista"].forEach((id) => { $(id).hidden = sec !== "descargas"; });
-    ["sec-actualizar-estado", "sec-actualizar-mef", "sec-actualizar-drive", "sec-actualizar-carga"].forEach((id) => { $(id).hidden = sec !== "actualizar"; });
-    document.querySelectorAll(".nav-item[data-sec]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.sec === sec)));
-    if (sec === "actualizar") {
-      api("/v1/estado").then((e) => { ESTADO = e; renderEstado(); }).catch(() => {});
-      api("/v1/mef").then((m) => { renderMef(m); if (m.corridas.some((c) => c.estado !== "completed")) vigilarMef(); })
-        .catch((e) => { $("mef").innerHTML = `<div class="err-box"><b>No se pudo consultar el scraper</b><span>${esc(e.message)}</span></div>`; });
-      api("/v1/drive").then(renderDrive).catch((e) => { $("drive").innerHTML = `<div class="err-box"><b>No se pudo consultar Drive</b><span>${esc(e.message)}</span></div>`; });
-    }
-    else pedirVista();
+  // ── Páginas comunes ──
+  function seccionComun() {
+    let cuerpo = "";
+    if (id === "panorama") {
+      const sects = ["agro", "pesca", "hidro", "manu", "cemento", "empleo", "expo", "impo", "credito", "depositos", "gasto", "inversion"];
+      cuerpo = `<p class="lead">Qué sectores van en la síntesis de cada región y en qué estado está cada uno.</p><div class="caja"><div class="scroll"><table><tr><th>Sector</th><th>Loreto</th><th>San Martín</th><th>Ucayali</th></tr>
+        ${sects.map((k) => `<tr><td><b>${esc(S[k].t)}</b></td>${["lor", "smn", "uca"].map((g) => planos(g).includes(k) ? `<td><a data-ir="${g}-${k}"><span class="chip ${estadoDe(k, REG[g])}">${ETIQ[estadoDe(k, REG[g])]}</span></a></td>` : '<td><span class="nota">no va en su síntesis</span></td>').join("")}</tr>`).join("")}</table></div></div>`;
+    } else if (id === "bases-mef") {
+      const deps = CAT.departamentos.filter((d) => d.codigo !== "98");
+      const marcados = paneles.mefDeps || (paneles.mefDeps = deps.map((d) => d.codigo));
+      cuerpo = `<p class="lead">Las bases del MEF con cualquier departamento del país, en un Excel con el formato de PIM_Funcion.xlsx.</p>
+        <div class="caja"><h3>1. Departamentos</h3><div class="fila"><button class="btn sec" type="button" data-deps="todos">Los 25</button><button class="btn sec" type="button" data-deps="lsu">Loreto · San Martín · Ucayali</button><button class="btn sec" type="button" data-deps="ninguno">Ninguno</button></div>
+          <div class="deptos">${deps.map((d) => `<label for="dep-${d.codigo}"><input type="checkbox" class="dep" id="dep-${d.codigo}" value="${d.codigo}" ${marcados.includes(d.codigo) ? "checked" : ""}>${esc(titulo(d.nombre))}</label>`).join("")}</div></div>
+        <div class="caja"><h3>2. Bases y periodo</h3>${panelBases("p-mef", [...NACIONAL, "inv-dev-fuente", ...GASTO], { deptos: () => paneles.mefDeps, alcance: true, marcar: 3, desde: MESES.includes("2025-01") ? "2025-01" : MESES[0] })}
+          <p class="nota">Las bases marcadas «LOR · SMN · UCA» solo tienen esas tres regiones: con otros departamentos, esas hojas salen vacías y la página lo avisa.</p></div>`;
+    } else if (id === "bases") {
+      cuerpo = `<p class="lead">Pesca y empleo de las tres regiones juntas, para comparar.</p>
+        <div class="caja"><h3>Pesca</h3>${panelBases("p-cpesca", ["pesca-loreto", "pesca-san-martin", "pesca-ucayali"], { deptos: () => LSU, marcar: 3 })}</div>
+        <div class="caja"><h3>Empleo</h3>${panelBases("p-cempleo", ["empleo"], { deptos: () => LSU, marcar: 1 })}</div>`;
+    } else if (id === "act-mef") cuerpo = cajaScraper("mef");
+    else if (id === "act-empleo") cuerpo = cajaScraper("empleo");
+    else if (id === "act-drive") cuerpo = '<div class="caja"><h3>Carpetas de crudos de las DIREPRO</h3><div id="drive-caja"></div></div>';
+    else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "Cualquier archivo que entienda la página: el .zip de Fiscal/Scrapeo/output, CSV del scraper o PIM_Funcion.xlsx (MEF); los Excel de las DIREPRO o los LONG de los notebooks (pesca); o el Excel del scraper de empleo. La página reconoce de qué sector y región es cada uno. Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.");
+    else if (id === "estado") {
+      const u = ESTADO.ultima_carga;
+      cuerpo = `<div class="stats"><div class="stat"><small>Datos hasta</small><b>${esc(etqMes(datosHasta()))}</b><span>último mes con datos</span></div>
+          <div class="stat"><small>Última carga</small><b style="font-size:17px">${u ? esc(fecha(u.fecha)) : "—"}</b><span>${u ? esc(u.origen) : "todavía no se cargó nada"}</span></div></div>
+        <div class="caja"><div class="scroll"><table><tr><th>Base</th><th>Grupo</th><th>Datos</th><th>Departamentos</th><th class="n">Filas</th></tr>
+        ${CAT.bases.map((b) => { const x = ESTADO.bases[b.id], ds = x.departamentos;
+          return `<tr><td>${esc(b.nombre)}</td><td>${esc(CAT.grupos[b.grupo].split(" · ")[0])}</td><td>${x.filas ? `${esc(etqMes(x.desde))} – ${esc(etqMes(x.hasta))}` : "sin datos"}</td>
+            <td>${ds.length > 6 ? `${ds.length} departamentos` : ds.map((c) => titulo(CAT.departamentos.find((d) => d.codigo === c).nombre)).join(", ") || "—"}</td><td class="n">${fmt(x.filas)}</td></tr>`; }).join("")}</table></div></div>`;
+    } else cuerpo = `<p class="lead">Valores que usan los cálculos de las tres regiones.</p><div class="caja"><div class="scroll"><table><tr><th>Parámetro</th><th class="n">Valor</th><th>Usado en</th></tr>
+        <tr><td>Precio base 2007 · pescado fresco</td><td class="n">3 275,04 S/ por t</td><td>VBP pesca</td></tr><tr><td>Precio base 2007 · seco salado</td><td class="n">2 987,78 S/ por t</td><td>VBP pesca</td></tr>
+        <tr><td>Precio base 2007 · salpreso</td><td class="n">3 015,89 S/ por t</td><td>VBP pesca</td></tr><tr><td>Precio base 2007 · peces ornamentales</td><td class="n">1 032,90 S/ por mil unidades</td><td>VBP pesca</td></tr></table></div>
+        <p class="nota">Están en el código (FISCAL/api/app/pesca.py y los notebooks de PESCA); aquí se muestran para consulta.</p></div>`;
+    return `<div><div class="ruta"><b>Las tres regiones</b></div><h1>${esc(C[id])}</h1></div>${cuerpo}`;
   }
-  const menu = (abrir) => { $("menu-panel").hidden = !abrir; $("menu-btn").setAttribute("aria-expanded", String(abrir)); };
-  $("menu-btn").addEventListener("click", (e) => { e.stopPropagation(); cerrarListas(); menu($("menu-panel").hidden); });
-  document.querySelectorAll(".nav-item[data-sec]").forEach((b) => b.addEventListener("click", () => { menu(false); ir(b.dataset.sec); }));
-  document.addEventListener("click", () => { menu(false); cerrarListas(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { menu(false); cerrarListas(); } });
+
+  // ── Navegación ──
+  function datosHasta() { const h = Object.values(ESTADO.bases).map((x) => x.hasta).filter((x) => x && x.length === 7).sort(); return h.length ? h[h.length - 1] : null; }
+  function pintarHasta() { const h = datosHasta(); $("datos-hasta").innerHTML = h ? `Datos hasta <b>${esc(etqMes(h))}</b>` : "Sin datos cargados"; }
+  function mostrar() {
+    let [g, ...resto] = (location.hash.slice(1) || "lor-resumen").split("-");
+    if (g === "actualizar") { g = "tres"; resto = ["act", "archivos"]; }
+    grupo = GRUPOS[g] ? g : "lor";
+    const ids = planos(grupo), pedido = resto.join("-");
+    id = ids.includes(pedido) ? pedido : ids[0];
+    pintarGrupos(); pintarIndice();
+    const oculto = $("marco").classList.contains("sin-indice");
+    $("sector").innerHTML = `<div class="cuerpo">${oculto ? '<button class="mostrar" type="button" id="mostrar">Mostrar índice</button>' : ""}${GRUPOS[grupo].comun ? seccionComun() : sectorRegion()}</div>`;
+    if (oculto) $("mostrar").addEventListener("click", () => { $("marco").classList.remove("sin-indice"); mostrar(); });
+    document.querySelectorAll("#sector [data-tab]").forEach((b) => b.addEventListener("click", () => { pestana[grupo + id] = b.dataset.tab; mostrar(); }));
+    document.querySelectorAll("#sector [data-ir]").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.ir; }));
+    document.querySelectorAll("#sector [data-deps]").forEach((b) => b.addEventListener("click", () => {
+      const deps = CAT.departamentos.filter((d) => d.codigo !== "98").map((d) => d.codigo);
+      paneles.mefDeps = b.dataset.deps === "todos" ? deps : b.dataset.deps === "lsu" ? LSU.slice() : [];
+      document.querySelectorAll(".dep").forEach((c) => { c.checked = paneles.mefDeps.includes(c.value); }); vistaPrevia("p-mef");
+    }));
+    document.querySelectorAll("#sector .dep").forEach((c) => c.addEventListener("change", () => { paneles.mefDeps = [...document.querySelectorAll(".dep")].filter((x) => x.checked).map((x) => x.value); vistaPrevia("p-mef"); }));
+    Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
+    ["sub-todo", "sub-emp", "sub-lor", "sub-smn", "sub-uca"].forEach(atarSubida);
+    atarScraper("mef"); atarScraper("empleo");
+    if ($("drive-caja")) cajaDrive($("drive-caja"), GRUPOS[grupo].comun ? null : REG[grupo].pesca);
+    if ($("cuadros-empleo")) cuadrosEmpleo(REG[grupo], $("cuadros-empleo"));
+    window.scrollTo(0, 0);
+  }
+  $("sel-movil").addEventListener("change", (ev) => { location.hash = ev.target.value; });
+  $("ocultar").addEventListener("click", () => { $("marco").classList.add("sin-indice"); mostrar(); });
+  window.addEventListener("hashchange", mostrar);
 
   (async function iniciar() {
-    try {
-      [CAT, ESTADO] = await Promise.all([api("/v1/catalogo"), api("/v1/estado")]);
-    } catch (e) {
-      $("vista").innerHTML = `<div class="err-box"><b>No se pudo conectar con el API</b><span>${esc(e.message)}</span></div>`; return;
-    }
+    try { [CAT, ESTADO] = await Promise.all([api("/v1/catalogo"), api("/v1/estado")]); }
+    catch (e) { $("sector").innerHTML = `<div class="cuerpo"><div class="err-box"><b>No se pudo conectar con el API</b><span>${esc(e.message)}</span></div></div>`; return; }
     const hoy = new Date(), tope = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
-    for (let a = 2020; a <= hoy.getFullYear(); a++) for (let m = 1; m <= 12; m++) { const ym = `${a}-${String(m).padStart(2, "0")}`; if (ym <= tope) MESES.push(ym); }
-    v.hasta = datosHasta() || MESES[MESES.length - 1];
-    if (v.desde > v.hasta) v.desde = v.hasta;
-    renderEstado(); renderParams();
-    ir(location.hash === "#actualizar" ? "actualizar" : "descargas");
+    for (let a = 2006; a <= hoy.getFullYear(); a++) for (let m = 1; m <= 12; m++) { const ym = `${a}-${String(m).padStart(2, "0")}`; if (ym <= tope) MESES.push(ym); }
+    pintarHasta(); mostrar();
   })();
 })();
 </script>

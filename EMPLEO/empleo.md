@@ -28,5 +28,14 @@ https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/mai
   MTPE cambia el diseño del Power BI, hay que ajustar esos clics.
 - La descarga final usa `files.download()` de Colab, que a veces falla sin aviso (ver `FISCAL/CONTEXTO_PROYECTO.md`
   §8). Si no baja, el archivo queda en el panel de archivos de Colab.
-- En el API, el Excel que genera este notebook se cargará como archivo mensual de empleo (hoja de ruta en
-  `FISCAL/api/README.md`).
+
+## En el servidor (sin Colab)
+
+`EMPLEO/automatizacion/empleo_servidor.py` corre este mismo notebook en GitHub Actions
+(`.github/workflows/empleo_scraper.yml`): quita las líneas `!apt-get`/`!pip`, responde la pregunta de regiones
+(`18,24,27` para Loreto, San Martín y Ucayali; `2-27` para todas menos Perú) y carga el Excel en la base del API.
+Corre los días 2 y 21 de cada mes, o con el botón «Actualizar empleo» de la página (o Actions → Run workflow). Si se
+cambia el notebook en Colab, el servidor usa la versión nueva; solo hay que mantener la línea `entrada = input(…)`.
+
+En la página, cada región tiene su sección **Empleo** con el cuadro, el gráfico y el anexo de la síntesis (detalle en
+`FISCAL/api/README.md`).
