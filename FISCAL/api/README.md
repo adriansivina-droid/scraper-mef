@@ -218,6 +218,16 @@ transferido al departamento; todo se descarga en Excel. Comprobado con el texto 
 Falta el precio del crudo (Reuters), que no está en DATA. La pestaña **Mapa** muestra el mapa de lotes del flujo de
 hidrocarburos (`/v1/hidrocarburos/mapa`, aislado en un iframe), con botones de pantalla completa y descarga.
 
+## Cuadros de pesca
+
+En cada región, Sector pesca → Cuadros:
+- indicadores del VBP y del volumen del mes y del acumulado;
+- producción pesquera: VBP (miles de soles de 2007) y volúmenes por estado, especie y origen, del mes y del Ene.-Mes
+  contra el año que se elija;
+- gráficos: VBP mes a mes de los dos años y su variación interanual;
+- en Loreto, el Cuadro Nº 07 del mes contra el mismo mes del otro año, con las filas de `cuadro_07` del notebook;
+- descarga en Excel (`app/pesca_cuadros.py`).
+
 ## Ejecución del presupuesto (fase 3)
 
 En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
@@ -261,6 +271,7 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/empleo` | Si el botón de empleo está configurado y las últimas corridas de su scraper |
 | POST | `/v1/empleo/actualizar` | Lanza el scraper de empleo (`regiones=LOR,SMN,UCA` o `TODAS`) |
 | GET | `/v1/descargas/empleo` | Empleo en el formato LONG del scraper, una hoja (`regiones=Loreto,San Martín` o `todas`; `desde`, `hasta` opcionales; `formato=xlsx`, `csv` o `json`) |
+| GET | `/v1/cuadros/pesca` | Producción pesquera de Loreto, San Martín o Ucayali (`departamento=16/22/25`, `periodo`, `comparar`, `formato`); en Loreto, también el Cuadro Nº 07 |
 | GET | `/v1/cuadros/ejecucion` | Gasto corriente (`sector=gasto`) o inversión (`sector=inversion`) de un departamento: `periodo`, `comparar` (año), `formato=json` o `xlsx` |
 | GET | `/v1/variaciones` | Variaciones alarmantes de la inversión (`departamento`, `periodo`, `comparar`) |
 | GET | `/v1/proyectos` | Proyectos detrás de las variaciones del último mes calculado |

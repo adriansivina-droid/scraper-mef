@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import archivos, carga, db, drive, ejecucion, empleo, hidrocarburos, ipc, mef
+from . import archivos, carga, db, drive, ejecucion, empleo, hidrocarburos, ipc, mef, pesca_cuadros
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -332,6 +332,29 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
 
 def _panel_muni(departamento):
     return ejecucion.panel_municipalidad(db.leer("inv-dev-municipalidad", [departamento], [], "1990-01", "2100-12"))
+
+
+_BASE_PESCA = {"16": "pesca-loreto", "22": "pesca-san-martin", "25": "pesca-ucayali"}
+
+
+@app.get("/v1/cuadros/pesca", dependencies=[Depends(acceso)])
+def cuadro_pesca(departamento: str = Query(..., pattern=r"^(16|22|25)$"), periodo: str = "", comparar: str = "",
+                 formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Producción pesquera de la región (VBP y volúmenes), mes y acumulado contra otro año, series del VBP y, en Loreto,
+    el Cuadro Nº 07."""
+    region = _ejecucion(departamento, periodo, comparar)
+    base_id = _BASE_PESCA[departamento]
+    df = db.leer(base_id, [departamento], [], "1990-01", "2100-12")
+    try:
+        c = pesca_cuadros.cuadros(base_id, df, periodo or None, comparar or None)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    if c is None:
+        return {"region": region, "cuadros": None}
+    if formato == "xlsx":
+        return Response(pesca_cuadros.excel(region, c), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"Pesca {region} {c['periodo']} vs {c['comparar']}.xlsx"))
+    return {"region": region, "cuadros": c}
 
 
 @app.get("/v1/variaciones", dependencies=[Depends(acceso)])
