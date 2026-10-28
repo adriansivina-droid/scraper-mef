@@ -24,6 +24,10 @@ on:
         description: "Prueba rápida (solo el mes «desde» y Loreto; no carga en la base)"
         type: boolean
         default: false
+      consultas:
+        description: "Consultas simultáneas al MEF (bájalo a 2-3 si salen errores de «la URL no aplicó el filtro»)"
+        type: string
+        default: "6"
 
 concurrency:
   group: fiscal-scraper
@@ -54,6 +58,7 @@ jobs:
           DESDE: ${{ inputs.desde }}
           HASTA: ${{ inputs.hasta }}
           PRUEBA: ${{ inputs.prueba }}
+          FISCAL_WORKERS: ${{ inputs.consultas || '6' }}
           FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
           PYTHONUNBUFFERED: "1"            # el avance se ve en vivo en los registros (sin esto sale todo al final)
         run: |
