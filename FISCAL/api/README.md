@@ -222,6 +222,26 @@ En cada región, Sector pesca → Cuadros:
   archivos»: se llevan al formato del LONG (mes a número, VBP a precios de 2007, nombres del crudo);
 - descarga en Excel (`app/pesca_cuadros.py`).
 
+## Exportaciones e importaciones (ESTAD)
+
+El ESTAD de cada región es la única fuente (EXPORT/info_export.md). Se sube en «Exportaciones → Actualizar» (o en «Subir
+archivos»): ESTADLO.xlsx (15.Export y 16.Import), ESTADSMN.xlsx (14.XLS) o ESTADUCA.xlsx (15.XLS). La página reconoce las
+hojas por su título, lee solo las columnas de cada mes (fecha en la fila 5 y menos de 5 caracteres en la fila 4: nunca la
+«Var.%» ni los «Ene.-Mes» del final) y guarda cada fila del cuadro (total, tipo, grupo, producto) en las bases
+`expo-estad` e `impo-estad` (miles de US$). Las notas al pie del ESTAD («Resto», «Otras») pasan al anexo.
+
+Cuadros (`/v1/cuadros/exportaciones?departamento=16&periodo=AAAA-MM[&flujo=impo][&formato=xlsx]`):
+- **Síntesis** (Cuadro N° 7 Loreto, N° 5 San Martín, N° 8 Ucayali): regla del Cuadro_LOR — millones de US$ con
+  REDONDEAR (Loreto 2 decimales; San Martín y Ucayali 1), total = suma de los tipos redondeados, variaciones con las
+  cifras redondeadas, estructura % del mes del año anterior y contribución; la página muestra además las variaciones
+  exactas (miles de US$) para redactar.
+- **Anexo** (Loreto 6 y 7, San Martín 4, Ucayali 6): 13 meses + total Ene.-Dic. del año anterior, todas las filas del ESTAD.
+- **Gráficos** (ENLACE ESTAD de las SERIES): variación % anual de 12 años (Ucayali: enero-mes en todos los años; Loreto
+  corta las barras de más de 250 %), circulares de no tradicionales (6 principales + Otros, año anterior y enero-mes) y
+  los 5 principales productos de enero-mes y del mes.
+
+El antiguo scraper de Infotrade (EXPORT/*.ipynb) ya no se usa.
+
 ## Ejecución del presupuesto (fase 3)
 
 En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:

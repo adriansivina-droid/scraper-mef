@@ -3,14 +3,15 @@
 Recibe el tipo y los datos del cuadro (los mismos con que se dibujó el SVG) y arma la hoja:
   · cuadro: título centrado, filetes horizontales (cabecera y total), sangrías y negritas;
   · anexo: horizontal, cabecera gris con los años arriba, total Ene.-Dic. separado, rótulos repetidos a la derecha;
-  · barras: la serie (mes y valor) y el gráfico de barras de Excel con los colores de la síntesis.
+  · barras: la serie (mes y valor) y el gráfico de barras de Excel con los colores de la síntesis;
+  · circular: la tabla de cada círculo (valor y %) con su gráfico circular; hbarras: los principales productos en barras.
 Los números van como números (no como texto), con los decimales que se ven en el cuadro.
 """
 import io
 import re
 
 from openpyxl import Workbook
-from openpyxl.chart import BarChart, Reference
+from openpyxl.chart import BarChart, PieChart, Reference
 from openpyxl.chart.label import DataLabelList
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter as L
@@ -126,7 +127,8 @@ def _anexo(ws, s):
         negrita = tipo != "item"
         for col in (1, n):
             c = ws.cell(r, col, f.get("nombre"))
-            c.font, c.alignment = (NEG if negrita else NOR), Alignment(horizontal="left", indent=0 if negrita else 1)
+            ind = f.get("ind")
+            c.font, c.alignment = (NEG if negrita else NOR), Alignment(horizontal="left", indent=int(ind) if ind is not None else (0 if negrita else 1))
         for j, v in enumerate(f.get("valores") or [], start=2):
             c = ws.cell(r, j, v)
             c.font, c.alignment, c.number_format = (NEG if negrita else NOR), DER, formato
@@ -158,7 +160,7 @@ def _barras(ws, s):
     ws.cell(r, 1, "Mes").font = NEG
     ws.cell(r, 2, "Valor").font = NEG
     for k, p in enumerate(puntos, start=1):
-        ws.cell(r + k, 1, p.get("periodo")).font = NOR
+        ws.cell(r + k, 1, p.get("etq") if p.get("etq") is not None else p.get("periodo")).font = NOR
         c = ws.cell(r + k, 2, p["valor"])
         c.font, c.number_format = NOR, "#,##0" + ("." + "0" * dec if dec else "")
     ch = BarChart()
@@ -182,12 +184,65 @@ def _barras(ws, s):
     ws.column_dimensions["A"].width = 12
 
 
+def _circular(ws, s):
+    """Cada círculo: su tabla (rubro, valor, %) y el gráfico circular de Excel."""
+    r = _encabezado(ws, s, 8) + 1
+    for k, circ in enumerate(s.get("circulos", [])):
+        partes = [p for p in circ.get("partes", []) if (p.get("valor") or 0) > 0]
+        total = sum(p["valor"] for p in partes) or 1
+        ws.cell(r, 1, circ.get("subtitulo")).font = NEG
+        ws.cell(r + 1, 1, "Rubro").font = NEG
+        ws.cell(r + 1, 2, "Valor").font = NEG
+        ws.cell(r + 1, 3, "%").font = NEG
+        for i, p in enumerate(partes, start=2):
+            ws.cell(r + i, 1, p["nombre"]).font = NOR
+            ws.cell(r + i, 2, p["valor"]).number_format = "#,##0"
+            c = ws.cell(r + i, 3, round(p["valor"] / total * 100, 1))
+            c.number_format = "0.0"
+        ch = PieChart()
+        ch.add_data(Reference(ws, min_col=2, min_row=r + 1, max_row=r + 1 + len(partes)), titles_from_data=True)
+        ch.set_categories(Reference(ws, min_col=1, min_row=r + 2, max_row=r + 1 + len(partes)))
+        ch.dataLabels = DataLabelList()
+        ch.dataLabels.showPercent, ch.dataLabels.showCatName = True, True
+        ch.dataLabels.showVal = ch.dataLabels.showSerName = ch.dataLabels.showLegendKey = False
+        ch.legend, ch.height, ch.width = None, 8, 11
+        ws.add_chart(ch, f"E{r}")
+        r += max(len(partes) + 4, 18)
+    _notas(ws, s.get("notas"), r)
+    ws.column_dimensions["A"].width = 30
+
+
+def _hbarras(ws, s):
+    partes, dec = s.get("partes", []), int(s.get("dec", 1))
+    r = _encabezado(ws, s, 8) + 1
+    ws.cell(r, 1, "Producto").font = NEG
+    ws.cell(r, 2, "Valor").font = NEG
+    for k, p in enumerate(partes, start=1):
+        ws.cell(r + k, 1, p["nombre"]).font = NOR
+        ws.cell(r + k, 2, p["valor"]).number_format = "#,##0" + ("." + "0" * dec if dec else "")
+    ch = BarChart()
+    ch.type, ch.legend, ch.gapWidth = "bar", None, 50
+    ch.add_data(Reference(ws, min_col=2, min_row=r, max_row=r + len(partes)), titles_from_data=True)
+    ch.set_categories(Reference(ws, min_col=1, min_row=r + 1, max_row=r + len(partes)))
+    ch.y_axis.majorGridlines = None
+    ch.x_axis.scaling.orientation = "maxMin"               # el mayor arriba, como en el cuadro
+    serie = ch.series[0]
+    serie.graphicalProperties.solidFill, serie.graphicalProperties.line.solidFill = "C6D9F1", "4F81BD"
+    ch.dataLabels = DataLabelList()
+    ch.dataLabels.showVal = True
+    ch.dataLabels.showSerName = ch.dataLabels.showCatName = ch.dataLabels.showLegendKey = ch.dataLabels.showPercent = False
+    ch.height, ch.width = 7, 16
+    ws.add_chart(ch, f"D{r}")
+    _notas(ws, s.get("notas"), r + len(partes) + 12)
+    ws.column_dimensions["A"].width = 30
+
+
 def libro(tipo, spec):
     wb = Workbook()
     ws = wb.active
     ws.title = re.sub(r"[\[\]\*\?/\\:]", "", (spec.get("numero") or "Cuadro"))[:31] or "Cuadro"
     ws.sheet_view.showGridLines = False
-    {"cuadro": _cuadro, "anexo": _anexo, "barras": _barras}[tipo](ws, spec)
+    {"cuadro": _cuadro, "anexo": _anexo, "barras": _barras, "circular": _circular, "hbarras": _hbarras}[tipo](ws, spec)
     # al imprimir: una página de ancho (los anexos, horizontales, como en la síntesis)
     ws.page_setup.orientation = "landscape" if tipo in ("anexo", "barras") else "portrait"
     ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0

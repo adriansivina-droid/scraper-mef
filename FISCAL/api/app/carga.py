@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import controles, db, empleo, hidrocarburos, ipc, pesca
+from . import controles, db, empleo, exportaciones, hidrocarburos, ipc, pesca
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -95,11 +95,15 @@ def leer_archivos(raiz):
     """-> {base_id: DataFrame con las columnas de la base + columnas internas}, avisos."""
     raiz = Path(raiz)
     por_bloque, avisos = {}, []
-    pim, pim_muni, de_pesca, de_empleo, de_hidro = [], [], [], [], []
+    pim, pim_muni, de_pesca, de_empleo, de_hidro, de_estad = [], [], [], [], [], []
     for n_archivo, ruta in enumerate(sorted(raiz.rglob("*"))):
         if not ruta.is_file() or ruta.name.startswith(("CONTROL", "LOG", ".")):
             continue
         if ruta.suffix.lower() == ".xlsx":
+            estad = exportaciones.reconocer(ruta)          # ESTADLO / ESTADSMN / ESTADUCA (exportaciones e importaciones)
+            if estad:
+                de_estad.append((n_archivo, ruta, estad))
+                continue
             try:
                 es_pesca = pesca.reconocer(ruta)
             except Exception:                         # no es un Excel legible
@@ -118,7 +122,7 @@ def leer_archivos(raiz):
                 hoja["_archivo"] = n_archivo
                 pim.append(hoja)
             else:
-                avisos.append(f"{ruta.name}: no es PIM_Funcion.xlsx ni un Excel de pesca o de empleo; se ignoró.")
+                avisos.append(f"{ruta.name}: no es PIM_Funcion.xlsx, un ESTAD ni un Excel de pesca o de empleo; se ignoró.")
             continue
         if ruta.suffix.lower() != ".csv":
             continue
@@ -174,6 +178,10 @@ def leer_archivos(raiz):
         de_hidrocarburos, avisos_hidro = hidrocarburos.leer(de_hidro)
         bases.update(de_hidrocarburos)
         avisos += avisos_hidro
+    if de_estad:
+        del_estad, avisos_estad = exportaciones.leer(de_estad)
+        bases.update(del_estad)
+        avisos += avisos_estad
     if de_pesca:
         de_la_pesca, avisos_pesca = pesca.leer(de_pesca, db.leer_todo)
         bases.update(de_la_pesca)

@@ -1,7 +1,7 @@
 // Cuadros y gráficos con el formato de la Síntesis de Actividad Económica (BCRP, Sucursal Iquitos), en SVG para
 // pegarlos en el informe: Arial, filetes horizontales, miles con espacio y decimales con coma; los gráficos, barras
 // celestes con borde azul (el mismo mes de cada año, en blanco), meses «J.24 J A S … J.25», notas de fuente y elaboración.
-// window.BCRP.cuadro(spec) / .anexo(spec) / .barras(spec) devuelven el SVG (texto); .descargar, .copiar, .png lo exportan.
+// window.BCRP.cuadro(spec) / .anexo(spec) / .barras(spec) / .circulares(spec) / .hbarras(spec) devuelven el SVG (texto); .descargar, .copiar, .png lo exportan.
 (function () {
   "use strict";
   const FUENTE = "Arial, Helvetica, sans-serif", TINTA = "#000", AZUL = "#4F81BD", RELLENO = "#C6D9F1", GRIS = "#C0C0C0";
@@ -88,7 +88,7 @@
   function anexo(spec) {
     api.ultimo = { tipo: "anexo", spec };
     const F = 10, filaH = 15, pad = 6, dec = spec.dec ?? 1;
-    const etqW = Math.ceil(Math.max(130, ...spec.filas.map((f) => ancho(f.nombre, F, f.tipo !== "item") + 18)));
+    const etqW = Math.ceil(Math.max(130, ...spec.filas.map((f) => ancho(f.nombre, F, f.tipo !== "item") + 18 + (f.ind || 0) * 10)));
     const cw = spec.columnas.map((c, j) => Math.ceil(Math.max(c.total ? 50 : 38, ...spec.filas.map((f) => ancho(num((f.valores || [])[j], dec), F, f.tipo !== "item") + pad * 2))));
     const T = etqW * 2 + cw.reduce((a, b) => a + b, 0), M = 14, W = T + 2 * M;
     const xs = [M + etqW];
@@ -113,7 +113,7 @@
       if (f.tipo === "total") y += 4;
       const negrita = f.tipo !== "item";
       if (f.tipo === "titulo" || f.tipo === "total") out.push(`<rect x="${M}" y="${y}" width="${T}" height="${filaH}" fill="${GRIS}"/>`);
-      const ind = f.tipo === "item" ? 14 : 4;
+      const ind = f.ind != null ? 4 + f.ind * 10 : f.tipo === "item" ? 14 : 4;
       out.push(`<text x="${M + ind}" y="${y + 11}" font-size="${F}"${negrita ? ' font-weight="bold"' : ""}>${esc(f.nombre)}</text>`);
       out.push(`<text x="${xs[xs.length - 1] + ind}" y="${y + 11}" font-size="${F}"${negrita ? ' font-weight="bold"' : ""}>${esc(f.nombre)}</text>`);
       if (f.valores) f.valores.forEach((v, j) => out.push(`<text x="${xs[j + 1] - pad}" y="${y + 11}" text-anchor="end" font-size="${F}"${negrita ? ' font-weight="bold"' : ""}>${esc(num(v, dec))}</text>`));
@@ -130,7 +130,8 @@
     return envolver(W, n.y + 4, out.join(""));
   }
 
-  // ── Gráfico de barras: spec = {numero, titulo, unidad, puntos: [{periodo: "Jun. 2025", valor}], dec, notas}
+  // ── Gráfico de barras: spec = {numero, titulo, unidad, puntos: [{periodo: "Jun. 2025", valor} o {etq: "2026*", valor}], dec, tope, notas}
+  // con «etq» cada barra lleva su rótulo (p. ej. años); con «tope», las barras más altas se cortan ahí y llevan su valor real
   const INICIAL = { Ene: "E", Feb: "F", Mar: "M", Abr: "A", May: "M", Jun: "J", Jul: "J", Ago: "A", Set: "S", Oct: "O", Nov: "N", Dic: "D" };
   function pasoBonito(rango, n = 7) {
     const bruto = rango / n, pot = 10 ** Math.floor(Math.log10(bruto || 1));
@@ -139,8 +140,9 @@
   function barras(spec) {
     api.ultimo = { tipo: "barras", spec };
     const p = spec.puntos.filter((x) => x.valor != null), dec = spec.dec ?? 1, W = 640, izq = 46, der = 12, arr = 66, abajo = 22, alto = 250;
-    const ult = p.length ? p[p.length - 1].periodo.split(" ")[0].replace(".", "") : "";
-    let lo = Math.min(0, ...p.map((x) => x.valor)), hi = Math.max(0, ...p.map((x) => x.valor));
+    const conEtq = p.some((x) => x.etq != null), tope = spec.tope, alto_ = (v) => tope != null && v > tope ? tope * 0.92 : v;
+    const ult = p.length && !conEtq ? p[p.length - 1].periodo.split(" ")[0].replace(".", "") : "";
+    let lo = Math.min(0, ...p.map((x) => x.valor)), hi = Math.max(0, ...p.map((x) => alto_(x.valor)));
     const paso = pasoBonito(hi - lo || 1);
     lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso;
     if (hi - lo < paso) hi = lo + paso;
@@ -152,15 +154,73 @@
     }
     out.push(`<line x1="${izq}" x2="${izq}" y1="${Y(hi)}" y2="${Y(lo)}" stroke="#808080" stroke-width="0.8"/>`);
     p.forEach((x, i) => {
-      const [m, a] = x.periodo.split(" "), mm = m.replace(".", ""), resalta = mm === ult;
-      const x0 = izq + i * bw + bw * 0.16, wv = bw * 0.68, yv = Y(Math.max(x.valor, 0)), hv = Math.max(Math.abs(Y(x.valor) - Y(0)), 0.8);
+      const [m, a] = conEtq ? [String(x.etq), ""] : x.periodo.split(" "), mm = m.replace(".", ""), resalta = !conEtq && mm === ult, v = alto_(x.valor);
+      const x0 = izq + i * bw + bw * 0.16, wv = bw * 0.68, yv = Y(Math.max(v, 0)), hv = Math.max(Math.abs(Y(v) - Y(0)), 0.8);
       out.push(`<rect x="${x0.toFixed(1)}" y="${yv.toFixed(1)}" width="${wv.toFixed(1)}" height="${hv.toFixed(1)}" fill="${resalta ? "#fff" : RELLENO}" stroke="${AZUL}" stroke-width="1"/>`);
+      // barra cortada: un arco blanco sobre ella, como en las SERIES
+      if (v !== x.valor) out.push(`<path d="M${(x0 - 2).toFixed(1)} ${(yv + 14).toFixed(1)} q${(wv / 2 + 2).toFixed(1)} -7 ${(wv + 4).toFixed(1)} 0 v5 q${(-wv / 2 - 2).toFixed(1)} -7 ${(-wv - 4).toFixed(1)} 0 z" fill="#fff"/>`);
       const ty = x.valor >= 0 ? yv - 4 : yv + hv + 10;
       out.push(`<text x="${(x0 + wv / 2).toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" font-size="9">${esc(num(x.valor, dec))}</text>`);
-      out.push(`<text x="${(x0 + wv / 2).toFixed(1)}" y="${Y(lo) + 14}" text-anchor="middle" font-size="9.5">${esc((INICIAL[mm] || mm[0]) + (resalta || i === 0 ? "." + a.slice(2) : ""))}</text>`);
+      out.push(`<text x="${(x0 + wv / 2).toFixed(1)}" y="${Y(lo) + 14}" text-anchor="middle" font-size="9.5">${esc(conEtq ? m : (INICIAL[mm] || mm[0]) + (resalta || i === 0 ? "." + a.slice(2) : ""))}</text>`);
     });
     out.push(`<line x1="${izq}" x2="${W - der}" y1="${Y(0)}" y2="${Y(0)}" stroke="#808080" stroke-width="0.8"/>`);
     const n = notas([...(spec.notas || []), ELABORACION], izq - 30, Y(lo) + abajo + 12);
+    out.push(n.svg);
+    return envolver(W, n.y + 4, out.join(""));
+  }
+
+  // ── Circulares (uno o dos lado a lado): spec = {numero, titulo, unidad, circulos: [{subtitulo, partes: [{nombre, valor}]}], notas}
+  // paleta de las SERIES (info_export §11); «Otros» siempre en gris
+  const PALETA = ["#111149", "#72D2D5", "#DD6140", "#FFC41D", "#4F81BD", "#8064A2", "#9BBB59"], OTROS = "#CCD3DF";
+  function circulares(spec) {
+    api.ultimo = { tipo: "circular", spec };
+    const n = spec.circulos.length, cw = 440, W = Math.max(cw * n, 480), R = 74, arr = 92, out = [];
+    const h = cabecera(spec, W, 18);
+    out.push(h.svg);
+    spec.circulos.forEach((c, k) => {
+      const cx = (W / n) * (k + 0.5), cy = arr + 30 + R + 18, total = c.partes.reduce((a, x) => a + Math.max(x.valor, 0), 0) || 1;
+      out.push(`<text x="${cx}" y="${arr + 6}" text-anchor="middle" font-size="10" font-weight="bold">${esc(c.subtitulo || "")}</text>`);
+      let ang = -Math.PI / 2, color = 0;
+      const etiquetas = [];
+      c.partes.forEach((x) => {
+        const frac = Math.max(x.valor, 0) / total, a1 = ang + frac * 2 * Math.PI, med = (ang + a1) / 2;
+        const fill = x.nombre === "Otros" ? OTROS : PALETA[color++ % PALETA.length];
+        const p0 = [cx + R * Math.cos(ang), cy + R * Math.sin(ang)], p1 = [cx + R * Math.cos(a1), cy + R * Math.sin(a1)];
+        out.push(frac >= 0.9999 ? `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${fill}" stroke="#FEFEFE" stroke-width="1.5"/>`
+          : `<path d="M${cx} ${cy} L${p0[0].toFixed(1)} ${p0[1].toFixed(1)} A${R} ${R} 0 ${frac > 0.5 ? 1 : 0} 1 ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Z" fill="${fill}" stroke="#FEFEFE" stroke-width="1.5"/>`);
+        etiquetas.push({ x, frac, med, der: Math.cos(med) >= 0, y: cy + (R + 16) * Math.sin(med) });
+        ang = a1;
+      });
+      // etiquetas fuera, con línea guía; las de cada lado se separan para que no se encimen
+      [true, false].forEach((lado) => {
+        const g = etiquetas.filter((e) => e.der === lado).sort((p, q) => p.y - q.y);
+        for (let i = 1; i < g.length; i++) if (g[i].y - g[i - 1].y < 22) g[i].y = g[i - 1].y + 22;
+        g.forEach((e) => {
+          const e0 = [cx + (R + 2) * Math.cos(e.med), cy + (R + 2) * Math.sin(e.med)], ex = cx + (R + 16) * Math.cos(e.med), tx = (lado ? Math.max(ex, cx + 20) : Math.min(ex, cx - 20)) + (lado ? 8 : -8);
+          out.push(`<polyline points="${e0[0].toFixed(1)},${e0[1].toFixed(1)} ${ex.toFixed(1)},${e.y.toFixed(1)} ${(tx + (lado ? -3 : 3)).toFixed(1)},${e.y.toFixed(1)}" fill="none" stroke="#181818" stroke-width="0.6"/>`);
+          out.push(`<text x="${tx.toFixed(1)}" y="${(e.y - 2).toFixed(1)}" font-size="9" text-anchor="${lado ? "start" : "end"}" fill="#181818">${esc(e.x.nombre)}</text>`);
+          out.push(`<text x="${tx.toFixed(1)}" y="${(e.y + 9).toFixed(1)}" font-size="9" text-anchor="${lado ? "start" : "end"}" fill="#181818">${esc(num(e.frac * 100, 1))}%</text>`);
+        });
+      });
+    });
+    const n_ = notas([...(spec.notas || []), ELABORACION], 14, arr + 30 + 2 * R + 70);
+    out.push(n_.svg);
+    return envolver(W, n_.y + 4, out.join(""));
+  }
+
+  // ── Barras horizontales (principales productos): spec = {numero, titulo, unidad, partes: [{nombre, valor}], dec, notas}
+  function hbarras(spec) {
+    api.ultimo = { tipo: "hbarras", spec };
+    const p = spec.partes, dec = spec.dec ?? 1, F = 10, etqW = Math.ceil(Math.max(90, ...p.map((x) => ancho(x.nombre, F) + 12))), W = Math.max(560, etqW + 380);
+    const h = cabecera(spec, W, 18), out = [h.svg], top = h.y + 16, fh = 26, maxV = Math.max(...p.map((x) => x.valor), 1), largo = W - etqW - 90;
+    p.forEach((x, i) => {
+      const y = top + i * fh, w = Math.max(x.valor / maxV * largo, 1);
+      out.push(`<text x="${etqW - 6}" y="${y + fh / 2 + 3}" text-anchor="end" font-size="${F}">${esc(x.nombre)}</text>`);
+      out.push(`<rect x="${etqW}" y="${y + 5}" width="${w.toFixed(1)}" height="${fh - 10}" fill="${RELLENO}" stroke="${AZUL}" stroke-width="1"/>`);
+      out.push(`<text x="${(etqW + w + 5).toFixed(1)}" y="${y + fh / 2 + 3}" font-size="9.5">${esc(num(x.valor, dec))}</text>`);
+    });
+    out.push(`<line x1="${etqW}" x2="${etqW}" y1="${top}" y2="${top + p.length * fh}" stroke="#808080" stroke-width="0.8"/>`);
+    const n = notas([...(spec.notas || []), ELABORACION], 14, top + p.length * fh + 18);
     out.push(n.svg);
     return envolver(W, n.y + 4, out.join(""));
   }
@@ -201,5 +261,5 @@
     bajar(await r.blob(), nombreArchivo(nombre) + ".xlsx");
   }
 
-  window.BCRP = Object.assign(api, { cuadro, anexo, barras, descargar, descargarPng, copiar, excel, num, var1, ELABORACION });
+  window.BCRP = Object.assign(api, { cuadro, anexo, barras, circulares, hbarras, descargar, descargarPng, copiar, excel, num, var1, ELABORACION });
 })();
