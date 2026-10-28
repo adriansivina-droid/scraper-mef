@@ -76,10 +76,10 @@ def main():
                 continue
             mb = int(a.get("size") or 0) / 1e6
             if en_disco(ruta):
-                n, m = por_carpeta.get(ruta, (0, 0.0))
+                n, m = por_carpeta.get(ruta, (0, 0.0))[:2]
                 por_carpeta[ruta] = (n + 1, m + mb, "no se copia: el flujo los vuelve a bajar de PERUPETRO (caché de GitHub)")
                 continue
-            n, m = por_carpeta.get(ruta, (0, 0.0))
+            n, m = por_carpeta.get(ruta, (0, 0.0))[:2]
             por_carpeta[ruta] = (n + 1, m + mb)
             total_mb += mb
             if a["mimeType"].startswith("application/vnd.google-apps."):
