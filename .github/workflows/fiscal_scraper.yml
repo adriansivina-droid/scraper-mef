@@ -55,6 +55,7 @@ jobs:
           HASTA: ${{ inputs.hasta }}
           PRUEBA: ${{ inputs.prueba }}
           FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
+          PYTHONUNBUFFERED: "1"            # el avance se ve en vivo en los registros (sin esto sale todo al final)
         run: |
           args=()
           [ -n "$DESDE" ] && args+=(--desde "$DESDE")
