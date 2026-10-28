@@ -134,6 +134,16 @@ tr.grupo td { background: var(--panel); padding-top: 14px; border-bottom: 1px so
 .barras .eje { stroke: var(--hair); }
 .barras .pos { fill: var(--navy); } .barras .neg { fill: var(--orange); }
 .barras .val { fill: var(--ink); font-size: 10px; }
+.barras .sep { stroke: var(--hair); } .barras .anio { fill: var(--ink); font-weight: 600; }
+.linea-niveles { width: 100%; min-width: 640px; height: auto; display: block; }
+.linea-niveles text { fill: var(--mid); font-family: var(--font); font-size: 11px; }
+.linea-niveles .eje, .linea-niveles .sep { stroke: var(--hair); }
+.linea-niveles .trazo { fill: none; stroke: var(--teal); stroke-width: 2; stroke-linejoin: round; }
+.linea-niveles .dot { fill: var(--teal); stroke: var(--paper); stroke-width: 2; }
+.linea-niveles .hit { fill: transparent; }
+.linea-niveles .pt:hover .dot { r: 6; }
+.linea-niveles .val { fill: var(--ink); font-size: 10.5px; font-weight: 600; }
+.linea-niveles .anio { font-weight: 600; fill: var(--ink); }
 code { font-family: var(--mono); font-size: 0.92em; }
 
 @media (max-width: 860px) {

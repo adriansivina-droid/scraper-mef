@@ -211,9 +211,21 @@
   }
 
   // ── Empleo en formato LONG (el Excel del scraper) por regiones ──
+  const regionesLong = () => $("el-vista") && $("el-vista").dataset.region ? [$("el-vista").dataset.region] : paneles.empReg;
   function consultaEmpleoLong() {
     const q = paneles.empLong;
-    return new URLSearchParams({ regiones: paneles.empReg.join(","), desde: q.desde, hasta: q.hasta }).toString();
+    return new URLSearchParams({ regiones: regionesLong().join(","), desde: q.desde, hasta: q.hasta }).toString();
+  }
+  function cajaLong(sufijoRegion) {
+    const q = paneles.empLong || (paneles.empLong = { desde: "", hasta: "", formato: "xlsx" });
+    const opMeses = (v, vacio) => `<option value="">${vacio}</option>` + MESES.map((m) => `<option value="${m}"${m === v ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("");
+    return `<div class="fila">
+        <label class="campo" for="el-d">Desde<select id="el-d">${opMeses(q.desde, "Desde el inicio")}</select></label>
+        <label class="campo" for="el-h">Hasta<select id="el-h">${opMeses(q.hasta, "Hasta el último mes")}</select></label>
+        <label class="campo" for="el-f">Formato<select id="el-f"><option value="xlsx">Excel (.xlsx)</option><option value="csv"${q.formato === "csv" ? " selected" : ""}>CSV</option></select></label>
+        <button class="btn" type="button" id="el-bajar">Descargar</button></div>
+      <p class="nota">El mismo Excel que genera el scraper del MTPE: una hoja (AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO), ordenada por región, actividad, año y mes${sufijoRegion ? "" : ", con el mismo nombre de archivo (Loreto_empleo.xlsx, Loreto_San_Martín_Ucayali_empleo.xlsx o 26_regiones_empleo.xlsx)"}.</p>
+      <div id="el-vista"${sufijoRegion ? ` data-region="${esc(sufijoRegion)}"` : ""}></div>`;
   }
   function atarEmpleoLong() {
     const q = paneles.empLong, marcar = (lista) => { paneles.empReg = lista; document.querySelectorAll(".emp-reg").forEach((c) => { c.checked = lista.includes(c.value); }); vistaEmpleoLong(); };
@@ -223,7 +235,7 @@
     document.querySelectorAll(".emp-reg").forEach((c) => c.addEventListener("change", () => marcar([...document.querySelectorAll(".emp-reg")].filter((x) => x.checked).map((x) => x.value))));
     ["el-d", "el-h", "el-f"].forEach((k) => $(k).addEventListener("change", () => { q.desde = $("el-d").value; q.hasta = $("el-h").value; q.formato = $("el-f").value; vistaEmpleoLong(); }));
     $("el-bajar").addEventListener("click", () => {
-      if (!paneles.empReg.length) { $("el-vista").innerHTML = '<div class="err-box"><b>Marca al menos una región</b></div>'; return; }
+      if (!regionesLong().length) { $("el-vista").innerHTML = '<div class="err-box"><b>Marca al menos una región</b></div>'; return; }
       window.location.href = `/v1/descargas/empleo?${consultaEmpleoLong()}&formato=${q.formato}`;
     });
     vistaEmpleoLong();
@@ -231,7 +243,7 @@
   function vistaEmpleoLong() {
     const q = paneles.empLong, caja = $("el-vista");
     if (!caja) return;
-    if (!paneles.empReg.length) { caja.innerHTML = '<p class="nota">Marca al menos una región para ver la vista previa.</p>'; return; }
+    if (!regionesLong().length) { caja.innerHTML = '<p class="nota">Marca al menos una región para ver la vista previa.</p>'; return; }
     if (q.desde && q.hasta && q.desde > q.hasta) { caja.innerHTML = '<div class="err-box"><b>El periodo está al revés</b><span>«Desde» es posterior a «Hasta».</span></div>'; return; }
     clearTimeout(temporizador);
     temporizador = setTimeout(async () => {
@@ -248,6 +260,35 @@
     }, 250);
   }
 
+  // ── Eje de meses con el año debajo (todos los gráficos): «Ene.» … y «2025» en el primer mes y en cada enero ──
+  function ejeMeses(etqs, X, H, mostrar, mitad) {   // mitad: media distancia entre meses (la raya del año va entre dos meses)
+    return etqs.map((e, i) => {
+      const [mes, anio] = e.split(" "), nuevo = i === 0 || mes === "Ene.";
+      return `${mostrar(i) ? `<text x="${X(i)}" y="${H - 22}" text-anchor="middle">${esc(mes)}</text>` : ""}
+        ${nuevo ? `<line class="sep" x1="${X(i) - mitad}" x2="${X(i) - mitad}" y1="${H - 36}" y2="${H}"></line><text class="anio" x="${X(i) - mitad + 4}" y="${H - 5}">${esc(anio)}</text>` : ""}`;
+    }).join("");
+  }
+
+  // ── Número de trabajadores (línea, como el portal del MTPE) ──
+  function graficoNiveles(n) {
+    if (!n || n.length < 2) return "";
+    const W = 900, H = 240, izq = 34, der = 34, arr = 34, aba = 48, vals = n.map((x) => x.trabajadores);
+    const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * 0.15 || hi * 0.05 || 1;
+    const y0 = lo - pad, y1 = hi + pad, X = (i) => izq + i * (W - izq - der) / (n.length - 1), Y = (v) => arr + (y1 - v) / (y1 - y0) * (H - arr - aba);
+    const mil = (v) => `${(v / 1000).toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mil`;
+    // valores en los meses de cada trimestre (ene., abr., jul., oct.) y el último, sin chocar con este
+    const trimestral = (i) => ["Ene.", "Abr.", "Jul.", "Oct."].includes(n[i].periodo.split(" ")[0]);
+    const etiqueta = (i) => i === n.length - 1 || (trimestral(i) && i < n.length - 2);
+    const linea = n.map((x, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(x.trabajadores).toFixed(1)}`).join(" ");
+    const puntos = n.map((x, i) => `<g class="pt"><circle class="hit" cx="${X(i)}" cy="${Y(x.trabajadores)}" r="11"></circle><circle class="dot" cx="${X(i)}" cy="${Y(x.trabajadores)}" r="4"></circle>
+        ${etiqueta(i) ? `<text class="val" x="${X(i)}" y="${Y(x.trabajadores) - 10}" text-anchor="middle">${mil(x.trabajadores)}</text>` : ""}
+        <title>${esc(x.periodo)}: ${fmt(x.trabajadores)} trabajadores</title></g>`).join("");
+    const meses = ejeMeses(n.map((x) => x.periodo), X, H, (i) => trimestral(i) || i === n.length - 1, (X(1) - X(0)) / 2);
+    return `<div class="caja"><h3>Gráfico · Número de trabajadores</h3><p>(Total de trabajadores asalariados privados formales · ${esc(n[0].periodo)} a ${esc(n[n.length - 1].periodo)})</p>
+      <div class="scroll"><svg class="linea-niveles" viewBox="0 0 ${W} ${H}" role="img" aria-label="Número de trabajadores por mes">
+        <line class="eje" x1="0" x2="${W}" y1="${H - aba}" y2="${H - aba}"></line><path class="trazo" d="${linea}"></path>${puntos}${meses}</svg></div></div>`;
+  }
+
   // ── Cuadros de empleo (los de la síntesis) ──
   async function cuadrosEmpleo(r, caja, periodo) {
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
@@ -258,17 +299,19 @@
       const num = { lor: "N° 6", smn: "N° 4", uca: "N° 7" }[grupo], mes = c.titulo_mes, a = c.anio;
       const cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
       const cuadro = c.cuadro.map((f) => `<tr class="${f.rama === "Total" ? "total" : ""}"><td>${esc(f.rama)}</td><td class="n">${fmt(f.mes_anterior)}</td><td class="n">${fmt(f.mes)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td><td class="n">${fmt(f.diciembre)}</td><td class="n">${fmt(f.mes)}</td><td class="n ${cls(f.var_dic)}">${pct(f.var_dic)}</td></tr>`).join("");
-      const g = c.grafico.filter((x) => x.var != null), max = Math.max(1, ...g.map((x) => Math.abs(x.var))), W = 760, H = 220, y0 = 110, bw = W / Math.max(g.length, 1);
-      const barras = g.map((x, i) => { const h = Math.abs(x.var) / max * 90, y = x.var >= 0 ? y0 - h : y0;
+      const g = c.grafico.filter((x) => x.var != null), max = Math.max(1, ...g.map((x) => Math.abs(x.var))), W = 760, H = 250, bw = W / Math.max(g.length, 1);
+      const hayNeg = g.some((x) => x.var < 0), y0 = hayNeg ? 110 : 190, alto = hayNeg ? 90 : 160;   // sin caídas, las barras usan todo el alto
+      const barras = g.map((x, i) => { const h = Math.abs(x.var) / max * alto, y = x.var >= 0 ? y0 - h : y0;
         return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${y}" width="${bw * 0.64}" height="${Math.max(h, 1)}"></rect>
           <text class="val" x="${i * bw + bw / 2}" y="${x.var >= 0 ? y - 4 : y + h + 11}" text-anchor="middle">${pct(x.var)}</text>
-          <text x="${i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${esc(x.periodo.split(" ")[0])}</text>`; }).join("");
+          <title>${esc(x.periodo)}: ${pct(x.var)} %</title>`; }).join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
       const anexo = c.anexo.map((f) => `<tr><td>${esc(f.periodo)}</td>${["Agricultura", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "Total"].map((k) => `<td class="n ${cls(f[k])}">${pct(f[k])}</td>`).join("")}</tr>`).join("");
       caja.innerHTML = `<div class="fila"><label class="campo" for="emp-p">Mes del informe<select id="emp-p">${meses.slice().reverse().map((m) => `<option value="${m}"${m === c.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
           <button class="btn" type="button" id="emp-xlsx">Descargar los cuadros en Excel</button></div>
         <div class="caja"><h3>Cuadro ${num} · ${esc(r.nombre.toUpperCase())}: TRABAJADORES ASALARIADOS PRIVADOS FORMALES</h3><p>(Número de trabajadores)</p>
           <div class="scroll"><table><tr><th>Rama de actividad</th><th class="n">${mes} ${a - 1}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Dic. ${a - 1}</th><th class="n">${mes.slice(0, 3)}. ${a}</th><th class="n">Var. %</th></tr>${cuadro}</table></div>
           <p class="nota">Fuente: Planilla Electrónica – PLAME y T-Registro. «Otros» es la actividad «No precisa» del MTPE.</p></div>
+        ${graficoNiveles(c.niveles)}
         <div class="caja"><h3>Gráfico · Variación % respecto a similar mes del año anterior</h3>
           ${g.length ? `<div class="scroll"><svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Variación porcentual interanual del total"><line class="eje" x1="0" x2="${W}" y1="${y0}" y2="${y0}"></line>${barras}</svg></div>` : '<p class="nota">Hace falta al menos un año de datos para la variación interanual.</p>'}</div>
         <div class="caja"><h3>${grupo === "lor" ? "Anexo 5 · " : ""}Trabajadores por sectores económicos</h3><p>(Variación % con respecto al mismo mes del año anterior)</p>
@@ -289,11 +332,10 @@
       const mes = c.titulo_mes, a = c.anio, m3 = mes.slice(0, 3), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
       const cuadro = c.bloques.map((b) => `<tr class="grupo"><td colspan="7"><b>${esc(b.producto)}</b> <span class="nota">(${esc(b.unidad)})</span></td></tr>` + b.filas.map((f) =>
         `<tr class="${f.lote === "Total" ? "total" : ""}"><td>${esc(f.lote)}</td><td class="n">${fmt1(f.mes_anterior)}</td><td class="n">${fmt1(f.mes)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td><td class="n">${fmt1(f.acum_anterior)}</td><td class="n">${fmt1(f.acum)}</td><td class="n ${cls(f.var_acum)}">${pct(f.var_acum)}</td></tr>`).join("")).join("");
-      const gr = c.grafico, g = gr ? gr.serie : [], max = Math.max(0.001, ...g.map((x) => x.valor)), W = 760, H = 220, base0 = 190, bw = W / Math.max(g.length, 1);
+      const gr = c.grafico, g = gr ? gr.serie : [], max = Math.max(0.001, ...g.map((x) => x.valor)), W = 760, H = 245, base0 = 195, bw = W / Math.max(g.length, 1);
       const barras = g.map((x, i) => { const h = x.valor / max * 160;
         return `<rect class="pos" x="${i * bw + bw * 0.18}" y="${base0 - h}" width="${bw * 0.64}" height="${Math.max(h, 1)}"><title>${esc(x.periodo)}: ${fmt1(x.valor)}${x.var == null ? "" : ` (${pct(x.var)} %)`}</title></rect>
-          <text class="val" x="${i * bw + bw / 2}" y="${base0 - h - 4}" text-anchor="middle">${fmt1(x.valor)}</text>
-          <text x="${i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${esc(x.periodo.split(" ")[0])}</text>`; }).join("");
+          <text class="val" x="${i * bw + bw / 2}" y="${base0 - h - 4}" text-anchor="middle">${fmt1(x.valor)}</text>`; }).join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
       const anexos = c.anexo.map((b) => `<div class="caja"><h3>${esc(r.nombre)}: producción de ${esc(b.producto.toLowerCase())} por lote</h3><p>(${esc(b.unidad.charAt(0).toUpperCase() + b.unidad.slice(1))})</p>
           <div class="scroll"><table><tr><th>Mes</th>${b.lotes.map((l) => `<th class="n">${esc(l)}</th>`).join("")}<th class="n">Total</th></tr>${b.filas.map((f) => `<tr><td>${esc(f.periodo)}</td>${b.lotes.map((l) => `<td class="n">${fmt1(f[l])}</td>`).join("")}<td class="n"><b>${fmt1(f.Total)}</b></td></tr>`).join("")}</table></div></div>`).join("");
       const k = c.canon;
@@ -415,7 +457,8 @@
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
-    if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : s.actualizar === "empleo" ? irComun("empleo-long", "Empleo · LONG por región") + " (el Excel tal como lo da el scraper, de una, varias o todas las regiones)" : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
+    if (t === "Datos" && id === "empleo") panel = `<div class="caja"><h3>Empleo · ${esc(r.nombre)}</h3><p>Todos los meses disponibles del MTPE (desde enero 2016). Para varias regiones o grupos, usa ${irComun("empleo-long", "Empleo · LONG por región")}.</p>${cajaLong(r.nombre)}</div>`;
+    else if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : s.actualizar === "empleo" ? irComun("empleo-long", "Empleo · LONG por región") + " (el Excel tal como lo da el scraper, de una, varias o todas las regiones)" : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
       : `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(s.t.toLowerCase())} en la página.</b><span>Fuente: ${esc(s.fuente)}. Entrará como: ${esc(s.entra.toLowerCase())}.</span></div>`;
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
@@ -449,20 +492,12 @@
           <p class="nota">Las bases marcadas «LOR · SMN · UCA» solo tienen esas tres regiones: con otros departamentos, esas hojas salen vacías y la página lo avisa.</p></div>`;
     } else if (id === "empleo-long") {
       const E = CAT.empleo, sel = paneles.empReg || (paneles.empReg = E.grupos[Object.keys(E.grupos)[0]].slice());
-      const q = paneles.empLong || (paneles.empLong = { desde: "", hasta: "", formato: "xlsx" });
-      const opMeses = (v, vacio) => `<option value="">${vacio}</option>` + MESES.map((m) => `<option value="${m}"${m === v ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("");
       cuerpo = `<p class="lead">El empleo del MTPE en el formato LONG que genera el scraper (AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO), de una región, de un grupo o de todas.</p>
         <div class="caja"><h3>1. Regiones</h3><div class="fila">${Object.keys(E.grupos).map((g) => `<button class="btn sec" type="button" data-empg="${esc(g)}">${esc(g)}</button>`).join("")}
           <button class="btn sec" type="button" data-empg="*">Todas (${E.regiones.length})</button><button class="btn sec" type="button" data-empg="">Ninguna</button></div>
           <div class="deptos">${E.regiones.map((r, i) => `<label for="er-${i}"><input type="checkbox" class="emp-reg" id="er-${i}" value="${esc(r)}" ${sel.includes(r) ? "checked" : ""}>${esc(r)}</label>`).join("")}</div>
           <p class="nota">Los grupos solo marcan las casillas: se puede combinar cualquier región. El total «Perú» del tablero no se guarda.</p></div>
-        <div class="caja"><h3>2. Periodo y formato</h3><div class="fila">
-          <label class="campo" for="el-d">Desde<select id="el-d">${opMeses(q.desde, "Desde el inicio")}</select></label>
-          <label class="campo" for="el-h">Hasta<select id="el-h">${opMeses(q.hasta, "Hasta el último mes")}</select></label>
-          <label class="campo" for="el-f">Formato<select id="el-f"><option value="xlsx">Excel (.xlsx)</option><option value="csv"${q.formato === "csv" ? " selected" : ""}>CSV</option></select></label>
-          <button class="btn" type="button" id="el-bajar">Descargar</button></div>
-          <p class="nota">Una sola hoja, con las filas ordenadas por región, actividad, año y mes, y el mismo nombre que pone el notebook (Loreto_empleo.xlsx, Loreto_San_Martín_Ucayali_empleo.xlsx o 26_regiones_empleo.xlsx).</p>
-          <div id="el-vista"></div></div>`;
+        <div class="caja"><h3>2. Periodo y formato</h3>${cajaLong(null)}</div>`;
     } else if (id === "bases") {
       cuerpo = `<p class="lead">Pesca y empleo de las tres regiones juntas, para comparar.</p>
         <div class="caja"><h3>Pesca</h3>${panelBases("p-cpesca", ["pesca-loreto", "pesca-san-martin", "pesca-ucayali"], { deptos: () => LSU, marcar: 3 })}</div>
