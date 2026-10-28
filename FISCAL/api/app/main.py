@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import archivos, carga, db, drive
+from . import archivos, carga, db, drive, mef
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -183,3 +183,28 @@ def drive_sincronizar(todo: bool = False, origen: str = Query("botón de la pág
         raise HTTPException(409, str(e))
     except Exception as e:                       # credencial vencida, carpeta sin permiso, Drive caído…
         raise HTTPException(502, f"No se pudo leer Drive: {e}")
+
+
+@app.get("/v1/mef", dependencies=[Depends(acceso)])
+def mef_estado():
+    """Si el botón «Actualizar desde el MEF» está configurado y las últimas corridas del scraper en GitHub."""
+    if not mef.configurado():
+        return {"configurado": False, "corridas": []}
+    try:
+        return {"configurado": True, "corridas": mef.corridas()}
+    except (mef.ErrorGitHub, OSError) as e:
+        return {"configurado": True, "corridas": [], "error": str(e)}
+
+
+@app.post("/v1/mef/actualizar", dependencies=[Depends(acceso)])
+def mef_actualizar(desde: str = "", hasta: str = "", prueba: bool = False):
+    """Lanza el scraper del MEF en GitHub Actions; al terminar (unos minutos) carga los datos en la base."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
+    try:
+        mef.lanzar(desde, hasta, prueba)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except (mef.ErrorGitHub, OSError) as e:
+        raise HTTPException(502, str(e))
+    return {"lanzado": True, "desde": desde or None, "hasta": hasta or None, "prueba": prueba}

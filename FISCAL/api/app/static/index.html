@@ -59,6 +59,10 @@
         <div class="card-head"><h2 id="t-estado">Estado actual de la base de datos</h2><span class="hint">se actualiza solo</span></div>
         <div class="card-body" id="estado"></div>
       </section>
+      <section class="card" id="sec-actualizar-mef" aria-labelledby="t-mef" hidden>
+        <div class="card-head"><h2 id="t-mef">Datos del MEF</h2><span class="hint">corre solo los días 6 y 21 de cada mes</span></div>
+        <div class="card-body" id="mef"></div>
+      </section>
       <section class="card" id="sec-actualizar-drive" aria-labelledby="t-drive" hidden>
         <div class="card-head"><h2 id="t-drive">Pesca desde Drive</h2><span class="hint">también corre solo, cada día</span></div>
         <div class="card-body" id="drive"></div>
@@ -74,7 +78,6 @@
             <button class="btn btn-primary" id="cargar" type="button">Cargar a la base de datos</button>
           </div>
           <div id="resultado-carga" aria-live="polite"></div>
-          <p class="hint">Próximamente (fase 2): el scraper correrá aquí mismo, cada mes y a pedido, sin pasar por Colab.</p>
         </div>
       </section>
     </div>
@@ -272,20 +275,69 @@
     });
   }
 
+  // ── Datos del MEF (scraper en GitHub Actions) ──
+  let sondeo = null;
+  const ESTADO_CORRIDA = (c) => c.estado !== "completed" ? (c.estado === "queued" ? "⏳ en cola" : "🔄 corriendo")
+    : c.resultado === "success" ? "✅ terminó bien" : c.resultado === "cancelled" ? "⏹ cancelada" : "❌ falló";
+  function renderMef(m) {
+    if (!m.configurado) {
+      $("mef").innerHTML = `<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render. Mientras tanto, el scraper corre solo los días 6 y 21, o lo lanzas en GitHub (Actions → «Fiscal · scraper del MEF»). Pasos en FISCAL/api/README.md.</span></div>`;
+      return;
+    }
+    const filas = m.corridas.map((c) => `<tr><td class="t">${esc(fecha(c.inicio))}</td><td class="t">${esc(c.titulo)}</td><td class="t">${c.origen === "schedule" ? "programada" : "a mano"}</td>
+      <td class="t">${ESTADO_CORRIDA(c)}</td><td class="t"><a href="${esc(c.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("");
+    $("mef").innerHTML = `<p class="hint">El scraper baja de Consulta Amigable las 7 bases (Loreto, San Martín y Ucayali) y las carga aquí. Tarda varios minutos; puedes cerrar la página. Vacío = año en curso hasta el último mes cerrado.</p>
+      <div class="subida"><label class="hint">Desde <input type="month" id="mef-desde"></label><label class="hint">Hasta <input type="month" id="mef-hasta"></label>
+        <label class="hint"><input type="checkbox" id="mef-prueba"> Prueba rápida (un mes, solo Loreto, no carga)</label>
+        <button class="btn btn-primary" id="mef-lanzar" type="button">Actualizar desde el MEF</button></div>
+      <div id="resultado-mef" aria-live="polite"></div>
+      ${m.error ? `<div class="err-box"><b>No se pudo consultar GitHub</b><span>${esc(m.error)}</span></div>` : ""}
+      ${filas ? `<div class="panel"><div class="scroll"><table><tr><th class="t">Inicio</th><th class="t">Periodo</th><th class="t">Cómo</th><th class="t">Estado</th><th class="t"></th></tr>${filas}</table></div></div>` : '<p class="hint">Todavía no hay corridas.</p>'}`;
+    $("mef-lanzar").addEventListener("click", async () => {
+      const btn = $("mef-lanzar"); btn.disabled = true; btn.textContent = "Lanzando…";
+      const q = new URLSearchParams({ desde: $("mef-desde").value, hasta: $("mef-hasta").value, prueba: $("mef-prueba").checked });
+      try {
+        await api(`/v1/mef/actualizar?${q}`, { method: "POST" });
+        $("resultado-mef").innerHTML = '<div class="ok-box"><b>Scraper lanzado</b><span>GitHub lo empieza en unos segundos. Esta tabla se actualiza sola; al terminar, la tabla de estado mostrará los meses nuevos.</span></div>';
+        vigilarMef();
+      } catch (e) {
+        $("resultado-mef").innerHTML = `<div class="err-box"><b>No se pudo lanzar</b><span>${esc(e.message)}</span></div>`;
+      } finally { btn.disabled = false; btn.textContent = "Actualizar desde el MEF"; }
+    });
+  }
+  function vigilarMef() {
+    clearInterval(sondeo);
+    let vueltas = 0;
+    const vuelta = async () => {
+      if (++vueltas > 90 || $("sec-actualizar-mef").hidden) { clearInterval(sondeo); return; }   // hasta 30 min
+      try {
+        const m = await api("/v1/mef"), aviso = $("resultado-mef") ? $("resultado-mef").innerHTML : "";
+        renderMef(m); if ($("resultado-mef")) $("resultado-mef").innerHTML = aviso;
+        if (m.corridas.length && m.corridas[0].estado === "completed" && vueltas > 1) {
+          clearInterval(sondeo); ESTADO = await api("/v1/estado"); renderEstado();
+        }
+      } catch (e) { /* se reintenta en la próxima vuelta */ }
+    };
+    setTimeout(vuelta, 4000);                // la corrida nueva aparece enseguida; luego cada 20 s
+    sondeo = setInterval(vuelta, 20000);
+  }
+
   // ── Secciones y menú ──
   const SECCIONES = {
     descargas: { titulo: "Bases de datos", lead: "Elige las bases de inversión, gasto o pesca, los departamentos, el nivel de gobierno (solo MEF) y el periodo. Se descarga un Excel con una hoja por base, con el mismo formato que PIM_Funcion.xlsx." },
-    actualizar: { titulo: "Actualizar base de datos", lead: "Qué hay cargado y hasta qué mes. Los datos del MEF se cargan con los archivos que genera el scraper en Colab (en la fase 2 correrá aquí); los de pesca, con los Excel mensuales de las DIREPRO." },
+    actualizar: { titulo: "Actualizar base de datos", lead: "Qué hay cargado y hasta qué mes. Los datos del MEF los baja el scraper en el servidor (solo, dos veces al mes, o con el botón); los de pesca, desde las carpetas de Drive. También se pueden subir archivos a mano." },
   };
   function ir(sec) {
     cerrarListas();
     $("titulo").textContent = SECCIONES[sec].titulo; $("lead").textContent = SECCIONES[sec].lead;
     $("menu-actual").textContent = SECCIONES[sec].titulo;
     ["sec-descargas-opciones", "sec-descargas-vista"].forEach((id) => { $(id).hidden = sec !== "descargas"; });
-    ["sec-actualizar-estado", "sec-actualizar-drive", "sec-actualizar-carga"].forEach((id) => { $(id).hidden = sec !== "actualizar"; });
+    ["sec-actualizar-estado", "sec-actualizar-mef", "sec-actualizar-drive", "sec-actualizar-carga"].forEach((id) => { $(id).hidden = sec !== "actualizar"; });
     document.querySelectorAll(".nav-item[data-sec]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.sec === sec)));
     if (sec === "actualizar") {
       api("/v1/estado").then((e) => { ESTADO = e; renderEstado(); }).catch(() => {});
+      api("/v1/mef").then((m) => { renderMef(m); if (m.corridas.some((c) => c.estado !== "completed")) vigilarMef(); })
+        .catch((e) => { $("mef").innerHTML = `<div class="err-box"><b>No se pudo consultar el scraper</b><span>${esc(e.message)}</span></div>`; });
       api("/v1/drive").then(renderDrive).catch((e) => { $("drive").innerHTML = `<div class="err-box"><b>No se pudo consultar Drive</b><span>${esc(e.message)}</span></div>`; });
     }
     else pedirVista();
