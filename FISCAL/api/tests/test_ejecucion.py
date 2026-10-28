@@ -262,3 +262,18 @@ def test_pagina_carga_los_cuadros_bcrp(datos):
     html = datos.get("/").text
     assert 'src="/static/bcrp.js?v=' in html and "Cuadros y gráficos BCRP" in html
     assert "window.BCRP" in datos.get("/static/bcrp.js").text
+
+
+def test_contraste_con_la_sintesis(datos):
+    """Lo que bajó el scraper contra lo publicado en la síntesis: coincide / diferencia menor / revisar."""
+    from app import db, ejecucion, ipc as ipc_
+    r = datos.get("/v1/contraste/ejecucion?departamento=16&sector=gasto").json()["contraste"]
+    assert [x["periodo"] for x in r] == ["2026-06"] and {f["estado"] for f in r[0]["filas"]} == {"revisar"}   # datos de prueba ≠ junio real
+    panel = ejecucion.panel_gasto(db.leer("gasto-dev-generica", ["16"], ["E", "R", "M"], "1990-01", "2100-12"))
+    c = ejecucion.cuadros("gasto", panel, None, ipc_.serie(), "2026-06", None)
+    ref = {f["nombre"].replace("Gobiernos Regionales", "Gobierno Regional"): [f["mes_b"], f["mes_a"], f["var_mes"], f["acum_b"], f["acum_a"], f["var_acum"]] for f in c["niveles"]}
+    ref["Total"][1] *= 1.005                                   # el MEF corrigió algo después del cierre: diferencia menor
+    ref["Gobierno Nacional"][4] += 5                           # 5 millones: revisar
+    x = ejecucion.contraste("gasto", panel, ipc_.serie(), {"2026-06": {"16": {"gasto": ref}}}, "16")[0]
+    assert {f["nivel"]: f["estado"] for f in x["filas"]} == {"Gobierno Nacional": "revisar", "Gobierno Regional": "coincide",
+                                                             "Gobiernos Locales": "coincide", "Total": "diferencia menor"}

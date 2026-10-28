@@ -365,6 +365,18 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
     return {"region": region, "cuadros": c, "ipc": ipc.estado()}
 
 
+@app.get("/v1/contraste/ejecucion", dependencies=[Depends(acceso)])
+def contraste_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector: str = Query("gasto", pattern="^(gasto|inversion)$")):
+    """El cuadro de ejecución de la página (lo que bajó el scraper del MEF) contra el publicado en las síntesis
+    (app/sintesis_publicada.json), mes por mes y nivel por nivel."""
+    _ejecucion(departamento, "", "")
+    niveles = list(NIVELES.values())
+    panel = (ejecucion.panel_gasto(db.leer("gasto-dev-generica", [departamento], niveles, "1990-01", "2100-12")) if sector == "gasto"
+             else _panel_inversion(departamento))
+    referencias = json.loads((Path(__file__).parent / "sintesis_publicada.json").read_text(encoding="utf-8"))
+    return {"contraste": ejecucion.contraste(sector, panel, ipc.serie(), {k: v for k, v in referencias.items() if not k.startswith("_")}, departamento)}
+
+
 def _panel_muni(departamento):
     return ejecucion.panel_municipalidad(db.leer("inv-dev-municipalidad", [departamento], [], "1990-01", "2100-12"))
 

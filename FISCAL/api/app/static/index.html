@@ -82,11 +82,11 @@
     depositos: { t: "Depósitos", estado: "falta", fuente: "SBS y AFP", entra: "Scraper de la web de la SBS, por construir",
       lead: "Saldos de depósitos del sistema financiero por tipo.", cuadros: ["Depósitos por tipo"] },
     gasto: { t: "Gasto corriente no financiero", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => GASTO, actualizar: "mef",
-      lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion", extra: ["Archivos"] },
+      lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion", extra: ["Contraste", "Archivos"] },
     inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => INV, actualizar: "mef",
-      lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos", "Archivos"] },
-    anexos: { t: "Anexos", estado: "falta", fuente: "Todos los sectores", entra: "Se generan con los demás sectores",
-      lead: "Cuadros estadísticos del final del informe, uno por sector.", cuadros: ["Un anexo por cada sector del índice"] },
+      lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos", "Contraste", "Archivos"] },
+    anexos: { t: "Anexos", fuente: "Todos los sectores", entra: "Se generan solos con los datos de cada sector", bases: (r) => ["gasto-dev-generica", "inv-dev-funcion", "empleo", "hidro-produccion", r.pesca],
+      lead: "Cuadros estadísticos del final del informe, uno por sector, con el formato de la síntesis: listos para copiar o descargar.", cuadros: "anexos" },
   };
   const cap = (titulo, items) => ({ titulo, items });
   const V = "V. Ejecución del presupuesto de gastos del Gobierno General";
@@ -687,40 +687,104 @@
     return items;
   }
 
+  const URL_BCRP = (sid, r, periodo) => {
+    const qp = periodo ? `&periodo=${periodo}` : "";
+    return { pesca: `/v1/cuadros/pesca?departamento=${r.cod}${qp}`, hidro: `/v1/cuadros/hidrocarburos?departamento=${r.cod}${qp}`, empleo: `/v1/cuadros/empleo?departamento=${r.cod}${qp}`,
+      gasto: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=gasto&anexos=true${qp}`, inversion: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=inversion&anexos=true${qp}` }[sid];
+  };
+  const itemsBCRP = (sid, c, R, N) => sid === "pesca" ? itemsPesca(c, R, N) : sid === "hidro" ? itemsHidro(c, R, N) : sid === "empleo" ? itemsEmpleo(c, R, N) : itemsEjecucion(sid, c, R, N, c.ultimo);
+
+  // galería: cada cuadro con su número (editable), Copiar / SVG / PNG; un ítem sin svg es un pendiente (texto)
+  function galeriaBCRP(caja, clave, items, controles) {
+    const etiqueta = (it, n) => n === "" || n == null ? (it.tipo === "ANEXO" ? "ANEXO" : `${it.tipo} N°`) : it.tipo === "ANEXO" ? `ANEXO ${n}` : `${it.tipo} N° ${n}`;
+    const valorNum = (it) => numBcrp[`${clave}-${it.clave}`] ?? (it.num ?? "");
+    const listos = items.map((it, k) => [it, k]).filter(([it]) => it.svg);
+    caja.innerHTML = `<div class="fila controles">${controles}<button class="btn sec" type="button" id="${clave}-todo"${listos.length ? "" : " disabled"}>Descargar todos (SVG)</button></div>
+      <p class="lead">Con el formato de la síntesis. <b>Copiar</b> deja la imagen lista para pegar en Word (Ctrl+V); <b>SVG</b> es vectorial (en Word: Insertar → Imágenes) y no pierde nitidez al ampliarla. Cambia el número si el informe lo pide.</p>
+      ${items.map((it, k) => it.svg ? `<div class="caja bcrp-item"><div class="fila" style="justify-content:space-between;align-items:center">
+          <label class="campo bcrp-num">${esc(it.tipo === "ANEXO" ? "Anexo" : it.tipo === "CUADRO" ? "Cuadro N°" : "Gráfico N°")}<input type="text" inputmode="numeric" data-k="${k}" value="${esc(valorNum(it))}" size="3"></label>
+          <div class="fila"><button class="btn" type="button" data-copiar="${k}">Copiar</button><button class="btn sec" type="button" data-svg="${k}">SVG</button><button class="btn sec" type="button" data-png="${k}">PNG</button></div></div>
+        <div class="bcrp-prev" id="${clave}-v${k}"></div><div class="bcrp-msj" id="${clave}-m${k}" aria-live="polite"></div></div>`
+        : `<div class="vacio-caja bcrp-pendiente"><b>${esc(etiqueta(it, it.num))} · ${esc(it.nombre)}</b><span>${esc(it.pendiente)}</span></div>`).join("")}`;
+    const svgDe = (k) => items[k].svg(etiqueta(items[k], valorNum(items[k])));
+    const pintar = (k) => { $(`${clave}-v${k}`).innerHTML = svgDe(k); };
+    listos.forEach(([, k]) => pintar(k));
+    const avisar = (k, t, ok) => { const m = $(`${clave}-m${k}`); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
+    caja.querySelectorAll(".bcrp-num input").forEach((inp) => inp.addEventListener("input", () => { const k = +inp.dataset.k; numBcrp[`${clave}-${items[k].clave}`] = inp.value.trim(); pintar(k); }));
+    caja.querySelectorAll("[data-copiar]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.copiar;
+      try { await B.copiar(svgDe(k)); avisar(k, "Copiado: pégalo en Word con Ctrl+V.", true); } catch (e) { avisar(k, e.message, false); } }));
+    const nombreDe = (k) => `${etiqueta(items[k], valorNum(items[k]))} ${items[k].nombre}`;
+    caja.querySelectorAll("[data-svg]").forEach((bt) => bt.addEventListener("click", () => { const k = +bt.dataset.svg; B.descargar(svgDe(k), nombreDe(k)); }));
+    caja.querySelectorAll("[data-png]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.png; try { await B.descargarPng(svgDe(k), nombreDe(k)); } catch (e) { avisar(k, e.message, false); } }));
+    $(`${clave}-todo`).addEventListener("click", async () => { for (const [, k] of listos) { B.descargar(svgDe(k), nombreDe(k)); await new Promise((ok) => setTimeout(ok, 350)); } });
+  }
+  const selectorMes = (clave, meses, actual) => `<label class="campo" for="${clave}-p">Mes del informe<select id="${clave}-p">${meses.map((m) => `<option value="${m}"${m === actual ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>`;
+
   async function cuadrosBCRP(sid, r, caja) {
     const clave = `bcrp-${sid}-${grupo}`, st = estadoEjec(clave), R = r.nombre.toUpperCase(), N = (NUM_BCRP[grupo] || {})[sid] || {};
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros y gráficos…</div>';
     try {
-      const qp = st.periodo ? `&periodo=${st.periodo}` : "";
-      const url = { pesca: `/v1/cuadros/pesca?departamento=${r.cod}${qp}`, hidro: `/v1/cuadros/hidrocarburos?departamento=${r.cod}${qp}`, empleo: `/v1/cuadros/empleo?departamento=${r.cod}${qp}`,
-        gasto: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=gasto&anexos=true${qp}`, inversion: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=inversion&anexos=true${qp}` }[sid];
-      const c = (await api(url)).cuadros;
+      const c = (await api(URL_BCRP(sid, r, st.periodo))).cuadros;
       if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(S[sid].t.toLowerCase())} de ${esc(r.nombre)}.</b><span>Cárgalos en la pestaña «Actualizar».</span></div>`; return; }
-      const items = sid === "pesca" ? itemsPesca(c, R, N) : sid === "hidro" ? itemsHidro(c, R, N) : sid === "empleo" ? itemsEmpleo(c, R, N) : itemsEjecucion(sid, c, R, N, c.ultimo);
       const ultimo = c.ultimo || c.periodo, desde = (ESTADO.bases[(S[sid].bases(r) || [])[0]] || {}).desde || "";
-      const meses = MESES.filter((m) => m >= desde && m <= ultimo).reverse();
-      const etiqueta = (it, n) => n === "" || n == null ? (it.tipo === "ANEXO" ? "ANEXO" : `${it.tipo} N°`) : it.tipo === "ANEXO" ? `ANEXO ${n}` : `${it.tipo} N° ${n}`;
-      const valorNum = (it) => numBcrp[`${clave}-${it.clave}`] ?? (it.num ?? "");
-      caja.innerHTML = `<div class="fila controles"><label class="campo" for="${clave}-p">Mes del informe<select id="${clave}-p">${meses.map((m) => `<option value="${m}"${m === c.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
-          <button class="btn sec" type="button" id="${clave}-todo">Descargar todos (SVG)</button></div>
-        <p class="lead">Con el formato de la síntesis. <b>Copiar</b> deja la imagen lista para pegar en Word (Ctrl+V); <b>SVG</b> es vectorial (en Word: Insertar → Imágenes) y no pierde nitidez al ampliarla. Cambia el número si el informe lo pide.</p>
-        ${items.map((it, k) => `<div class="caja bcrp-item"><div class="fila" style="justify-content:space-between;align-items:center">
-            <label class="campo bcrp-num">${esc(it.tipo === "ANEXO" ? "Anexo" : it.tipo === "CUADRO" ? "Cuadro N°" : "Gráfico N°")}<input type="text" inputmode="numeric" data-k="${k}" value="${esc(valorNum(it))}" size="3"></label>
-            <div class="fila"><button class="btn" type="button" data-copiar="${k}">Copiar</button><button class="btn sec" type="button" data-svg="${k}">SVG</button><button class="btn sec" type="button" data-png="${k}">PNG</button></div></div>
-          <div class="bcrp-prev" id="${clave}-v${k}"></div><div class="bcrp-msj" id="${clave}-m${k}" aria-live="polite"></div></div>`).join("")}`;
-      const svgDe = (k) => items[k].svg(etiqueta(items[k], valorNum(items[k])));
-      const pintar = (k) => { $(`${clave}-v${k}`).innerHTML = svgDe(k); };
-      items.forEach((_, k) => pintar(k));
-      const avisar = (k, t, ok) => { const m = $(`${clave}-m${k}`); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
-      caja.querySelectorAll(".bcrp-num input").forEach((inp) => inp.addEventListener("input", () => { const k = +inp.dataset.k; numBcrp[`${clave}-${items[k].clave}`] = inp.value.trim(); pintar(k); }));
-      caja.querySelectorAll("[data-copiar]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.copiar;
-        try { await B.copiar(svgDe(k)); avisar(k, "Copiado: pégalo en Word con Ctrl+V.", true); } catch (e) { avisar(k, e.message, false); } }));
-      const nombreDe = (k) => `${etiqueta(items[k], valorNum(items[k]))} ${items[k].nombre}`;
-      caja.querySelectorAll("[data-svg]").forEach((bt) => bt.addEventListener("click", () => { const k = +bt.dataset.svg; B.descargar(svgDe(k), nombreDe(k)); }));
-      caja.querySelectorAll("[data-png]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.png; try { await B.descargarPng(svgDe(k), nombreDe(k)); } catch (e) { avisar(k, e.message, false); } }));
-      $(`${clave}-todo`).addEventListener("click", async () => { for (let k = 0; k < items.length; k++) { B.descargar(svgDe(k), nombreDe(k)); await new Promise((ok) => setTimeout(ok, 350)); } });
+      galeriaBCRP(caja, clave, itemsBCRP(sid, c, R, N), selectorMes(clave, MESES.filter((m) => m >= desde && m <= ultimo).reverse(), c.periodo));
       $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; cuadrosBCRP(sid, r, caja); });
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
+  }
+
+  // ── Anexos: los de la síntesis de cada región, en su orden (junio 2026). [sector, n° de anexo del sector] o [sector, título] si aún no hay datos
+  const ANEXOS_TAB = "Anexos BCRP";
+  const PENDIENTES = { agro: "Producción agrícola (MIDAGRI / dirección regional de agricultura)", manu1: "Producción manufacturera · índice de volumen físico (año 2007 = 100)",
+    manu2: "Producción manufacturera · variación porcentual", expo: "Exportaciones por grupo de productos (SUNAT)", impo: "Importaciones FOB según uso o destino económico - Aduana de Iquitos",
+    credito: "Crédito (SBS)", depositos: "Depósitos (SBS)", morosidad: "Tasa de morosidad (SBS)" };
+  const ANEXOS_SINTESIS = {
+    lor: [["agro"], ["hidro", 0], ["manu1"], ["manu2"], ["empleo", 0], ["expo"], ["impo"], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+    smn: [["agro"], ["manu1"], ["manu2"], ["expo"], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+    uca: [["agro"], ["pesca", 0], ["hidro", 0], ["manu1"], ["manu2"], ["expo"], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+  };
+  async function anexosBCRP(r, caja) {
+    const clave = `anx-${grupo}`, st = estadoEjec(clave), R = r.nombre.toUpperCase(), lista = ANEXOS_SINTESIS[grupo] || [];
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los anexos…</div>';
+    const sectores = [...new Set(lista.filter((x) => x.length === 2).map((x) => x[0]))];
+    const datos = Object.fromEntries(await Promise.all(sectores.map(async (sid) => {
+      try { return [sid, { c: (await api(URL_BCRP(sid, r, st.periodo))).cuadros }]; } catch (e) { return [sid, { error: e.message }]; }
+    })));
+    const anexosDe = {};
+    sectores.forEach((sid) => { const d = datos[sid]; if (d.c) anexosDe[sid] = itemsBCRP(sid, d.c, R, {}).filter((it) => it.tipo === "ANEXO"); });
+    const items = lista.map(([sid, k], i) => {
+      const num = i + 1;
+      if (k === undefined) return { clave: `p${num}`, tipo: "ANEXO", num, nombre: PENDIENTES[sid], pendiente: "Todavía no entra a la página: se armará cuando se construya este sector." };
+      const it = (anexosDe[sid] || [])[k];
+      if (it) return { ...it, clave: `${sid}-${k}`, num };
+      const d = datos[sid] || {};
+      return { clave: `x${num}`, tipo: "ANEXO", num, nombre: `${S[sid].t}${sid === "gasto" || sid === "inversion" ? ` · ${["Gobierno Nacional", "Gobierno Regional", "Gobiernos Locales"][k]}` : ""}`,
+        pendiente: d.error ? `No se pudo armar: ${d.error}` : `Todavía no hay datos de ${S[sid].t.toLowerCase()} de ${r.nombre}: cárgalos en ese sector («Actualizar»).` };
+    });
+    // meses: los del MEF (la mayoría de los anexos); cada sector usa el elegido si lo tiene
+    const ult = sectores.map((sid) => datos[sid].c && (datos[sid].c.ultimo || datos[sid].c.periodo)).filter(Boolean).sort().pop() || MESES[MESES.length - 1];
+    const actual = st.periodo || ult, meses = MESES.filter((m) => m >= "2025-01" && m <= ult).reverse();
+    const listos = items.filter((it) => it.svg).length;
+    galeriaBCRP(caja, clave, items, `${selectorMes(clave, meses, actual)}<span class="nota">${listos} de ${items.length} anexos con datos</span>`);
+    $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; anexosBCRP(r, caja); });
+  }
+
+  // ── Contraste: lo que bajó el scraper del MEF contra lo publicado en las síntesis (app/sintesis_publicada.json) ──
+  async function contrasteSintesis(sector, r, caja) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Comparando con las síntesis publicadas…</div>';
+    try {
+      const x = (await api(`/v1/contraste/ejecucion?departamento=${r.cod}&sector=${sector}`)).contraste;
+      const chip = { coincide: '<span class="chip ok">coincide</span>', "diferencia menor": '<span class="chip vacio">diferencia menor</span>', revisar: '<span class="chip error">revisar</span>' };
+      const cab = ["mes año ant.", "mes", "Var. %", "Ene.-mes año ant.", "Ene.-mes", "Var. %"];
+      const celda = (p, q, d, k) => `<td class="n">${k % 3 === 2 ? pct(p) : mill(p)}<br><small class="nota">${q == null ? "—" : k % 3 === 2 ? pct(q) : mill(q)}${d && Math.abs(d) >= 0.05 ? ` <b class="${Math.abs(d) > 0.15 && k % 3 !== 2 ? "baja" : ""}">(${d > 0 ? "+" : ""}${k % 3 === 2 ? pct(d) : mill(d)})</b>` : ""}</small></td>`;
+      caja.innerHTML = `<p class="lead">El cuadro de la página (lo que bajó el scraper del MEF) contra el publicado en cada síntesis, nivel por nivel. En cada celda: arriba la página, abajo lo publicado y, entre paréntesis, la diferencia.
+          <b>Coincide</b>: hasta 0,1 millón de diferencia. <b>Diferencia menor</b>: hasta 1 % (el MEF sigue registrando devengados después del cierre del informe). <b>Revisar</b>: más que eso.</p>
+        ${x.length ? x.map((b) => `<div class="caja"><h3>${esc(b.titulo || b.periodo)}${b.fecha_datos ? ` · síntesis con datos al ${esc(b.fecha_datos)}` : ""}</h3>
+          ${b.error ? `<p class="nota">${esc(b.error)}</p>` : `<div class="scroll"><table><tr><th>Nivel</th>${cab.map((h) => `<th class="n">${h}</th>`).join("")}<th>Estado</th></tr>
+            ${b.filas.map((f) => `<tr class="${f.nivel === "Total" ? "total" : ""}"><td>${esc(f.nivel)}</td>${f.pagina.map((p, k) => celda(p, f.publicado[k], f.dif[k], k)).join("")}<td>${chip[f.estado]}</td></tr>`).join("")}</table></div>
+            ${b.real ? "" : '<p class="nota">La página no tiene el IPC de ese mes: sus Var. % son nominales y la síntesis las da reales.</p>'}`}</div>`).join("")
+          : '<div class="vacio-caja"><b>No hay síntesis publicadas para comparar.</b><span>Se agregan en FISCAL/api/app/sintesis_publicada.json.</span></div>'}
+        <p class="nota">Otras pruebas que ya hace el scraper en cada corrida: suma de los meses contra la vista anual del MEF y PIM por nivel contra el total («cuadre interno»; ERRORES = 0 en el resumen de GitHub).</p>`;
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo comparar</b><span>${esc(e.message)}</span></div>`; }
   }
 
   // ── Carga de archivos y scrapers de GitHub ──
@@ -836,8 +900,8 @@
   // ── Página de un sector de una región ──
   function sectorRegion() {
     const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
-    const tabs = ["Datos", "Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []), "Actualizar", ...(s.extra || [])];
-    const t = pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
+    const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : ["Datos", "Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []), "Actualizar", ...(s.extra || [])];
+    const t = s.cuadros === "anexos" ? ANEXOS_TAB : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
@@ -854,6 +918,8 @@
     else if (t === "Proyectos") panel = '<div id="proyectos"></div>';
     else if (t === "Archivos") panel = '<div id="archivos-fiscal"></div>';
     else if (t === BCRP_TAB) panel = `<div id="bcrp" data-sector="${id}"></div>`;
+    else if (t === ANEXOS_TAB) panel = '<div id="anexos-bcrp"></div>';
+    else if (t === "Contraste") panel = `<div id="contraste" data-sector="${id}"></div>`;
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
@@ -949,6 +1015,8 @@
     if ($("proyectos")) proyectosVariaciones(REG[grupo], $("proyectos"));
     if ($("archivos-fiscal")) archivosFiscales(REG[grupo], $("archivos-fiscal"));
     if ($("bcrp")) cuadrosBCRP($("bcrp").dataset.sector, REG[grupo], $("bcrp"));
+    if ($("anexos-bcrp")) anexosBCRP(REG[grupo], $("anexos-bcrp"));
+    if ($("contraste")) contrasteSintesis($("contraste").dataset.sector, REG[grupo], $("contraste"));
     window.scrollTo(0, 0);
   }
   $("sel-movil").addEventListener("change", (ev) => { location.hash = ev.target.value; });

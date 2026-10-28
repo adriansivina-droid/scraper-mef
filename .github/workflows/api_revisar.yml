@@ -43,6 +43,10 @@ jobs:
                   q = c.get("cuadros") or {}
                   t = (q.get("niveles") or [{}])[-1]
                   print(f"  ejecución {d} {s:9s}: periodo {q.get('periodo')} · real={q.get('real')} · var acum real {t.get('var_acum')} · nominal {t.get('var_acum_nominal')}{' · ' + c['error'] if 'error' in c else ''}")
+              for s in ("gasto", "inversion"):
+                  for b in get(f"/v1/contraste/ejecucion?departamento={d}&sector={s}").get("contraste", []):
+                      for f in b.get("filas", []):
+                          print(f"  contraste {d} {s:9s} {b['periodo']} {f['nivel']:18s} {f['estado']:16s} página {f['pagina']} · síntesis {f['publicado']}")
               p = get(f"/v1/proyectos?departamento={d}")
               print(f"  proyectos {d}: {p.get('periodo')} · niveles {len(p.get('proyectos') or [])}")
           PY

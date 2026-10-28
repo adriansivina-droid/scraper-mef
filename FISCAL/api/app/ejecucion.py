@@ -367,3 +367,39 @@ def excel(region, c, v=None):
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+# ── Contraste con las síntesis publicadas (app/sintesis_publicada.json) ──
+CAMPOS = ["mes_b", "mes_a", "var_mes", "acum_b", "acum_a", "var_acum"]
+_NOMBRE_SINTESIS = {"Gobierno Nacional": "Gobierno Nacional", "Gobiernos Regionales": "Gobierno Regional", "Gobiernos Locales": "Gobiernos Locales", "Total": "Total"}
+
+
+def contraste(sector, panel, ipc, referencias, departamento):
+    """Compara, por nivel de gobierno, el cuadro de la página con el publicado en cada síntesis de `referencias`
+    ({periodo: {depto: {sector: {nivel: [6 valores]}}}}). Montos: coincide si difieren en 0,1 millón o menos; diferencia
+    menor si es hasta 1 % (el MEF sigue registrando devengados después del cierre del informe); si no, revisar."""
+    salida = []
+    for periodo, bloque in sorted(referencias.items()):
+        ref = (bloque.get(departamento) or {}).get(sector) if isinstance(bloque, dict) else None
+        if not ref:
+            continue
+        try:
+            c = cuadros(sector, panel, None, ipc, periodo, None)
+        except ValueError as e:
+            salida.append({"periodo": periodo, "fecha_datos": bloque.get("_fecha_datos"), "error": str(e), "filas": []})
+            continue
+        if c is None:
+            continue
+        filas = []
+        for f in c["niveles"]:
+            pub = ref.get(_NOMBRE_SINTESIS.get(f["nombre"], f["nombre"]))
+            if not pub:
+                continue
+            pagina = [f["mes_b"], f["mes_a"], f["var_mes"] if c["real"] else f["var_mes_nominal"], f["acum_b"], f["acum_a"], f["var_acum"] if c["real"] else f["var_acum_nominal"]]
+            difs = [None if p is None or q is None else round(p - q, 3) for p, q in zip(pagina, pub)]
+            peor = max((abs(d) / abs(q) * 100 if q else 0, abs(d)) for d, q, k in zip(difs, pub, CAMPOS) if d is not None and not k.startswith("var"))
+            estado = "coincide" if peor[1] <= 0.15 else "diferencia menor" if peor[0] <= 1 else "revisar"
+            filas.append({"nivel": _NOMBRE_SINTESIS.get(f["nombre"], f["nombre"]), "pagina": pagina, "publicado": pub, "dif": difs, "estado": estado})
+        salida.append({"periodo": periodo, "titulo": f"{MESES[int(periodo[5:]) - 1]} {periodo[:4]}", "fecha_datos": bloque.get("_fecha_datos"),
+                       "real": c["real"], "filas": filas})
+    return salida
