@@ -56,13 +56,30 @@ jobs:
           echo "modo=$M" >> "$GITHUB_OUTPUT"
           echo "Modo: $M"
 
+      # los PDF anuales de PERUPETRO (DATA/PDF, ~450 MB) no van a la base: se guardan en la caché de GitHub entre corridas
+      # (si se pierde, el notebook los vuelve a bajar de PERUPETRO)
+      - name: Recuperar los PDF de PERUPETRO
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/almacen_local
+          key: hidro-pdf-${{ github.run_id }}
+          restore-keys: hidro-pdf-
+
       - name: Ejecutar notebooks y cargar en la página
         env:
           PP_TRABAJO: ${{ runner.temp }}/pp
           PP_ALMACEN: pagina
+          ALMACEN_LOCAL: ${{ runner.temp }}/almacen_local
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PYTHONUNBUFFERED: "1"
         run: python HIDROCARBUROS/automatizacion/ejecutar_notebooks.py "${{ steps.modo.outputs.modo }}"
+
+      - name: Guardar los PDF de PERUPETRO
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/almacen_local
+          key: hidro-pdf-${{ github.run_id }}
 
       - name: Preparar el mapa para descargar
         if: always()
