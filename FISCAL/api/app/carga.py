@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import controles, db, empleo, exportaciones, hidrocarburos, ipc, pesca
+from . import controles, db, empleo, exportaciones, hidrocarburos, ipc, pesca, sunat_expo
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -95,7 +95,7 @@ def leer_archivos(raiz):
     """-> {base_id: DataFrame con las columnas de la base + columnas internas}, avisos."""
     raiz = Path(raiz)
     por_bloque, avisos = {}, []
-    pim, pim_muni, de_pesca, de_empleo, de_hidro, de_estad = [], [], [], [], [], []
+    pim, pim_muni, de_pesca, de_empleo, de_hidro, de_estad, de_sunat = [], [], [], [], [], [], []
     for n_archivo, ruta in enumerate(sorted(raiz.rglob("*"))):
         if not ruta.is_file() or ruta.name.startswith(("CONTROL", "LOG", ".")):
             continue
@@ -103,6 +103,12 @@ def leer_archivos(raiz):
             estad = exportaciones.reconocer(ruta)          # ESTADLO / ESTADSMN / ESTADUCA (exportaciones e importaciones)
             if estad:
                 de_estad.append((n_archivo, ruta, estad))
+                continue
+            if sunat_expo.es_anual_pro(ruta):              # ANUAL_PRO: diccionarios (UNICOS, PARTIDA) y su hoja ORIGEN
+                de_sunat.append((n_archivo, ruta, "anual"))
+                continue
+            if sunat_expo.es_sunat(ruta):                  # base mensual de SUNAT (X_AAAAMM.xlsx)
+                de_sunat.append((n_archivo, ruta, "sunat"))
                 continue
             try:
                 es_pesca = pesca.reconocer(ruta)
@@ -182,6 +188,14 @@ def leer_archivos(raiz):
         del_estad, avisos_estad = exportaciones.leer(de_estad)
         bases.update(del_estad)
         avisos += avisos_estad
+    if de_sunat:
+        # el ESTAD de la misma carga va primero: la base de SUNAT se ubica en sus filas
+        for b in ("expo-estad",):
+            if b in bases and bases[b] is not None:
+                db.guardar(b, bases[b].copy())
+        de_la_sunat, avisos_sunat = sunat_expo.leer(de_sunat)
+        bases.update(de_la_sunat)
+        avisos += avisos_sunat
     if de_pesca:
         de_la_pesca, avisos_pesca = pesca.leer(de_pesca, db.leer_todo)
         bases.update(de_la_pesca)
