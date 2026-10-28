@@ -67,6 +67,13 @@ BASES = {b.id: b for b in [
     Base("gasto-dev-fuente", "gasto", "Devengado por fuente de financiamiento", "Gasto por fuente", "GASTO Fuentes",
          ["AÑO", "MES", "NIVEL_GOBIERNO", "DEPARTAMENTO", "GENERICA", "COD_FUENTE", "FUENTE", "DEVENGADO"], [9.7, 12, 26, 20, 10, 12, 44, 14],
          descripcion="Devengado total (todas las genéricas) por mes, nivel de gobierno y fuente de financiamiento."),
+    # Proyectos detrás de las variaciones (FISCAL/Fiscal_Proyectos.ipynb, en GitHub Actions tras el scraper del MEF)
+    Base("inv-proyectos", "inversion", "Proyectos detrás de las variaciones", "Proyectos de inversión", "PROYECTOS",
+         ["AÑO", "MES", "DEPARTAMENTO", "NIVEL_GOBIERNO", "DIFERENCIA_NIVEL", "MES_CONSULTADO", "N_FUNCION", "FUNCION", "ANTERIOR",
+          "ACTUAL", "DIFERENCIA_FUNCION", "N_PROYECTO", "CODIGO", "PROYECTO", "DEVENGADO", "PCT_FUNCION"],
+         [8, 6, 16, 22, 16, 12, 8, 40, 14, 14, 14, 8, 12, 80, 14, 10], departamentos=("16", "22", "25"),
+         descripcion="Por departamento y nivel: las 5 funciones que más explican la variación de la inversión del mes contra el "
+                     "mismo mes del año anterior y sus 5 proyectos con mayor devengado (Consulta Amigable, nivel proyecto)."),
     # Pesca (PESCA/pesca.md): el LONG de cada región, con sus columnas; VBP en miles de soles de 2007
     Base("pesca-loreto", "pesca", "Loreto · desembarque y peces ornamentales", "Pesca Loreto", "PESCA Loreto",
          ["AÑO", "MES", "DEPARTAMENTO", "FUENTE", "ESTADO", "DESTINO", "ESPECIE", "ESPECIE_CORREGIDA", "ESPECIE_OK",

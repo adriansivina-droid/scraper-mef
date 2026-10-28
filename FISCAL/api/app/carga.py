@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import db, empleo, hidrocarburos, pesca
+from . import db, empleo, hidrocarburos, ipc, pesca
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -201,9 +201,17 @@ def leer_archivos(raiz):
 
 def cargar(origen, archivos):
     """archivos: lista de (nombre, bytes). Un .zip se descomprime. Guarda en la base de datos y devuelve el resumen."""
+    avisos_ipc = []
     with tempfile.TemporaryDirectory() as tmp:
         for nombre, contenido in archivos:
             nombre = os.path.basename(nombre)
+            if ipc.es_ipc(nombre):                    # el IPC no es una base: va a su tabla (variaciones reales)
+                try:
+                    s = ipc.de_excel(contenido)
+                    avisos_ipc.append(f"{nombre}: IPC de Lima, {ipc.guardar(s, nombre)} meses ({min(s)} a {max(s)}).")
+                except Exception as e:
+                    avisos_ipc.append(f"{nombre}: no se pudo leer como IPC ({e}).")
+                continue
             if nombre.lower().endswith(".zip"):
                 with zipfile.ZipFile(io.BytesIO(contenido)) as z:
                     for info in z.infolist():
@@ -215,12 +223,12 @@ def cargar(origen, archivos):
             else:
                 (Path(tmp) / nombre).write_bytes(contenido)
         bases, avisos = leer_archivos(tmp)
-    resumen = {"bases": {}, "avisos": avisos}
+    resumen = {"bases": {}, "avisos": avisos_ipc + avisos}
     for base_id, df in bases.items():
         filas = db.guardar(base_id, df)
         resumen["bases"][base_id] = {"filas": filas, "departamentos": sorted(df["_depto"].unique().tolist()),
                                      "periodos": sorted({f"{a}" if m == 0 else f"{a}-{m:02d}" for a, m in zip(df["_anio"], df["_mes"])})}
-    if not bases:
+    if not bases and not avisos_ipc:
         resumen["avisos"].append("No se encontró ningún archivo de los scrapers, de pesca, de empleo ni de hidrocarburos en lo que subiste.")
     db.registrar_carga(origen, resumen)
     return resumen
