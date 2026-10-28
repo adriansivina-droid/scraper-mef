@@ -1,4 +1,5 @@
 """Conexión a la base de datos (Postgres en Railway; SQLite en local) y lecturas por base."""
+import base64
 import json
 import os
 from datetime import datetime, timezone
@@ -163,3 +164,27 @@ def documento(nombre):
     with motor().connect() as cx:
         r = cx.execute(text("SELECT contenido, modificado FROM documentos WHERE nombre = :n"), {"n": nombre}).first()
     return None if r is None else (r[0], r[1])
+
+
+# ── Archivos generados por los notebooks (Excel del procesamiento fiscal, variaciones, proyectos) ──
+# Se guardan como documentos «archivo:<carpeta>/<nombre>» con el contenido en base64.
+def guardar_archivo(carpeta, nombre, contenido):
+    guardar_documento(f"archivo:{carpeta}/{nombre}", base64.b64encode(contenido).decode("ascii"),
+                      datetime.now(timezone.utc).isoformat(timespec="seconds"))
+
+
+def archivos(carpeta):
+    """[{nombre, fecha, kb}] de una carpeta, el más reciente primero."""
+    _documentos()
+    prefijo = f"archivo:{carpeta}/"
+    with motor().connect() as cx:
+        filas = cx.execute(text("SELECT nombre, modificado, LENGTH(contenido) FROM documentos WHERE nombre LIKE :p"),
+                           {"p": prefijo + "%"}).all()
+    salida = [{"nombre": n[len(prefijo):], "fecha": m, "kb": round(int(t or 0) * 3 / 4 / 1024)} for n, m, t in filas]
+    return sorted(salida, key=lambda x: (x["fecha"] or "", x["nombre"]), reverse=True)
+
+
+def archivo(carpeta, nombre):
+    """bytes o None."""
+    doc = documento(f"archivo:{carpeta}/{nombre}")
+    return None if doc is None else base64.b64decode(doc[0])

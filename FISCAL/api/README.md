@@ -252,9 +252,16 @@ En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
   `Fiscal_Procesamiento.ipynb`: siempre 5 aumentos (las 5 mayores diferencias), sin ítems en 0 y sin repetir.
 - **Proyectos**: `.github/workflows/fiscal_proyectos.yml` corre `Fiscal_Proyectos.ipynb` sin Colab
   (`FISCAL/automatizacion/proyectos_servidor.py`) al terminar cada corrida del scraper del MEF, o con el botón de la
-  pestaña. Sus CSV de entrada salen de la base, y el resultado va a la base `inv-proyectos`.
+  pestaña. Sus CSV de entrada salen de la base, y el resultado va a la base `inv-proyectos`. El Excel de su bloque 6
+  («Proyectos variaciones AAAA-MM.xlsx») queda en la pestaña **Archivos** en vez de subirse a Drive.
+- **Archivos** (procesamiento): `.github/workflows/fiscal_procesamiento.yml` corre `Fiscal_Procesamiento.ipynb` completo
+  sin Colab (`FISCAL/automatizacion/procesamiento_servidor.py`) al terminar cada corrida del scraper del MEF, o con el
+  botón «Volver a procesar». Los CSV de `Scrapeo/output` se arman desde la base (con los mismos nombres y columnas que
+  deja el scraper; la deuda desglosada vuelve a `DEV Deuda`) y el `IPC.xlsx`, con el IPC cargado en la página. Sus
+  Excel (`Fiscal-<Depto>_AUTO.xlsx` y «Variaciones alarmantes AAAA-MM.xlsx») se guardan en la base y se descargan en la
+  pestaña **Archivos** de Gasto corriente e Inversión pública.
 - **IPC de Lima** (variación real): se trae de la API del BCRP en cada sincronización con Drive (serie `IPC_SERIE_BCRP`,
-  por defecto `PN01270PM`). Si no responde, usa el `IPC.xlsx` de Drive, o el que se suba en la página. Sin IPC, los
+  por defecto `PN38705PM` y, de respaldo, `PN01270PM`). Si no responde, usa el `IPC.xlsx` de Drive, o el que se suba en la página. Sin IPC, los
   cuadros muestran la variación nominal y lo avisan.
 
 ## Endpoints
@@ -281,6 +288,9 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/variaciones` | Variaciones alarmantes de la inversión (`departamento`, `periodo`, `comparar`) |
 | GET | `/v1/proyectos` | Proyectos detrás de las variaciones del último mes calculado |
 | POST | `/v1/proyectos/actualizar` | Lanza la consulta de proyectos en GitHub Actions |
+| GET | `/v1/fiscal/archivos` | Excel de los notebooks fiscales guardados (procesamiento, variaciones, proyectos) |
+| GET | `/v1/fiscal/archivos/descargar?nombre=` | Descarga uno de esos Excel |
+| POST | `/v1/fiscal/procesar` | Lanza `Fiscal_Procesamiento` en GitHub Actions |
 | GET / POST | `/v1/ipc`, `/v1/ipc/actualizar` | IPC de Lima cargado / traerlo del BCRP |
 | GET | `/v1/cuadros/hidrocarburos` | Producción, gráfico, anexo por lote y canon de un departamento (`departamento=16`, `periodo` opcional, `formato=json` o `xlsx`) |
 | GET | `/v1/cuadros/empleo` | Cuadro, gráfico y anexo de empleo de un departamento (`departamento=16`, `periodo=2026-08` opcional, `formato=json` o `xlsx`) |

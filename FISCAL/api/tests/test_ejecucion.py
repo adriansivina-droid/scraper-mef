@@ -160,10 +160,10 @@ def test_proyectos_del_notebook(datos, tmp_path, monkeypatch):
     ps.preparar_csv(raiz, "2026-09")
     assert sorted(p.name for p in (raiz / "Scrapeo/output/DEVENGADO/Gobierno Nacional").iterdir()) == [
         "DEV Funcion.GobNacional 2025 - Mes 09 - LOR - SMN - UCA.csv", "DEV Funcion.GobNacional 2026 - Mes 09 - LOR - SMN - UCA.csv"]
-    ps.sustituir_colab()
+    ps.procesamiento_servidor.sin_drive()
     g = {"__name__": "__main__", "display": lambda *x, **k: None}
     celdas = ps.celdas("2026-09", raiz)
-    assert len(celdas) == 5 and "MES_ANALISIS = '2026-09'" in celdas[1]
+    assert len(celdas) == 6 and "MES_ANALISIS = '2026-09'" in celdas[1] and '"/content"' not in celdas[5]
     for codigo in celdas[:3]:                                  # librerías, configuración y funciones a abrir
         exec(compile(codigo, "nb", "exec"), g)
     plan = {(p["cod_depto"], p["nivel"]["codigo"]): p for p in g["plan"]}
@@ -172,6 +172,9 @@ def test_proyectos_del_notebook(datos, tmp_path, monkeypatch):
     for p in g["plan"]:                                        # bloque 5 simulado
         for f in p["funciones"]:
             f["proyectos"], f["devengado_funcion"] = [("2001621", f"PROYECTO DE {f['nombre']}", 80e6), ("2195", "OTRO", 20e6)], 100e6
+            f["n_proyectos"] = 2
+    exec(compile(celdas[5], "nb", "exec"), g)                 # bloque 6: el Excel queda en Procesamiento/output
+    assert [p.name for p in (raiz / "Procesamiento/output").iterdir()] == ["Proyectos variaciones 2026-09.xlsx"]
     df = ps.filas(g)
     from app import db
     db.guardar("inv-proyectos", df)
@@ -182,3 +185,43 @@ def test_proyectos_del_notebook(datos, tmp_path, monkeypatch):
                                                                                  "devengado": 80e6, "pct": 80.0}
     gr = r["proyectos"][1]
     assert gr["funciones"] == [] and gr["consultado"] == "Set-25" and gr["nota"] == "Ninguna función en la lista de caídas"
+
+
+def test_procesamiento_del_notebook(datos, tmp_path, monkeypatch):
+    """Fiscal_Procesamiento.ipynb completo con los CSV y el IPC.xlsx armados desde la base: sus Excel quedan en la página."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "automatizacion"))
+    import procesamiento_servidor as ps
+    raiz = tmp_path / "Fiscal"
+    hechas = ps.preparar(raiz)
+    assert hechas["DEV Funcion.Municipalidad"] == 63 and hechas["DEV Generica.GobNacional"] == 84 and hechas["IPC"] == len(MESES)
+    monkeypatch.chdir(tmp_path)
+    g = ps.correr(Path(__file__).resolve().parents[2] / "Fiscal_Procesamiento.ipynb", raiz)
+    assert g["ULTIMO_MES"].strftime("%Y-%m") == "2026-09"
+    nombres = ps.guardar(raiz / "Procesamiento" / "output")
+    assert nombres == ["Fiscal-Loreto_AUTO.xlsx", "Fiscal-SanMartin_AUTO.xlsx", "Fiscal-Ucayali_AUTO.xlsx", "Variaciones alarmantes 2026-09.xlsx"]
+    wb = load_workbook(raiz / "Procesamiento/output/Fiscal-Loreto_AUTO.xlsx")
+    assert wb.sheetnames[:2] == ["GASTO G.N.", "INVERSIÓN G.N."] and "CONTROL" in wb.sheetnames
+
+    lista = datos.get("/v1/fiscal/archivos").json()["archivos"]
+    assert sorted(a["nombre"] for a in lista) == sorted(nombres)
+    r = datos.get("/v1/fiscal/archivos/descargar", params={"nombre": "Variaciones alarmantes 2026-09.xlsx"})
+    assert r.status_code == 200 and "Variaciones" in r.headers["content-disposition"]
+    assert load_workbook(io.BytesIO(r.content)).sheetnames[-1] == "DETALLE"
+    assert datos.get("/v1/fiscal/archivos/descargar", params={"nombre": "otro.xlsx"}).status_code == 404
+
+
+def test_deuda_desglosada_vuelve_al_formato_del_scraper():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "automatizacion"))
+    import procesamiento_servidor as ps
+    base = dict(AÑO=2026, MES="9: Setiembre", NIVEL_GOBIERNO="R: GOBIERNOS REGIONALES", DEPARTAMENTO="16: LORETO")
+    gen = pd.DataFrame([dict(base, COD_GENERICA="5-21", GENERICA="5-21: PERSONAL", DESGLOSE="", DEVENGADO=10.0),
+                        dict(base, COD_GENERICA="7-28", GENERICA="7-28: SERVICIO DE LA DEUDA PUBLICA", DESGLOSE="AMORTIZACIÓN", DEVENGADO=6.0),
+                        dict(base, COD_GENERICA="7-28", GENERICA="7-28: SERVICIO DE LA DEUDA PUBLICA", DESGLOSE="INTERESES Y COMISIONES", DEVENGADO=3.0),
+                        dict(base, COD_GENERICA="7-28", GENERICA="7-28: SERVICIO DE LA DEUDA PUBLICA", DESGLOSE="OTROS (sin clasificar)", DEVENGADO=1.0)])
+    generica, deuda = ps.generica_y_deuda(gen)
+    assert generica["DEVENGADO"].tolist() == [10.0, 10.0] and "DESGLOSE" not in generica
+    assert deuda["CLASIFICACION"].tolist() == ["AMORTIZACION", "INTERESES Y COMISIONES"] and deuda["DEVENGADO"].sum() == 9.0

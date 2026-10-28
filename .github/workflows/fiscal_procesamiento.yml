@@ -1,0 +1,43 @@
+# Procesamiento fiscal: corre FISCAL/Fiscal_Procesamiento.ipynb sin Colab con los datos de la base del API y guarda sus
+# Excel en la página (FISCAL/automatizacion/procesamiento_servidor.py): Fiscal-<Depto>_AUTO.xlsx de Loreto, San Martín y
+# Ucayali y «Variaciones alarmantes AAAA-MM.xlsx». Se descargan en Ejecución del presupuesto → Archivos.
+#   · solo, al terminar el scraper del MEF (con éxito)
+#   · a mano: Actions → «Fiscal · procesamiento» → Run workflow, o el botón de la pestaña «Archivos»
+# Requiere el secreto DATABASE_URL. No consulta al MEF: tarda un par de minutos.
+name: Fiscal · procesamiento
+
+on:
+  workflow_run:
+    workflows: ["Fiscal · scraper del MEF"]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: fiscal-procesamiento
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  procesar:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r FISCAL/api/requirements.txt numpy
+
+      - name: Correr el notebook y guardar los Excel en la página
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONUNBUFFERED: "1"
+        run: python FISCAL/automatizacion/procesamiento_servidor.py

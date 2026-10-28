@@ -81,9 +81,9 @@
     depositos: { t: "Depósitos", estado: "falta", fuente: "SBS y AFP", entra: "Scraper de la web de la SBS, por construir",
       lead: "Saldos de depósitos del sistema financiero por tipo.", cuadros: ["Depósitos por tipo"] },
     gasto: { t: "Gasto corriente no financiero", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => GASTO, actualizar: "mef",
-      lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion" },
+      lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion", extra: ["Archivos"] },
     inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => INV, actualizar: "mef",
-      lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos"] },
+      lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos", "Archivos"] },
     anexos: { t: "Anexos", estado: "falta", fuente: "Todos los sectores", entra: "Se generan con los demás sectores",
       lead: "Cuadros estadísticos del final del informe, uno por sector.", cuadros: ["Un anexo por cada sector del índice"] },
   };
@@ -552,6 +552,30 @@
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron leer los proyectos</b><span>${esc(e.message)}</span></div>`; }
   }
 
+  // Excel de los notebooks fiscales (Fiscal_Procesamiento y Fiscal_Proyectos), generados en GitHub tras el scraper del MEF
+  async function archivosFiscales(r, caja) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Buscando los archivos…</div>';
+    try {
+      const j = await api("/v1/fiscal/archivos");
+      const clave = r.nombre.normalize("NFD").replace(/[\u0300-\u036f\s]/g, "");
+      const tipo = (n) => n.startsWith("Fiscal-") ? (n.startsWith(`Fiscal-${clave}_`) ? 0 : 3) : n.startsWith("Variaciones") ? 1 : n.startsWith("Proyectos") ? 2 : 4;
+      const que = ["Cuadros de gasto, inversión y PIM de " + r.nombre + " (Fiscal_Procesamiento)", "Variaciones alarmantes de las tres regiones (Fiscal_Procesamiento, bloque 6)",
+        "Proyectos detrás de las variaciones, tres regiones (Fiscal_Proyectos)", "Cuadros de otra región (Fiscal_Procesamiento)", "Otro"];
+      const lista = j.archivos.slice().sort((a, b) => tipo(a.nombre) - tipo(b.nombre) || b.nombre.localeCompare(a.nombre));
+      const boton = j.configurado ? '<button class="btn sec" type="button" id="ar-lanzar">Volver a procesar</button>' : "";
+      caja.innerHTML = `<div class="fila controles" style="justify-content:space-between"><p class="lead" style="margin:0">Los Excel que generaban los notebooks en Colab. Se generan solos al terminar cada corrida del scraper del MEF, con los datos de la página y su IPC.</p>${boton}</div><div id="ar-res" aria-live="polite"></div>
+        ${lista.length ? `<div class="caja"><div class="scroll"><table><tr><th>Archivo</th><th>Contenido</th><th>Generado</th><th class="n">Tamaño</th><th></th></tr>
+          ${lista.map((a) => `<tr><td><b>${esc(a.nombre)}</b></td><td>${esc(que[tipo(a.nombre)])}</td><td>${a.fecha ? esc(fecha(a.fecha)) : ""}</td><td class="n">${fmt(a.kb)} KB</td>
+            <td><a class="btn sec" href="/v1/fiscal/archivos/descargar?nombre=${encodeURIComponent(a.nombre)}">Descargar</a></td></tr>`).join("")}</table></div></div>`
+          : '<div class="vacio-caja"><b>Todavía no se generaron los archivos.</b><span>Se generan al terminar la próxima corrida del scraper del MEF, o con «Volver a procesar» (un par de minutos).</span></div>'}`;
+      if ($("ar-lanzar")) $("ar-lanzar").addEventListener("click", async () => {
+        const bt = $("ar-lanzar"); bt.disabled = true;
+        try { await api("/v1/fiscal/procesar", { method: "POST" }); $("ar-res").innerHTML = '<div class="ok-box"><b>Procesamiento lanzado en GitHub</b><span>Tarda un par de minutos; vuelve a abrir esta pestaña luego. El Excel de proyectos se renueva con «Volver a consultar al MEF» en la pestaña Proyectos.</span></div>'; }
+        catch (e) { $("ar-res").innerHTML = `<div class="err-box"><b>No se pudo lanzar</b><span>${esc(e.message)}</span></div>`; bt.disabled = false; }
+      });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron leer los archivos</b><span>${esc(e.message)}</span></div>`; }
+  }
+
   // ── Carga de archivos, Drive y scrapers de GitHub ──
   function resultado(r, tit, ok) {
     const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(base(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
@@ -664,6 +688,7 @@
     else if (t === "Cuadros" && s.cuadros === "pesca") panel = '<div id="cuadros-pesca"></div>';
     else if (t === "Variaciones alarmantes") panel = '<div id="variaciones"></div>';
     else if (t === "Proyectos") panel = '<div id="proyectos"></div>';
+    else if (t === "Archivos") panel = '<div id="archivos-fiscal"></div>';
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
@@ -757,6 +782,7 @@
     if ($("cuadros-ejec")) cuadrosEjecucion($("cuadros-ejec").dataset.sector, REG[grupo], $("cuadros-ejec"));
     if ($("variaciones")) variacionesAlarmantes(REG[grupo], $("variaciones"));
     if ($("proyectos")) proyectosVariaciones(REG[grupo], $("proyectos"));
+    if ($("archivos-fiscal")) archivosFiscales(REG[grupo], $("archivos-fiscal"));
     window.scrollTo(0, 0);
   }
   $("sel-movil").addEventListener("change", (ev) => { location.hash = ev.target.value; });

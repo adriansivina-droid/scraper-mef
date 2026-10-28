@@ -409,6 +409,33 @@ def proyectos_actualizar(mes: str = Query("", pattern=r"^(\d{4}-(0[1-9]|1[0-2]))
     return {"lanzado": True, "mes": mes or None}
 
 
+@app.get("/v1/fiscal/archivos", dependencies=[Depends(acceso)])
+def fiscal_archivos():
+    """Los Excel de los notebooks fiscales guardados en la base: Fiscal-<Depto>_AUTO.xlsx y Variaciones alarmantes
+    (Fiscal_Procesamiento) y Proyectos variaciones (Fiscal_Proyectos), el más reciente primero."""
+    return {"archivos": db.archivos("fiscal"), "configurado": mef.configurado()}
+
+
+@app.get("/v1/fiscal/archivos/descargar", dependencies=[Depends(acceso)])
+def fiscal_archivo(nombre: str = Query(..., max_length=120)):
+    contenido = db.archivo("fiscal", nombre)
+    if contenido is None:
+        raise HTTPException(404, f"No hay ningún archivo «{nombre}»: corre el procesamiento.")
+    return Response(contenido, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=_adjunto(nombre))
+
+
+@app.post("/v1/fiscal/procesar", dependencies=[Depends(acceso)])
+def fiscal_procesar():
+    """Lanza en GitHub Actions Fiscal_Procesamiento (también corre solo al terminar el scraper del MEF)."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
+    try:
+        mef.lanzar(nombre="procesamiento", inputs={})
+    except (mef.ErrorGitHub, OSError) as e:
+        raise HTTPException(502, str(e))
+    return {"lanzado": True}
+
+
 @app.get("/v1/ipc", dependencies=[Depends(acceso)])
 def ipc_estado():
     """El IPC de Lima cargado (para las variaciones reales): meses, desde, hasta y fuente."""

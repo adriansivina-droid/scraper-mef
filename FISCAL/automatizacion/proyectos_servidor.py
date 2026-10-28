@@ -7,11 +7,11 @@ El notebook elige, por departamento y nivel, las 5 funciones que más explican l
 contra el mismo mes del año anterior y consulta al MEF sus 5 proyectos con mayor devengado (unas 45 consultas). Aquí:
   · los CSV «DEV Funcion.*» que el notebook lee de Scrapeo/output se arman con la base «Inversión por función» (así
     no hace falta volver a bajar el año anterior);
-  · se corren sus bloques 1 a 5 (sin el Excel ni la subida a Drive del bloque 6) y su resultado (`plan`) se guarda en la
-    base «Proyectos detrás de las variaciones». Necesita DATABASE_URL.
+  · se corren todos sus bloques; su resultado (`plan`) se guarda en la base «Proyectos detrás de las variaciones» y el
+    Excel del bloque 6 («Proyectos variaciones AAAA-MM.xlsx»), en vez de subirse a Drive, queda en la página para
+    descargarlo (Ejecución del presupuesto → Archivos). Necesita DATABASE_URL.
 """
 import argparse
-import json
 import os
 import re
 import sys
@@ -29,7 +29,7 @@ NOTEBOOK = AQUI.parent / "Fiscal_Proyectos.ipynb"
 RUTA_COLAB = "/content/drive/MyDrive/Fiscal"
 sys.path.insert(0, str(AQUI))
 sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
-from scraper_servidor import sustituir_colab  # noqa: E402
+import procesamiento_servidor  # noqa: E402
 
 CARPETA = {"E": ("Gobierno Nacional", "GobNacional"), "R": ("Gobierno Regional", "GobRegional"), "M": ("Gobierno Municipal", "Municipalidad")}
 DEPTOS = ["16", "22", "25"]
@@ -59,25 +59,8 @@ def preparar_csv(raiz, mes):
 
 
 def celdas(mes, raiz):
-    nb = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
-    salida, fijado = [], False
-    for c in nb["cells"]:
-        if c["cell_type"] != "code":
-            continue
-        codigo = "".join(c["source"])
-        if "BLOQUE 6" in codigo.split("\n")[0]:
-            break                                          # Excel y subida a Drive: no hacen falta aquí
-        lineas = []
-        for linea in codigo.split("\n"):
-            if linea.lstrip().startswith(("!", "%")):
-                continue
-            if re.match(r"^MES_ANALISIS\s*=", linea):
-                linea, fijado = f"MES_ANALISIS = {mes!r}", True
-            lineas.append(linea)
-        salida.append("\n".join(lineas).replace(RUTA_COLAB, str(raiz)))
-    if not fijado:
-        raise RuntimeError("El notebook ya no define MES_ANALISIS en el BLOQUE 2: revisa proyectos_servidor.py")
-    return salida
+    """Todo el notebook con MES_ANALISIS fijado; el bloque 6 guarda el Excel en Procesamiento/output (no en Drive)."""
+    return procesamiento_servidor.celdas(NOTEBOOK, raiz, raiz.parent / "content", {"MES_ANALISIS": mes})
 
 
 def filas(g):
@@ -121,18 +104,16 @@ def main():
         with tempfile.TemporaryDirectory() as tmp:
             raiz = Path(tmp) / "Fiscal"
             preparar_csv(raiz, mes)
-            sustituir_colab()
-            g = {"__name__": "__main__", "display": lambda *x, **k: print(*x)}
             os.chdir(tmp)
-            for i, codigo in enumerate(celdas(mes, raiz), 1):
-                print(f"\n── celda {i} ──", flush=True)
-                exec(compile(codigo, f"Fiscal_Proyectos.ipynb#celda{i}", "exec"), g)
+            g = procesamiento_servidor.correr(NOTEBOOK, raiz, {"MES_ANALISIS": mes})
+            excel = procesamiento_servidor.guardar(raiz / "Procesamiento" / "output")
         df = filas(g)
         from app import db
         filas_guardadas = db.guardar("inv-proyectos", df) if not df.empty else 0
         con = df[df["N_PROYECTO"] > 0] if not df.empty else df
         lineas.append(f"**✅ {len(con)} proyectos** de {df[['_depto', '_nivel', 'FUNCION']].drop_duplicates().shape[0] if not df.empty else 0} "
                       f"funciones guardados en la base ({filas_guardadas} filas, {(time.time() - t0) / 60:.1f} min).")
+        lineas += [f"- 📄 {n} guardado en la página (Ejecución del presupuesto → Archivos)" for n in excel]
         lineas += [f"- ⚠ {x}" for x in g.get("avisos", [])] + [f"- ❌ {x}" for x in g.get("errores", [])]
         ok = filas_guardadas > 0
     except BaseException as e:
