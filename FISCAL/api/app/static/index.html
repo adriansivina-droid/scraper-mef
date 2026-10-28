@@ -62,7 +62,7 @@
     agro: { t: "Sector agropecuario", estado: "falta", fuente: "MIDAGRI y direcciones regionales de agricultura", entra: "Archivo mensual",
       lead: "Producción de los principales cultivos y crianzas, y avance de siembras de la campaña.", cuadros: ["Producción agropecuaria (t)", "Superficie sembrada (ha)", "Anexo de producción agrícola"] },
     pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Drive, cada día a las 7:30 a. m., o subiendo el Excel", bases: (r) => [r.pesca], actualizar: "drive",
-      lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: ["Producción pesquera (VBP a precios de 2007)", "Cuadro Nº 07 · Indicadores del sector pesquero (Loreto)"] },
+      lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: "pesca" },
     hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Scraper diario de PERUPETRO (7:00 a. m.) → Drive → página (7:30 y 9:00 a. m.)",
       bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "drive-hidro", cuadros: "hidrocarburos", mapa: true,
       lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
@@ -396,6 +396,50 @@
   const leyenda = (items) => `<div class="ley-graf">${items.map(([cl, t]) => `<span><i class="${cl}"></i>${esc(t)}</span>`).join("")}</div>`;
   const avanceBarra = (v, ref) => v == null ? "" : `<div class="avance"><div class="pista"><div style="width:${Math.min(v, 100)}%"></div>${ref != null ? `<b style="left:${Math.min(ref, 100)}%" title="Ritmo parejo: ${pct(ref)} %"></b>` : ""}</div><span>${pct(v)} %</span></div>`;
 
+  // barras de variación % (positivas y negativas) con el año debajo de los meses
+  function barrasVar(g, W) {
+    if (!g.length) return '<p class="nota">Hace falta el mismo mes del año anterior para la variación.</p>';
+    const max = Math.max(1, ...g.map((x) => Math.abs(x.var))), H = 230, y0 = 100, bw = W / g.length;
+    return `<svg class="barras" viewBox="0 0 ${W} ${H}"><line class="eje" x1="0" x2="${W}" y1="${y0}" y2="${y0}"></line>${g.map((x, i) => { const h = Math.abs(x.var) / max * 80, y = x.var >= 0 ? y0 - h : y0;
+      return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${y}" width="${bw * 0.64}" height="${Math.max(h, 1)}" rx="2"><title>${esc(x.periodo)}: ${pct(x.var)} %</title></rect><text class="val" x="${i * bw + bw / 2}" y="${x.var >= 0 ? y - 4 : y + h + 11}" text-anchor="middle">${pct(x.var)}</text>`; }).join("")}
+      ${ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2)}</svg>`;
+  }
+
+  // ── Cuadros de pesca ──
+  async function cuadrosPesca(r, caja) {
+    const clave = `pe-${grupo}`, st = estadoEjec(clave);
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
+    try {
+      const c = (await api(`/v1/cuadros/pesca?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo, comparar: st.comparar })}`)).cuadros;
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay datos de pesca de ${esc(r.nombre)}.</b><span>Sincroniza la carpeta de crudos o sube el Excel en «Actualizar».</span></div>`; return; }
+      const a = c.anio, b = c.comparar, mes = c.titulo_mes, m3 = mes.slice(0, 3), num = (f) => f.unidad === "unidades" ? fmt(f.mes_a) : mill(f.mes_a);
+      const vb = c.filas[0], prod = c.filas[1];
+      const cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
+      const fila = (f) => `<tr class="${f.nivel === 0 ? "total" : ""}"><td>${f.nivel ? "&nbsp;&nbsp;&nbsp;" : ""}${esc(f.nombre)} <span class="nota">(${esc(f.unidad)})</span></td>
+        <td class="n">${mill(f.mes_b)}</td><td class="n">${mill(f.mes_a)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td>
+        <td class="n">${mill(f.acum_b)}</td><td class="n">${mill(f.acum_a)}</td><td class="n ${cls(f.var_acum)}">${pct(f.var_acum)}</td></tr>`;
+      const c7 = c.cuadro_07 ? `<div class="caja"><h3>Cuadro Nº 07 · LORETO: INDICADORES DEL SECTOR PESQUERO</h3><p>(Toneladas; peces ornamentales en miles de unidades)</p>
+        <div class="scroll"><table><tr><th></th><th class="n">${mes} ${b}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th></tr>
+        ${c.cuadro_07.map((f) => `<tr class="${f.nivel === 0 ? "total" : ""}"><td>${f.nivel ? "&nbsp;&nbsp;&nbsp;" : ""}${esc(f.nombre)}</td><td class="n">${mill(f.antes)}</td><td class="n">${mill(f.ahora)}</td><td class="n ${cls(f.var)}">${pct(f.var)}</td></tr>`).join("")}</table></div>
+        <p class="nota">1/ por estado · 2/ por especie · 3/ por destino. Mismas filas que el Cuadro Nº 07 del notebook de Loreto.</p></div>` : "";
+      caja.innerHTML = `${selectorEjec(c, clave, `<button class="btn" type="button" id="${clave}-x">Descargar en Excel</button>`)}
+        <div class="stats tiles">
+          <div class="stat"><small>VBP · ${esc(mes)} ${a}</small><b>S/ ${mill(vb.mes_a)} mil</b>${delta(vb.var_mes)}<span>soles de 2007 · ${esc(mes.toLowerCase())} ${b}: ${mill(vb.mes_b)}</span></div>
+          <div class="stat"><small>VBP · Ene.-${m3}. ${a}</small><b>S/ ${mill(vb.acum_a)} mil</b>${delta(vb.var_acum)}<span>Ene.-${m3}. ${b}: ${mill(vb.acum_b)}</span></div>
+          <div class="stat"><small>${esc(prod.nombre)} · ${esc(mes)} ${a}</small><b>${num(prod)} ${esc(prod.unidad)}</b>${delta(prod.var_mes)}<span>acumulado: ${mill(prod.acum_a)} (${pct(prod.var_acum)} %)</span></div>
+        </div>
+        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: PRODUCCIÓN PESQUERA</h3><p>(Valor bruto en miles de soles de 2007 y volúmenes; variación %)</p>
+          <div class="scroll"><table><tr><th></th><th class="n">${mes} ${b}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Ene.-${m3}. ${b}</th><th class="n">Ene.-${m3}. ${a}</th><th class="n">Var. %</th></tr>${c.filas.map(fila).join("")}</table></div>
+          <p class="nota">Fuente: ${esc(c.fuente)}. VBP a precios de 2007 (ver Parámetros).</p></div>
+        <div class="caja"><h3>Valor bruto pesquero mes a mes · ${a} vs ${b}</h3><p>(Miles de soles de 2007)</p>${leyenda([["anio-a", a], ["anio-b", b]])}<div class="scroll">${barrasAnios(c.mensual, a, b)}</div></div>
+        <div class="caja"><h3>VBP: variación % respecto al mismo mes del año anterior</h3><div class="scroll">${barrasVar(c.interanual.filter((x) => x.var != null), 760)}</div></div>
+        ${c7}`;
+      const cambiar = () => { st.periodo = $(`${clave}-p`).value; st.comparar = $(`${clave}-c`).value; if (st.comparar >= st.periodo.slice(0, 4)) st.comparar = ""; cuadrosPesca(r, caja); };
+      $(`${clave}-p`).addEventListener("change", cambiar); $(`${clave}-c`).addEventListener("change", cambiar);
+      $(`${clave}-x`).addEventListener("click", () => { window.location.href = `/v1/cuadros/pesca?${new URLSearchParams({ departamento: r.cod, periodo: c.periodo, comparar: c.comparar, formato: "xlsx" })}`; });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
+  }
+
   async function cuadrosEjecucion(sector, r, caja) {
     const clave = `ej-${sector}-${grupo}`, st = estadoEjec(clave);
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
@@ -436,11 +480,7 @@
         <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ${titulo} POR ${inv ? "FUNCIÓN" : "GENÉRICA"}</h3><p>(Millones de soles y variación % ${real ? "real" : "nominal"}${inv ? "; 16: Comunicaciones va en 15: Transporte" : ""})</p>
           <div class="scroll"><table>${cab}${c.detalle.map(fila).join("")}</table></div></div>`;
       const g = c.interanual.map((x) => ({ periodo: x.periodo, var: real ? x.var : x.var_nominal })).filter((x) => x.var != null);
-      $(`${clave}-ia`).innerHTML = g.length ? (() => { const max = Math.max(1, ...g.map((x) => Math.abs(x.var))), W = 380, H = 230, y0 = 100, bw = W / g.length;
-        return `<svg class="barras" viewBox="0 0 ${W} ${H}"><line class="eje" x1="0" x2="${W}" y1="${y0}" y2="${y0}"></line>${g.map((x, i) => { const h = Math.abs(x.var) / max * 80, y = x.var >= 0 ? y0 - h : y0;
-          return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${y}" width="${bw * 0.64}" height="${Math.max(h, 1)}" rx="2"><title>${esc(x.periodo)}: ${pct(x.var)} %</title></rect><text class="val" x="${i * bw + bw / 2}" y="${x.var >= 0 ? y - 4 : y + h + 11}" text-anchor="middle">${pct(x.var)}</text>`; }).join("")}
-          ${ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2)}</svg>`; })()
-        : '<p class="nota">Hace falta el mismo mes del año anterior para la variación.</p>';
+      $(`${clave}-ia`).innerHTML = barrasVar(g, 380);
       const cambiar = () => { st.periodo = $(`${clave}-p`).value; st.comparar = $(`${clave}-c`).value; if (st.comparar >= st.periodo.slice(0, 4)) st.comparar = ""; cuadrosEjecucion(sector, r, caja); };
       $(`${clave}-p`).addEventListener("change", cambiar); $(`${clave}-c`).addEventListener("change", cambiar);
       $(`${clave}-x`).addEventListener("click", () => { window.location.href = `/v1/cuadros/ejecucion?${new URLSearchParams({ departamento: r.cod, sector, periodo: c.periodo, comparar: c.comparar, formato: "xlsx" })}`; });
@@ -608,6 +648,7 @@
         <div class="fila"><a class="btn sec" href="/v1/hidrocarburos/mapa" target="_blank" rel="noopener">Pantalla completa</a><a class="btn sec" href="/v1/hidrocarburos/mapa?descargar=true">Descargar</a></div></div>
         <iframe class="mapa" src="/v1/hidrocarburos/mapa" title="Mapa de lotes de hidrocarburos" sandbox="allow-scripts allow-popups allow-downloads allow-modals" loading="lazy"></iframe></div>`;
     else if (t === "Cuadros" && s.cuadros === "ejecucion") panel = `<div id="cuadros-ejec" data-sector="${id}"></div>`;
+    else if (t === "Cuadros" && s.cuadros === "pesca") panel = '<div id="cuadros-pesca"></div>';
     else if (t === "Variaciones alarmantes") panel = '<div id="variaciones"></div>';
     else if (t === "Proyectos") panel = '<div id="proyectos"></div>';
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
@@ -699,6 +740,7 @@
     if ($("drive-caja")) cajaDrive($("drive-caja"), $("drive-caja").dataset.base || null);
     if ($("cuadros-empleo")) cuadrosEmpleo(REG[grupo], $("cuadros-empleo"));
     if ($("cuadros-hidro")) cuadrosHidro(REG[grupo], $("cuadros-hidro"));
+    if ($("cuadros-pesca")) cuadrosPesca(REG[grupo], $("cuadros-pesca"));
     if ($("cuadros-ejec")) cuadrosEjecucion($("cuadros-ejec").dataset.sector, REG[grupo], $("cuadros-ejec"));
     if ($("variaciones")) variacionesAlarmantes(REG[grupo], $("variaciones"));
     if ($("proyectos")) proyectosVariaciones(REG[grupo], $("proyectos"));
