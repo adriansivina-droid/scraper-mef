@@ -262,11 +262,12 @@
 
   // ── Eje de meses con el año debajo (todos los gráficos): «Ene.» … y «2025» en el primer mes y en cada enero ──
   function ejeMeses(etqs, X, H, mostrar, mitad) {   // mitad: media distancia entre meses (la raya del año va entre dos meses)
-    return etqs.map((e, i) => {
-      const [mes, anio] = e.split(" "), nuevo = i === 0 || mes === "Ene.";
-      return `${mostrar(i) ? `<text x="${X(i)}" y="${H - 22}" text-anchor="middle">${esc(mes)}</text>` : ""}
-        ${nuevo ? `<line class="sep" x1="${X(i) - mitad}" x2="${X(i) - mitad}" y1="${H - 36}" y2="${H}"></line><text class="anio" x="${X(i) - mitad + 4}" y="${H - 5}">${esc(anio)}</text>` : ""}`;
-    }).join("");
+    const meses = etqs.map((e, i) => mostrar(i) ? `<text x="${X(i)}" y="${H - 22}" text-anchor="middle">${esc(e.split(" ")[0])}</text>` : "").join("");
+    const grupos = [];                                   // [año, primer índice, último índice]
+    etqs.forEach((e, i) => { const a = e.split(" ")[1]; if (!grupos.length || grupos[grupos.length - 1][0] !== a) grupos.push([a, i, i]); else grupos[grupos.length - 1][2] = i; });
+    const anios = grupos.map(([a, i0, i1], k) => `${k ? `<line class="sep" x1="${X(i0) - mitad}" x2="${X(i0) - mitad}" y1="${H - 36}" y2="${H}"></line>` : ""}
+      <text class="anio" x="${(X(i0) + X(i1)) / 2}" y="${H - 4}" text-anchor="middle">${esc(a)}</text>`).join("");
+    return meses + anios;
   }
 
   // ── Número de trabajadores (línea, como el portal del MTPE) ──
@@ -280,13 +281,13 @@
     const trimestral = (i) => ["Ene.", "Abr.", "Jul.", "Oct."].includes(n[i].periodo.split(" ")[0]);
     const etiqueta = (i) => i === n.length - 1 || (trimestral(i) && i < n.length - 2);
     const linea = n.map((x, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(x.trabajadores).toFixed(1)}`).join(" ");
-    const puntos = n.map((x, i) => `<g class="pt"><circle class="hit" cx="${X(i)}" cy="${Y(x.trabajadores)}" r="11"></circle><circle class="dot" cx="${X(i)}" cy="${Y(x.trabajadores)}" r="4"></circle>
-        ${etiqueta(i) ? `<text class="val" x="${X(i)}" y="${Y(x.trabajadores) - 10}" text-anchor="middle">${mil(x.trabajadores)}</text>` : ""}
+    const puntos = n.map((x, i) => `<g class="pt"><circle class="hit" cx="${X(i)}" cy="${Y(x.trabajadores)}" r="11"></circle><circle class="dot${etiqueta(i) ? " marcado" : ""}" cx="${X(i)}" cy="${Y(x.trabajadores)}" r="3"></circle>
+        ${etiqueta(i) ? `<text class="val" x="${X(i)}" y="${Y(x.trabajadores) - 11}" text-anchor="middle">${mil(x.trabajadores)}</text>` : ""}
         <title>${esc(x.periodo)}: ${fmt(x.trabajadores)} trabajadores</title></g>`).join("");
     const meses = ejeMeses(n.map((x) => x.periodo), X, H, (i) => trimestral(i) || i === n.length - 1, (X(1) - X(0)) / 2);
     return `<div class="caja"><h3>Gráfico · Número de trabajadores</h3><p>(Total de trabajadores asalariados privados formales · ${esc(n[0].periodo)} a ${esc(n[n.length - 1].periodo)})</p>
       <div class="scroll"><svg class="linea-niveles" viewBox="0 0 ${W} ${H}" role="img" aria-label="Número de trabajadores por mes">
-        <line class="eje" x1="0" x2="${W}" y1="${H - aba}" y2="${H - aba}"></line><path class="trazo" d="${linea}"></path>${puntos}${meses}</svg></div></div>`;
+        <line class="eje" x1="0" x2="${W}" y1="${H - aba}" y2="${H - aba}"></line><path class="area" d="${linea} L${X(n.length - 1)},${H - aba} L${X(0)},${H - aba} Z"></path><path class="trazo" d="${linea}"></path>${puntos}${meses}</svg></div></div>`;
   }
 
   // ── Cuadros de empleo (los de la síntesis) ──
