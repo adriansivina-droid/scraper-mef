@@ -285,6 +285,18 @@ def descarga_empleo(regiones: str = "todas", desde: str = "", hasta: str = "",
                     headers=_adjunto(nombre))
 
 
+@app.get("/v1/hidrocarburos/mapa", dependencies=[Depends(acceso)])
+def mapa_hidrocarburos(descargar: bool = False):
+    """El mapa de lotes de PERUPETRO (DATA/MAPA/PP_mapa_lotes_plus.html, del flujo de hidrocarburos), tal como lo arma su
+    notebook; se toma de Drive en cada sincronización."""
+    doc = db.documento("mapa-hidrocarburos")
+    if doc is None:
+        return HTMLResponse("<p style='font-family:sans-serif;color:#5A5A9E;padding:24px'>Todavía no se cargó el mapa: "
+                            "sincroniza Drive (el flujo de hidrocarburos lo deja en DATA/MAPA).</p>", status_code=404)
+    extra = _adjunto("Mapa de Hidrocarburos - Perú.html") if descargar else {}
+    return HTMLResponse(doc[0], headers={**extra, "X-Mapa-Modificado": doc[1] or ""})
+
+
 @app.get("/v1/cuadros/hidrocarburos", dependencies=[Depends(acceso)])
 def cuadro_hidrocarburos(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "",
                          formato: str = Query("json", pattern="^(json|xlsx)$")):

@@ -128,3 +128,65 @@ def test_drive_toma_solo_los_csv_de_hidrocarburos(cliente, monkeypatch):
     assert sorted(falsa.bajados) == ["H2", "H3", "H4"] and r["carpetas"]["hidrocarburos"] == 3
     assert set(r["bases"]) == {"hidro-produccion", "hidro-canon"}
     assert cliente.post("/v1/drive/sincronizar").json()["bases"] == {}      # nada nuevo
+
+
+def diaria():
+    """Producción diaria: diciembre 2025 (ya está en la mensual: se ignora), enero-febrero 2026 completos y marzo al día 10."""
+    filas = []
+    for (a, m, dias) in ((2025, 12, 31), (2026, 1, 31), (2026, 2, 28), (2026, 3, 10)):
+        for d in range(1, dias + 1):
+            filas += [dict(FECHA=f"{d:02d}/{m:02d}/{a}", AÑO=a, MES=m, DIA=d, FLUIDO="LIQUIDOS", PRODUCTO="PETROLEO Y CONDENSADO",
+                           UNIDAD="BBL", OPERADOR="PETROTAL", LOTE_ORIGINAL="95", LOTE="95", VALOR=15000, FUENTE="x", DEPARTAMENTO="LORETO"),
+                      dict(FECHA="", AÑO=a, MES=m, DIA=d, FLUIDO="LIQUIDOS", PRODUCTO="PETROLEO Y CONDENSADO", UNIDAD="BBL",
+                           OPERADOR="UPLAND", LOTE_ORIGINAL="8", LOTE="8", VALOR=3000, FUENTE="x", DEPARTAMENTO="LORETO"),
+                      dict(FECHA="", AÑO=a, MES=m, DIA=d, FLUIDO="GAS", PRODUCTO="GAS NATURAL", UNIDAD="M3", OPERADOR="X",
+                           LOTE_ORIGINAL="95", LOTE="95", VALOR=999, FUENTE="x", DEPARTAMENTO="LORETO")]
+    return pd.DataFrame(filas).to_csv(index=False).encode("utf-8-sig")
+
+
+def test_meses_de_la_produccion_diaria(cliente):
+    subir(cliente, csvs())
+    subir(cliente, {"PP_produccion_diaria.csv": diaria()})
+    c = cliente.get("/v1/cuadros/hidrocarburos?departamento=16").json()["cuadros"]
+    assert c["periodo"] == "2026-02" and c["de_diaria"] == ["Ene. 2026", "Feb. 2026"]
+    assert c["parcial"] == {"periodo": "Marzo 2026", "dias": 10, "de": 31}
+    filas = {f["lote"]: f for f in c["bloques"][0]["filas"]}
+    assert filas["Lote 95"]["mes"] == 420.0 and filas["Lote 8"]["mes"] == 84.0      # 28 días × 15 y × 3 mil barriles
+    assert [b["producto"] for b in c["bloques"]] == ["Petróleo"]                      # los m3 de gas no se suman
+    ultimo = c["grafico"]["serie"][-1]
+    assert ultimo == {"periodo": "Mar. 2026", "valor": 18.0, "var": None, "parcial": True}
+    # diciembre 2025 sigue saliendo de la estadística mensual
+    dic = cliente.get("/v1/cuadros/hidrocarburos?departamento=16&periodo=2025-12").json()["cuadros"]
+    assert round([f for f in dic["bloques"][0]["filas"] if f["lote"] == "Total"][0]["acum"]) == 7905
+    d = cliente.get("/v1/descargas?base=hidro-produccion&departamento=16&desde=2026-03&hasta=2026-03&formato=json").json()["hidro-produccion"]["datos"]
+    assert {f["FUENTE"] for f in d} == {"PRODUCCIÓN DIARIA · 10 de 31 días"}
+
+
+def test_mapa_desde_drive(cliente, monkeypatch):
+    assert cliente.get("/v1/hidrocarburos/mapa").status_code == 404
+
+    class Falsa(DriveFalsa):
+        def subcarpeta(self, carpeta, nombre):
+            return "MAPA_ID" if carpeta == drive.CARPETAS["hidrocarburos"] and nombre == "MAPA" else None
+
+    falsa = Falsa({drive.CARPETAS["hidrocarburos"]: {"H2": ("PP_produccion_diaria.csv", "2026-10-28T12:40:00Z", diaria())},
+                   "MAPA_ID": {"M1": ("PP_mapa_lotes.html", "2026-10-20T00:00:00Z", b"<html>simple</html>"),
+                               "M2": ("PP_mapa_lotes_plus.html", "2026-10-28T12:50:00Z", "<html>plus · Perú</html>".encode()),
+                               "M3": ("PP_lotes_indicadores.geojson", "2026-10-28T12:50:00Z", b"{}")}})
+    monkeypatch.setenv("GOOGLE_DRIVE_CREDENCIAL", "{}")
+    monkeypatch.setattr(drive, "LectorDrive", lambda credencial: falsa)
+    r = cliente.post("/v1/drive/sincronizar").json()
+    assert sorted(falsa.bajados) == ["H2", "M2"] and "hidro-produccion" in r["bases"]
+    assert any("Mapa de lotes" in a for a in r["avisos"])
+    m = cliente.get("/v1/hidrocarburos/mapa")
+    assert m.status_code == 200 and m.text == "<html>plus · Perú</html>"
+    assert "attachment" in cliente.get("/v1/hidrocarburos/mapa?descargar=true").headers["content-disposition"]
+
+
+def test_tabla_vieja_sin_columna_fuente(cliente):
+    with db.motor().begin() as cx:                      # como estaba en Neon antes de agregar FUENTE
+        cx.execute(text('CREATE TABLE "base_hidro_produccion" ("AÑO" BIGINT, "MES" BIGINT, "DEPARTAMENTO" TEXT, "ZONA" TEXT, '
+                        '"OPERADOR" TEXT, "LOTE" TEXT, "LOTE_HISTORICO" TEXT, "PRODUCTO" TEXT, "UNIDAD" TEXT, "VOLUMEN" FLOAT, '
+                        '"PROMEDIO_DIARIO" FLOAT, _anio BIGINT, _mes BIGINT, _depto TEXT, _nivel TEXT)'))
+    subir(cliente, csvs())
+    assert cliente.get("/v1/cuadros/hidrocarburos?departamento=16").json()["cuadros"]["periodo"] == "2025-12"

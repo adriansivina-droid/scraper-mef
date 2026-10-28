@@ -3,7 +3,9 @@
 Entran los CSV que el flujo diario de HIDROCARBUROS/ (PP_Produccion_Lotes.ipynb) deja en la carpeta DATA de Drive:
   · PP_produccion_lote_mes_<ini>-<fin>.csv      petróleo, LGN y condensado (BARRILES, BPD) por año, mes y lote;
   · PP_produccion_gas_lote_mes_<ini>-<fin>.csv  gas natural (MPC, MMPCD) por año, mes y lote;
-  · PP_canon_departamento_mes.csv               canon y sobrecanon transferido por departamento (MM S/).
+  · PP_canon_departamento_mes.csv               canon y sobrecanon transferido por departamento (MM S/);
+  · PP_produccion_diaria.csv                    producción diaria por lote: la suma del mes cubre los meses que la
+    estadística mensual aún no publica (va con dos o tres meses de rezago), y el mes en curso sale como parcial.
 El API solo los lee (drive.sincronizar_hidrocarburos o subiéndolos en la página); el flujo de hidrocarburos no cambia.
 
 También arma lo de la síntesis de Loreto y Ucayali: producción del mes y acumulada por producto y lote, contra el
@@ -40,6 +42,9 @@ FUENTE = "Fuente: PERUPETRO, producción fiscalizada y canon petrolero. Elaborac
 _RE_LIQ = re.compile(r"^PP_produccion_lote_mes_\d{4}-\d{4}\.csv$", re.I)
 _RE_GAS = re.compile(r"^PP_produccion_gas_lote_mes_\d{4}-\d{4}\.csv$", re.I)
 _RE_CANON = re.compile(r"^PP_canon_departamento_mes\.csv$", re.I)
+_RE_DIARIA = re.compile(r"^PP_produccion_diaria\.csv$", re.I)
+MENSUAL = "ESTADÍSTICA MENSUAL"
+_RE_PARCIAL = re.compile(r"(\d+) de (\d+) días")
 
 
 def _clave(t):
@@ -51,8 +56,30 @@ _CODIGO = {_clave(n): c for c, n in DEPARTAMENTOS.items() if c <= "25"}
 
 
 def tipo(nombre):
-    """'liquidos', 'gas', 'canon' o None, según el nombre que pone el notebook de producción."""
-    return "liquidos" if _RE_LIQ.match(nombre) else "gas" if _RE_GAS.match(nombre) else "canon" if _RE_CANON.match(nombre) else None
+    """'liquidos', 'gas', 'canon', 'diaria' o None, según el nombre que pone el notebook de producción."""
+    for t, r in (("liquidos", _RE_LIQ), ("gas", _RE_GAS), ("canon", _RE_CANON), ("diaria", _RE_DIARIA)):
+        if r.match(nombre):
+            return t
+    return None
+
+
+def _diaria(df):
+    """Suma del mes por lote y producto (barriles y Mcf = MPC). FUENTE dice cuántos días trae el mes."""
+    df = df[_texto(df["UNIDAD"]).str.upper().isin(["BBL", "MCF"])].copy()
+    df["PRODUCTO"] = _texto(df["PRODUCTO"]).str.upper().replace({"PETROLEO Y CONDENSADO": "PETROLEO"})
+    df["VALOR"] = pd.to_numeric(df["VALOR"], errors="coerce").fillna(0)
+    for c in ("DEPARTAMENTO", "OPERADOR"):
+        df[c] = _texto(df[c]) if c in df.columns else ""
+    df["LOTE"] = _texto(df["LOTE"])
+    dias = df.groupby(["AÑO", "MES"])["DIA"].nunique()
+    g = df.groupby(["AÑO", "MES", "DEPARTAMENTO", "OPERADOR", "LOTE", "PRODUCTO", "UNIDAD"], as_index=False)["VALOR"].sum()
+    g["DIAS"] = [int(dias[(a, m)]) for a, m in zip(g["AÑO"], g["MES"])]
+    g["FUENTE"] = [f"PRODUCCIÓN DIARIA · {d} de {calendar.monthrange(int(a), int(m))[1]} días" for a, m, d in zip(g["AÑO"], g["MES"], g["DIAS"])]
+    gas = g["UNIDAD"].str.upper() == "MCF"
+    return pd.DataFrame({"AÑO": g["AÑO"], "MES": g["MES"], "DEPARTAMENTO": g["DEPARTAMENTO"], "ZONA": "", "OPERADOR": g["OPERADOR"],
+                         "LOTE": g["LOTE"], "LOTE_HISTORICO": g["LOTE"], "PRODUCTO": g["PRODUCTO"],
+                         "MPC": g["VALOR"].where(gas), "BARRILES": g["VALOR"].where(~gas),
+                         "DIARIO": g["VALOR"] / g["DIAS"], "FUENTE": g["FUENTE"], "_gas": gas})
 
 
 def _depto(texto, lote=""):
@@ -63,6 +90,27 @@ def _depto(texto, lote=""):
 
 def _texto(serie):
     return serie.fillna("").astype(str).str.strip()
+
+
+def _produccion(df, gas, n, nivel):
+    """Columnas de la base a partir del CSV mensual o de la suma de la diaria. Cada nivel (líquidos, gas y sus versiones
+    diarias) se reemplaza por separado."""
+    volumen, diario = ("MPC", "MMPCD") if gas else ("BARRILES", "BPD")
+    df = df.copy()
+    for c in ("DEPARTAMENTO", "ZONA", "OPERADOR", "LOTE_HISTORICO", diario):
+        if c not in df.columns:
+            df[c] = None
+    df["LOTE"] = _texto(df["LOTE"])
+    df["LOTE_HISTORICO"] = _texto(df["LOTE_HISTORICO"]).where(_texto(df["LOTE_HISTORICO"]) != "", df["LOTE"])
+    df["_depto"] = [_depto(d, l) for d, l in zip(df["DEPARTAMENTO"], df["LOTE_HISTORICO"])]
+    df["DEPARTAMENTO"] = df["_depto"].map(lambda c: DEPARTAMENTOS.get(c, "SIN DEPARTAMENTO"))
+    df["VOLUMEN"] = pd.to_numeric(df[volumen], errors="coerce").fillna(0)
+    df["PROMEDIO_DIARIO"] = pd.to_numeric(df[diario], errors="coerce")
+    df["UNIDAD"] = "MPC" if gas else "BARRILES"
+    df["PRODUCTO"] = _texto(df["PRODUCTO"]).str.upper()
+    df["ZONA"], df["OPERADOR"] = _texto(df["ZONA"]), _texto(df["OPERADOR"])
+    df["_nivel"] = nivel
+    return df.assign(_archivo=n)
 
 
 def leer(archivos):
@@ -77,26 +125,22 @@ def leer(archivos):
             df["_nivel"] = "CANON"
             canon.append(df.assign(_archivo=n))
             continue
+        if t == "diaria":
+            if not {"AÑO", "MES", "DIA", "LOTE", "PRODUCTO", "UNIDAD", "VALOR"} <= set(df.columns):
+                avisos.append(f"{ruta.name}: no tiene las columnas de la producción diaria; no se cargó.")
+                continue
+            d = _diaria(df)
+            for es_gas, parte in d.groupby("_gas"):
+                parte = parte.drop(columns="_gas").rename(columns={"DIARIO": "MMPCD" if es_gas else "BPD"})
+                produccion.append(_produccion(parte, bool(es_gas), n, "DIARIA_GAS" if es_gas else "DIARIA_LIQUIDOS"))
+            continue
         gas = t == "gas"
-        volumen, diario = ("MPC", "MMPCD") if gas else ("BARRILES", "BPD")
+        volumen = "MPC" if gas else "BARRILES"
         faltan = [c for c in ("AÑO", "MES", "LOTE", "PRODUCTO", volumen) if c not in df.columns]
         if faltan:
             avisos.append(f"{ruta.name}: faltan las columnas {', '.join(faltan)}; no se cargó.")
             continue
-        for c in ("DEPARTAMENTO", "ZONA", "OPERADOR", "LOTE_HISTORICO", diario):
-            if c not in df.columns:
-                df[c] = None
-        df["LOTE"] = _texto(df["LOTE"])
-        df["LOTE_HISTORICO"] = _texto(df["LOTE_HISTORICO"]).where(_texto(df["LOTE_HISTORICO"]) != "", df["LOTE"])
-        df["_depto"] = [_depto(d, l) for d, l in zip(df["DEPARTAMENTO"], df["LOTE_HISTORICO"])]
-        df["DEPARTAMENTO"] = df["_depto"].map(lambda c: DEPARTAMENTOS.get(c, "SIN DEPARTAMENTO"))
-        df["VOLUMEN"] = pd.to_numeric(df[volumen], errors="coerce").fillna(0)
-        df["PROMEDIO_DIARIO"] = pd.to_numeric(df[diario], errors="coerce")
-        df["UNIDAD"] = "MPC" if gas else "BARRILES"
-        df["PRODUCTO"] = _texto(df["PRODUCTO"]).str.upper()
-        df["ZONA"], df["OPERADOR"] = _texto(df["ZONA"]), _texto(df["OPERADOR"])
-        df["_nivel"] = "GAS" if gas else "LIQUIDOS"            # el CSV de gas y el de líquidos no se pisan
-        produccion.append(df.assign(_archivo=n))
+        produccion.append(_produccion(df.assign(FUENTE=MENSUAL), gas, n, "GAS" if gas else "LIQUIDOS"))
     bases = {}
     for base_id, partes in (("hidro-produccion", produccion), ("hidro-canon", canon)):
         if partes:
@@ -128,11 +172,11 @@ def cuadros(prod, canon, periodo=None):
     """prod / canon: filas de un departamento. periodo AAAA-MM (por defecto, el último mes con producción)."""
     if prod.empty:
         return None
-    prod = prod.assign(P=prod["AÑO"] * 100 + prod["MES"], LOTE_C=prod["LOTE_HISTORICO"].map(_lote))
+    prod, parcial, de_diaria = _unir(prod)
     ultimo = int(prod["P"].max())
     p = int(periodo.replace("-", "")) if periodo else ultimo
     if p not in set(prod["P"]):
-        raise ValueError(f"No hay producción de hidrocarburos para {etiqueta(p)} (último mes: {etiqueta(ultimo)}).")
+        raise ValueError(f"No hay producción de hidrocarburos para {etiqueta(p)} (último mes completo: {etiqueta(ultimo)}).")
     a, m = p // 100, p % 100
     ventanas = {"mes_anterior": [p - 100], "mes": [p],
                 "acum_anterior": list(range((a - 1) * 100 + 1, p - 100 + 1)), "acum": list(range(a * 100 + 1, p + 1))}
@@ -161,11 +205,45 @@ def cuadros(prod, canon, periodo=None):
                        "serie": [{"periodo": etiqueta(q, True), "valor": round(float(t.loc[q].sum()) / calendar.monthrange(q // 100, q % 100)[1], 2),
                                   "var": _var(float(t.loc[q - 100].sum()) if q - 100 in t.index else None, float(t.loc[q].sum()))}
                                  for q in periodos[-25:]]}
+            # el mes en curso (días que van de la producción diaria): promedio de los días reportados
+            if parcial and p == ultimo:
+                x = parcial["filas"][parcial["filas"]["PRODUCTO"] == k]
+                if not x.empty:
+                    grafico["serie"].append({"periodo": etiqueta(parcial["P"], True), "valor": round(float(x["VOLUMEN"].sum()) / div / parcial["dias"], 2),
+                                             "var": None, "parcial": True})
+                    grafico["serie"] = grafico["serie"][-25:]
         anexo.append({"producto": nombre, "unidad": unidad, "lotes": lotes,
                       "filas": [{"periodo": etiqueta(q, True), **{l: round(float(t.at[q, l]), 3) for l in lotes},
                                  "Total": round(float(t.loc[q].sum()), 3)} for q in periodos[-13:]]})
     return {"periodo": f"{a}-{m:02d}", "ultimo": f"{ultimo // 100}-{ultimo % 100:02d}", "titulo_mes": MESES[m - 1],
-            "anio": a, "bloques": bloques, "grafico": grafico, "anexo": anexo, "canon": _canon(canon)}
+            "anio": a, "bloques": bloques, "grafico": grafico, "anexo": anexo, "canon": _canon(canon),
+            "de_diaria": [etiqueta(q, True) for q in de_diaria if q <= p],
+            "parcial": None if not parcial else {"periodo": etiqueta(parcial["P"]), "dias": parcial["dias"], "de": parcial["de"]}}
+
+
+def _unir(prod):
+    """Estadística mensual primero; la suma de la producción diaria solo para los meses y productos que aquella aún no
+    trae. El mes en curso (incompleto) se separa: no entra en el cuadro ni en el anexo, solo en el gráfico."""
+    prod = prod.assign(P=prod["AÑO"] * 100 + prod["MES"])
+    fuente = prod["FUENTE"].fillna(MENSUAL).astype(str) if "FUENTE" in prod.columns else pd.Series(MENSUAL, index=prod.index)
+    es_diaria = fuente.str.startswith("PRODUCCIÓN DIARIA")
+    mensual, diaria = prod[~es_diaria], prod[es_diaria].copy()
+    # en la diaria el 192 sale como «192»; en la mensual, como «1-AB/192»
+    historico = dict(zip(mensual["LOTE"], mensual["LOTE_HISTORICO"]))
+    diaria["LOTE_HISTORICO"] = diaria["LOTE"].map(historico).fillna(diaria["LOTE_HISTORICO"])
+    cubiertos = set(zip(mensual["P"], mensual["PRODUCTO"]))
+    diaria = diaria.loc[pd.Series([(q, k) not in cubiertos for q, k in zip(diaria["P"], diaria["PRODUCTO"])], index=diaria.index, dtype=bool)]
+    dias = diaria["FUENTE"].astype(str).str.extract(_RE_PARCIAL).astype(float)
+    incompleta = (dias[0] < dias[1]).fillna(False)
+    parcial = None
+    if incompleta.any():
+        q = int(diaria.loc[incompleta, "P"].max())
+        filas = diaria[incompleta & (diaria["P"] == q)]
+        d = dias[incompleta & (diaria["P"] == q)].iloc[0]
+        parcial = {"P": q, "dias": int(d[0]), "de": int(d[1]), "filas": filas}
+    unida = pd.concat([mensual, diaria[~incompleta]], ignore_index=True)
+    unida["LOTE_C"] = unida["LOTE_HISTORICO"].map(_lote)
+    return unida, parcial, sorted(set(diaria.loc[~incompleta, "P"]))
 
 
 def _canon(canon):

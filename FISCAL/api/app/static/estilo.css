@@ -90,6 +90,7 @@ h1 { font-family: var(--display); font-weight: 600; font-size: 40px; line-height
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 .fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 .btn { border: 1px solid var(--navy); background: var(--navy); color: #FEFEFE; border-radius: 999px; padding: 8px 16px; font-weight: 600; cursor: pointer; }
+a.btn { text-decoration: none; display: inline-block; }
 .btn.sec { background: var(--paper); color: var(--navy); border-color: var(--hair); }
 .btn:disabled { opacity: .55; cursor: default; }
 .campo { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--mid); }
@@ -133,6 +134,8 @@ tr.grupo td { background: var(--panel); padding-top: 14px; border-bottom: 1px so
 .barras text { fill: var(--mid); font-family: var(--font); font-size: 11px; }
 .barras .eje { stroke: var(--hair); }
 .barras .pos { fill: var(--navy); } .barras .neg { fill: var(--orange); }
+.barras .parcial { fill: var(--navy); opacity: .45; }
+iframe.mapa { width: 100%; height: 75vh; min-height: 480px; border: 1px solid var(--hair); border-radius: var(--r-s); background: var(--panel); }
 .barras .val { fill: var(--ink); font-size: 10px; }
 .barras .sep { stroke: var(--hair); } .barras .anio { fill: var(--ink); font-weight: 600; }
 .linea-niveles { width: 100%; min-width: 640px; height: auto; display: block; }
