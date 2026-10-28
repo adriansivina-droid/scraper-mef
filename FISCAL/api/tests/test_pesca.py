@@ -229,3 +229,41 @@ def test_drive_mismo_nombre_en_dos_carpetas(cliente, drive_falsa):
     drive_falsa.carpetas[drive.CARPETAS["pesca-ucayali"]]["X"] = ("SMN_PESCA_2026-08.xlsx", "2026-10-01T10:00:00Z", uca_crudo())
     r = cliente.post("/v1/drive/sincronizar").json()
     assert sorted(r["bases"]) == ["pesca-loreto", "pesca-san-martin", "pesca-ucayali"]
+
+
+def test_drive_cuenta_sin_acceso_a_la_carpeta(cliente, monkeypatch):
+    """Drive responde 404 a una carpeta que la cuenta no ve: debe ser un error claro, no «no hay archivos nuevos»."""
+    from app import drive
+
+    class Respuesta:
+        def __init__(self, codigo, datos=None):
+            self.status_code, self._datos = codigo, datos or {}
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(self.status_code)
+        def json(self):
+            return self._datos
+
+    class Sesion:
+        def get(self, url, params=None, timeout=None):
+            if url.endswith(drive.CARPETAS["pesca-san-martin"]):
+                return Respuesta(404)
+            if "alt" not in (params or {}) and "q" not in (params or {}):
+                return Respuesta(200, {"mimeType": "application/vnd.google-apps.folder"})
+            return Respuesta(200, {"files": []})
+
+    lector = drive.LectorDrive.__new__(drive.LectorDrive)
+    lector.sesion = Sesion()
+    assert lector.listar(drive.CARPETAS["pesca-loreto"]) == []
+    monkeypatch.setenv("GOOGLE_DRIVE_CREDENCIAL", "{}")
+    monkeypatch.setattr(drive, "LectorDrive", lambda credencial: lector)
+    r = cliente.post("/v1/drive/sincronizar")
+    assert r.status_code == 502 and "no puede ver la carpeta" in r.json()["detail"]
+
+
+def test_drive_dice_cuantos_excel_hay_en_cada_carpeta(cliente, drive_falsa):
+    cliente.post("/v1/drive/sincronizar")
+    r = cliente.post("/v1/drive/sincronizar").json()
+    assert r["carpetas"] == {"pesca-loreto": 1, "pesca-san-martin": 1, "pesca-ucayali": 0}
+    assert r["avisos"] == ["No hay archivos nuevos ni modificados en las carpetas de Drive "
+                           "(Excel en cada carpeta · Loreto: 1, San Martín: 1, Ucayali: 0)."]
