@@ -17,7 +17,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from . import carga, db, hidrocarburos
+from . import carga, db, hidrocarburos, ipc
 
 # carpeta de crudos de cada base de pesca (PESCA/pesca.md); se pueden cambiar con variables de entorno
 CARPETAS = {
@@ -87,6 +87,13 @@ class LectorDrive:
         f = r.json().get("files", [])
         return f[0]["id"] if f else None
 
+    def buscar(self, nombre):
+        """Archivos con ese nombre en todo lo que ve la cuenta: [{id, name, modifiedTime}]."""
+        r = self.sesion.get(API, params={"q": f"name = '{nombre}' and trashed = false", "fields": "files(id,name,modifiedTime)",
+                                         "supportsAllDrives": "true", "includeItemsFromAllDrives": "true", "corpora": "allDrives"}, timeout=60)
+        r.raise_for_status()
+        return r.json().get("files", [])
+
     def bajar(self, file_id):
         r = self.sesion.get(f"{API}/{file_id}", params={"alt": "media", "supportsAllDrives": "true"}, timeout=300)
         r.raise_for_status()
@@ -142,6 +149,23 @@ def _listar(lector, base_id, carpeta):
     return list(ultimos.values())
 
 
+def _ipc(lector):
+    """IPC de Lima para las variaciones reales: del BCRP; si no responde, el IPC.xlsx más reciente de Drive."""
+    try:
+        return ipc.actualizar_bcrp()
+    except Exception as e:
+        motivo = f"el BCRP no respondió ({type(e).__name__})"
+    try:
+        hallados = lector.buscar("IPC.xlsx") if hasattr(lector, "buscar") else []
+        if hallados:
+            a = max(hallados, key=lambda x: x["modifiedTime"])
+            s = ipc.de_excel(lector.bajar(a["id"]))
+            return f"IPC de Lima: {motivo}; se usó IPC.xlsx de Drive ({ipc.guardar(s, 'IPC.xlsx de Drive')} meses, hasta {max(s)})."
+    except Exception as e:
+        return f"IPC de Lima: {motivo} y no se pudo leer IPC.xlsx de Drive ({e})."
+    return f"IPC de Lima: {motivo} y no hay IPC.xlsx en Drive; las variaciones quedan en términos nominales."
+
+
 def sincronizar(origen="botón de la página", todo=False, lector=None):
     """Carga los Excel nuevos o modificados (todos, con todo=True) de las carpetas de crudos. Devuelve el resumen."""
     if not _en_curso.acquire(blocking=False):
@@ -171,6 +195,7 @@ def sincronizar(origen="botón de la página", todo=False, lector=None):
                                                f"(archivos en cada carpeta · {hay})."]}
         if mapas:
             resumen["avisos"].append(f"Mapa de lotes de hidrocarburos actualizado ({mapas[0]['name']}).")
+        resumen["avisos"].append(_ipc(lector))
         resumen["archivos"] = [{"base": b, "nombre": a["name"]} for b, a in nuevos]
         resumen["carpetas"] = {b: len(lista) for b, lista in listados.items()}
         ahora = datetime.now(timezone.utc).isoformat(timespec="microseconds")   # ordena las sincronizaciones

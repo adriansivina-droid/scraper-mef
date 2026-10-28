@@ -13,7 +13,7 @@ descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 | 2 | El scraper del MEF corre solo (GitHub Actions, días 2 y 21) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
 | Empleo | Base de empleo del MTPE (scraper en GitHub Actions, días 2 y 21, o botón «Actualizar empleo»), con el cuadro, el gráfico y el anexo de la síntesis por región | **lista** |
 | Hidrocarburos | Producción por lote y canon de PERUPETRO, tomados de la carpeta DATA de Drive (los deja el flujo diario de `HIDROCARBUROS/`), con el cuadro, el gráfico, el anexo por lote y el canon de la síntesis | **lista** |
-| 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en el servidor | pendiente |
+| 3 | Ejecución del presupuesto: cuadros de gasto corriente e inversión (var. % real con el IPC de Lima, avance del PIM, comparación entre años), variaciones alarmantes y proyectos (GitHub Actions tras el scraper) | **lista** |
 
 ## Hoja de ruta: el informe completo
 
@@ -218,6 +218,30 @@ transferido al departamento; todo se descarga en Excel. Comprobado con el texto 
 Falta el precio del crudo (Reuters), que no está en DATA. La pestaña **Mapa** muestra el mapa de lotes del flujo de
 hidrocarburos (`/v1/hidrocarburos/mapa`, aislado en un iframe), con botones de pantalla completa y descarga.
 
+## Ejecución del presupuesto (fase 3)
+
+En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
+
+- **Gasto corriente no financiero** (genéricas de tipo 5: personal, pensiones, bienes y servicios, donaciones y
+  transferencias y otros gastos corrientes; sin deuda ni capital) e **inversión pública** (genérica 2.6), pestaña
+  Cuadros:
+  - indicadores del mes y del acumulado;
+  - cuadro por nivel de gobierno y por genérica o función: mes y Ene.-Mes de un año contra otro (se elige con qué
+    año comparar), en millones de soles, con var. % real;
+  - gráficos: mes a mes y acumulado de los dos años, variación real interanual y participación de cada nivel;
+  - en inversión, además, PIM, avance del PIM contra el ritmo parejo (meses / 12) y la curva de avance de los dos
+    años;
+  - descarga en Excel (con las variaciones alarmantes, en inversión).
+- **Variaciones alarmantes** (inversión): los 5 mayores aumentos y caídas en soles corrientes, del mes y del acumulado,
+  por todos los niveles juntos, por nivel y función y por municipalidad. Es el criterio del Bloque 6 de
+  `Fiscal_Procesamiento.ipynb`: siempre 5 aumentos (las 5 mayores diferencias), sin ítems en 0 y sin repetir.
+- **Proyectos**: `.github/workflows/fiscal_proyectos.yml` corre `Fiscal_Proyectos.ipynb` sin Colab
+  (`FISCAL/automatizacion/proyectos_servidor.py`) al terminar cada corrida del scraper del MEF, o con el botón de la
+  pestaña. Sus CSV de entrada salen de la base, y el resultado va a la base `inv-proyectos`.
+- **IPC de Lima** (variación real): se trae de la API del BCRP en cada sincronización con Drive (serie `IPC_SERIE_BCRP`,
+  por defecto `PN01270PM`). Si no responde, usa el `IPC.xlsx` de Drive, o el que se suba en la página. Sin IPC, los
+  cuadros muestran la variación nominal y lo avisan.
+
 ## Endpoints
 
 Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`.
@@ -237,6 +261,11 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/empleo` | Si el botón de empleo está configurado y las últimas corridas de su scraper |
 | POST | `/v1/empleo/actualizar` | Lanza el scraper de empleo (`regiones=LOR,SMN,UCA` o `TODAS`) |
 | GET | `/v1/descargas/empleo` | Empleo en el formato LONG del scraper, una hoja (`regiones=Loreto,San Martín` o `todas`; `desde`, `hasta` opcionales; `formato=xlsx`, `csv` o `json`) |
+| GET | `/v1/cuadros/ejecucion` | Gasto corriente (`sector=gasto`) o inversión (`sector=inversion`) de un departamento: `periodo`, `comparar` (año), `formato=json` o `xlsx` |
+| GET | `/v1/variaciones` | Variaciones alarmantes de la inversión (`departamento`, `periodo`, `comparar`) |
+| GET | `/v1/proyectos` | Proyectos detrás de las variaciones del último mes calculado |
+| POST | `/v1/proyectos/actualizar` | Lanza la consulta de proyectos en GitHub Actions |
+| GET / POST | `/v1/ipc`, `/v1/ipc/actualizar` | IPC de Lima cargado / traerlo del BCRP |
 | GET | `/v1/cuadros/hidrocarburos` | Producción, gráfico, anexo por lote y canon de un departamento (`departamento=16`, `periodo` opcional, `formato=json` o `xlsx`) |
 | GET | `/v1/cuadros/empleo` | Cuadro, gráfico y anexo de empleo de un departamento (`departamento=16`, `periodo=2026-08` opcional, `formato=json` o `xlsx`) |
 | GET | `/docs` | Documentación interactiva |

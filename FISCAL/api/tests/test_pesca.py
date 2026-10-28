@@ -266,5 +266,5 @@ def test_drive_dice_cuantos_excel_hay_en_cada_carpeta(cliente, drive_falsa):
     cliente.post("/v1/drive/sincronizar")
     r = cliente.post("/v1/drive/sincronizar").json()
     assert r["carpetas"] == {"pesca-loreto": 1, "pesca-san-martin": 1, "pesca-ucayali": 0, "hidrocarburos": 0}
-    assert r["avisos"] == ["No hay archivos nuevos ni modificados en las carpetas de Drive "
+    assert r["avisos"][:1] == ["No hay archivos nuevos ni modificados en las carpetas de Drive "
                            "(archivos en cada carpeta · Loreto: 1, San Martín: 1, Ucayali: 0, Hidrocarburos: 0)."]

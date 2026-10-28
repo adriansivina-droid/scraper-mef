@@ -12,7 +12,7 @@ import re
 import requests
 
 REPO = os.environ.get("GITHUB_REPO", "adriansivina-droid/scraper-mef")
-FLUJOS = {"mef": "fiscal_scraper.yml", "empleo": "empleo_scraper.yml"}   # scrapers que se lanzan desde la página
+FLUJOS = {"mef": "fiscal_scraper.yml", "empleo": "empleo_scraper.yml", "proyectos": "fiscal_proyectos.yml"}   # scrapers que se lanzan desde la página
 
 
 def _api(nombre):

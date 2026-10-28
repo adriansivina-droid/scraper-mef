@@ -9,12 +9,13 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
+import pandas as pd
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import archivos, carga, db, drive, empleo, hidrocarburos, mef
+from . import archivos, carga, db, drive, ejecucion, empleo, hidrocarburos, ipc, mef
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -283,6 +284,120 @@ def descarga_empleo(regiones: str = "todas", desde: str = "", hasta: str = "",
     df.to_excel(buf, index=False)                      # igual que el notebook: una hoja, sin formato
     return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers=_adjunto(nombre))
+
+
+def _ejecucion(departamento, periodo, comparar):
+    if departamento not in DEPARTAMENTOS:
+        raise HTTPException(422, f"departamento no válido: {departamento}.")
+    if periodo and not _RE_PERIODO.match(periodo):
+        raise HTTPException(422, f"Periodo no válido: {periodo!r} (formato AAAA-MM).")
+    if comparar and not re.match(r"^\d{4}$", comparar):
+        raise HTTPException(422, f"Año de comparación no válido: {comparar!r}.")
+    return DEPARTAMENTOS[departamento].title().replace(" De ", " de ")
+
+
+def _panel_inversion(departamento):
+    return ejecucion.panel_inversion(db.leer("inv-dev-funcion", [departamento], list(NIVELES.values()), "1990-01", "2100-12"))
+
+
+@app.get("/v1/cuadros/ejecucion", dependencies=[Depends(acceso)])
+def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector: str = Query("gasto", pattern="^(gasto|inversion)$"),
+                     periodo: str = "", comparar: str = "", formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Gasto corriente no financiero o inversión pública de un departamento: mes y acumulado de un año contra otro
+    (comparar = año; por defecto el anterior), por nivel y por genérica o función, con variación real (IPC de Lima),
+    avance del PIM (inversión) y series para los gráficos. formato=xlsx incluye las variaciones alarmantes (inversión)."""
+    region = _ejecucion(departamento, periodo, comparar)
+    niveles = list(NIVELES.values())
+    if sector == "gasto":
+        panel, pim = ejecucion.panel_gasto(db.leer("gasto-dev-generica", [departamento], niveles, "1990-01", "2100-12")), None
+    else:
+        panel = _panel_inversion(departamento)
+        pim = ejecucion.panel_pim(db.leer("inv-pim-funcion", [departamento], niveles, "1990-01", "2100-12"))
+    serie_ipc = ipc.serie()
+    try:
+        c = ejecucion.cuadros(sector, panel, pim, serie_ipc, periodo or None, comparar or None)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    if c is None:
+        return {"region": region, "cuadros": None, "ipc": ipc.estado()}
+    if formato == "xlsx":
+        v = None
+        if sector == "inversion":
+            v = ejecucion.variaciones(panel, _panel_muni(departamento), c["periodo"], str(c["comparar"]))
+        nombre = f"{'Gasto corriente' if sector == 'gasto' else 'Inversión pública'} {region} {c['periodo']} vs {c['comparar']}.xlsx"
+        return Response(ejecucion.excel(region, c, v), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(nombre))
+    return {"region": region, "cuadros": c, "ipc": ipc.estado()}
+
+
+def _panel_muni(departamento):
+    return ejecucion.panel_municipalidad(db.leer("inv-dev-municipalidad", [departamento], [], "1990-01", "2100-12"))
+
+
+@app.get("/v1/variaciones", dependencies=[Depends(acceso)])
+def variaciones_inversion(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "", comparar: str = ""):
+    """Variaciones alarmantes de la inversión: 5 mayores aumentos y caídas en soles (mes y acumulado), por todos los
+    niveles, por nivel y función y por municipalidad."""
+    region = _ejecucion(departamento, periodo, comparar)
+    v = ejecucion.variaciones(_panel_inversion(departamento), _panel_muni(departamento), periodo or None, comparar or None)
+    return {"region": region, "variaciones": v}
+
+
+@app.get("/v1/proyectos", dependencies=[Depends(acceso)])
+def proyectos(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = ""):
+    """Proyectos detrás de las variaciones de la inversión (mes vs mismo mes del año anterior), del último mes calculado
+    hasta `periodo`: por nivel, las funciones elegidas y sus proyectos con mayor devengado."""
+    region = _ejecucion(departamento, periodo, "")
+    df = db.leer("inv-proyectos", [departamento], list(NIVELES.values()), "1990-01", periodo or "2100-12")
+    if df.empty:
+        return {"region": region, "proyectos": None, "meses": []}
+    df["P"] = df["AÑO"].astype(int) * 100 + df["MES"].astype(int)
+    meses = sorted({f"{q // 100}-{q % 100:02d}" for q in df["P"]}, reverse=True)
+    q = int(df["P"].max())
+    d = df[df["P"] == q]
+    niveles = []
+    for nivel, g in d.groupby("NIVEL_GOBIERNO", sort=False):
+        funciones = []
+        for (n, funcion), h in g[g["N_FUNCION"] > 0].groupby(["N_FUNCION", "FUNCION"], sort=True):
+            x = h.iloc[0]
+            funciones.append({"funcion": funcion, "anterior": float(x["ANTERIOR"]), "actual": float(x["ACTUAL"]), "diferencia": float(x["DIFERENCIA_FUNCION"]),
+                              "proyectos": [{"codigo": r.CODIGO, "proyecto": r.PROYECTO, "devengado": float(r.DEVENGADO),
+                                             "pct": None if pd.isna(r.PCT_FUNCION) else float(r.PCT_FUNCION)}
+                                            for r in h.sort_values("N_PROYECTO").itertuples() if r.N_PROYECTO > 0],
+                              "nota": None if (h["N_PROYECTO"] > 0).any() else h.iloc[0]["PROYECTO"]})
+        x = g.iloc[0]
+        niveles.append({"nivel": nivel, "diferencia": float(x["DIFERENCIA_NIVEL"]), "consultado": x["MES_CONSULTADO"], "funciones": funciones,
+                        "nota": None if funciones else g.iloc[0]["PROYECTO"]})
+    orden = {"GOBIERNO NACIONAL": 0, "GOBIERNO REGIONAL": 1, "GOBIERNOS LOCALES": 2}
+    niveles.sort(key=lambda n: orden.get(n["nivel"], 9))
+    return {"region": region, "periodo": f"{q // 100}-{q % 100:02d}", "meses": meses, "proyectos": niveles}
+
+
+@app.post("/v1/proyectos/actualizar", dependencies=[Depends(acceso)])
+def proyectos_actualizar(mes: str = Query("", pattern=r"^(\d{4}-(0[1-9]|1[0-2]))?$")):
+    """Lanza en GitHub Actions la consulta de proyectos (también corre sola al terminar el scraper del MEF)."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
+    try:
+        mef.lanzar(nombre="proyectos", inputs={"mes": mes})
+    except (mef.ErrorGitHub, OSError) as e:
+        raise HTTPException(502, str(e))
+    return {"lanzado": True, "mes": mes or None}
+
+
+@app.get("/v1/ipc", dependencies=[Depends(acceso)])
+def ipc_estado():
+    """El IPC de Lima cargado (para las variaciones reales): meses, desde, hasta y fuente."""
+    return ipc.estado()
+
+
+@app.post("/v1/ipc/actualizar", dependencies=[Depends(acceso)])
+def ipc_actualizar():
+    """Trae el IPC de Lima del BCRP (también se hace en cada sincronización con Drive)."""
+    try:
+        return {"mensaje": ipc.actualizar_bcrp(), **ipc.estado()}
+    except Exception as e:
+        raise HTTPException(502, f"No se pudo traer el IPC del BCRP: {e}. Sube el IPC.xlsx en «Subir archivos».")
 
 
 @app.get("/v1/hidrocarburos/mapa", dependencies=[Depends(acceso)])
