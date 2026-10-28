@@ -4,7 +4,8 @@ las bases del catálogo.
 Se reconocen los archivos por su nombre, el mismo que usan Fiscal_Scraper y los scrapers anteriores:
   DEV Funcion.<Nivel> AAAA - Mes MM - ….csv   DEV InvFuente.<Nivel> …   DEV Generica.<Nivel> …   DEV Deuda.<Nivel> …
   DEV Fuente.<Nivel> …   PIM Funcion AAAA - ….csv   PIM Funcion.Municipalidad AAAA - ….csv
-Los archivos CONTROL y LOG se ignoran. Los Excel de pesca (crudos de las DIREPRO o LONG de los notebooks) se reconocen
+Los archivos CONTROL y LOG se ignoran. Los CSV de PERUPETRO (PP_produccion_lote_mes_…, PP_produccion_gas_lote_mes_…,
+PP_canon_departamento_mes.csv) van a hidrocarburos.py. Los Excel de pesca (crudos de las DIREPRO o LONG de los notebooks) se reconocen
 por sus hojas: ver pesca.py.
 """
 import io
@@ -17,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import db, empleo, pesca
+from . import db, empleo, hidrocarburos, pesca
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -94,7 +95,7 @@ def leer_archivos(raiz):
     """-> {base_id: DataFrame con las columnas de la base + columnas internas}, avisos."""
     raiz = Path(raiz)
     por_bloque, avisos = {}, []
-    pim, pim_muni, de_pesca, de_empleo = [], [], [], []
+    pim, pim_muni, de_pesca, de_empleo, de_hidro = [], [], [], [], []
     for n_archivo, ruta in enumerate(sorted(raiz.rglob("*"))):
         if not ruta.is_file() or ruta.name.startswith(("CONTROL", "LOG", ".")):
             continue
@@ -121,8 +122,11 @@ def leer_archivos(raiz):
             continue
         if ruta.suffix.lower() != ".csv":
             continue
+        t = hidrocarburos.tipo(ruta.name)
         m = _RE_DEV.match(ruta.name)
-        if m:
+        if t:
+            de_hidro.append((n_archivo, ruta, t))
+        elif m:
             df = _leer_csv(ruta).assign(_archivo=n_archivo)
             df["_nivel"] = NIVEL_DE_CORTO[m.group(2)]
             por_bloque.setdefault((m.group(1), NIVEL_DE_CORTO[m.group(2)]), []).append(df)
@@ -166,6 +170,10 @@ def leer_archivos(raiz):
         if not df.empty:
             bases["empleo"] = df
         avisos += avisos_empleo
+    if de_hidro:
+        de_hidrocarburos, avisos_hidro = hidrocarburos.leer(de_hidro)
+        bases.update(de_hidrocarburos)
+        avisos += avisos_hidro
     if de_pesca:
         de_la_pesca, avisos_pesca = pesca.leer(de_pesca, db.leer_todo)
         bases.update(de_la_pesca)
@@ -213,7 +221,7 @@ def cargar(origen, archivos):
         resumen["bases"][base_id] = {"filas": filas, "departamentos": sorted(df["_depto"].unique().tolist()),
                                      "periodos": sorted({f"{a}" if m == 0 else f"{a}-{m:02d}" for a, m in zip(df["_anio"], df["_mes"])})}
     if not bases:
-        resumen["avisos"].append("No se encontró ningún archivo de los scrapers ni de pesca en lo que subiste.")
+        resumen["avisos"].append("No se encontró ningún archivo de los scrapers, de pesca, de empleo ni de hidrocarburos en lo que subiste.")
     db.registrar_carga(origen, resumen)
     return resumen
 

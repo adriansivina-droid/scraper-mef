@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import archivos, carga, db, drive, empleo, mef
+from . import archivos, carga, db, drive, empleo, hidrocarburos, mef
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -91,8 +91,8 @@ def _avisos(bases, deptos):
 
 
 def _prefijo(bases):
-    grupos = {BASES[b].grupo for b in bases}
-    return "bases_pesca" if grupos == {"pesca"} else "bases_fiscal" if "pesca" not in grupos else "bases"
+    sectores = {{"inversion": "fiscal", "gasto": "fiscal"}.get(BASES[b].grupo, BASES[b].grupo) for b in bases}
+    return f"bases_{sectores.pop()}" if len(sectores) == 1 else "bases"
 
 
 def _sufijo(deptos):
@@ -184,7 +184,7 @@ def drive_estado():
 
 @app.post("/v1/drive/sincronizar", dependencies=[Depends(acceso)])
 def drive_sincronizar(todo: bool = False, origen: str = Query("botón de la página", max_length=60)):
-    """Carga los Excel nuevos o modificados de las carpetas de crudos de pesca en Drive (todos, con todo=true)."""
+    """Carga los archivos nuevos o modificados de Drive: crudos de pesca y CSV de hidrocarburos (todos, con todo=true)."""
     if not drive.configurado():
         raise HTTPException(503, "Falta la credencial de Drive (variable GOOGLE_DRIVE_CREDENCIAL en Render).")
     try:
@@ -279,6 +279,30 @@ def descarga_empleo(regiones: str = "todas", desde: str = "", hasta: str = "",
     df.to_excel(buf, index=False)                      # igual que el notebook: una hoja, sin formato
     return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers=_adjunto(nombre))
+
+
+@app.get("/v1/cuadros/hidrocarburos", dependencies=[Depends(acceso)])
+def cuadro_hidrocarburos(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "",
+                         formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Producción por producto y lote (mes y acumulado contra el año anterior), promedio diario, anexo por lote y canon
+    de un departamento (periodo AAAA-MM; vacío = último mes con producción)."""
+    if departamento not in DEPARTAMENTOS:
+        raise HTTPException(422, f"departamento no válido: {departamento}.")
+    if periodo and not _RE_PERIODO.match(periodo):
+        raise HTTPException(422, f"Periodo no válido: {periodo!r} (formato AAAA-MM).")
+    prod = db.leer("hidro-produccion", [departamento], [], "1990-01", "2100-12")
+    canon = db.leer("hidro-canon", [departamento], [], "1990-01", "2100-12")
+    try:
+        c = hidrocarburos.cuadros(prod, canon, periodo or None)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    region = DEPARTAMENTOS[departamento].title().replace(" De ", " de ")
+    if c is None:
+        return {"region": region, "cuadros": None}
+    if formato == "xlsx":
+        return Response(hidrocarburos.excel(region, c), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"Hidrocarburos {region} {c['periodo']}.xlsx"))
+    return {"region": region, "cuadros": c}
 
 
 @app.get("/v1/cuadros/empleo", dependencies=[Depends(acceso)])

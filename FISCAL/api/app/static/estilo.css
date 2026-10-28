@@ -102,6 +102,7 @@ th.n { text-align: right; }
 td { padding: 9px 10px; border-bottom: 1px solid var(--hair); vertical-align: top; }
 td.n { text-align: right; font-family: var(--mono); font-size: 13px; white-space: nowrap; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--hair); }
+tr.grupo td { background: var(--panel); padding-top: 14px; border-bottom: 1px solid var(--hair); }
 .sube { color: var(--teal); } .baja { color: var(--orange); }
 .vacio-caja { border: 1px dashed var(--hair); border-radius: var(--r); padding: 22px; color: var(--mid); display: flex; flex-direction: column; gap: 6px; }
 .vacio-caja b { color: var(--ink); }

@@ -1,14 +1,17 @@
-# Pesca desde Drive: cada día le pide al API (Render) que cargue los Excel nuevos o modificados de las carpetas de
-# crudos de las DIREPRO (Loreto, San Martín y Ucayali). Es lo mismo que el botón «Sincronizar ahora» de la página.
-#   · diario (07:30 hora de Lima)
-#   · a mano: Actions → «Pesca · sincronizar desde Drive» → Run workflow (puedes volver a procesar todo)
+# Drive → API: cada día le pide al API (Render) que cargue los archivos nuevos o modificados de Drive: los Excel de las
+# carpetas de crudos de las DIREPRO (pesca de Loreto, San Martín y Ucayali) y los CSV de PERUPETRO que el flujo de
+# hidrocarburos deja en su carpeta DATA. Es lo mismo que el botón «Sincronizar ahora» de la página.
+#   · diario a las 07:30 y a las 09:00 hora de Lima (la segunda recoge lo que el flujo de hidrocarburos de las 07:00
+#     terminó de subir)
+#   · a mano: Actions → «Drive · sincronizar pesca e hidrocarburos» → Run workflow (puedes volver a procesar todo)
 # Requiere los secretos ESTUDIOS_API_URL (https://….onrender.com), ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE
 # (los de Render: variables APP_USUARIO y APP_CLAVE). Pasos en FISCAL/api/README.md.
-name: Pesca · sincronizar desde Drive
+name: Drive · sincronizar pesca e hidrocarburos
 
 on:
   schedule:
     - cron: "30 12 * * *"          # 12:30 UTC = 07:30 en Lima (GitHub puede demorar unos minutos en arrancar)
+    - cron: "0 14 * * *"           # 14:00 UTC = 09:00 en Lima
   workflow_dispatch:
     inputs:
       todo:

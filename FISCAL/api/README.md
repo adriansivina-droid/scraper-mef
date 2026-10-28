@@ -12,6 +12,7 @@ descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 | Pesca | Las 3 bases de pesca, cargadas con los Excel mensuales de las DIREPRO (o los LONG de los notebooks de `PESCA/`) | **lista** |
 | 2 | El scraper del MEF corre solo (GitHub Actions, días 2 y 21) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
 | Empleo | Base de empleo del MTPE (scraper en GitHub Actions, días 2 y 21, o botón «Actualizar empleo»), con el cuadro, el gráfico y el anexo de la síntesis por región | **lista** |
+| Hidrocarburos | Producción por lote y canon de PERUPETRO, tomados de la carpeta DATA de Drive (los deja el flujo diario de `HIDROCARBUROS/`), con el cuadro, el gráfico, el anexo por lote y el canon de la síntesis | **lista** |
 | 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en el servidor | pendiente |
 
 ## Hoja de ruta: el informe completo
@@ -25,7 +26,7 @@ scraper (o carga de una plantilla) → base de datos → descargas en Excel → 
 | Resumen · otros indicadores | Cuadro 1 | SBS, MEF, DIREPRO y empresas | se arma con los demás módulos | al final |
 | Agropecuario | producción (t), superficie sembrada (ha) · Anexo 1 | MIDAGRI y direcciones regionales | **archivo mensual** que recibe el equipo | falta |
 | Pesca | producción pesquera y VBP · Anexo 2 | DIREPRO Loreto, San Martín y Ucayali | **archivo mensual**: el Excel de cada DIREPRO se sube en la página (o el LONG de los notebooks de `PESCA/`) | **en el API** |
-| Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions); precio por archivo | scraper listo |
+| Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions) → Drive (DATA) → API | **en el API** (producción y canon; falta el precio) |
 | Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | **archivo mensual** | falta |
 | Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | scraper de `EMPLEO/` en GitHub Actions (o su Excel subido en la página) | **en el API**, con cuadro, gráfico y anexo |
 | Exportaciones | por grupo de productos · Anexo | SUNAT | **archivo mensual** | falta |
@@ -151,7 +152,7 @@ todos). Solo lee: nunca escribe ni borra en Drive.
 3. **Primera carga:** deja también en las carpetas de San Martín y Ucayali sus LONG históricos (`SMN_PESCA_LONG.xlsx`,
    `UCA_PESCA_LONG.xlsx`), o súbelos una vez en la página: de ahí sale la clasificación de especies. Los notebooks de
    `PESCA/` ignoran esos LONG en las carpetas de crudos.
-4. Prueba con «Sincronizar ahora», o en GitHub: Actions → «Pesca · sincronizar desde Drive» → Run workflow.
+4. Prueba con «Sincronizar ahora», o en GitHub: Actions → «Drive · sincronizar pesca e hidrocarburos» → Run workflow.
 
 Las carpetas se pueden cambiar sin tocar el código con las variables `DRIVE_CRUDOS_LORETO`, `DRIVE_CRUDOS_SAN_MARTIN` y
 `DRIVE_CRUDOS_UCAYALI`.
@@ -178,6 +179,31 @@ mismo nombre de archivo), de una región, de varias o de las 26. Botones de grup
 Centro, Sur y Lima y Callao (`GRUPOS_REGIONES` en `app/empleo.py`); solo marcan casillas, así que se puede combinar
 cualquier región. Para tener las 26, el scraper debe correr con «Todas las regiones».
 
+## Hidrocarburos (PERUPETRO)
+
+El flujo diario de `HIDROCARBUROS/` (07:00 en Lima, sin cambios) deja en la carpeta **DATA** del Proyecto Petróleo
+(`1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq`) los CSV de PERUPETRO. La sincronización con Drive (botón «Sincronizar ahora» o
+`.github/workflows/pesca_drive.yml`, a las 07:30 y a las 09:00) toma el más reciente de cada uno:
+
+| Archivo de DATA | Base | Hoja |
+|---|---|---|
+| `PP_produccion_lote_mes_<ini>-<fin>.csv` (petróleo, LGN, condensado; barriles) | `hidro-produccion` | HIDROCARBUROS |
+| `PP_produccion_gas_lote_mes_<ini>-<fin>.csv` (gas natural; MPC) | `hidro-produccion` | HIDROCARBUROS |
+| `PP_canon_departamento_mes.csv` (canon y sobrecanon transferido; MM S/) | `hidro-canon` | CANON PETROLERO |
+
+Los CSV traen la serie completa: cada carga reemplaza los meses que trae en todos los departamentos. El departamento
+sale de la columna `DEPARTAMENTO` (la que asigna el mapa de lotes; «UCAYALI / HUANUCO» va a Ucayali); si falta, de
+`LOTES_DEPTO` en `app/hidrocarburos.py` (1-AB/192, 8, 95, 67, 39, 64, 102 → Loreto; 31-C, 131 → Ucayali); los demás
+quedan como «SIN DEPARTAMENTO». También se pueden subir los CSV en la página. La carpeta se cambia con la variable
+`DRIVE_HIDROCARBUROS_DATA`.
+
+En Loreto y Ucayali, la pestaña **Cuadros** del sector hidrocarburos arma: la producción por producto (petróleo y LGN
+en miles de barriles, gas natural en millones de pies cúbicos) y lote, del mes y acumulada, contra el mismo periodo del
+año anterior; el gráfico de producción diaria promedio (25 meses); el anexo mensual por lote (13 meses) y el canon
+transferido al departamento; todo se descarga en Excel. Comprobado con el texto de Loreto 2025
+(`HIDROCARBUROS/analisis`): 7,9 millones de barriles (+22,9 %), Lote 95 +5,9 % (`tests/test_hidrocarburos.py`).
+Falta el precio del crudo (Reuters), que no está en DATA.
+
 ## Endpoints
 
 Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`.
@@ -191,12 +217,13 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/descargas` | El archivo: `formato=xlsx` (una hoja por base), `csv` (un `.zip` si son varias) o `json` (paginado) |
 | POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output`, `PIM_Funcion.xlsx`, los Excel de pesca o el de empleo |
 | GET | `/v1/drive` | Si Drive está conectado, sus carpetas y la última sincronización |
-| POST | `/v1/drive/sincronizar` | Carga los Excel nuevos o modificados de las carpetas de crudos (`todo=true`: todos) |
+| POST | `/v1/drive/sincronizar` | Carga los archivos nuevos o modificados de Drive: crudos de pesca y CSV de hidrocarburos (`todo=true`: todos) |
 | GET | `/v1/mef` | Si el botón del MEF está configurado y las últimas corridas del scraper en GitHub |
 | POST | `/v1/mef/actualizar` | Lanza el scraper del MEF en GitHub Actions (`desde`, `hasta` AAAA-MM opcionales; `prueba=true`) |
 | GET | `/v1/empleo` | Si el botón de empleo está configurado y las últimas corridas de su scraper |
 | POST | `/v1/empleo/actualizar` | Lanza el scraper de empleo (`regiones=LOR,SMN,UCA` o `TODAS`) |
 | GET | `/v1/descargas/empleo` | Empleo en el formato LONG del scraper, una hoja (`regiones=Loreto,San Martín` o `todas`; `desde`, `hasta` opcionales; `formato=xlsx`, `csv` o `json`) |
+| GET | `/v1/cuadros/hidrocarburos` | Producción, gráfico, anexo por lote y canon de un departamento (`departamento=16`, `periodo` opcional, `formato=json` o `xlsx`) |
 | GET | `/v1/cuadros/empleo` | Cuadro, gráfico y anexo de empleo de un departamento (`departamento=16`, `periodo=2026-08` opcional, `formato=json` o `xlsx`) |
 | GET | `/docs` | Documentación interactiva |
 

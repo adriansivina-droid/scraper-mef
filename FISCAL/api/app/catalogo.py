@@ -6,7 +6,7 @@ DEPARTAMENTOS = {
     "07": "CALLAO", "08": "CUSCO", "09": "HUANCAVELICA", "10": "HUÁNUCO", "11": "ICA", "12": "JUNÍN",
     "13": "LA LIBERTAD", "14": "LAMBAYEQUE", "15": "LIMA", "16": "LORETO", "17": "MADRE DE DIOS", "18": "MOQUEGUA",
     "19": "PASCO", "20": "PIURA", "21": "PUNO", "22": "SAN MARTÍN", "23": "TACNA", "24": "TUMBES", "25": "UCAYALI",
-    "98": "EXTERIOR",
+    "98": "EXTERIOR", "99": "SIN DEPARTAMENTO",
 }
 
 # nivel de la URL -> código MEF (el que guardan los CSV en NIVEL_GOBIERNO y el nombre corto de sus archivos)
@@ -17,7 +17,8 @@ NIVEL_PIM = {"E": "GOBIERNO NACIONAL", "R": "GOBIERNOS REGIONALES", "M": "GOBIER
 
 GRUPOS = {"inversion": "Inversión · genérica 2.6", "gasto": "Gasto total · todas las genéricas",
           "pesca": "Pesca · DIREPRO, VBP a precios de 2007",
-          "empleo": "Empleo · MTPE, Planilla Electrónica"}
+          "empleo": "Empleo · MTPE, Planilla Electrónica",
+          "hidrocarburos": "Hidrocarburos · PERUPETRO"}
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class Base:
     descripcion: str = ""
     departamentos: tuple = ()                   # si la base es de algunos departamentos (vacío: todos)
     formato_valor: str = "#,##0"
+    reemplaza_periodo: bool = False             # cada carga trae la serie completa: reemplaza el periodo en todos los departamentos
 
     @property
     def tabla(self):
@@ -83,6 +85,15 @@ BASES = {b.id: b for b in [
     Base("empleo", "empleo", "Trabajadores asalariados privados formales", "Empleo", "EMPLEO",
          ["AÑO", "MES", "REGIÓN", "ACTIVIDAD_ECONOMICA", "EMPLEO"], [8, 6, 20, 24, 12], valor="EMPLEO", usa_niveles=False,
          descripcion="MTPE (PLAME y T-Registro): trabajadores asalariados privados formales por mes, región y actividad económica."),
+    # Hidrocarburos (HIDROCARBUROS/perupetro_produccion.md): los CSV que el flujo diario deja en Drive (DATA)
+    Base("hidro-produccion", "hidrocarburos", "Producción fiscalizada por lote", "Producción de hidrocarburos", "HIDROCARBUROS",
+         ["AÑO", "MES", "DEPARTAMENTO", "ZONA", "OPERADOR", "LOTE", "LOTE_HISTORICO", "PRODUCTO", "UNIDAD", "VOLUMEN", "PROMEDIO_DIARIO"],
+         [8, 6, 18, 14, 28, 10, 14, 14, 10, 14, 14], valor="VOLUMEN", usa_niveles=False, reemplaza_periodo=True,
+         descripcion="PERUPETRO: petróleo, LGN y condensado (barriles) y gas natural (MPC) fiscalizados por mes, lote y operador."),
+    Base("hidro-canon", "hidrocarburos", "Canon y sobrecanon petrolero transferido", "Canon petrolero", "CANON PETROLERO",
+         ["AÑO", "MES", "DEPARTAMENTO", "CANON_MM_SOLES"], [8, 6, 18, 16], valor="CANON_MM_SOLES", usa_niveles=False,
+         reemplaza_periodo=True, formato_valor="#,##0.00",
+         descripcion="PERUPETRO: canon y sobrecanon petrolero transferido a cada departamento por mes (millones de soles)."),
 ]}
 
 # columnas internas para filtrar (no salen en las descargas)
