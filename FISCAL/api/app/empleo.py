@@ -142,8 +142,11 @@ def cuadros(df, periodo=None):
     grafico = [{"periodo": etiqueta(q, True), "var": _var(_val(t, q - 100, "Total"), t.at[q, "Total"])} for q in periodos[-25:]]
     anexo = [{"periodo": etiqueta(q, True), **{n: _var(_val(t, q - 100, r), t.at[q, r]) for r, n in ORDEN_ANEXO},
               "Total": _var(_val(t, q - 100, "Total"), t.at[q, "Total"])} for q in periodos[-13:]]
+    # número de trabajadores (total), desde enero de tres años antes, como el gráfico del portal del MTPE
+    niveles = [{"periodo": etiqueta(q, True), "trabajadores": float(t.at[q, "Total"])} for q in periodos if q >= (p // 100 - 3) * 100 + 1]
     return {"periodo": f"{p // 100}-{p % 100:02d}", "ultimo": f"{ultimo // 100}-{ultimo % 100:02d}",
-            "titulo_mes": MESES[p % 100 - 1], "anio": p // 100, "cuadro": cuadro, "grafico": grafico, "anexo": anexo}
+            "titulo_mes": MESES[p % 100 - 1], "anio": p // 100, "cuadro": cuadro, "grafico": grafico, "anexo": anexo,
+            "niveles": niveles}
 
 
 def _val(t, p, rama):
@@ -181,6 +184,13 @@ def excel(region, c):
     for g in c["grafico"]:
         wg.append([g["periodo"], g["var"]])
     wg["A1"].font = neg
+    wn = wb.create_sheet("Trabajadores")
+    wn.append([f"{region.upper()}: NÚMERO DE TRABAJADORES ASALARIADOS PRIVADOS FORMALES"]); wn.append(["(Total, número de trabajadores)"]); wn.append([])
+    wn.append(["Mes", "Trabajadores"])
+    for g in c["niveles"]:
+        wn.append([g["periodo"], g["trabajadores"]])
+        wn.cell(wn.max_row, 2).number_format = "#,##0"
+    wn["A1"].font = neg
 
     wa = wb.create_sheet("Anexo")
     wa.append([f"{region.upper()}: TRABAJADORES ASALARIADOS PRIVADOS FORMALES POR SECTORES ECONÓMICOS"])

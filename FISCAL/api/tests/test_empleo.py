@@ -68,6 +68,8 @@ def test_cuadro_igual_al_publicado(cliente):
     assert (total["mes_anterior"], total["mes"], total["diciembre"]) == (38274, 39678, 39637)
     assert c["grafico"][-1] == {"periodo": "Abr. 2026", "var": 3.7}
     assert c["anexo"][-1]["Agricultura"] == 5.4 and c["anexo"][-1]["Total"] == 3.7
+    assert c["niveles"] == [{"periodo": "Abr. 2025", "trabajadores": 38274.0}, {"periodo": "Dic. 2025", "trabajadores": 39637.0},
+                            {"periodo": "Abr. 2026", "trabajadores": 39678.0}]
 
 
 def test_cuadro_por_defecto_y_errores(cliente):
@@ -79,7 +81,7 @@ def test_cuadro_por_defecto_y_errores(cliente):
 def test_cuadro_en_excel(cliente):
     r = cliente.get("/v1/cuadros/empleo?departamento=16&periodo=2026-04&formato=xlsx")
     wb = load_workbook(io.BytesIO(r.content))
-    assert wb.sheetnames == ["Cuadro", "Gráfico", "Anexo"]
+    assert wb.sheetnames == ["Cuadro", "Gráfico", "Trabajadores", "Anexo"]
     ws = wb["Cuadro"]
     assert ws["A1"].value == "LORETO: TRABAJADORES ASALARIADOS PRIVADOS FORMALES"
     assert [c.value for c in ws[4]] == ["Rama de actividad", "Abril 2025", "Abril 2026", "Var. %", "Dic. 2025", "Abr. 2026", "Var. %"]

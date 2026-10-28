@@ -174,10 +174,13 @@ Base `empleo` (hoja EMPLEO): `AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO`, 
 El total «Perú» no se guarda (la síntesis no lo usa). Lima Metropolitana y Lima Provincias van en el departamento 15
 sin pisarse. En cada región, la pestaña **Cuadros** de Empleo arma el cuadro de la síntesis (Loreto N° 6, San Martín
 N° 4, Ucayali N° 7: mes del año anterior, mes, var. %, diciembre anterior, mes, var. %; «Otros» es «No precisa»), el
-gráfico de 25 meses de var. % interanual del total y el anexo por sectores de 13 meses, y los descarga en Excel.
+gráfico del número de trabajadores (desde enero de tres años antes, como el portal del MTPE), el gráfico de 25 meses
+de var. % interanual del total y el anexo por sectores de 13 meses, y los descarga en Excel. En todos los gráficos de
+la página, el año va debajo de los meses.
 Las cifras se comprobaron con el Cuadro N° 6 publicado de Loreto (`tests/test_empleo.py`).
 
-**Descarga en formato LONG** (Las tres regiones → Datos → «Empleo · LONG por región»): el mismo Excel que genera el
+**Descarga en formato LONG** (pestaña Datos de Empleo en cada región, o Las tres regiones → Datos → «Empleo · LONG por
+región»), con todos los meses que publica el MTPE (desde enero 2016): el mismo Excel que genera el
 scraper (una hoja `AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO`, ordenada por región, actividad, año y mes, con su
 mismo nombre de archivo), de una región, de varias o de las 26. Botones de grupo: Sucursal Iquitos, Oriente, Norte,
 Centro, Sur y Lima y Callao (`GRUPOS_REGIONES` en `app/empleo.py`); solo marcan casillas, así que se puede combinar
