@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import almacen, archivos, bcrp_excel, carga, controles, db, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, mef, pesca_cuadros
+from . import almacen, archivos, bcrp_excel, carga, controles, db, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, mef, pesca_cuadros, sunat_expo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -432,6 +432,69 @@ def cuadro_exportaciones(departamento: str = Query(..., pattern=r"^(16|22|25)$")
     return {"region": region, "cuadros": c}
 
 
+# ── Base mensual de SUNAT (sunat_expo.py): revisión, correcciones y paso al ESTAD ──
+def _depto_expo(departamento):
+    if departamento not in sunat_expo.CORTO:
+        raise HTTPException(422, "departamento: 16, 22 o 25.")
+
+
+def _periodo_expo(periodo):
+    if not _RE_PERIODO.match(periodo or ""):
+        raise HTTPException(422, f"Periodo no válido: {periodo!r} (formato AAAA-MM).")
+    return int(periodo[:4]), int(periodo[5:7])
+
+
+@app.get("/v1/exportaciones/sunat", dependencies=[Depends(acceso)])
+def sunat_revision(departamento: str, periodo: str = ""):
+    """Estado de la base de SUNAT de la región: filas por estado, empresas por verificar, partidas sin clasificar,
+    productos que van a «Resto», el ESTAD propuesto contra el cargado, y destinos, aduanas y empresas del mes."""
+    _depto_expo(departamento)
+    r = sunat_expo.revision(departamento, periodo or None)
+    return json.loads(json.dumps({"revision": r}, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
+
+
+@app.post("/v1/exportaciones/sunat/{tabla}", dependencies=[Depends(acceso)])
+def sunat_corregir(tabla: str, cuerpo: dict = Body(...)):
+    """Correcciones de la revisión: empresas (BORRAR PARA, nota), partidas (tipo, categoría, producto), equivalencias
+    (producto -> fila del ESTAD) o reglas de limpieza (la lista completa). Luego se vuelve a procesar toda la base."""
+    filas = cuerpo.get("filas")
+    if not isinstance(filas, list):
+        raise HTTPException(422, "Falta la lista «filas».")
+    try:
+        if tabla == "empresas":
+            sunat_expo.actualizar_empresas(filas)
+        elif tabla == "partidas":
+            sunat_expo.actualizar_partidas(filas)
+        elif tabla == "equivalencias":
+            sunat_expo.actualizar_equivalencias(filas)
+        elif tabla == "reglas":
+            sunat_expo.guardar_tabla("reglas", pd.DataFrame([f for f in filas if str(f.get("valor") or "").strip()], columns=sunat_expo.TABLAS["reglas"]))
+        else:
+            raise HTTPException(404, f"No hay tabla {tabla!r}.")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return {"filas": sunat_expo.reprocesar()}
+
+
+@app.post("/v1/exportaciones/sunat-estad", dependencies=[Depends(acceso)])
+def sunat_pasar(departamento: str, periodo: str):
+    """Pasa el ESTAD propuesto (desde las filas ok de SUNAT) del mes a la base del ESTAD de la región."""
+    _depto_expo(departamento)
+    a, m = _periodo_expo(periodo)
+    try:
+        return {"filas": sunat_expo.pasar_al_estad(departamento, a, m)}
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/v1/exportaciones/sunat-estad.xlsx", dependencies=[Depends(acceso)])
+def sunat_propuesta_excel(departamento: str, periodo: str):
+    _depto_expo(departamento)
+    a, m = _periodo_expo(periodo)
+    return Response(sunat_expo.excel_propuesta(departamento, a, m), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers=_adjunto(f"ESTAD propuesto {sunat_expo.CORTO[departamento]} {periodo}.xlsx"))
+
+
 @app.get("/v1/variaciones", dependencies=[Depends(acceso)])
 def variaciones_inversion(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "", comparar: str = ""):
     """Variaciones alarmantes de la inversión: 5 mayores aumentos y caídas en soles (mes y acumulado), por todos los
@@ -508,6 +571,30 @@ def fiscal_procesar():
     except (mef.ErrorGitHub, OSError) as e:
         raise HTTPException(502, str(e))
     return {"lanzado": True}
+
+
+@app.post("/v1/exportaciones/padron", dependencies=[Depends(acceso)])
+def expo_padron():
+    """Lanza en GitHub Actions la búsqueda de razón social de los RUC nuevos en el padrón reducido de SUNAT
+    (EXPORT/automatizacion/padron_ruc.py: baja el padrón, unos 300 MB, y completa la tabla de empresas)."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
+    try:
+        mef.lanzar(nombre="padron", inputs={})
+    except (mef.ErrorGitHub, OSError) as e:
+        raise HTTPException(502, str(e))
+    return {"lanzado": True, "pendientes": len(sunat_expo.pendientes_ruc())}
+
+
+@app.get("/v1/exportaciones/padron", dependencies=[Depends(acceso)])
+def expo_padron_corridas():
+    corr = []
+    if mef.configurado():
+        try:
+            corr = mef.corridas(3, nombre="padron")
+        except (mef.ErrorGitHub, OSError):
+            corr = []
+    return {"configurado": mef.configurado(), "pendientes": sunat_expo.pendientes_ruc(), "corridas": corr}
 
 
 @app.get("/v1/ipc", dependencies=[Depends(acceso)])

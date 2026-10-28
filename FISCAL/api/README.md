@@ -240,6 +240,26 @@ Cuadros (`/v1/cuadros/exportaciones?departamento=16&periodo=AAAA-MM[&flujo=impo]
   corta las barras de más de 250 %), circulares de no tradicionales (6 principales + Otros, año anterior y enero-mes) y
   los 5 principales productos de enero-mes y del mes.
 
+### Base mensual de SUNAT (pestaña «SUNAT» de Exportaciones)
+
+El flujo de ANUAL_PRO (hoja ORIGEN y tablas dinámicas) en la página (`sunat_expo.py`, base `expo-sunat`):
+1. Subir un **ANUAL_PRO_AAAA.xlsx** una vez: carga los diccionarios (UNICOS: PROD_UNICOS, PAISES, EMPRESAS, ADUANA; y
+   PARTIDA) y su hoja ORIGEN como base de ese año.
+2. Cada mes, subir la base de SUNAT tal como llega (**X_AAAAMM.xlsx**). Cada fila toma producto, categoría, país,
+   aduana, empresa y BORRAR PARA, y un estado: **ok** (BORRAR PARA = OK; solo estas entran), **verificar** (empresa nueva
+   o BORRAR PARA vacío), **borrar** (BORRAR PARA con otra cosa, o una regla de limpieza obligatoria: hoy, café y tara en
+   polvo en Loreto; se editan en la página) o **clasificar** (partida sin tipo ni producto).
+3. Revisión en la página: empresas por verificar (BORRAR PARA y nota; razón social con «Buscar en el padrón de SUNAT»,
+   que corre `EXPORT/automatizacion/padron_ruc.py` en GitHub: workflow `expo_padron_ruc.yml`, con DATABASE_URL),
+   partidas sin clasificar y productos que van a «Resto» (equivalencias producto → fila del ESTAD). Cada corrección
+   vuelve a procesar toda la base.
+4. **ESTAD propuesto**: la tabla dinámica de las filas ok, fila por fila del último ESTAD de la región (por categoría al
+   grupo; dentro del grupo, al producto del mismo nombre o de la equivalencia; maderas sin fila propia a «Otros
+   acabados»; lo demás a «Resto»; tipo 3 a «Otras exportaciones»), contra el ESTAD cargado. «Pasar al ESTAD» lo guarda
+   como el ESTAD del mes y los cuadros lo usan. También destinos, aduanas y empresas del mes y del acumulado.
+
+Con SUNAT 2023 (X_202301-202312) la página llega a las mismas 24 696 filas ok que la hoja ORIGEN depurada a mano.
+
 El antiguo scraper de Infotrade (EXPORT/*.ipynb) ya no se usa.
 
 ## Ejecución del presupuesto (fase 3)

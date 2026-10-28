@@ -1,0 +1,37 @@
+# Exportaciones · razón social de los RUC nuevos: baja el padrón reducido de SUNAT y completa la tabla de empresas de la
+# página (EXPORT/automatizacion/padron_ruc.py), como razon_social_ruc.py en Colab pero con los RUC pendientes de la base.
+#   · a mano: el botón «Buscar en el padrón de SUNAT» de Exportaciones → SUNAT, o Actions → Run workflow
+# Requiere el secreto DATABASE_URL. El padrón pesa unos 300 MB: tarda varios minutos.
+name: Exportaciones · padrón de RUC
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: expo-padron
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  padron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r FISCAL/api/requirements.txt
+
+      - name: Buscar los RUC en el padrón y guardarlos en la página
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONUNBUFFERED: "1"
+        run: python EXPORT/automatizacion/padron_ruc.py
