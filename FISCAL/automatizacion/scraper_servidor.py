@@ -33,6 +33,16 @@ def periodo_por_defecto(hoy=None):
     return f"{anio}-01", f"{anio}-{mes:02d}"
 
 
+def tramo_por_defecto(tramo, hoy=None):
+    """El año por defecto en dos tramos (enero-junio y julio-último mes cerrado), cada uno en su propio job de GitHub:
+    con 3 consultas simultáneas un año completo no entra en las 6 horas que GitHub da a un job. None: no hay tramo."""
+    d0, d1 = periodo_por_defecto(hoy)
+    anio, mes = d1[:4], int(d1[5:])
+    if tramo == 1:
+        return d0, f"{anio}-{min(mes, 6):02d}"
+    return (f"{anio}-07", d1) if mes >= 7 else None
+
+
 def sustituir_colab():
     """«google.colab.drive» (Drive ya es una carpeta local) y, si falta, «IPython.display» (display imprime)."""
     colab, drive = types.ModuleType("google.colab"), types.ModuleType("google.colab.drive")
@@ -74,7 +84,7 @@ def raspar(desde, hasta, prueba):
     a0, m0 = map(int, desde.split("-"))
     a1, m1 = map(int, hasta.split("-"))
     fijar = {"PRUEBA_RAPIDA": prueba, "AÑO_INICIO": a0, "MES_INICIO": m0, "AÑO_FIN": a1, "MES_FIN": m1,
-             "WORKERS": int(os.environ.get("FISCAL_WORKERS", "6"))}   # consultas simultáneas (el MEF tolera 4-8)
+             "WORKERS": int(os.environ.get("FISCAL_WORKERS", "3"))}   # consultas simultáneas: con 6, el MEF devolvió páginas cruzadas (2026)
     (TRABAJO / "Fiscal").mkdir(parents=True, exist_ok=True)
     sustituir_colab()
     g = {"__name__": "__main__", "display": lambda *x, **k: print(*x)}
@@ -97,7 +107,14 @@ def main():
     ap.add_argument("--desde", default="", help=f"AAAA-MM (por defecto {d0})")
     ap.add_argument("--hasta", default="", help=f"AAAA-MM (por defecto {d1}, el último mes cerrado)")
     ap.add_argument("--prueba", action="store_true", help="PRUEBA_RAPIDA del notebook: solo el mes «desde» y Loreto")
+    ap.add_argument("--tramo", type=int, choices=[1, 2], help="sin --desde/--hasta: 1 = enero-junio, 2 = julio-último mes cerrado")
     a = ap.parse_args()
+    if a.tramo and not (a.desde or a.hasta):
+        t = tramo_por_defecto(a.tramo)
+        if t is None:
+            print(f"Tramo {a.tramo}: el último mes cerrado es {d1}; no hay meses de julio en adelante. Nada que hacer.")
+            return
+        d0, d1 = t
     desde, hasta = a.desde or d0, a.hasta or d1
     for p in (desde, hasta):
         if not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", p):

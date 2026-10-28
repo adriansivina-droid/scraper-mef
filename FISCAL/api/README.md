@@ -112,8 +112,12 @@ en el notebook, el servidor usa el cambio.
 - **Departamentos:** el detalle municipal (`DEV Funcion.Municipalidad`, base «Inversión por municipalidad»), el PIM por
   función y el PIM por función y municipalidad se bajan para **los 25 departamentos** (`DEPARTAMENTOS_NACIONAL` en el
   BLOQUE 2 del notebook); el resto de bloques, para Loreto, San Martín y Ucayali. Todo se descarga con el formato de
-  `PIM_Funcion.xlsx`. Con 25 departamentos una corrida de un año completo toma unas 2 a 3 horas: para periodos largos,
-  conviene un año por corrida (el límite de GitHub es de 6 horas por corrida).
+  `PIM_Funcion.xlsx`.
+- **Consultas simultáneas: 3** (entrada «consultas» del flujo; `FISCAL_WORKERS`). Con 6, la corrida de 2026 recibió del
+  MEF páginas de otro filtro desde marzo («la URL no aplicó el filtro»); con 3 salió limpia, pero más lenta: unos 30
+  minutos por mes con 25 departamentos. Por eso, sin periodo elegido (corrida automática o botón con el periodo vacío),
+  el año se baja en **dos tramos seguidos**, enero-junio y julio-último mes cerrado, cada uno en su job (GitHub da 6
+  horas por job). Con un periodo elegido a mano va en un solo job: hasta unos 10 meses por corrida.
 - Los CSV de cada corrida quedan como artefacto en GitHub por 30 días (incluidos los CONTROL y LOG).
 - Requiere el secreto `DATABASE_URL` en GitHub (la misma cadena de Neon). `FISCAL/automatizacion/prueba_mef.py`
   (flujo «Fiscal · prueba de conexión al MEF») comprueba que el MEF responde desde GitHub.
