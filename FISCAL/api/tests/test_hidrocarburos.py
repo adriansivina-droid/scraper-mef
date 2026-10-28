@@ -1,0 +1,130 @@
+"""Hidrocarburos: carga de los CSV de PERUPETRO (como los deja el flujo diario en Drive) y cuadros de la síntesis.
+
+Datos reales de 2024 y 2025 (HIDROCARBUROS/analisis/Loreto_Ucayali_datos_mensuales.xlsx); las cifras se comparan con
+el texto de Loreto 2025 (analisis/Loreto_petroleo_2025_texto.md): 7,9 millones de barriles, +22,9 %; Lote 95, +5,9 %.
+"""
+import io
+import os
+from pathlib import Path
+
+import pandas as pd
+import pytest
+from openpyxl import load_workbook
+from sqlalchemy import text
+
+from app import db, drive
+from tests.test_api import cliente_http
+from tests.test_pesca import DriveFalsa
+
+ANALISIS = Path(__file__).resolve().parents[3] / "HIDROCARBUROS" / "analisis" / "Loreto_Ucayali_datos_mensuales.xlsx"
+DEPTO = {"95": "LORETO", "8": "LORETO", "192": "LORETO", "67": "LORETO", "39": "LORETO", "131": "UCAYALI / HUANUCO", "31-C": ""}
+
+
+def csvs():
+    d = pd.read_excel(ANALISIS)
+    d = d[(d["TEMA"] == "Producción") & d["LOTE"].notna() & (d["LOTE"] != "TODOS (PAÍS)")].copy()
+    d["LOTE"] = d["LOTE"].astype(str)
+    comunes = lambda x: pd.DataFrame({"AÑO": x["AÑO"], "MES": x["MES"], "FECHA": x["FECHA"], "ZONA": "SELVA",
+                                      "DEPARTAMENTO": x["LOTE"].map(DEPTO), "OPERADOR": x["OPERADOR"], "LOTE": x["LOTE"],
+                                      "LOTE_ORIGINAL": x["LOTE"], "LOTE_HISTORICO": x["LOTE"], "PRODUCTO": x["DETALLE"]})
+    liq = d[d["DETALLE"] != "GAS NATURAL"]
+    liq = comunes(liq).assign(BARRILES=liq["VALOR"], BPD=None, ESTADO_FILA="OK", FUENTE="prueba")
+    zocalo = liq.iloc[:1].assign(LOTE="Z-69", LOTE_ORIGINAL="Z-69", LOTE_HISTORICO="Z-2B/Z-69", DEPARTAMENTO="", BARRILES=500)
+    gas = d[d["DETALLE"] == "GAS NATURAL"]
+    gas = comunes(gas).assign(MPC=gas["VALOR"], MMPCD=None, ESTADO_FILA="OK", FUENTE="prueba")
+    c = pd.read_excel(ANALISIS)
+    c = c[c["SERIE"].str.startswith("Canon transferido por departamento", na=False)]
+    canon = pd.DataFrame({"AÑO": c["AÑO"], "MES": c["MES"], "FECHA": c["FECHA"], "DEPARTAMENTO": c["DEPARTAMENTO"],
+                          "CANON_MM_SOLES": c["VALOR"], "FUENTE": "prueba"})
+    canon = pd.concat([canon, canon.assign(DEPARTAMENTO="TOTAL")])
+    a_bytes = lambda df: df.to_csv(index=False).encode("utf-8-sig")
+    return {"PP_produccion_lote_mes_1994-2026.csv": a_bytes(pd.concat([liq, zocalo])),
+            "PP_produccion_gas_lote_mes_1994-2026.csv": a_bytes(gas), "PP_canon_departamento_mes.csv": a_bytes(canon)}
+
+
+@pytest.fixture()
+def cliente(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", os.environ.get("PRUEBA_DATABASE_URL") or f"sqlite:///{tmp_path / 'hidro.db'}")
+    monkeypatch.delenv("APP_CLAVE", raising=False)
+    db.reiniciar_motor()
+    if db.motor().dialect.name == "postgresql":
+        with db.motor().begin() as cx:
+            cx.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public"))
+        db.reiniciar_motor()
+    yield cliente_http()
+    db.reiniciar_motor()
+
+
+def subir(c, archivos):
+    r = c.post("/v1/cargas", files=[("archivos", (n, b, "text/csv")) for n, b in archivos.items()])
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_carga_y_departamentos(cliente):
+    r = subir(cliente, csvs())
+    assert set(r["bases"]) == {"hidro-produccion", "hidro-canon"}
+    assert r["bases"]["hidro-produccion"]["departamentos"] == ["16", "25", "99"]   # 31-C sin departamento → Ucayali por su lote
+    assert any("Z-69" in a for a in r["avisos"])
+    d = cliente.get("/v1/descargas?base=hidro-produccion&departamento=25&desde=2025-01&hasta=2025-12&formato=json").json()["hidro-produccion"]["datos"]
+    assert {(f["LOTE"], f["PRODUCTO"], f["UNIDAD"], f["DEPARTAMENTO"]) for f in d} == {
+        ("131", "PETROLEO", "BARRILES", "UCAYALI"), ("31-C", "LGN", "BARRILES", "UCAYALI"), ("31-C", "GAS NATURAL", "MPC", "UCAYALI")}
+    canon = cliente.get("/v1/descargas?base=hidro-canon&departamento=16&desde=2025-01&hasta=2025-12&formato=json").json()["hidro-canon"]
+    assert canon["filas"] == 12 and abs(sum(f["CANON_MM_SOLES"] for f in canon["datos"]) - 213.85) < 0.005
+
+
+def test_recargar_no_duplica_y_mueve_de_departamento(cliente):
+    subir(cliente, csvs())
+    a = csvs()
+    liq = pd.read_csv(io.BytesIO(a["PP_produccion_lote_mes_1994-2026.csv"]), dtype=str)
+    liq.loc[liq["LOTE"] == "Z-69", "DEPARTAMENTO"] = "TUMBES"          # el mapa le asigna departamento
+    a["PP_produccion_lote_mes_1994-2026.csv"] = liq.to_csv(index=False).encode("utf-8-sig")
+    subir(cliente, a)
+    e = cliente.get("/v1/estado").json()["bases"]["hidro-produccion"]
+    assert e["departamentos"] == ["16", "24", "25"]
+    total = sum(len(pd.read_csv(io.BytesIO(b))) for n, b in a.items() if "produccion" in n)
+    assert e["filas"] == total
+
+
+def test_cuadro_loreto_igual_al_texto(cliente):
+    subir(cliente, csvs())
+    c = cliente.get("/v1/cuadros/hidrocarburos?departamento=16").json()["cuadros"]
+    assert c["periodo"] == "2025-12" and [b["producto"] for b in c["bloques"]] == ["Petróleo"]
+    filas = {f["lote"]: f for f in c["bloques"][0]["filas"]}
+    assert list(filas) == ["Lote 95", "Lote 8", "Total"]                 # sin los lotes que no produjeron
+    assert round(filas["Total"]["acum"]) == 7905 and filas["Total"]["var_acum"] == 22.9
+    assert filas["Lote 95"]["var_acum"] == 5.9 and round(filas["Lote 8"]["acum"]) == 1130
+    assert c["grafico"]["producto"] == "Petróleo" and len(c["grafico"]["serie"]) == 24
+    assert c["anexo"][0]["lotes"] == ["Lote 95", "Lote 8"] and len(c["anexo"][0]["filas"]) == 13
+    assert c["canon"]["acum"] == 213.85 and c["canon"]["var_acum"] is None   # la muestra no trae el canon de 2024
+
+
+def test_cuadro_ucayali_y_excel(cliente):
+    subir(cliente, csvs())
+    c = cliente.get("/v1/cuadros/hidrocarburos?departamento=25&periodo=2025-06").json()["cuadros"]
+    assert [b["producto"] for b in c["bloques"]] == ["Petróleo", "Líquidos de gas natural", "Gas natural"]
+    assert c["bloques"][2]["unidad"] == "millones de pies cúbicos"
+    r = cliente.get("/v1/cuadros/hidrocarburos?departamento=25&periodo=2025-06&formato=xlsx")
+    assert "Hidrocarburos%20Ucayali%202025-06.xlsx" in r.headers["content-disposition"]
+    wb = load_workbook(io.BytesIO(r.content))
+    assert wb.sheetnames == ["Cuadro", "Gráfico", "Anexo", "Canon"]
+    assert [x.value for x in wb["Cuadro"][3]] == ["Producto / lote", "Junio 2024", "Junio 2025", "Var. %", "Ene.-Jun. 2024", "Ene.-Jun. 2025", "Var. %"]
+    assert cliente.get("/v1/cuadros/hidrocarburos?departamento=25&periodo=2026-03").status_code == 422
+    assert cliente.get("/v1/cuadros/hidrocarburos?departamento=22").json()["cuadros"] is None
+
+
+def test_drive_toma_solo_los_csv_de_hidrocarburos(cliente, monkeypatch):
+    a = csvs()
+    viejo = a["PP_produccion_lote_mes_1994-2026.csv"]
+    carpeta = {"H1": ("PP_produccion_lote_mes_1994-2025.csv", "2026-01-01T00:00:00Z", b"x"),     # de una corrida anterior
+               "H2": ("PP_produccion_lote_mes_1994-2026.csv", "2026-10-28T12:40:00Z", viejo),
+               "H3": ("PP_produccion_gas_lote_mes_1994-2026.csv", "2026-10-28T12:40:00Z", a["PP_produccion_gas_lote_mes_1994-2026.csv"]),
+               "H4": ("PP_canon_departamento_mes.csv", "2026-10-28T12:40:00Z", a["PP_canon_departamento_mes.csv"]),
+               "H5": ("PP_regalias_lote_anio.csv", "2026-10-28T12:40:00Z", b"x"), "H6": ("PP_LOTES_GEO.csv", "2026-10-28T12:40:00Z", b"x")}
+    falsa = DriveFalsa({drive.CARPETAS["hidrocarburos"]: carpeta})
+    monkeypatch.setenv("GOOGLE_DRIVE_CREDENCIAL", "{}")
+    monkeypatch.setattr(drive, "LectorDrive", lambda credencial: falsa)
+    r = cliente.post("/v1/drive/sincronizar").json()
+    assert sorted(falsa.bajados) == ["H2", "H3", "H4"] and r["carpetas"]["hidrocarburos"] == 3
+    assert set(r["bases"]) == {"hidro-produccion", "hidro-canon"}
+    assert cliente.post("/v1/drive/sincronizar").json()["bases"] == {}      # nada nuevo

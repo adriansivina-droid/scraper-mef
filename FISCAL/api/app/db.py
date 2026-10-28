@@ -50,7 +50,14 @@ def guardar(base_id, df):
         return 0
     m = motor()
     with m.begin() as cx:
-        if existe(b.tabla):
+        if existe(b.tabla) and b.reemplaza_periodo:
+            # la serie completa: se borra el tramo de periodos que trae, en todos los departamentos (un lote puede
+            # cambiar de departamento cuando se cruza con el mapa)
+            for nivel, g in df.groupby("_nivel"):
+                p = g["_anio"] * 100 + g["_mes"]
+                cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE _nivel = :n AND (_anio * 100 + _mes) BETWEEN :p0 AND :p1'),
+                           {"n": nivel, "p0": int(p.min()), "p1": int(p.max())})
+        elif existe(b.tabla):
             claves = df[INTERNAS].drop_duplicates().itertuples(index=False)
             for anio, mes, depto, nivel in claves:
                 cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE _anio = :a AND _mes = :m AND _depto = :d AND _nivel = :n'),

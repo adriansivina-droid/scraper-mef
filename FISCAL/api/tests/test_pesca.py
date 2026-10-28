@@ -180,8 +180,9 @@ class DriveFalsa:
     def __init__(self, carpetas):
         self.carpetas, self.bajados = carpetas, []
 
-    def listar(self, carpeta):
-        return [{"id": i, "name": n, "modifiedTime": m} for i, (n, m, _) in self.carpetas.get(carpeta, {}).items()]
+    def listar(self, carpeta, aceptar=None):
+        aceptar = aceptar or (lambda n: n.endswith(".xlsx"))
+        return [{"id": i, "name": n, "modifiedTime": m} for i, (n, m, _) in self.carpetas.get(carpeta, {}).items() if aceptar(n)]
 
     def bajar(self, file_id):
         self.bajados.append(file_id)
@@ -219,7 +220,7 @@ def test_drive_sincroniza_solo_lo_nuevo(cliente, drive_falsa):
     assert sorted(a["nombre"] for a in r["archivos"]) == ["CONSUMO_FEBRERO_-_2026-OPP.xlsx", "ESTADISTICA_UCA_2026.xlsx"]
     assert datos(cliente, "pesca-loreto", "16").query("ESPECIE == 'Boquichico'").VOLUMEN.tolist() == [30.0]
     e = cliente.get("/v1/drive").json()
-    assert e["configurado"] and e["ultima"]["origen"] == "GitHub Actions" and len(e["carpetas"]) == 3
+    assert e["configurado"] and e["ultima"]["origen"] == "GitHub Actions" and len(e["carpetas"]) == 4
     r = cliente.post("/v1/drive/sincronizar?todo=true").json()                # volver a procesar todo
     assert len(r["archivos"]) == 3
 
@@ -264,6 +265,6 @@ def test_drive_cuenta_sin_acceso_a_la_carpeta(cliente, monkeypatch):
 def test_drive_dice_cuantos_excel_hay_en_cada_carpeta(cliente, drive_falsa):
     cliente.post("/v1/drive/sincronizar")
     r = cliente.post("/v1/drive/sincronizar").json()
-    assert r["carpetas"] == {"pesca-loreto": 1, "pesca-san-martin": 1, "pesca-ucayali": 0}
+    assert r["carpetas"] == {"pesca-loreto": 1, "pesca-san-martin": 1, "pesca-ucayali": 0, "hidrocarburos": 0}
     assert r["avisos"] == ["No hay archivos nuevos ni modificados en las carpetas de Drive "
-                           "(Excel en cada carpeta · Loreto: 1, San Martín: 1, Ucayali: 0)."]
+                           "(archivos en cada carpeta · Loreto: 1, San Martín: 1, Ucayali: 0, Hidrocarburos: 0)."]

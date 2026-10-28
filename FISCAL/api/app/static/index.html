@@ -63,8 +63,9 @@
       lead: "Producción de los principales cultivos y crianzas, y avance de siembras de la campaña.", cuadros: ["Producción agropecuaria (t)", "Superficie sembrada (ha)", "Anexo de producción agrícola"] },
     pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Drive, cada día a las 7:30 a. m., o subiendo el Excel", bases: (r) => [r.pesca], actualizar: "drive",
       lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: ["Producción pesquera (VBP a precios de 2007)", "Cuadro Nº 07 · Indicadores del sector pesquero (Loreto)"] },
-    hidro: { t: "Sector hidrocarburos", estado: "parcial", fuente: "PERUPETRO; precio del crudo, Reuters", entra: "Scraper diario (7:00 a. m.) que guarda en Drive",
-      lead: "Producción fiscalizada de petróleo por lote, canon y regalías. El scraper ya corre todos los días; falta mostrar sus datos aquí.", cuadros: ["Producción de petróleo crudo por lote (barriles)", "Canon y regalías"] },
+    hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Scraper diario de PERUPETRO (7:00 a. m.) → Drive → página (7:30 y 9:00 a. m.)",
+      bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "drive-hidro", cuadros: "hidrocarburos",
+      lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
     manu: { t: "Sector manufactura", estado: "falta", fuente: "DIREPRO y encuesta BCRP a empresas industriales", entra: "Archivo mensual",
       lead: "Índice de volumen físico de la manufactura.", cuadros: ["Índice de volumen físico", "Anexo de producción manufacturera"] },
     cemento: { t: "Despachos de cemento", estado: "falta", fuente: "Empresas cementeras", entra: "Archivo mensual",
@@ -96,7 +97,7 @@
     tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-drive", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
   const C = { panorama: "Panorama de las tres regiones", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
-              "act-empleo": "Scraper de empleo", "act-drive": "Pesca desde Drive", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
+              "act-empleo": "Scraper de empleo", "act-drive": "Drive: pesca e hidrocarburos", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
   const CORTO = { [V]: "V. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
 
@@ -277,6 +278,42 @@
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
   }
 
+  // ── Cuadros de hidrocarburos (los de la síntesis) ──
+  const fmt1 = (v) => v == null ? "" : v.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  async function cuadrosHidro(r, caja, periodo) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
+    try {
+      const j = await api(`/v1/cuadros/hidrocarburos?departamento=${r.cod}${periodo ? `&periodo=${periodo}` : ""}`), c = j.cuadros;
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay producción de hidrocarburos de ${esc(r.nombre)}.</b><span>Sincroniza la carpeta DATA de Drive o sube los CSV en la pestaña «Actualizar».</span></div>`; return; }
+      const e = ESTADO.bases["hidro-produccion"], meses = MESES.filter((m) => m >= (e.desde || "") && m <= c.ultimo);
+      const mes = c.titulo_mes, a = c.anio, m3 = mes.slice(0, 3), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
+      const cuadro = c.bloques.map((b) => `<tr class="grupo"><td colspan="7"><b>${esc(b.producto)}</b> <span class="nota">(${esc(b.unidad)})</span></td></tr>` + b.filas.map((f) =>
+        `<tr class="${f.lote === "Total" ? "total" : ""}"><td>${esc(f.lote)}</td><td class="n">${fmt1(f.mes_anterior)}</td><td class="n">${fmt1(f.mes)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td><td class="n">${fmt1(f.acum_anterior)}</td><td class="n">${fmt1(f.acum)}</td><td class="n ${cls(f.var_acum)}">${pct(f.var_acum)}</td></tr>`).join("")).join("");
+      const gr = c.grafico, g = gr ? gr.serie : [], max = Math.max(0.001, ...g.map((x) => x.valor)), W = 760, H = 220, base0 = 190, bw = W / Math.max(g.length, 1);
+      const barras = g.map((x, i) => { const h = x.valor / max * 160;
+        return `<rect class="pos" x="${i * bw + bw * 0.18}" y="${base0 - h}" width="${bw * 0.64}" height="${Math.max(h, 1)}"><title>${esc(x.periodo)}: ${fmt1(x.valor)}${x.var == null ? "" : ` (${pct(x.var)} %)`}</title></rect>
+          <text class="val" x="${i * bw + bw / 2}" y="${base0 - h - 4}" text-anchor="middle">${fmt1(x.valor)}</text>
+          <text x="${i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${esc(x.periodo.split(" ")[0])}</text>`; }).join("");
+      const anexos = c.anexo.map((b) => `<div class="caja"><h3>${esc(r.nombre)}: producción de ${esc(b.producto.toLowerCase())} por lote</h3><p>(${esc(b.unidad.charAt(0).toUpperCase() + b.unidad.slice(1))})</p>
+          <div class="scroll"><table><tr><th>Mes</th>${b.lotes.map((l) => `<th class="n">${esc(l)}</th>`).join("")}<th class="n">Total</th></tr>${b.filas.map((f) => `<tr><td>${esc(f.periodo)}</td>${b.lotes.map((l) => `<td class="n">${fmt1(f[l])}</td>`).join("")}<td class="n"><b>${fmt1(f.Total)}</b></td></tr>`).join("")}</table></div></div>`).join("");
+      const k = c.canon;
+      const canon = k ? `<div class="caja"><h3>${esc(r.nombre)}: canon y sobrecanon petrolero transferido</h3><p>(Millones de soles · último mes: ${esc(etqMes(k.ultimo))})</p>
+          <div class="scroll"><table><tr><th>Mes</th><th class="n">Millones de S/</th><th class="n">Var. %</th></tr>${k.meses.map((x) => `<tr><td>${esc(x.periodo)}</td><td class="n">${fmt1(x.valor)}</td><td class="n ${cls(x.var)}">${pct(x.var)}</td></tr>`).join("")}
+          <tr class="total"><td>Ene.-${esc(k.titulo_mes.slice(0, 3))}. ${k.anio}</td><td class="n">${fmt1(k.acum)}</td><td class="n ${cls(k.var_acum)}">${pct(k.var_acum)}</td></tr></table></div></div>`
+        : '<div class="caja"><h3>Canon y sobrecanon petrolero</h3><p class="nota">Todavía no se cargó PP_canon_departamento_mes.csv.</p></div>';
+      caja.innerHTML = `<div class="fila"><label class="campo" for="hid-p">Mes del informe<select id="hid-p">${meses.slice().reverse().map((m) => `<option value="${m}"${m === c.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
+          <button class="btn" type="button" id="hid-xlsx">Descargar los cuadros en Excel</button></div>
+        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: PRODUCCIÓN DE HIDROCARBUROS</h3><p>(Producción fiscalizada)</p>
+          <div class="scroll"><table><tr><th>Producto / lote</th><th class="n">${mes} ${a - 1}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Ene.-${m3}. ${a - 1}</th><th class="n">Ene.-${m3}. ${a}</th><th class="n">Var. %</th></tr>${cuadro}</table></div>
+          <p class="nota">Fuente: PERUPETRO, producción fiscalizada mensual por lote (estadística anual y mensual).</p></div>
+        ${gr ? `<div class="caja"><h3>Gráfico · Producción de ${esc(gr.producto.toLowerCase())}</h3><p>(${esc(gr.unidad.charAt(0).toUpperCase() + gr.unidad.slice(1))})</p>
+          <div class="scroll"><svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Producción diaria promedio por mes"><line class="eje" x1="0" x2="${W}" y1="${base0}" y2="${base0}"></line>${barras}</svg></div></div>` : ""}
+        ${anexos}${canon}`;
+      $("hid-p").addEventListener("change", (ev) => cuadrosHidro(r, caja, ev.target.value));
+      $("hid-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/hidrocarburos?departamento=${r.cod}&periodo=${c.periodo}&formato=xlsx`; });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
+  }
+
   // ── Carga de archivos, Drive y scrapers de GitHub ──
   function resultado(r, tit, ok) {
     const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(base(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
@@ -350,10 +387,12 @@
       const d = await api("/v1/drive");
       if (!d.configurado) { caja.innerHTML = '<div class="err-box"><b>Falta conectar Drive</b><span>Agrega la variable GOOGLE_DRIVE_CREDENCIAL en Render (la misma credencial del flujo de hidrocarburos). Pasos en FISCAL/api/README.md.</span></div>'; return; }
       const u = d.ultima, archivos = u ? u.resumen.archivos || [] : [], cuenta = u && u.resumen.carpetas ? u.resumen.carpetas : {};
-      const RN = { "pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali" };
+      const RN = { "pesca-loreto": "Pesca · Loreto", "pesca-san-martin": "Pesca · San Martín", "pesca-ucayali": "Pesca · Ucayali", hidrocarburos: "Hidrocarburos · DATA" };
       const carpetas = Object.entries(d.carpetas).filter(([b]) => !soloBase || b === soloBase);
-      caja.innerHTML = `<p>Deja los Excel que manda la DIREPRO en su carpeta de crudos: se cargan solos cada día a las 7:30 a. m. y al instante con el botón. Solo se procesan los archivos nuevos o modificados.</p>
-        <div class="scroll"><table><tr><th>Carpeta de crudos</th><th class="n">Excel en la última revisión</th></tr>${carpetas.map(([b, cid]) => `<tr><td><a href="https://drive.google.com/drive/folders/${encodeURIComponent(cid)}" target="_blank" rel="noopener">${esc(RN[b])}</a></td><td class="n">${cuenta[b] ?? "—"}</td></tr>`).join("")}</table></div>
+      caja.innerHTML = `<p>${soloBase === "hidrocarburos" ? "El scraper diario de PERUPETRO (7:00 a. m.) deja en la carpeta DATA los CSV de producción por lote y de canon. La página toma el más reciente de cada uno cada día a las 7:30 y a las 9:00 a. m., y al instante con el botón."
+          : soloBase ? "Deja los Excel que manda la DIREPRO en su carpeta de crudos: se cargan solos cada día a las 7:30 y a las 9:00 a. m. y al instante con el botón."
+          : "Pesca: los Excel de las DIREPRO en sus carpetas de crudos. Hidrocarburos: los CSV que el scraper de PERUPETRO deja en DATA. Se cargan solos cada día a las 7:30 y a las 9:00 a. m., y al instante con el botón."} Solo se procesan los archivos nuevos o modificados.</p>
+        <div class="scroll"><table><tr><th>Carpeta</th><th class="n">Archivos en la última revisión</th></tr>${carpetas.map(([b, cid]) => `<tr><td><a href="https://drive.google.com/drive/folders/${encodeURIComponent(cid)}" target="_blank" rel="noopener">${esc(RN[b])}</a></td><td class="n">${cuenta[b] ?? "—"}</td></tr>`).join("")}</table></div>
         <p class="nota">Última sincronización: ${u ? `${esc(fecha(u.fecha))} (${esc(u.origen)}) · ${archivos.length ? `${archivos.length} archivo(s): ${esc(archivos.map((a) => a.nombre).join(", "))}` : "sin archivos nuevos"}` : "todavía ninguna"}.</p>
         <div class="fila"><label class="chk"><input type="checkbox" id="drive-todo"> Volver a procesar todos los archivos</label><button class="btn" type="button" id="drive-sinc">Sincronizar ahora</button></div><div id="drive-res" aria-live="polite"></div>`;
       $("drive-sinc").addEventListener("click", async () => {
@@ -372,23 +411,24 @@
   function sectorRegion() {
     const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
     const tabs = ["Datos", "Cuadros", "Actualizar", ...(s.extra || [])];
-    const t = pestana[grupo + id] || (s.cuadros === "empleo" ? "Cuadros" : "Datos");
+    const t = pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
     if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : s.actualizar === "empleo" ? irComun("empleo-long", "Empleo · LONG por región") + " (el Excel tal como lo da el scraper, de una, varias o todas las regiones)" : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
       : `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(s.t.toLowerCase())} en la página.</b><span>Fuente: ${esc(s.fuente)}. Entrará como: ${esc(s.entra.toLowerCase())}.</span></div>`;
-    else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>'
+    else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
-      : s.actualizar === "drive" ? `<div class="grid2"><div class="caja"><h3>Carpeta de crudos de ${esc(r.nombre)}</h3><div id="drive-caja"></div></div>${cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG del notebook.`)}</div>`
+      : s.actualizar === "drive-hidro" ? `<div class="grid2"><div class="caja"><h3>Carpeta DATA del Proyecto Petróleo</h3><div id="drive-caja" data-base="hidrocarburos"></div></div>${cajaSubida("sub-hidro", "Los CSV de la carpeta DATA: PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv. Traen la serie completa y reemplazan lo cargado.")}</div>`
+      : s.actualizar === "drive" ? `<div class="grid2"><div class="caja"><h3>Carpeta de crudos de ${esc(r.nombre)}</h3><div id="drive-caja" data-base="${r.pesca}"></div></div>${cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG del notebook.`)}</div>`
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
       : `<div class="vacio-caja"><b>Cómo entrará: ${esc(s.entra.toLowerCase())}.</b><span>Cuando se construya, aquí estarán su actualización y la carga del archivo del mes de ${esc(r.nombre)}.</span></div>`;
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
     return `<div><div class="ruta"><b>${esc(r.nombre)}</b>${capitulo ? `<span>›</span><span>${esc(capitulo.titulo)}</span>` : ""}</div><h1>${esc(s.t)}</h1><p class="lead">${esc(s.lead)}</p></div>
       <div class="ficha"><div><small>Estado</small><span class="chip ${est}">${ETIQ[est]}</span></div><div><small>Fuente</small><b>${esc(s.fuente)}</b></div>
         <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div><div><small>Datos hasta</small><b>${hasta ? esc(etqMes(hasta)) : "—"}</b></div></div>
-      <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}">${esc(x)}${(x === "Cuadros" && s.cuadros !== "empleo") || (s.extra || []).includes(x) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
+      <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}">${esc(x)}${(x === "Cuadros" && Array.isArray(s.cuadros)) || (s.extra || []).includes(x) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
       <div class="panel" role="tabpanel">${panel}</div>`;
   }
 
@@ -429,7 +469,7 @@
         <div class="caja"><h3>Empleo</h3>${panelBases("p-cempleo", ["empleo"], { deptos: () => LSU, marcar: 1 })}</div>`;
     } else if (id === "act-mef") cuerpo = cajaScraper("mef");
     else if (id === "act-empleo") cuerpo = cajaScraper("empleo");
-    else if (id === "act-drive") cuerpo = '<div class="caja"><h3>Carpetas de crudos de las DIREPRO</h3><div id="drive-caja"></div></div>';
+    else if (id === "act-drive") cuerpo = '<div class="caja"><h3>Carpetas de Drive: crudos de las DIREPRO y DATA de hidrocarburos</h3><div id="drive-caja"></div></div>';
     else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "Cualquier archivo que entienda la página: el .zip de Fiscal/Scrapeo/output, CSV del scraper o PIM_Funcion.xlsx (MEF); los Excel de las DIREPRO o los LONG de los notebooks (pesca); o el Excel del scraper de empleo. La página reconoce de qué sector y región es cada uno. Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.");
     else if (id === "estado") {
       const u = ESTADO.ultima_carga;
@@ -469,10 +509,11 @@
     document.querySelectorAll("#sector .dep").forEach((c) => c.addEventListener("change", () => { paneles.mefDeps = [...document.querySelectorAll(".dep")].filter((x) => x.checked).map((x) => x.value); vistaPrevia("p-mef"); }));
     if ($("el-vista")) atarEmpleoLong();
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
-    ["sub-todo", "sub-emp", "sub-lor", "sub-smn", "sub-uca"].forEach(atarSubida);
+    ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
-    if ($("drive-caja")) cajaDrive($("drive-caja"), GRUPOS[grupo].comun ? null : REG[grupo].pesca);
+    if ($("drive-caja")) cajaDrive($("drive-caja"), $("drive-caja").dataset.base || null);
     if ($("cuadros-empleo")) cuadrosEmpleo(REG[grupo], $("cuadros-empleo"));
+    if ($("cuadros-hidro")) cuadrosHidro(REG[grupo], $("cuadros-hidro"));
     window.scrollTo(0, 0);
   }
   $("sel-movil").addEventListener("change", (ev) => { location.hash = ev.target.value; });

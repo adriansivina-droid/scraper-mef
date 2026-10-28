@@ -1,5 +1,8 @@
-"""Sincroniza la pesca desde Drive: baja los Excel nuevos o modificados de las carpetas de crudos de cada DIREPRO y los
-carga como si se hubieran subido en la página. Lo usan el botón «Sincronizar desde Drive» y GitHub Actions
+"""Sincroniza desde Drive la pesca y los hidrocarburos: baja los archivos nuevos o modificados y los carga como si se
+hubieran subido en la página.
+  · Pesca: los Excel de las carpetas de crudos de cada DIREPRO.
+  · Hidrocarburos: de la carpeta DATA del Proyecto Petróleo (HIDROCARBUROS/perupetro_produccion.md), solo la producción
+    de líquidos y de gas por lote (el CSV más reciente de cada uno) y el canon por departamento. Lo usan el botón «Sincronizar desde Drive» y GitHub Actions
 (.github/workflows/pesca_drive.yml).
 
 Credencial: variable GOOGLE_DRIVE_CREDENCIAL con el JSON de HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb
@@ -14,15 +17,16 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from . import carga, db
+from . import carga, db, hidrocarburos
 
 # carpeta de crudos de cada base de pesca (PESCA/pesca.md); se pueden cambiar con variables de entorno
 CARPETAS = {
     "pesca-loreto": os.environ.get("DRIVE_CRUDOS_LORETO", "1FRKRjpHi_KX5twCCafYiHedPuQPscWqj"),
     "pesca-san-martin": os.environ.get("DRIVE_CRUDOS_SAN_MARTIN", "1Kkwys70cT3Z4ia5T7tO6CmNuQX-mSKWT"),
     "pesca-ucayali": os.environ.get("DRIVE_CRUDOS_UCAYALI", "1AEEvAfbtJwbkW773mKg-BIsDwjigjCg9"),
+    "hidrocarburos": os.environ.get("DRIVE_HIDROCARBUROS_DATA", "1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq"),
 }
-REGION = {"pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali"}
+REGION = {"pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali", "hidrocarburos": "Hidrocarburos"}
 API = "https://www.googleapis.com/drive/v3/files"
 _en_curso = threading.Lock()
 
@@ -46,8 +50,8 @@ class LectorDrive:
         cred, _ = google.auth.load_credentials_from_dict(info, scopes=alcance)
         self.sesion = AuthorizedSession(cred)
 
-    def listar(self, carpeta):
-        """[{id, name, modifiedTime}] de los .xlsx de la carpeta. Falla si la cuenta no puede ver la carpeta (Drive
+    def listar(self, carpeta, aceptar=None):
+        """[{id, name, modifiedTime}] de los archivos de la carpeta que pasan `aceptar(nombre)` (por defecto, los .xlsx). Falla si la cuenta no puede ver la carpeta (Drive
         devolvería una lista vacía y parecería que no hay archivos)."""
         r = self.sesion.get(f"{API}/{carpeta}", params={"fields": "id,name,mimeType", "supportsAllDrives": "true"}, timeout=60)
         if r.status_code == 404:
@@ -69,7 +73,8 @@ class LectorDrive:
             archivos += j.get("files", [])
             pagina = j.get("nextPageToken")
             if not pagina:
-                return [a for a in archivos if a["name"].lower().endswith(".xlsx") and not a["name"].startswith("~$")]
+                aceptar = aceptar or (lambda n: n.lower().endswith(".xlsx") and not n.startswith("~$"))
+                return [a for a in archivos if aceptar(a["name"])]
 
     def bajar(self, file_id):
         r = self.sesion.get(f"{API}/{file_id}", params={"alt": "media", "supportsAllDrives": "true"}, timeout=300)
@@ -107,6 +112,18 @@ def _nombre_unico(nombre, usados):
     return f"{p.stem} ({i}){p.suffix}"
 
 
+def _listar(lector, base_id, carpeta):
+    if base_id != "hidrocarburos":
+        return lector.listar(carpeta)
+    # de cada tipo, solo el más reciente (en DATA pueden quedar CSV de corridas con otro rango de años)
+    ultimos = {}
+    for a in lector.listar(carpeta, hidrocarburos.tipo):
+        t = hidrocarburos.tipo(a["name"])
+        if t not in ultimos or a["modifiedTime"] > ultimos[t]["modifiedTime"]:
+            ultimos[t] = a
+    return list(ultimos.values())
+
+
 def sincronizar(origen="botón de la página", todo=False, lector=None):
     """Carga los Excel nuevos o modificados (todos, con todo=True) de las carpetas de crudos. Devuelve el resumen."""
     if not _en_curso.acquire(blocking=False):
@@ -115,7 +132,7 @@ def sincronizar(origen="botón de la página", todo=False, lector=None):
         _tablas()
         lector = lector or LectorDrive(os.environ["GOOGLE_DRIVE_CREDENCIAL"])
         vistos = {} if todo else _vistos()
-        listados = {base_id: lector.listar(carpeta) for base_id, carpeta in CARPETAS.items()}
+        listados = {base_id: _listar(lector, base_id, carpeta) for base_id, carpeta in CARPETAS.items()}
         nuevos = [(base_id, a) for base_id, lista in listados.items() for a in lista if vistos.get(a["id"]) != a["modifiedTime"]]
         if nuevos:
             usados, archivos = set(), []
@@ -127,7 +144,7 @@ def sincronizar(origen="botón de la página", todo=False, lector=None):
         else:
             hay = ", ".join(f"{REGION[b]}: {len(lista)}" for b, lista in listados.items())
             resumen = {"bases": {}, "avisos": [f"No hay archivos nuevos ni modificados en las carpetas de Drive "
-                                               f"(Excel en cada carpeta · {hay})."]}
+                                               f"(archivos en cada carpeta · {hay})."]}
         resumen["archivos"] = [{"base": b, "nombre": a["name"]} for b, a in nuevos]
         resumen["carpetas"] = {b: len(lista) for b, lista in listados.items()}
         ahora = datetime.now(timezone.utc).isoformat(timespec="microseconds")   # ordena las sincronizaciones
