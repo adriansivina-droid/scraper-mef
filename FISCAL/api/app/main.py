@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
@@ -111,7 +111,11 @@ def salud():
 
 @app.get("/", include_in_schema=False, dependencies=[Depends(acceso)])
 def inicio():
-    return FileResponse(ESTATICOS / "index.html")
+    # la hoja de estilos lleva su fecha de modificación: tras cada despliegue el navegador baja la nueva y no mezcla la
+    # página nueva con estilos viejos guardados en caché
+    version = int((ESTATICOS / "estilo.css").stat().st_mtime)
+    html = (ESTATICOS / "index.html").read_text(encoding="utf-8").replace('href="/static/estilo.css"', f'href="/static/estilo.css?v={version}"')
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/v1/catalogo", dependencies=[Depends(acceso)])
