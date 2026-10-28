@@ -11,6 +11,7 @@ descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 | 1 | Página, descarga de las 7 bases del MEF (Excel, CSV o JSON), estado de la base de datos y carga de los archivos que genera el scraper de Colab | **lista** |
 | Pesca | Las 3 bases de pesca, cargadas con los Excel mensuales de las DIREPRO (o los LONG de los notebooks de `PESCA/`) | **lista** |
 | 2 | El scraper del MEF corre solo (GitHub Actions, días 2 y 21) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
+| Empleo | Base de empleo del MTPE (scraper en GitHub Actions, días 2 y 21, o botón «Actualizar empleo»), con el cuadro, el gráfico y el anexo de la síntesis por región | **lista** |
 | 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en el servidor | pendiente |
 
 ## Hoja de ruta: el informe completo
@@ -26,7 +27,7 @@ scraper (o carga de una plantilla) → base de datos → descargas en Excel → 
 | Pesca | producción pesquera y VBP · Anexo 2 | DIREPRO Loreto, San Martín y Ucayali | **archivo mensual**: el Excel de cada DIREPRO se sube en la página (o el LONG de los notebooks de `PESCA/`) | **en el API** |
 | Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions); precio por archivo | scraper listo |
 | Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | **archivo mensual** | falta |
-| Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | **archivo mensual**, que genera el scraper de `EMPLEO/` (Power BI del MTPE) | falta |
+| Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | scraper de `EMPLEO/` en GitHub Actions (o su Excel subido en la página) | **en el API**, con cuadro, gráfico y anexo |
 | Exportaciones | por grupo de productos · Anexo | SUNAT | **archivo mensual** | falta |
 | Importaciones (Loreto) | FOB por uso o destino, aduana de Iquitos · Anexo | SUNAT | **archivo mensual** | falta |
 | Crédito, depósitos y morosidad | saldos, crédito por tipo sin BN ni Agrobanco · Anexos | SBS y AFP | scraper (web de la SBS) | falta |
@@ -155,6 +156,22 @@ todos). Solo lee: nunca escribe ni borra en Drive.
 Las carpetas se pueden cambiar sin tocar el código con las variables `DRIVE_CRUDOS_LORETO`, `DRIVE_CRUDOS_SAN_MARTIN` y
 `DRIVE_CRUDOS_UCAYALI`.
 
+## Empleo (MTPE)
+
+Base `empleo` (hoja EMPLEO): `AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO`, tal como sale de
+`EMPLEO/Scraping_MTPE_Empleo_x_Region_Actividad.ipynb`. Entra de tres formas:
+
+- **Solo:** `.github/workflows/empleo_scraper.yml` corre los días 2 y 21 (12:30 UTC) para Loreto, San Martín y Ucayali.
+- **Con el botón** «Actualizar empleo» (Las tres regiones → Actualización → Empleo), que usa el mismo
+  `GITHUB_ACCIONES_TOKEN` que el botón del MEF; ahí se puede pedir `TODAS` las regiones.
+- **Subiendo el Excel** `*_empleo.xlsx` en «Archivos».
+
+El total «Perú» no se guarda (la síntesis no lo usa). Lima Metropolitana y Lima Provincias van en el departamento 15
+sin pisarse. En cada región, la pestaña **Cuadros** de Empleo arma el cuadro de la síntesis (Loreto N° 6, San Martín
+N° 4, Ucayali N° 7: mes del año anterior, mes, var. %, diciembre anterior, mes, var. %; «Otros» es «No precisa»), el
+gráfico de 25 meses de var. % interanual del total y el anexo por sectores de 13 meses, y los descarga en Excel.
+Las cifras se comprobaron con el Cuadro N° 6 publicado de Loreto (`tests/test_empleo.py`).
+
 ## Endpoints
 
 Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`.
@@ -166,11 +183,14 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/estado` | Por base: filas, departamentos y periodo cargado; última carga |
 | GET | `/v1/descargas/vista-previa` | Primeras filas y conteo de lo que se descargaría |
 | GET | `/v1/descargas` | El archivo: `formato=xlsx` (una hoja por base), `csv` (un `.zip` si son varias) o `json` (paginado) |
-| POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output`, `PIM_Funcion.xlsx` o los Excel de pesca |
+| POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output`, `PIM_Funcion.xlsx`, los Excel de pesca o el de empleo |
 | GET | `/v1/drive` | Si Drive está conectado, sus carpetas y la última sincronización |
 | POST | `/v1/drive/sincronizar` | Carga los Excel nuevos o modificados de las carpetas de crudos (`todo=true`: todos) |
 | GET | `/v1/mef` | Si el botón del MEF está configurado y las últimas corridas del scraper en GitHub |
 | POST | `/v1/mef/actualizar` | Lanza el scraper del MEF en GitHub Actions (`desde`, `hasta` AAAA-MM opcionales; `prueba=true`) |
+| GET | `/v1/empleo` | Si el botón de empleo está configurado y las últimas corridas de su scraper |
+| POST | `/v1/empleo/actualizar` | Lanza el scraper de empleo (`regiones=LOR,SMN,UCA` o `TODAS`) |
+| GET | `/v1/cuadros/empleo` | Cuadro, gráfico y anexo de empleo de un departamento (`departamento=16`, `periodo=2026-08` opcional, `formato=json` o `xlsx`) |
 | GET | `/docs` | Documentación interactiva |
 
 Parámetros de las descargas: `base=inv-dev-funcion,inv-pim-funcion`, `departamento=16,22,25`,

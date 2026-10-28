@@ -16,7 +16,8 @@ NIVEL_MEF = {"E": "E: GOBIERNO NACIONAL", "R": "R: GOBIERNOS REGIONALES", "M": "
 NIVEL_PIM = {"E": "GOBIERNO NACIONAL", "R": "GOBIERNOS REGIONALES", "M": "GOBIERNOS LOCALES"}
 
 GRUPOS = {"inversion": "Inversión · genérica 2.6", "gasto": "Gasto total · todas las genéricas",
-          "pesca": "Pesca · DIREPRO, VBP a precios de 2007"}
+          "pesca": "Pesca · DIREPRO, VBP a precios de 2007",
+          "empleo": "Empleo · MTPE, Planilla Electrónica"}
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,10 @@ BASES = {b.id: b for b in [
          ["AÑO", "MES", "TIPO", "ESPECIES", "ESPECIES_CORREGIDO", "ESPECIES_OK", "VOLUMEN", "VBP"],
          [8, 6, 14, 30, 30, 22, 12, 12], valor="VBP", usa_niveles=False, departamentos=("25",), formato_valor="#,##0.000",
          descripcion="DIREPRO Ucayali: desembarque fresco, seco salado y total (t) y peces ornamentales (unidades)."),
+    # Empleo (EMPLEO/empleo.md): trabajadores asalariados privados formales por región y actividad
+    Base("empleo", "empleo", "Trabajadores asalariados privados formales", "Empleo", "EMPLEO",
+         ["AÑO", "MES", "REGIÓN", "ACTIVIDAD_ECONOMICA", "EMPLEO"], [8, 6, 20, 24, 12], valor="EMPLEO", usa_niveles=False,
+         descripcion="MTPE (PLAME y T-Registro): trabajadores asalariados privados formales por mes, región y actividad económica."),
 ]}
 
 # columnas internas para filtrar (no salen en las descargas)

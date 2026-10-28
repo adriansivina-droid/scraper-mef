@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import archivos, carga, db, drive, mef
+from . import archivos, carga, db, drive, empleo, mef
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -208,3 +208,49 @@ def mef_actualizar(desde: str = "", hasta: str = "", prueba: bool = False):
     except (mef.ErrorGitHub, OSError) as e:
         raise HTTPException(502, str(e))
     return {"lanzado": True, "desde": desde or None, "hasta": hasta or None, "prueba": prueba}
+
+
+@app.get("/v1/empleo", dependencies=[Depends(acceso)])
+def empleo_estado():
+    """Si el botón «Actualizar empleo» está configurado y las últimas corridas del scraper de empleo en GitHub."""
+    if not mef.configurado():
+        return {"configurado": False, "corridas": []}
+    try:
+        return {"configurado": True, "corridas": mef.corridas(nombre="empleo")}
+    except (mef.ErrorGitHub, OSError) as e:
+        return {"configurado": True, "corridas": [], "error": str(e)}
+
+
+@app.post("/v1/empleo/actualizar", dependencies=[Depends(acceso)])
+def empleo_actualizar(regiones: str = Query("LOR,SMN,UCA", pattern="^(LOR,SMN,UCA|TODAS)$")):
+    """Lanza el scraper de empleo (Power BI del MTPE) en GitHub Actions; al terminar carga los datos en la base."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
+    try:
+        mef.lanzar(nombre="empleo", inputs={"regiones": regiones})
+    except (mef.ErrorGitHub, OSError) as e:
+        raise HTTPException(502, str(e))
+    return {"lanzado": True, "regiones": regiones}
+
+
+@app.get("/v1/cuadros/empleo", dependencies=[Depends(acceso)])
+def cuadro_empleo(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "",
+                  formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Cuadro, gráfico y anexo de empleo de la síntesis de una región (periodo AAAA-MM; vacío = último mes con datos)."""
+    if departamento not in DEPARTAMENTOS:
+        raise HTTPException(422, f"departamento no válido: {departamento}.")
+    if periodo and not _RE_PERIODO.match(periodo):
+        raise HTTPException(422, f"Periodo no válido: {periodo!r} (formato AAAA-MM).")
+    df = db.leer("empleo", [departamento], [], "1990-01", "2100-12")
+    try:
+        c = empleo.cuadros(df, periodo or None)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    region = DEPARTAMENTOS[departamento].title().replace(" De ", " de ")
+    if c is None:
+        return {"region": region, "cuadros": None}
+    if formato == "xlsx":
+        nombre = f"Empleo {region} {c['periodo']}.xlsx"
+        return Response(empleo.excel(region, c), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+    return {"region": region, "cuadros": c}
