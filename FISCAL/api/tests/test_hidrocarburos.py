@@ -188,5 +188,8 @@ def test_tabla_vieja_sin_columna_fuente(cliente):
         cx.execute(text('CREATE TABLE "base_hidro_produccion" ("AÑO" BIGINT, "MES" BIGINT, "DEPARTAMENTO" TEXT, "ZONA" TEXT, '
                         '"OPERADOR" TEXT, "LOTE" TEXT, "LOTE_HISTORICO" TEXT, "PRODUCTO" TEXT, "UNIDAD" TEXT, "VOLUMEN" FLOAT, '
                         '"PROMEDIO_DIARIO" FLOAT, _anio BIGINT, _mes BIGINT, _depto TEXT, _nivel TEXT)'))
+        cx.execute(text("INSERT INTO base_hidro_produccion VALUES (2025,12,'LORETO','','X','95','95','PETROLEO','BARRILES',100,3,2025,12,'16','LIQUIDOS')"))
+    assert cliente.get("/v1/cuadros/hidrocarburos?departamento=16").status_code == 200       # antes de la primera carga: era un 500
+    assert cliente.get("/v1/descargas?base=hidro-produccion&departamento=16&desde=2025-01&hasta=2025-12&formato=json").status_code == 200
     subir(cliente, csvs())
     assert cliente.get("/v1/cuadros/hidrocarburos?departamento=16").json()["cuadros"]["periodo"] == "2025-12"

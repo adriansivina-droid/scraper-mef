@@ -93,7 +93,7 @@ def leer(base_id, deptos, niveles, desde, hasta):
         filtro.append("(_anio * 100 + _mes) BETWEEN :p0 AND :p1")
         params.update(p0=a0 * 100 + m0, p1=a1 * 100 + m1)
     with motor().connect() as cx:
-        df = pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE {" AND ".join(filtro)}'), cx, params=params)
+        df = _completar(pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE {" AND ".join(filtro)}'), cx, params=params), b)
     orden = ["_anio", "_mes", "_depto", "_nivel"] + [c for c in b.columnas if c not in ("AÑO", "MES", b.valor)]
     df = df.sort_values(orden, ascending=[False, True] + [True] * (len(orden) - 2), kind="stable")
     return df[b.columnas].reset_index(drop=True)
@@ -105,7 +105,15 @@ def leer_todo(base_id):
     if not existe(b.tabla):
         return None
     with motor().connect() as cx:
-        return pd.read_sql(text(f'SELECT * FROM "{b.tabla}"'), cx)[b.columnas]
+        return _completar(pd.read_sql(text(f'SELECT * FROM "{b.tabla}"'), cx), b)[b.columnas]
+
+
+def _completar(df, b):
+    """Una columna que el catálogo agregó después de crear la tabla (se crea en la próxima carga) sale vacía."""
+    for c in b.columnas:
+        if c not in df.columns:
+            df[c] = None
+    return df
 
 
 def disponibilidad():
