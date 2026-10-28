@@ -93,9 +93,9 @@
     lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[2], comunes[3], { id: "anexos" }] },
     smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "manu", "cemento"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
     uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
-    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["bases-mef", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-drive", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
+    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-drive", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
-  const C = { panorama: "Panorama de las tres regiones", "bases-mef": "MEF · 25 departamentos", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
+  const C = { panorama: "Panorama de las tres regiones", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
               "act-empleo": "Scraper de empleo", "act-drive": "Pesca desde Drive", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
   const CORTO = { [V]: "V. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
@@ -205,6 +205,44 @@
           ${v.avisos.map((x) => `<p class="nota">${esc(x)}</p>`).join("")}
           <div class="scroll"><table><tr>${a.columnas.map((k) => `<th>${esc(k)}</th>`).join("")}</tr>${filas}</table></div>`;
         caja.querySelectorAll("[data-hoja]").forEach((b) => b.addEventListener("click", () => { p.hoja = b.dataset.hoja; vistaPrevia(clave); }));
+      } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar la vista previa</b><span>${esc(e.message)}</span></div>`; }
+    }, 250);
+  }
+
+  // ── Empleo en formato LONG (el Excel del scraper) por regiones ──
+  function consultaEmpleoLong() {
+    const q = paneles.empLong;
+    return new URLSearchParams({ regiones: paneles.empReg.join(","), desde: q.desde, hasta: q.hasta }).toString();
+  }
+  function atarEmpleoLong() {
+    const q = paneles.empLong, marcar = (lista) => { paneles.empReg = lista; document.querySelectorAll(".emp-reg").forEach((c) => { c.checked = lista.includes(c.value); }); vistaEmpleoLong(); };
+    document.querySelectorAll("[data-empg]").forEach((b) => b.addEventListener("click", () => {
+      const g = b.dataset.empg; marcar(g === "*" ? CAT.empleo.regiones.slice() : g ? CAT.empleo.grupos[g].slice() : []);
+    }));
+    document.querySelectorAll(".emp-reg").forEach((c) => c.addEventListener("change", () => marcar([...document.querySelectorAll(".emp-reg")].filter((x) => x.checked).map((x) => x.value))));
+    ["el-d", "el-h", "el-f"].forEach((k) => $(k).addEventListener("change", () => { q.desde = $("el-d").value; q.hasta = $("el-h").value; q.formato = $("el-f").value; vistaEmpleoLong(); }));
+    $("el-bajar").addEventListener("click", () => {
+      if (!paneles.empReg.length) { $("el-vista").innerHTML = '<div class="err-box"><b>Marca al menos una región</b></div>'; return; }
+      window.location.href = `/v1/descargas/empleo?${consultaEmpleoLong()}&formato=${q.formato}`;
+    });
+    vistaEmpleoLong();
+  }
+  function vistaEmpleoLong() {
+    const q = paneles.empLong, caja = $("el-vista");
+    if (!caja) return;
+    if (!paneles.empReg.length) { caja.innerHTML = '<p class="nota">Marca al menos una región para ver la vista previa.</p>'; return; }
+    if (q.desde && q.hasta && q.desde > q.hasta) { caja.innerHTML = '<div class="err-box"><b>El periodo está al revés</b><span>«Desde» es posterior a «Hasta».</span></div>'; return; }
+    clearTimeout(temporizador);
+    temporizador = setTimeout(async () => {
+      caja.innerHTML = '<div class="loading"><span class="spin"></span>Buscando en la base de datos…</div>';
+      try {
+        const v = await api(`/v1/descargas/empleo?${consultaEmpleoLong()}&formato=json&filas=8`);
+        const filas = v.muestra.length ? v.muestra.map((f) => `<tr>${v.columnas.map((k) => `<td class="${k === "EMPLEO" ? "n" : ""}">${k === "EMPLEO" ? fmt(f[k]) : esc(f[k])}</td>`).join("")}</tr>`).join("")
+          : `<tr><td colspan="${v.columnas.length}">No hay filas para estas opciones.</td></tr>`;
+        caja.innerHTML = `<div class="fila" style="justify-content:space-between;align-items:center"><b>Vista previa · ${fmt(v.filas)} filas${v.desde ? ` · ${esc(etqMes(v.desde))} – ${esc(etqMes(v.hasta))}` : ""}</b><span class="nota">${esc(v.archivo.replace(/\.xlsx$/, q.formato === "csv" ? ".csv" : ".xlsx"))}</span></div>
+          ${v.sin_datos.length ? `<p class="nota">Sin datos cargados: ${esc(v.sin_datos.join(", "))}. Para traerlas, lanza el scraper de empleo con «Todas las regiones» (${irComun("act-empleo", "Scraper de empleo")}).</p>` : ""}
+          <div class="scroll"><table><tr>${v.columnas.map((k) => `<th class="${k === "EMPLEO" ? "n" : ""}">${esc(k)}</th>`).join("")}</tr>${filas}</table></div>`;
+        caja.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.ir; }));
       } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar la vista previa</b><span>${esc(e.message)}</span></div>`; }
     }, 250);
   }
@@ -338,7 +376,7 @@
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
-    if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
+    if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : s.actualizar === "empleo" ? irComun("empleo-long", "Empleo · LONG por región") + " (el Excel tal como lo da el scraper, de una, varias o todas las regiones)" : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
       : `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(s.t.toLowerCase())} en la página.</b><span>Fuente: ${esc(s.fuente)}. Entrará como: ${esc(s.entra.toLowerCase())}.</span></div>`;
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
@@ -369,6 +407,22 @@
           <div class="deptos">${deps.map((d) => `<label for="dep-${d.codigo}"><input type="checkbox" class="dep" id="dep-${d.codigo}" value="${d.codigo}" ${marcados.includes(d.codigo) ? "checked" : ""}>${esc(titulo(d.nombre))}</label>`).join("")}</div></div>
         <div class="caja"><h3>2. Bases y periodo</h3>${panelBases("p-mef", [...NACIONAL, "inv-dev-fuente", ...GASTO], { deptos: () => paneles.mefDeps, alcance: true, marcar: 3, desde: MESES.includes("2025-01") ? "2025-01" : MESES[0] })}
           <p class="nota">Las bases marcadas «LOR · SMN · UCA» solo tienen esas tres regiones: con otros departamentos, esas hojas salen vacías y la página lo avisa.</p></div>`;
+    } else if (id === "empleo-long") {
+      const E = CAT.empleo, sel = paneles.empReg || (paneles.empReg = E.grupos[Object.keys(E.grupos)[0]].slice());
+      const q = paneles.empLong || (paneles.empLong = { desde: "", hasta: "", formato: "xlsx" });
+      const opMeses = (v, vacio) => `<option value="">${vacio}</option>` + MESES.map((m) => `<option value="${m}"${m === v ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("");
+      cuerpo = `<p class="lead">El empleo del MTPE en el formato LONG que genera el scraper (AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO), de una región, de un grupo o de todas.</p>
+        <div class="caja"><h3>1. Regiones</h3><div class="fila">${Object.keys(E.grupos).map((g) => `<button class="btn sec" type="button" data-empg="${esc(g)}">${esc(g)}</button>`).join("")}
+          <button class="btn sec" type="button" data-empg="*">Todas (${E.regiones.length})</button><button class="btn sec" type="button" data-empg="">Ninguna</button></div>
+          <div class="deptos">${E.regiones.map((r, i) => `<label for="er-${i}"><input type="checkbox" class="emp-reg" id="er-${i}" value="${esc(r)}" ${sel.includes(r) ? "checked" : ""}>${esc(r)}</label>`).join("")}</div>
+          <p class="nota">Los grupos solo marcan las casillas: se puede combinar cualquier región. El total «Perú» del tablero no se guarda.</p></div>
+        <div class="caja"><h3>2. Periodo y formato</h3><div class="fila">
+          <label class="campo" for="el-d">Desde<select id="el-d">${opMeses(q.desde, "Desde el inicio")}</select></label>
+          <label class="campo" for="el-h">Hasta<select id="el-h">${opMeses(q.hasta, "Hasta el último mes")}</select></label>
+          <label class="campo" for="el-f">Formato<select id="el-f"><option value="xlsx">Excel (.xlsx)</option><option value="csv"${q.formato === "csv" ? " selected" : ""}>CSV</option></select></label>
+          <button class="btn" type="button" id="el-bajar">Descargar</button></div>
+          <p class="nota">Una sola hoja, con las filas ordenadas por región, actividad, año y mes, y el mismo nombre que pone el notebook (Loreto_empleo.xlsx, Loreto_San_Martín_Ucayali_empleo.xlsx o 26_regiones_empleo.xlsx).</p>
+          <div id="el-vista"></div></div>`;
     } else if (id === "bases") {
       cuerpo = `<p class="lead">Pesca y empleo de las tres regiones juntas, para comparar.</p>
         <div class="caja"><h3>Pesca</h3>${panelBases("p-cpesca", ["pesca-loreto", "pesca-san-martin", "pesca-ucayali"], { deptos: () => LSU, marcar: 3 })}</div>
@@ -413,6 +467,7 @@
       document.querySelectorAll(".dep").forEach((c) => { c.checked = paneles.mefDeps.includes(c.value); }); vistaPrevia("p-mef");
     }));
     document.querySelectorAll("#sector .dep").forEach((c) => c.addEventListener("change", () => { paneles.mefDeps = [...document.querySelectorAll(".dep")].filter((x) => x.checked).map((x) => x.value); vistaPrevia("p-mef"); }));
+    if ($("el-vista")) atarEmpleoLong();
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
     ["sub-todo", "sub-emp", "sub-lor", "sub-smn", "sub-uca"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");

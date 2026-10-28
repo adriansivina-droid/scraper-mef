@@ -172,6 +172,12 @@ N° 4, Ucayali N° 7: mes del año anterior, mes, var. %, diciembre anterior, me
 gráfico de 25 meses de var. % interanual del total y el anexo por sectores de 13 meses, y los descarga en Excel.
 Las cifras se comprobaron con el Cuadro N° 6 publicado de Loreto (`tests/test_empleo.py`).
 
+**Descarga en formato LONG** (Las tres regiones → Datos → «Empleo · LONG por región»): el mismo Excel que genera el
+scraper (una hoja `AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO`, ordenada por región, actividad, año y mes, con su
+mismo nombre de archivo), de una región, de varias o de las 26. Botones de grupo: Sucursal Iquitos, Oriente, Norte,
+Centro, Sur y Lima y Callao (`GRUPOS_REGIONES` en `app/empleo.py`); solo marcan casillas, así que se puede combinar
+cualquier región. Para tener las 26, el scraper debe correr con «Todas las regiones».
+
 ## Endpoints
 
 Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`.
@@ -190,6 +196,7 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | POST | `/v1/mef/actualizar` | Lanza el scraper del MEF en GitHub Actions (`desde`, `hasta` AAAA-MM opcionales; `prueba=true`) |
 | GET | `/v1/empleo` | Si el botón de empleo está configurado y las últimas corridas de su scraper |
 | POST | `/v1/empleo/actualizar` | Lanza el scraper de empleo (`regiones=LOR,SMN,UCA` o `TODAS`) |
+| GET | `/v1/descargas/empleo` | Empleo en el formato LONG del scraper, una hoja (`regiones=Loreto,San Martín` o `todas`; `desde`, `hasta` opcionales; `formato=xlsx`, `csv` o `json`) |
 | GET | `/v1/cuadros/empleo` | Cuadro, gráfico y anexo de empleo de un departamento (`departamento=16`, `periodo=2026-08` opcional, `formato=json` o `xlsx`) |
 | GET | `/docs` | Documentación interactiva |
 
