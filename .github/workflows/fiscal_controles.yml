@@ -1,0 +1,63 @@
+# Trae a la página los CSV de CONTROL de corridas anteriores del scraper del MEF (los de las corridas nuevas se guardan
+# solos): la vista anual de Consulta Amigable, para la pestaña «Contraste». Solo los CONTROL: no vuelve a cargar datos.
+# Actions → «Fiscal · cargar controles» → Run workflow, con los números de las corridas (de la más antigua a la más nueva).
+# Requiere el secreto DATABASE_URL.
+name: Fiscal · cargar controles
+
+on:
+  workflow_dispatch:
+    inputs:
+      corridas:
+        description: "IDs de corridas de «Fiscal · scraper del MEF», separados por espacios (de la más antigua a la más nueva)"
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  controles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r FISCAL/api/requirements.txt
+
+      - name: Bajar los CSV de cada corrida
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORRIDAS: ${{ inputs.corridas }}
+        run: |
+          i=0
+          for id in $CORRIDAS; do
+            i=$((i + 1))
+            mkdir -p "controles/$(printf '%02d' $i)-$id"
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" --name scrapeo-output --dir "controles/$(printf '%02d' $i)-$id" || echo "::warning::No se pudo bajar la corrida $id"
+          done
+
+      - name: Guardar los CONTROL en la página
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          import pandas as pd
+          sys.path.insert(0, "FISCAL/api")
+          from app import controles
+          total = 0
+          for carpeta in sorted(Path("controles").iterdir()):          # en orden: la corrida más nueva queda al final
+              partes = [(r.name, controles.leer(r.name, pd.read_csv(r, encoding="utf-8-sig"))) for r in sorted(carpeta.rglob("CONTROL*.csv"))]
+              n = controles.guardar(partes)
+              print(f"{carpeta.name}: {n} filas de control")
+              total += n
+          print(f"::notice::{total} filas de control guardadas")
+          PY

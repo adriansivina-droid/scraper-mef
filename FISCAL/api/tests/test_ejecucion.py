@@ -262,3 +262,49 @@ def test_pagina_carga_los_cuadros_bcrp(datos):
     html = datos.get("/").text
     assert 'src="/static/bcrp.js?v=' in html and "Cuadros y gráficos BCRP" in html
     assert "window.BCRP" in datos.get("/static/bcrp.js").text
+
+
+def test_contraste_con_lo_publicado_por_el_mef(cliente):  # noqa: F811
+    """Los CSV de CONTROL del scraper traen la vista anual del MEF; la página la compara con lo que tiene guardado."""
+    s = {k: v for k, v in scraper().items()}
+    ctl = lambda nivel, ref: _csv(pd.DataFrame([dict(AÑO=2025, DEPARTAMENTO="16: LORETO", COD_GENERICA="5-21", DEV_REF_ANUAL=ref, DEV_SUMA_MESES=ref, ESTADO="OK")]))
+    total_gn_2025 = 12 * (100 + 50 + 777 + 999) * M                     # lo que bajó el scraper (todas las genéricas)
+    s["output/DEVENGADO/CARPETA DE CONTROL/CONTROL Generica GobNacional 2025.csv"] = ctl("GobNacional", total_gn_2025)
+    s["output/DEVENGADO/CARPETA DE CONTROL/CONTROL Generica GobRegional 2025.csv"] = ctl("GobRegional", 1_000_000)
+    s["output/DEVENGADO/CARPETA DE CONTROL/CONTROL Generica GobRegional 2026.csv"] = _csv(pd.DataFrame([dict(AÑO=2026, DEPARTAMENTO="16: LORETO",
+        COD_GENERICA="5-21", DEV_REF_ANUAL=9 * (200 + 50 + 777 + 999) * M * 1.2, DEV_SUMA_MESES=0, ESTADO="PARCIAL")]))
+    r = cliente.post("/v1/cargas", files=[("archivos", ("output.zip", zip_de(s), "application/zip"))]).json()
+    assert any("Controles del MEF" in a for a in r["avisos"])
+    c = {(f["nivel"], f["anio"]): f for f in cliente.get("/v1/contraste/ejecucion?departamento=16&sector=gasto").json()["contraste"]}
+    gn = c[("Gobierno Nacional", 2025)]
+    assert gn["estado"] == "coincide" and gn["mef"] == gn["pagina"] == total_gn_2025 and gn["meses"] == "01 a 12"
+    assert c[("Gobiernos Regionales", 2025)]["estado"] == "revisar"
+    assert c[("Gobiernos Regionales", 2026)]["estado"] in ("mes en curso", "revisar")
+    assert cliente.get("/v1/contraste/ejecucion?departamento=16&sector=inversion").json()["contraste"] == []
+
+
+def test_excel_de_los_cuadros_bcrp(datos):
+    """El botón Excel de «Cuadros y gráficos BCRP»: el mismo cuadro, con números de verdad y el formato de la síntesis."""
+    cuadro = {"numero": "CUADRO N° 4", "titulo": "UCAYALI: PRODUCCIÓN PESQUERA", "llamada": "1/", "unidad": "(Toneladas)",
+              "cab": [[{"t": ""}, {"t": "Junio", "span": 2, "linea": True}, {"t": ""}], [{"t": ""}, {"t": 2025}, {"t": 2026}, {"t": "Var. %"}]],
+              "filas": [{"c": ["Consumo Humano", "72", "1 215", "1 587,5"], "b": True}, {"c": ["Bagre", "14", "90", "-"], "ind": 2},
+                        {"c": ["SECTOR PESCA 2/", "", "", "635,9"], "b": True, "total": True}], "notas": ["Fuente: DIREPRO."]}
+    r = datos.post("/v1/bcrp/excel", json={"tipo": "cuadro", "spec": cuadro, "nombre": "CUADRO N° 4 UCAYALI"})
+    assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+    ws = load_workbook(io.BytesIO(r.content)).active
+    vals = {c.coordinate: c.value for row in ws.iter_rows() for c in row if c.value is not None}
+    assert vals["A1"] == "CUADRO N° 4" and vals["A2"] == "UCAYALI: PRODUCCIÓN PESQUERA 1/"
+    fila = next(row for row in ws.iter_rows() if row[0].value == "Consumo Humano")
+    assert [c.value for c in fila[1:4]] == [72, 1215, 1587.5] and fila[3].number_format == "#,##0.0" and fila[0].font.bold
+    assert next(row for row in ws.iter_rows() if row[0].value == "Bagre")[3].value == "-"
+    anexo = {"numero": "ANEXO 2", "titulo": "LORETO: PRODUCCIÓN DE PETRÓLEO CRUDO", "unidad": "(Miles de barriles)", "dec": 0,
+             "columnas": [{"etq": "Dic.", "anio": 2025}, {"etq": "Ene.-Dic.", "anio": "Total", "total": True}, {"etq": "Ene.", "anio": 2026}],
+             "filas": [{"nombre": "Lotes", "tipo": "grupo"}, {"nombre": "Lote 95", "tipo": "item", "valores": [455, 6775, 460]},
+                       {"nombre": "TOTAL", "tipo": "total", "valores": [537, 7905, 591]}]}
+    ws = load_workbook(io.BytesIO(datos.post("/v1/bcrp/excel", json={"tipo": "anexo", "spec": anexo}).content)).active
+    total = next(row for row in ws.iter_rows() if row[0].value == "TOTAL")
+    assert [c.value for c in total] == ["TOTAL", 537, 7905, 591, "TOTAL"] and total[1].fill.fgColor.rgb.endswith("C0C0C0")
+    g = {"numero": "GRÁFICO N° 1", "titulo": "X", "puntos": [{"periodo": "Jun. 2025", "valor": -27.2}, {"periodo": "Jul. 2025", "valor": 5.0}]}
+    wb = load_workbook(io.BytesIO(datos.post("/v1/bcrp/excel", json={"tipo": "barras", "spec": g}).content))
+    assert [c.value for c in next(row for row in wb.active.iter_rows() if row[0].value == "Jun. 2025")[:2]] == ["Jun. 2025", -27.2]
+    assert datos.post("/v1/bcrp/excel", json={"tipo": "otro", "spec": {}}).status_code == 422
