@@ -1,6 +1,6 @@
 # Fase 2 · scraper del MEF en el servidor: corre FISCAL/Fiscal_Scraper.ipynb sin Colab y carga lo que baja en la base de
 # datos del API (Neon), igual que subir el .zip de Scrapeo/output en la página.
-#   · cada mes, los días 6 y 21 (06:00 hora de Lima): año en curso hasta el último mes cerrado (el MEF ajusta los meses
+#   · cada mes, los días 2 y 21 (06:00 hora de Lima): año en curso hasta el último mes cerrado (el MEF ajusta los meses
 #     anteriores, por eso se vuelve a bajar todo el año)
 #   · a mano: Actions → «Fiscal · scraper del MEF» → Run workflow (eliges el periodo) o el botón «Actualizar desde el MEF»
 # Requiere el secreto DATABASE_URL. Los CSV quedan como artefacto de la corrida (30 días).
@@ -9,7 +9,7 @@ run-name: "Scraper del MEF · ${{ inputs.desde || 'año en curso' }}${{ inputs.h
 
 on:
   schedule:
-    - cron: "0 11 6,21 * *"        # 11:00 UTC = 06:00 en Lima
+    - cron: "0 11 2,21 * *"        # 11:00 UTC = 06:00 en Lima
   workflow_dispatch:
     inputs:
       desde:

@@ -10,7 +10,7 @@ descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 |---|---|---|
 | 1 | Página, descarga de las 7 bases del MEF (Excel, CSV o JSON), estado de la base de datos y carga de los archivos que genera el scraper de Colab | **lista** |
 | Pesca | Las 3 bases de pesca, cargadas con los Excel mensuales de las DIREPRO (o los LONG de los notebooks de `PESCA/`) | **lista** |
-| 2 | El scraper del MEF corre solo (GitHub Actions, días 6 y 21) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
+| 2 | El scraper del MEF corre solo (GitHub Actions, días 2 y 21) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
 | 3 | Reportes procesados (cuadros, variaciones, proyectos) generados en el servidor | pendiente |
 
 ## Hoja de ruta: el informe completo
@@ -102,7 +102,7 @@ el `Dockerfile` sirve en cualquier servicio que corra contenedores.
 periodo) y carga `Scrapeo/output` en la base de datos con la misma lógica que subir el `.zip`. Si cambias el scraper
 en el notebook, el servidor usa el cambio.
 
-- **Solo:** los días 6 y 21 de cada mes a las 6:00 a. m.: año en curso hasta el último mes cerrado (el MEF sigue
+- **Solo:** los días 2 y 21 de cada mes a las 6:00 a. m.: año en curso hasta el último mes cerrado (el MEF sigue
   ajustando los meses anteriores, por eso se vuelve a bajar todo el año).
 - **A mano:** botón «Actualizar desde el MEF» en «Actualizar base de datos» (eliges el periodo; vacío = año en curso),
   o en GitHub: Actions → «Fiscal · scraper del MEF» → Run workflow. La prueba rápida (un mes, solo Loreto) no carga
