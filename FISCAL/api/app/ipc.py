@@ -1,17 +1,20 @@
 """IPC de Lima Metropolitana para deflactar el gasto y la inversión (variaciones % reales).
 
-Dos fuentes, la primera que funcione:
+Dos fuentes:
   · la API de estadísticas del BCRP: prueba las series de IPC_SERIE_BCRP (separadas por comas; por defecto la del
     índice de Lima base dic. 2021 = 100 y la de base anterior) y se queda con la que llega al mes más reciente; una
-    serie que no llega a los últimos 4 meses se descarta (la de base anterior terminó en dic. 2021). Se consulta en
-    cada sincronización con Drive y con el botón de la página;
-  · el IPC.xlsx que usa Fiscal_Procesamiento.ipynb (Fecha en la columna B e IPC en la C desde la fila 4), tomado de
-    Drive o subido en la página.
+    serie que no llega a los últimos 4 meses se descarta (la de base anterior terminó en dic. 2021). Se consulta sola
+    (refrescar: al abrir los cuadros de ejecución si al IPC cargado le falta el mes anterior, a lo más una vez al día),
+    antes de cada procesamiento fiscal y con el botón de la página;
+  · el IPC.xlsx que usa Fiscal_Procesamiento.ipynb (Fecha en la columna B e IPC en la C desde la fila 4), subido en la
+    página, por si el BCRP no responde.
 La base del índice no importa: las variaciones reales comparan valores deflactados con la misma serie.
 """
 import io
 import os
 import re
+import threading
+import time
 from datetime import date, datetime, timezone
 
 import pandas as pd
@@ -127,3 +130,25 @@ def actualizar_bcrp():
     _, serie, s = max(mejores)
     n = guardar(s, f"BCRP, serie {serie}")
     return f"IPC de Lima (BCRP, {serie}): {n} meses, hasta {max(s)}."
+
+
+_ultimo_intento = [0.0]
+
+
+def refrescar(horas=24, hoy=None):
+    """Si al IPC cargado le falta el mes anterior, lo trae del BCRP en segundo plano (a lo más una vez cada `horas`).
+    Nunca falla ni demora la respuesta: si el BCRP no responde, se queda el cargado."""
+    hoy = hoy or date.today()
+    anterior = f"{hoy.year - (hoy.month == 1)}-{(hoy.month - 2) % 12 + 1:02d}"
+    hasta = estado()["hasta"]
+    if (hasta and hasta >= anterior) or time.time() - _ultimo_intento[0] < horas * 3600:
+        return False
+    _ultimo_intento[0] = time.time()
+
+    def traer():
+        try:
+            actualizar_bcrp()
+        except Exception:
+            pass
+    threading.Thread(target=traer, daemon=True).start()
+    return True

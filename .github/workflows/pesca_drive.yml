@@ -1,12 +1,12 @@
-# Drive → API: cada día le pide al API (Render) que cargue los archivos nuevos o modificados de Drive: los Excel de las
-# carpetas de crudos de las DIREPRO (pesca de Loreto, San Martín y Ucayali) y los CSV de PERUPETRO que el flujo de
-# hidrocarburos deja en su carpeta DATA. Es lo mismo que el botón «Sincronizar ahora» de la página.
+# Drive → API: cada día le pide al API (Render) que cargue los CSV y el mapa que el flujo de hidrocarburos deja en su
+# carpeta DATA de Drive (lo único que la página aún toma de Drive: la pesca se sube en la página y el IPC se trae del BCRP).
+# Es lo mismo que el botón «Sincronizar ahora» de la página.
 #   · diario a las 07:30 y a las 09:00 hora de Lima (la segunda recoge lo que el flujo de hidrocarburos de las 07:00
 #     terminó de subir)
-#   · a mano: Actions → «Drive · sincronizar pesca e hidrocarburos» → Run workflow (puedes volver a procesar todo)
+#   · a mano: Actions → «Drive · sincronizar hidrocarburos» → Run workflow (puedes volver a procesar todo)
 # Requiere los secretos ESTUDIOS_API_URL (https://….onrender.com), ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE
 # (los de Render: variables APP_USUARIO y APP_CLAVE). Pasos en FISCAL/api/README.md.
-name: Drive · sincronizar pesca e hidrocarburos
+name: Drive · sincronizar hidrocarburos
 
 on:
   schedule:

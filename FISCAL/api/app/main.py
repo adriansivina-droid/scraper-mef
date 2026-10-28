@@ -189,7 +189,7 @@ def drive_estado():
 
 @app.post("/v1/drive/sincronizar", dependencies=[Depends(acceso)])
 def drive_sincronizar(todo: bool = False, origen: str = Query("botón de la página", max_length=60)):
-    """Carga los archivos nuevos o modificados de Drive: crudos de pesca y CSV de hidrocarburos (todos, con todo=true)."""
+    """Carga los archivos nuevos o modificados de la carpeta DATA de hidrocarburos en Drive (todos, con todo=true)."""
     if not drive.configurado():
         raise HTTPException(503, "Falta la credencial de Drive (variable GOOGLE_DRIVE_CREDENCIAL en Render).")
     try:
@@ -307,6 +307,7 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
     (comparar = año; por defecto el anterior), por nivel y por genérica o función, con variación real (IPC de Lima),
     avance del PIM (inversión) y series para los gráficos. formato=xlsx incluye las variaciones alarmantes (inversión)."""
     region = _ejecucion(departamento, periodo, comparar)
+    ipc.refrescar()
     niveles = list(NIVELES.values())
     if sector == "gasto":
         panel, pim = ejecucion.panel_gasto(db.leer("gasto-dev-generica", [departamento], niveles, "1990-01", "2100-12")), None

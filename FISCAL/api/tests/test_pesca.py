@@ -189,47 +189,16 @@ class DriveFalsa:
         return next(c[file_id][2] for c in self.carpetas.values() if file_id in c)
 
 
-@pytest.fixture()
-def drive_falsa(cliente, monkeypatch):
-    from app import drive
-    falsa = DriveFalsa({drive.CARPETAS["pesca-loreto"]: {"L1": ("CONSUMO_FEBRERO_-_2026-OPP.xlsx", "2026-03-10T10:00:00Z", loreto_consumo())},
-                        drive.CARPETAS["pesca-san-martin"]: {"S1": ("SMN_PESCA_2026-08.xlsx", "2026-09-05T10:00:00Z", smn_crudo())},
-                        drive.CARPETAS["pesca-ucayali"]: {}})
-    monkeypatch.setenv("GOOGLE_DRIVE_CREDENCIAL", "{}")
-    monkeypatch.setattr(drive, "LectorDrive", lambda credencial: falsa)
-    return falsa
-
-
 def test_drive_sin_credencial(cliente, monkeypatch):
     monkeypatch.delenv("GOOGLE_DRIVE_CREDENCIAL", raising=False)
     assert cliente.get("/v1/drive").json()["configurado"] is False
     assert cliente.post("/v1/drive/sincronizar").status_code == 503
 
 
-def test_drive_sincroniza_solo_lo_nuevo(cliente, drive_falsa):
+def test_drive_ya_no_lee_pesca():
+    """La pesca se sube en la página: Drive solo queda para la carpeta DATA de hidrocarburos."""
     from app import drive
-    r = cliente.post("/v1/drive/sincronizar").json()
-    assert sorted(r["bases"]) == ["pesca-loreto", "pesca-san-martin"] and len(r["archivos"]) == 2
-    assert cliente.get("/v1/estado").json()["bases"]["pesca-san-martin"]["hasta"] == "2026-08"
-    r = cliente.post("/v1/drive/sincronizar").json()                         # nada cambió: no baja nada
-    assert r["bases"] == {} and r["archivos"] == [] and drive_falsa.bajados == ["L1", "S1"]
-    # DIREPRO corrige el archivo de Loreto y llega uno nuevo de Ucayali
-    drive_falsa.carpetas[drive.CARPETAS["pesca-loreto"]]["L1"] = ("CONSUMO_FEBRERO_-_2026-OPP.xlsx", "2026-03-20T10:00:00Z", loreto_consumo(boquichico=30.0))
-    drive_falsa.carpetas[drive.CARPETAS["pesca-ucayali"]]["U1"] = ("ESTADISTICA_UCA_2026.xlsx", "2026-10-01T10:00:00Z", uca_crudo())
-    r = cliente.post("/v1/drive/sincronizar?origen=GitHub Actions").json()
-    assert sorted(a["nombre"] for a in r["archivos"]) == ["CONSUMO_FEBRERO_-_2026-OPP.xlsx", "ESTADISTICA_UCA_2026.xlsx"]
-    assert datos(cliente, "pesca-loreto", "16").query("ESPECIE == 'Boquichico'").VOLUMEN.tolist() == [30.0]
-    e = cliente.get("/v1/drive").json()
-    assert e["configurado"] and e["ultima"]["origen"] == "GitHub Actions" and len(e["carpetas"]) == 4
-    r = cliente.post("/v1/drive/sincronizar?todo=true").json()                # volver a procesar todo
-    assert len(r["archivos"]) == 3
-
-
-def test_drive_mismo_nombre_en_dos_carpetas(cliente, drive_falsa):
-    from app import drive
-    drive_falsa.carpetas[drive.CARPETAS["pesca-ucayali"]]["X"] = ("SMN_PESCA_2026-08.xlsx", "2026-10-01T10:00:00Z", uca_crudo())
-    r = cliente.post("/v1/drive/sincronizar").json()
-    assert sorted(r["bases"]) == ["pesca-loreto", "pesca-san-martin", "pesca-ucayali"]
+    assert list(drive.CARPETAS) == ["hidrocarburos"]
 
 
 def test_drive_cuenta_sin_acceso_a_la_carpeta(cliente, monkeypatch):
@@ -247,7 +216,7 @@ def test_drive_cuenta_sin_acceso_a_la_carpeta(cliente, monkeypatch):
 
     class Sesion:
         def get(self, url, params=None, timeout=None):
-            if url.endswith(drive.CARPETAS["pesca-san-martin"]):
+            if url.endswith(drive.CARPETAS["hidrocarburos"]):
                 return Respuesta(404)
             if "alt" not in (params or {}) and "q" not in (params or {}):
                 return Respuesta(200, {"mimeType": "application/vnd.google-apps.folder"})
@@ -255,16 +224,9 @@ def test_drive_cuenta_sin_acceso_a_la_carpeta(cliente, monkeypatch):
 
     lector = drive.LectorDrive.__new__(drive.LectorDrive)
     lector.sesion = Sesion()
-    assert lector.listar(drive.CARPETAS["pesca-loreto"]) == []
+    assert lector.listar("OTRA_CARPETA") == []
     monkeypatch.setenv("GOOGLE_DRIVE_CREDENCIAL", "{}")
     monkeypatch.setattr(drive, "LectorDrive", lambda credencial: lector)
     r = cliente.post("/v1/drive/sincronizar")
     assert r.status_code == 502 and "no puede ver la carpeta" in r.json()["detail"]
 
-
-def test_drive_dice_cuantos_excel_hay_en_cada_carpeta(cliente, drive_falsa):
-    cliente.post("/v1/drive/sincronizar")
-    r = cliente.post("/v1/drive/sincronizar").json()
-    assert r["carpetas"] == {"pesca-loreto": 1, "pesca-san-martin": 1, "pesca-ucayali": 0, "hidrocarburos": 0}
-    assert r["avisos"][:1] == ["No hay archivos nuevos ni modificados en las carpetas de Drive "
-                           "(archivos en cada carpeta · Loreto: 1, San Martín: 1, Ucayali: 0, Hidrocarburos: 0)."]
