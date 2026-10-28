@@ -22,6 +22,7 @@ CARPETAS = {
     "pesca-san-martin": os.environ.get("DRIVE_CRUDOS_SAN_MARTIN", "1Kkwys70cT3Z4ia5T7tO6CmNuQX-mSKWT"),
     "pesca-ucayali": os.environ.get("DRIVE_CRUDOS_UCAYALI", "1AEEvAfbtJwbkW773mKg-BIsDwjigjCg9"),
 }
+REGION = {"pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali"}
 API = "https://www.googleapis.com/drive/v3/files"
 _en_curso = threading.Lock()
 
@@ -46,7 +47,15 @@ class LectorDrive:
         self.sesion = AuthorizedSession(cred)
 
     def listar(self, carpeta):
-        """[{id, name, modifiedTime}] de los .xlsx de la carpeta."""
+        """[{id, name, modifiedTime}] de los .xlsx de la carpeta. Falla si la cuenta no puede ver la carpeta (Drive
+        devolvería una lista vacía y parecería que no hay archivos)."""
+        r = self.sesion.get(f"{API}/{carpeta}", params={"fields": "id,name,mimeType", "supportsAllDrives": "true"}, timeout=60)
+        if r.status_code == 404:
+            raise PermissionError(f"la cuenta de la credencial no puede ver la carpeta {carpeta}: compártela con esa "
+                                  "cuenta o revisa el ID")
+        r.raise_for_status()
+        if r.json().get("mimeType") != "application/vnd.google-apps.folder":
+            raise ValueError(f"el ID {carpeta} no es una carpeta de Drive")
         archivos, pagina = [], None
         while True:
             params = {"q": f"'{carpeta}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'",
@@ -106,8 +115,8 @@ def sincronizar(origen="botón de la página", todo=False, lector=None):
         _tablas()
         lector = lector or LectorDrive(os.environ["GOOGLE_DRIVE_CREDENCIAL"])
         vistos = {} if todo else _vistos()
-        nuevos = [(base_id, a) for base_id, carpeta in CARPETAS.items() for a in lector.listar(carpeta)
-                  if vistos.get(a["id"]) != a["modifiedTime"]]
+        listados = {base_id: lector.listar(carpeta) for base_id, carpeta in CARPETAS.items()}
+        nuevos = [(base_id, a) for base_id, lista in listados.items() for a in lista if vistos.get(a["id"]) != a["modifiedTime"]]
         if nuevos:
             usados, archivos = set(), []
             for _, a in nuevos:
@@ -116,8 +125,11 @@ def sincronizar(origen="botón de la página", todo=False, lector=None):
                 archivos.append((nombre, lector.bajar(a["id"])))
             resumen = carga.cargar(f"Drive ({origen}): {', '.join(a['name'] for _, a in nuevos)}"[:250], archivos)
         else:
-            resumen = {"bases": {}, "avisos": ["No hay archivos nuevos ni modificados en las carpetas de Drive."]}
+            hay = ", ".join(f"{REGION[b]}: {len(lista)}" for b, lista in listados.items())
+            resumen = {"bases": {}, "avisos": [f"No hay archivos nuevos ni modificados en las carpetas de Drive "
+                                               f"(Excel en cada carpeta · {hay})."]}
         resumen["archivos"] = [{"base": b, "nombre": a["name"]} for b, a in nuevos]
+        resumen["carpetas"] = {b: len(lista) for b, lista in listados.items()}
         ahora = datetime.now(timezone.utc).isoformat(timespec="microseconds")   # ordena las sincronizaciones
         with db.motor().begin() as cx:
             # un archivo que no se pudo leer también queda visto: se vuelve a intentar si cambia o con todo=True
