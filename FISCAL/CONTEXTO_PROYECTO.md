@@ -301,5 +301,10 @@ Es un proyecto aparte, con su propio documento de contexto: **`EXPORT/exportacio
 `Fiscal_Scraper.ipynb` también corre sin Colab en GitHub Actions (`.github/workflows/fiscal_scraper.yml`, días 2 y 21, o
 el botón «Actualizar desde el MEF» del API) mediante `FISCAL/automatizacion/scraper_servidor.py`, que ejecuta las celdas
 del notebook y carga `Scrapeo/output` en la base de datos del API (Neon). Al editar el notebook, mantener en el BLOQUE 2
-las variables `PRUEBA_RAPIDA`, `AÑO_INICIO`, `MES_INICIO`, `AÑO_FIN` y `MES_FIN` (el servidor las fija) y la ruta
+las variables `PRUEBA_RAPIDA`, `AÑO_INICIO`, `MES_INICIO`, `AÑO_FIN`, `MES_FIN` y `WORKERS` (el servidor las fija) y la ruta
 `/content/drive/MyDrive/Fiscal`. Detalle en `FISCAL/api/README.md`.
+
+`DEPARTAMENTOS_NACIONAL = "TODOS"` (BLOQUE 2): el detalle municipal de la función (DEV Funcion.Municipalidad), PIM Funcion
+y PIM Funcion.Municipalidad se raspan para los 25 departamentos; sus archivos llevan el sufijo «TODOS LOS DEPARTAMENTOS».
+El resto sigue con `departamentos` (Loreto, San Martín y Ucayali). `Fiscal_Procesamiento` y `Fiscal_Proyectos` filtran
+por sus tres códigos, así que no cambian.

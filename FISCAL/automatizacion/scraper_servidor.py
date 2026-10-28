@@ -73,7 +73,8 @@ def celdas(fijar):
 def raspar(desde, hasta, prueba):
     a0, m0 = map(int, desde.split("-"))
     a1, m1 = map(int, hasta.split("-"))
-    fijar = {"PRUEBA_RAPIDA": prueba, "AÑO_INICIO": a0, "MES_INICIO": m0, "AÑO_FIN": a1, "MES_FIN": m1}
+    fijar = {"PRUEBA_RAPIDA": prueba, "AÑO_INICIO": a0, "MES_INICIO": m0, "AÑO_FIN": a1, "MES_FIN": m1,
+             "WORKERS": int(os.environ.get("FISCAL_WORKERS", "6"))}   # consultas simultáneas (el MEF tolera 4-8)
     (TRABAJO / "Fiscal").mkdir(parents=True, exist_ok=True)
     sustituir_colab()
     g = {"__name__": "__main__", "display": lambda *x, **k: print(*x)}
