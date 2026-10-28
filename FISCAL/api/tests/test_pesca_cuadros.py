@@ -59,13 +59,60 @@ def test_cuadros_de_las_tres_regiones(cliente):  # noqa: F811
     assert f["Estado fresco"]["var_mes"] == 20.0 and f["Estado fresco"]["acum_a"] == 360.0
     assert f["Peces ornamentales vivos"]["mes_a"] == 50.0 and f["Desembarque total"]["mes_a"] == 130.0
     assert c["mensual"]["b"][11] is not None and c["mensual"]["a"][3] is None
+    sl = {x["nombre"]: x for x in c["sintesis"]["filas"]}
+    assert c["sintesis"]["titulo"] == "LORETO: PRODUCCIÓN PESQUERA 1/" and sl["Consumo Humano (toneladas)"]["mes_a"] == 130.0
+    assert sl["Boquichico"]["mes_a"] == 120.0 and sl["Mercado externo"]["mes_a"] == 50.0 and sl["SECTOR PESCA 2/"]["solo_var"]
     c7 = {}
-    for x in c["cuadro_07"]:                            # el bloque fresco repite nombres: vale la primera aparición
+    for x in c["cuadro_07"]["filas"]:                   # el bloque fresco repite nombres: vale la primera aparición
         c7.setdefault(x["nombre"], x)
-    assert c7["Boquichico"]["ahora"] == 120.0 and c7["Paiche"]["antes"] == 10.0 and c7["Mercado externo"]["ahora"] == 50.0
+    assert c["cuadro_07"]["columnas"][0] == "Ene. 2025" and c["cuadro_07"]["columnas"][-1] == "Mar. 2026"
+    assert c7["Paiche"]["totales"]["2025"] == 120.0 and c7["PECES ORNAMENTALES 1/"]["totales"]["2026"] == 150.0
     s = cliente.get("/v1/cuadros/pesca?departamento=22").json()["cuadros"]
     fs = {x["nombre"]: x for x in s["filas"]}
     assert fs["Producción de San Martín"]["var_mes"] == 100.0 and fs["Llega de otros departamentos"]["mes_a"] == 5.0 and "Tilapia" in fs
+    ss = {x["nombre"]: x for x in s["sintesis"]["filas"]}
+    assert ss["Producción Interna"]["mes_a"] == 20.0 and ss["Tilapia"]["var_acum"] == 100.0 and ss["Otras especies"]["mes_a"] == 0.0
+    c7s = {x["nombre"]: x for x in s["cuadro_07"]["filas"]}
+    assert c7s["TOTAL"]["totales"]["2026"] == 75.0 and c7s["INGRESO OTROS DPTOS. (CONTINENTAL)"]["totales"]["2026"] == 15.0
     u = cliente.get("/v1/cuadros/pesca?departamento=25&periodo=2026-02&formato=xlsx")
-    assert load_workbook(io.BytesIO(u.content)).sheetnames == ["Producción", "VBP mensual"]
+    assert load_workbook(io.BytesIO(u.content)).sheetnames == ["Producción pesquera", "Cuadro 07", "Producción", "VBP mensual"]
     assert cliente.get("/v1/cuadros/pesca?departamento=16&comparar=2026").status_code == 422
+
+
+def test_ucayali_formato_de_la_sucursal(cliente):  # noqa: F811
+    """«UCAYALI: PRODUCCIÓN PESQUERA» de junio 2026 (la imagen que mandó el usuario, con cifras redondeadas) y Cuadro Nº 07."""
+    fresco = {"Bagre": (14, 90), "Ractacara": (0, 186), "Boquichico": (19, 2), "Palometa": (3, 48), "Chiu Chiu": (0, 0),
+              "Sardina": (12, 30), "Doncella": (8, 139)}                            # Doncella va a «Otras especies»
+    f = []
+    for (a, i) in ((2025, 0), (2026, 1)):
+        for m in range(1, 7):
+            for e, v in fresco.items():
+                vol = v[i] if m == 6 else 1
+                f += [dict(AÑO=a, MES=m, TIPO="FRESCO", ESPECIES=e.upper(), ESPECIES_CORREGIDO=e, ESPECIES_OK=e if e != "Doncella" else "Otros",
+                           VOLUMEN=vol, VBP=vol * 3.27504),
+                      dict(AÑO=a, MES=m, TIPO="AGREGADO", ESPECIES=e.upper(), ESPECIES_CORREGIDO=e, ESPECIES_OK="Otros", VOLUMEN=vol, VBP=0)]
+            seco = (16, 28)[i] if m == 6 else 1
+            f += [dict(AÑO=a, MES=m, TIPO="SECO-SALADO", ESPECIES="BAGRE", ESPECIES_CORREGIDO="Bagre", ESPECIES_OK="Bagre", VOLUMEN=seco, VBP=seco * 2.98778),
+                  dict(AÑO=a, MES=m, TIPO="AGREGADO", ESPECIES="BAGRE ", ESPECIES_CORREGIDO="Bagre", ESPECIES_OK="Otros", VOLUMEN=seco, VBP=0),
+                  dict(AÑO=a, MES=m, TIPO="ORNAMENTAL", ESPECIES="NEON", ESPECIES_CORREGIDO="Neon", ESPECIES_OK="Neon", VOLUMEN=1000, VBP=0)]
+    cliente.post("/v1/cargas", files=[("archivos", ("UCA_PESCA_LONG.xlsx", long("UCA_PESCA", UCA_COLUMNAS, f), "application/octet-stream"))])
+    c = cliente.get("/v1/cuadros/pesca?departamento=25&periodo=2026-06").json()["cuadros"]
+    s = {x["nombre"]: x for x in c["sintesis"]["filas"]}
+    assert [x["nombre"] for x in c["sintesis"]["filas"]] == ["Consumo Humano", "Fresco", "Bagre", "Ractacara", "Boquichico", "Palometa", "Chiu Chiu",
+                                                              "Sardina", "Otras especies", "Seco salado", "SECTOR PESCA 2/"]
+    assert (s["Consumo Humano"]["mes_b"], s["Consumo Humano"]["mes_a"]) == (72.0, 523.0)
+    assert s["Fresco"]["mes_a"] == 495.0 and s["Otras especies"]["mes_a"] == 139.0 and s["Boquichico"]["var_mes"] == -89.5
+    assert s["Ractacara"]["var_mes"] is None and s["SECTOR PESCA 2/"]["solo_var"] and s["Seco salado"]["var_mes"] == 75.0
+    c7 = c["cuadro_07"]
+    assert c7["columnas"][0] == "Ene. 2025" and len(c7["columnas"]) == 12
+    filas = {}
+    for x in c7["filas"]:
+        if not x.get("titulo"):
+            filas.setdefault(x["nombre"], x)
+    assert filas["TOTAL 1/"]["totales"]["2026"] == filas["TOTAL"]["totales"]["2026"] == 523 + 5 * 8      # 1/ = fresco + seco
+    assert filas["PECES ORNAMENTALES (unidades)"]["totales"]["2025"] == 6000
+    wb = load_workbook(io.BytesIO(cliente.get("/v1/cuadros/pesca?departamento=25&periodo=2026-06&formato=xlsx").content))
+    ws = wb["Producción pesquera"]
+    assert ws["B7"].value == "UCAYALI: PRODUCCIÓN PESQUERA 1/" and [ws.cell(13, j).value for j in range(2, 5)] == ["Consumo Humano", 72, 523]
+    w7 = wb["Cuadro 07"]
+    assert w7["A2"].value == "UCAYALI: DESEMBARQUE DE PESCADO PARA CONSUMO HUMANO" and w7["B4"].value == 2025 and w7["H5"].value == 2025      # 2025 trae ene.-jun. en la prueba

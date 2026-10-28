@@ -206,3 +206,9 @@ b.sube, span.sube { color: var(--teal); } b.baja, span.baja { color: var(--orang
 details.funcion { border-top: 1px solid var(--hair); padding: 10px 0; }
 details.funcion summary { cursor: pointer; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
 details.funcion summary small { color: var(--mid); }
+
+.cuadro-sintesis table { max-width: 820px; margin: 0 auto; }
+tr.fuerte td { font-weight: 700; }
+table.c07 td, table.c07 th { padding: 5px 6px; font-size: 12px; }
+table.c07 .tot { background: var(--panel); font-weight: 700; }
+details.caja > summary { cursor: pointer; }
