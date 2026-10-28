@@ -1,7 +1,7 @@
 # Revisión rápida del API publicado (solo lectura): qué hay cargado en cada base, el IPC y si los cuadros de
 # ejecución salen con variación real. Sirve para comprobar una carga sin entrar a la página.
 #   · a mano: Actions → «API · revisar» → Run workflow
-# Usa los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE (los mismos de la sincronización con Drive).
+# Usa los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE (los mismos de «Archivos · cargar en la página»).
 name: API · revisar
 
 on:

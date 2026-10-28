@@ -1,0 +1,58 @@
+# Una sola vez: copia a la página (almacén de la base) lo que el flujo de hidrocarburos tenía en Drive (carpetas DATA y
+# CONTROL: CSV acumulados, PDF de PERUPETRO, Excel de canon, capas y mapa) y carga la página. Después el flujo
+# «Hidrocarburos · actualización» ya no usa Drive. Primero «listar» (cuánto pesa), luego «copiar».
+# Se puede volver a correr: no baja otra vez lo ya copiado. Solo lee Drive.
+# Requiere los secretos GOOGLE_DRIVE_CREDENCIAL (el de siempre) y DATABASE_URL.
+name: Hidrocarburos · migrar desde Drive
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "listar: solo cuenta archivos y MB · copiar: copia a la página"
+        type: choice
+        options: [listar, copiar]
+        default: listar
+
+concurrency:
+  group: hidrocarburos-actualizar
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r FISCAL/api/requirements.txt google-api-python-client
+
+      - name: Credencial de Drive
+        env:
+          CRED: ${{ secrets.GOOGLE_DRIVE_CREDENCIAL }}
+        run: |
+          if [ -z "$CRED" ]; then
+            echo "::error::Falta el secreto GOOGLE_DRIVE_CREDENCIAL"; exit 1
+          fi
+          printf '%s' "$CRED" > "$RUNNER_TEMP/drive.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/drive.json" >> "$GITHUB_ENV"
+
+      - name: Migrar
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONUNBUFFERED: "1"
+        run: python HIDROCARBUROS/automatizacion/migrar_drive.py "${{ inputs.modo }}"
+
+      - name: Borrar la credencial
+        if: always()
+        run: rm -f "$RUNNER_TEMP/drive.json"

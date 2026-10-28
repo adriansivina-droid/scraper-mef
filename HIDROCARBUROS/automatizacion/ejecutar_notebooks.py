@@ -8,6 +8,11 @@ de trabajo y las ejecuta en orden, como «Ejecutar todo» en Colab, con los valo
 del MEF, que se fijan abajo). «google.colab» se reemplaza por un sustituto: la autenticación de Drive usa la credencial de
 la variable GOOGLE_APPLICATION_CREDENTIALS (en GitHub, el secreto GOOGLE_DRIVE_CREDENCIAL) y userdata.get lee variables de
 entorno. Los widgets (ipywidgets) funcionan sin pantalla: se usa su valor por defecto.
+
+Con PP_ALMACEN=pagina (así corre en GitHub Actions) no se usa Drive: la API de Drive de los notebooks se reemplaza por
+el almacén de la página (FISCAL/api/app/almacen.py, en la base DATABASE_URL), con las mismas carpetas DATA y CONTROL, y
+al terminar se cargan en la página la producción, el canon y el mapa. Antes hay que copiar una vez lo que había en Drive
+(HIDROCARBUROS/automatizacion/migrar_drive.py); con el almacén vacío no corre, para no perder los históricos.
 """
 import json, os, re, sys, time, types, traceback
 from datetime import date, datetime
@@ -45,6 +50,27 @@ def sustituir_colab():
         setattr(colab, n, m); sys.modules[f"google.colab.{n}"] = m
     sys.modules["google.colab"] = colab
     google.colab = colab
+
+
+def usar_almacen_de_la_pagina():
+    """«googleapiclient» (discovery.build, http.MediaFileUpload/MediaIoBaseDownload, errors.HttpError) → almacén."""
+    sys.path.insert(0, os.path.join(os.path.dirname(RAIZ), "FISCAL", "api"))
+    from app import almacen
+    if almacen.vacio():
+        sys.exit("El almacén de la página está vacío: corre antes «Hidrocarburos · migrar desde Drive» (una sola vez) "
+                 "para no perder los históricos que estaban en Drive.")
+    paquete = types.ModuleType("googleapiclient")
+    for nombre, cosas in (("discovery", {"build": almacen.build}),
+                          ("http", {"MediaFileUpload": almacen.MediaFileUpload, "MediaIoBaseUpload": almacen.MediaIoBaseUpload,
+                                    "MediaIoBaseDownload": almacen.MediaIoBaseDownload}),
+                          ("errors", {"HttpError": almacen.HttpError})):
+        m = types.ModuleType(f"googleapiclient.{nombre}")
+        m.__dict__.update(cosas)
+        setattr(paquete, nombre, m)
+        sys.modules[f"googleapiclient.{nombre}"] = m
+    sys.modules["googleapiclient"] = paquete
+    print("🗄️  Almacén de la página:", ", ".join(f"{k}: {v['archivos']} archivos, {v['mb']} MB" for k, v in almacen.resumen().items()), flush=True)
+    return almacen
 
 
 def celdas(nb_ruta, fijar):
@@ -92,17 +118,37 @@ def ejecutar(nb, nombre, fijar):
     return {"NOTEBOOK": nb, "PASO": nombre, "ESTADO": estado, "MINUTOS": round(dur / 60, 1)}
 
 
+def cargar_en_la_pagina(almacen):
+    """La producción, el canon y el mapa que quedaron en DATA, a las bases de la página."""
+    t0 = time.time()
+    print(f"\n{'═' * 100}\n▶ Carga en la página\n{'═' * 100}", flush=True)
+    try:
+        r = almacen.sincronizar(origen="GitHub Actions")
+        for base, x in r.get("bases", {}).items():
+            print(f"  {base}: {x['filas']} filas · {x['periodos'][0]} a {x['periodos'][-1]}")
+        for a in r.get("avisos", []):
+            print("  ·", a)
+        estado = "OK"
+    except BaseException as e:
+        traceback.print_exc()
+        estado = f"ERROR: {type(e).__name__}: {e}"
+    return {"NOTEBOOK": "-", "PASO": "Carga en la página", "ESTADO": estado, "MINUTOS": round((time.time() - t0) / 60, 1)}
+
+
 def main():
     modo = (sys.argv[1] if len(sys.argv) > 1 else "diario").lower()
     if modo not in MODOS:
         sys.exit(f"Modo desconocido «{modo}»: usa {', '.join(MODOS)}")
     os.makedirs(TRABAJO, exist_ok=True)
     sustituir_colab()
+    almacen = usar_almacen_de_la_pagina() if os.environ.get("PP_ALMACEN") == "pagina" else None
     res = []
     for nb, nombre, fijar in MODOS[modo]:
         res.append(ejecutar(nb, nombre, fijar))
         if nb == PRODUCCION[0] and not res[-1]["ESTADO"].startswith("OK"):
-            print("⚠️ La producción falló: los mapas se generan igual con los datos que ya hay en Drive.")
+            print("⚠️ La producción falló: los mapas se generan igual con los datos que ya hay guardados.")
+    if almacen is not None:
+        res.append(cargar_en_la_pagina(almacen))
     lineas = [f"## Actualización {modo} · {datetime.now():%d/%m/%Y %H:%M}", "", "| Paso | Estado | Minutos |", "|---|---|---|"]
     lineas += [f"| {r['PASO']} | {'✅' if r['ESTADO'] == 'OK' else '❌'} {r['ESTADO'][:300]} | {r['MINUTOS']} |" for r in res]
     resumen = "\n".join(lineas)

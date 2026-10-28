@@ -12,7 +12,7 @@ descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 | Pesca | Las 3 bases de pesca, cargadas con los Excel mensuales de las DIREPRO (o los LONG de los notebooks de `PESCA/`) | **lista** |
 | 2 | El scraper del MEF corre solo (GitHub Actions, días 2 y 21) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
 | Empleo | Base de empleo del MTPE (scraper en GitHub Actions, días 2 y 21, o botón «Actualizar empleo»), con el cuadro, el gráfico y el anexo de la síntesis por región | **lista** |
-| Hidrocarburos | Producción por lote y canon de PERUPETRO, tomados de la carpeta DATA de Drive (los deja el flujo diario de `HIDROCARBUROS/`), con el cuadro, el gráfico, el anexo por lote y el canon de la síntesis | **lista** |
+| Hidrocarburos | Producción por lote y canon de PERUPETRO, que guarda en la página el flujo diario de `HIDROCARBUROS/`, con el cuadro, el gráfico, el anexo por lote y el canon de la síntesis | **lista** |
 | 3 | Ejecución del presupuesto: cuadros de gasto corriente e inversión (var. % real con el IPC de Lima, avance del PIM, comparación entre años), variaciones alarmantes y proyectos (GitHub Actions tras el scraper) | **lista** |
 
 ## Hoja de ruta: el informe completo
@@ -26,7 +26,7 @@ scraper (o carga de una plantilla) → base de datos → descargas en Excel → 
 | Resumen · otros indicadores | Cuadro 1 | SBS, MEF, DIREPRO y empresas | se arma con los demás módulos | al final |
 | Agropecuario | producción (t), superficie sembrada (ha) · Anexo 1 | MIDAGRI y direcciones regionales | **archivo mensual** que recibe el equipo | falta |
 | Pesca | producción pesquera y VBP · Anexo 2 | DIREPRO Loreto, San Martín y Ucayali | **archivo mensual**: el Excel de cada DIREPRO se sube en la página (o el LONG de los notebooks de `PESCA/`) | **en el API** |
-| Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions) → Drive (DATA) → API | **en el API** (producción y canon; falta el precio) |
+| Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions) → almacén de la página → API | **en el API** (producción y canon; falta el precio) |
 | Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | **archivo mensual** | falta |
 | Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | scraper de `EMPLEO/` en GitHub Actions (o su Excel subido en la página) | **en el API**, con cuadro, gráfico y anexo |
 | Exportaciones | por grupo de productos · Anexo | SUNAT | **archivo mensual** | falta |
@@ -130,21 +130,23 @@ en el notebook, el servidor usa el cambio.
 3. Render → servicio → **Environment** → **Add Environment Variable** → `GITHUB_ACCIONES_TOKEN` = el token → guardar.
    Nunca lo pegues en un chat. Cuando venza, el botón avisará «el token no es válido o venció»: se genera otro igual.
 
-## Todo en la página (Drive solo para hidrocarburos)
+## Todo en la página (sin Drive)
 
 La página guarda todo en su base de datos y usa GitHub Actions solo para lo que necesita un servidor aparte (los
-scrapers del MEF y de empleo, los notebooks fiscales). Drive ya no hace falta, salvo para hidrocarburos:
+scrapers del MEF, de empleo y de PERUPETRO, los notebooks fiscales). Drive ya no hace falta:
 
 - **Pesca:** el Excel que manda cada DIREPRO (o el LONG / la base histórica) se sube en la página: pestaña
   «Actualizar» del sector pesca de cada región, o «Las tres regiones → Subir archivos». Queda guardado en la base.
 - **IPC de Lima:** se trae solo del BCRP (al abrir los cuadros de ejecución si le falta el mes anterior, a lo más una
   vez al día, y antes de cada procesamiento fiscal). Si el BCRP no responde, se sube `IPC.xlsx` en la página.
 - **Notebooks fiscales:** sus Excel quedan en la pestaña «Archivos» (ver Ejecución del presupuesto).
-- **Hidrocarburos:** el flujo `hidrocarburos_actualizar.yml` sigue guardando su DATA en Drive; la página la toma de
-  allí cada día a las 7:30 y 9:00 a. m. (`.github/workflows/pesca_drive.yml`, «Drive · sincronizar hidrocarburos») o
-  con «Sincronizar ahora». Requiere la variable `GOOGLE_DRIVE_CREDENCIAL` en Render (la misma credencial del flujo de
-  hidrocarburos, generada con `HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb`) y los secretos de GitHub
-  `ESTUDIOS_API_URL`, `ESTUDIOS_API_USUARIO` y `ESTUDIOS_API_CLAVE`. Nunca pegues credenciales en un chat.
+- **Hidrocarburos:** el flujo `hidrocarburos_actualizar.yml` (07:00 en Lima, o el botón «Actualizar desde PERUPETRO»)
+  corre los notebooks de `HIDROCARBUROS/` y guarda todo (CSV acumulados, PDF de PERUPETRO, Excel de canon, capas y
+  mapa) en el **almacén de la página** (`app/almacen.py`, tabla `almacen`, con las mismas carpetas DATA y CONTROL e IDs
+  que tenía en Drive: los notebooks no cambian). Al terminar carga la producción, el canon y el mapa. Lo que había en
+  Drive se copia una sola vez con «Hidrocarburos · migrar desde Drive» (`hidrocarburos_migrar.yml`: primero `listar`,
+  luego `copiar`); hasta entonces el flujo diario no corre, para no perder los históricos. Los archivos guardados se
+  ven y se descargan en la pestaña «Actualizar» del sector hidrocarburos.
 - **Cargar archivos sin abrir la página:** `.github/workflows/cargar_archivos.yml` sube a la página los archivos de la
   carpeta `cargas/` de una rama aparte.
 
@@ -175,9 +177,8 @@ cualquier región. Para tener las 26, el scraper debe correr con «Todas las reg
 
 ## Hidrocarburos (PERUPETRO)
 
-El flujo diario de `HIDROCARBUROS/` (07:00 en Lima, sin cambios) deja en la carpeta **DATA** del Proyecto Petróleo
-(`1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq`) los CSV de PERUPETRO. La sincronización con Drive (botón «Sincronizar ahora» o
-`.github/workflows/pesca_drive.yml`, a las 07:30 y a las 09:00) toma el más reciente de cada uno:
+El flujo diario de `HIDROCARBUROS/` (07:00 en Lima) guarda en la carpeta **DATA** del almacén de la página los CSV de
+PERUPETRO y, al terminar, carga el más reciente de cada uno (también con «Volver a cargar en las bases» en la página):
 
 | Archivo de DATA | Base | Hoja |
 |---|---|---|
@@ -194,8 +195,7 @@ gráfico va como promedio de los días reportados, marcado con «*».
 Los CSV traen la serie completa: cada carga reemplaza los meses que trae en todos los departamentos. El departamento
 sale de la columna `DEPARTAMENTO` (la que asigna el mapa de lotes; «UCAYALI / HUANUCO» va a Ucayali); si falta, de
 `LOTES_DEPTO` en `app/hidrocarburos.py` (1-AB/192, 8, 95, 67, 39, 64, 102 → Loreto; 31-C, 131 → Ucayali); los demás
-quedan como «SIN DEPARTAMENTO». También se pueden subir los CSV en la página. La carpeta se cambia con la variable
-`DRIVE_HIDROCARBUROS_DATA`.
+quedan como «SIN DEPARTAMENTO». También se pueden subir los CSV en la página.
 
 En Loreto y Ucayali, la pestaña **Cuadros** del sector hidrocarburos arma: la producción por producto (petróleo y LGN
 en miles de barriles, gas natural en millones de pies cúbicos) y lote, del mes y acumulada, contra el mismo periodo del
@@ -263,8 +263,10 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/descargas/vista-previa` | Primeras filas y conteo de lo que se descargaría |
 | GET | `/v1/descargas` | El archivo: `formato=xlsx` (una hoja por base), `csv` (un `.zip` si son varias) o `json` (paginado) |
 | POST | `/v1/cargas` | Sube CSV del scraper, el `.zip` de `Scrapeo/output`, `PIM_Funcion.xlsx`, los Excel de pesca o el de empleo |
-| GET | `/v1/drive` | Si Drive está conectado, sus carpetas y la última sincronización |
-| POST | `/v1/drive/sincronizar` | Carga los archivos nuevos o modificados de la carpeta DATA de hidrocarburos en Drive (`todo=true`: todos) |
+| GET | `/v1/hidrocarburos/almacen` | Archivos y MB guardados por el flujo de hidrocarburos, última carga y corridas |
+| POST | `/v1/hidrocarburos/cargar` | Carga en las bases los CSV nuevos o modificados del almacén y el mapa (`todo=true`: todos) |
+| POST | `/v1/hidrocarburos/actualizar?modo=diario\|mensual` | Lanza el flujo de PERUPETRO en GitHub Actions |
+| GET | `/v1/hidrocarburos/archivos` · `/v1/hidrocarburos/archivos/descargar?id=` | Lista y descarga los archivos del almacén |
 | GET | `/v1/mef` | Si el botón del MEF está configurado y las últimas corridas del scraper en GitHub |
 | POST | `/v1/mef/actualizar` | Lanza el scraper del MEF en GitHub Actions (`desde`, `hasta` AAAA-MM opcionales; `prueba=true`) |
 | GET | `/v1/empleo` | Si el botón de empleo está configurado y las últimas corridas de su scraper |

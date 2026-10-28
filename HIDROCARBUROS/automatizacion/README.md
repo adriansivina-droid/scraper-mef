@@ -1,6 +1,6 @@
 # Actualización automática (GitHub Actions)
 
-Corre los notebooks del proyecto **sin abrir Colab**, todos los días, y guarda los resultados en las mismas carpetas de Drive (DATA y CONTROL).
+Corre los notebooks del proyecto **sin abrir Colab**, todos los días, y guarda los resultados en la **página** (almacén de la base, `FISCAL/api/app/almacen.py`), con las mismas carpetas DATA y CONTROL que antes estaban en Drive. Al terminar, la producción, el canon y el mapa quedan cargados en la página. Ya no usa Drive (con `PP_ALMACEN=pagina`; en Colab los notebooks siguen usando Drive).
 
 | Cuándo | Modo | Qué corre |
 |---|---|---|
@@ -12,17 +12,16 @@ Los notebooks corren con sus **valores por defecto**, como «Ejecutar todo» en 
 
 ## Configuración (una sola vez)
 
-1. **Credencial de Drive.** Abre `PP_Credencial_Drive.ipynb` en Colab y sigue los pasos. Descarga `credencial_drive.json`.
-   - https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb
-2. **Secreto en GitHub.**
-   - Ve al repositorio → **Settings → Secrets and variables → Actions → New repository secret**.
-   - Nombre: `GOOGLE_DRIVE_CREDENCIAL`. Valor: todo el contenido de `credencial_drive.json`.
-   - Después borra el archivo de tu computadora.
-3. **Primera prueba.** Ve a **Actions → «Hidrocarburos · actualización» → Run workflow** y elige `diario`.
+1. **Secreto `DATABASE_URL` en GitHub** (el mismo de los demás flujos de la página).
+2. **Copiar lo que había en Drive:** Actions → **«Hidrocarburos · migrar desde Drive»** → Run workflow → `listar` (cuánto
+   pesa) y luego `copiar`. Usa por última vez el secreto `GOOGLE_DRIVE_CREDENCIAL`; después se puede borrar. Mientras el
+   almacén esté vacío, el flujo diario no corre (para no perder los históricos).
+3. **Prueba:** Actions → «Hidrocarburos · actualización» → Run workflow (`diario`), o el botón «Actualizar desde
+   PERUPETRO» de la página (sector hidrocarburos → Actualizar).
 
 ## Dónde ver los resultados
 
-- **Drive:** DATA, CONTROL y DATA/MAPA, igual que con Colab.
+- **La página:** sector hidrocarburos (cuadros, mapa) y, en «Actualizar», los archivos de DATA, CONTROL y DATA/MAPA para descargar.
 - **GitHub, en cada ejecución:**
   - el **resumen** con cada paso y su estado (✅/❌) y los minutos que tomó;
   - el archivo **«Mapa de Hidrocarburos - Perú»**: el mapa Plus en un solo HTML, descargable por 14 días. GitHub lo entrega dentro de un .zip; se descomprime y se abre con doble clic.

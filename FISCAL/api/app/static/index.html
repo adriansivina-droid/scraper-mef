@@ -63,8 +63,8 @@
       lead: "Producción de los principales cultivos y crianzas, y avance de siembras de la campaña.", cuadros: ["Producción agropecuaria (t)", "Superficie sembrada (ha)", "Anexo de producción agrícola"] },
     pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Subiendo en la página el Excel que envía DIREPRO", bases: (r) => [r.pesca], actualizar: "subir",
       lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: "pesca" },
-    hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Scraper diario de PERUPETRO (7:00 a. m.) → Drive → página (7:30 y 9:00 a. m.)",
-      bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "drive-hidro", cuadros: "hidrocarburos", mapa: true,
+    hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Flujo diario de PERUPETRO en GitHub (7:00 a. m.), o con el botón",
+      bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "hidro", cuadros: "hidrocarburos", mapa: true,
       lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
     manu: { t: "Sector manufactura", estado: "falta", fuente: "DIREPRO y encuesta BCRP a empresas industriales", entra: "Archivo mensual",
       lead: "Índice de volumen físico de la manufactura.", cuadros: ["Índice de volumen físico", "Anexo de producción manufacturera"] },
@@ -94,10 +94,10 @@
     lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[2], comunes[3], { id: "anexos" }] },
     smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "manu", "cemento"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
     uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
-    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-drive", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
+    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
   const C = { panorama: "Panorama de las tres regiones", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
-              "act-empleo": "Scraper de empleo", "act-drive": "Drive: hidrocarburos", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
+              "act-empleo": "Scraper de empleo", "act-hidro": "Hidrocarburos (PERUPETRO)", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
   const CORTO = { [V]: "V. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
 
@@ -328,7 +328,7 @@
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
     try {
       const j = await api(`/v1/cuadros/hidrocarburos?departamento=${r.cod}${periodo ? `&periodo=${periodo}` : ""}`), c = j.cuadros;
-      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay producción de hidrocarburos de ${esc(r.nombre)}.</b><span>Sincroniza la carpeta DATA de Drive o sube los CSV en la pestaña «Actualizar».</span></div>`; return; }
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay producción de hidrocarburos de ${esc(r.nombre)}.</b><span>Actualízala desde PERUPETRO o sube los CSV en la pestaña «Actualizar».</span></div>`; return; }
       const e = ESTADO.bases["hidro-produccion"], meses = MESES.filter((m) => m >= (e.desde || "") && m <= c.ultimo);
       const mes = c.titulo_mes, a = c.anio, m3 = mes.slice(0, 3), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
       const cuadro = c.bloques.map((b) => `<tr class="grupo"><td colspan="7"><b>${esc(b.producto)}</b> <span class="nota">(${esc(b.unidad)})</span></td></tr>` + b.filas.map((f) =>
@@ -576,7 +576,7 @@
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron leer los archivos</b><span>${esc(e.message)}</span></div>`; }
   }
 
-  // ── Carga de archivos, Drive y scrapers de GitHub ──
+  // ── Carga de archivos y scrapers de GitHub ──
   function resultado(r, tit, ok) {
     const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(base(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
     return `<div class="${ok ? "ok-box" : "err-box"}"><b>${esc(tit)}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
@@ -643,29 +643,46 @@
     });
     const m = await pintar(); if (m && m.corridas.some((c) => c.estado !== "completed")) vigilar();
   }
-  async function cajaDrive(caja, soloBase) {
-    caja.innerHTML = '<div class="loading"><span class="spin"></span>Consultando Drive…</div>';
+  // Hidrocarburos: el flujo de PERUPETRO corre en GitHub y guarda todo en el almacén de la página (ya no en Drive)
+  async function cajaHidro(caja) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Consultando el almacén…</div>';
     try {
-      const d = await api("/v1/drive");
-      if (!d.configurado) { caja.innerHTML = '<div class="err-box"><b>Falta conectar Drive</b><span>Agrega la variable GOOGLE_DRIVE_CREDENCIAL en Render (la misma credencial del flujo de hidrocarburos). Pasos en FISCAL/api/README.md.</span></div>'; return; }
-      const u = d.ultima, archivos = u ? u.resumen.archivos || [] : [], cuenta = u && u.resumen.carpetas ? u.resumen.carpetas : {};
-      const RN = { "pesca-loreto": "Pesca · Loreto", "pesca-san-martin": "Pesca · San Martín", "pesca-ucayali": "Pesca · Ucayali", hidrocarburos: "Hidrocarburos · DATA" };
-      const carpetas = Object.entries(d.carpetas).filter(([b]) => !soloBase || b === soloBase);
-      caja.innerHTML = `<p>${soloBase === "hidrocarburos" ? "El scraper diario de PERUPETRO (7:00 a. m.) deja en la carpeta DATA los CSV de producción por lote y de canon. La página toma el más reciente de cada uno cada día a las 7:30 y a las 9:00 a. m., y al instante con el botón."
-          : soloBase ? "Deja los Excel que manda la DIREPRO en su carpeta de crudos: se cargan solos cada día a las 7:30 y a las 9:00 a. m. y al instante con el botón."
-          : "Pesca: los Excel de las DIREPRO en sus carpetas de crudos. Hidrocarburos: los CSV que el scraper de PERUPETRO deja en DATA. Se cargan solos cada día a las 7:30 y a las 9:00 a. m., y al instante con el botón."} Solo se procesan los archivos nuevos o modificados.</p>
-        <div class="scroll"><table><tr><th>Carpeta</th><th class="n">Archivos en la última revisión</th></tr>${carpetas.map(([b, cid]) => `<tr><td><a href="https://drive.google.com/drive/folders/${encodeURIComponent(cid)}" target="_blank" rel="noopener">${esc(RN[b])}</a></td><td class="n">${cuenta[b] ?? "—"}</td></tr>`).join("")}</table></div>
-        <p class="nota">Última sincronización: ${u ? `${esc(fecha(u.fecha))} (${esc(u.origen)}) · ${archivos.length ? `${archivos.length} archivo(s): ${esc(archivos.map((a) => a.nombre).join(", "))}` : "sin archivos nuevos"}` : "todavía ninguna"}.</p>
-        <div class="fila"><label class="chk"><input type="checkbox" id="drive-todo"> Volver a procesar todos los archivos</label><button class="btn" type="button" id="drive-sinc">Sincronizar ahora</button></div><div id="drive-res" aria-live="polite"></div>`;
-      $("drive-sinc").addEventListener("click", async () => {
-        const btn = $("drive-sinc"); btn.disabled = true; btn.textContent = "Sincronizando…";
-        $("drive-res").innerHTML = '<div class="loading"><span class="spin"></span>Revisando las carpetas de Drive…</div>';
-        try { const r = await api(`/v1/drive/sincronizar?todo=${$("drive-todo").checked}`, { method: "POST" }); const ok = Object.keys(r.bases).length > 0;
-          const html = resultado(r, !r.archivos.length ? "Todo estaba al día" : ok ? "Sincronización terminada" : "Los archivos nuevos no se pudieron cargar", ok || !r.archivos.length);
-          ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); await cajaDrive(caja, soloBase); $("drive-res").innerHTML = html;
-        } catch (e) { $("drive-res").innerHTML = `<div class="err-box"><b>No se pudo sincronizar</b><span>${esc(e.message)}</span></div>`; btn.disabled = false; btn.textContent = "Sincronizar ahora"; }
+      const d = await api("/v1/hidrocarburos/almacen");
+      const u = d.ultima, archivos = u ? u.resumen.archivos || [] : [], R = d.resumen || {};
+      const carp = (k) => R[k] ? `${fmt(R[k].archivos)} archivos · ${R[k].mb.toLocaleString("es-PE")} MB` : "vacía";
+      caja.innerHTML = `<p>El flujo de PERUPETRO corre solo cada día a las 7:00 a. m. (el día 5, también el canon municipal del MEF): baja la producción, el canon y las regalías, arma el mapa y lo guarda todo en la página. Al terminar, la producción, el canon y el mapa quedan cargados.</p>
+        <div class="scroll"><table><tr><th>Carpeta en la página</th><th>Contenido</th><th>Qué guarda</th></tr>
+          <tr><td><b>DATA</b></td><td>${carp("DATA")}</td><td>CSV acumulados, PDF de PERUPETRO, Excel de canon, capas y mapa</td></tr>
+          <tr><td><b>CONTROL</b></td><td>${carp("CONTROL")}</td><td>Controles y catálogos de cada corrida</td></tr></table></div>
+        <p class="nota">Última carga en la página: ${u ? `${esc(fecha(u.fecha))} (${esc(u.origen)}) · ${archivos.length ? `${archivos.length} archivo(s): ${esc(archivos.map((a) => a.nombre).join(", "))}` : "sin archivos nuevos"}` : "todavía ninguna"}.</p>
+        ${d.configurado ? `<div class="fila"><label class="campo" for="hid-modo">Qué actualizar<select id="hid-modo"><option value="diario">Producción, canon y mapa</option><option value="mensual">Además, canon municipal del MEF</option></select></label>
+          <button class="btn" type="button" id="hid-lanzar">Actualizar desde PERUPETRO</button></div>` : '<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render. Mientras tanto, corre solo cada día a las 7:00 a. m.</span></div>'}
+        <div id="hid-res" aria-live="polite"></div>
+        ${d.corridas.length ? `<div class="scroll"><table><tr><th>Corrida</th><th>Estado</th><th>Inicio</th><th></th></tr>${d.corridas.map((c) => `<tr><td>${esc(c.origen === "schedule" ? "programada" : "a mano")}</td><td>${ESTADO_CORRIDA(c)}</td><td>${esc(fecha(c.inicio))}</td><td><a href="${esc(c.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("")}</table></div>` : ""}
+        <details><summary>Volver a cargar en las bases lo guardado</summary><div class="fila"><label class="chk"><input type="checkbox" id="hid-todo"> Todos los archivos (no solo los nuevos)</label><button class="btn sec" type="button" id="hid-cargar">Cargar ahora</button></div></details>
+        <details id="hid-arch"><summary>Ver y descargar los archivos guardados</summary><div class="loading"><span class="spin"></span>…</div></details>`;
+      if ($("hid-lanzar")) $("hid-lanzar").addEventListener("click", async () => {
+        const bt = $("hid-lanzar"); bt.disabled = true;
+        try { await api(`/v1/hidrocarburos/actualizar?modo=${$("hid-modo").value}`, { method: "POST" }); $("hid-res").innerHTML = '<div class="ok-box"><b>Flujo lanzado en GitHub</b><span>Tarda alrededor de una hora; puedes cerrar la página. Al terminar, los datos y el mapa nuevos aparecen aquí.</span></div>'; }
+        catch (e) { $("hid-res").innerHTML = `<div class="err-box"><b>No se pudo lanzar</b><span>${esc(e.message)}</span></div>`; bt.disabled = false; }
       });
-    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar Drive</b><span>${esc(e.message)}</span></div>`; }
+      $("hid-cargar").addEventListener("click", async () => {
+        const bt = $("hid-cargar"); bt.disabled = true;
+        $("hid-res").innerHTML = '<div class="loading"><span class="spin"></span>Cargando…</div>';
+        try { const r = await api(`/v1/hidrocarburos/cargar?todo=${$("hid-todo").checked}`, { method: "POST" }); const ok = Object.keys(r.bases).length > 0;
+          const html = resultado(r, !r.archivos.length ? "Todo estaba al día" : ok ? "Carga terminada" : "Los archivos no se pudieron cargar", ok || !r.archivos.length);
+          ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); await cajaHidro(caja); $("hid-res").innerHTML = html;
+        } catch (e) { $("hid-res").innerHTML = `<div class="err-box"><b>No se pudo cargar</b><span>${esc(e.message)}</span></div>`; bt.disabled = false; }
+      });
+      $("hid-arch").addEventListener("toggle", async (ev) => {
+        if (!ev.target.open || ev.target.dataset.listo) return;
+        ev.target.dataset.listo = "1";
+        const j = await api("/v1/hidrocarburos/archivos"), a = j.archivos, nombre = { ...Object.fromEntries(a.map((x) => [x.id, x.nombre])), ...j.raices };
+        const ruta = (x) => { const p = []; let q = x.padre, n = 0; while (q && nombre[q] && n++ < 9) { p.unshift(nombre[q]); q = (a.find((y) => y.id === q) || {}).padre; } return p.join("/"); };
+        const filas = a.filter((x) => !x.carpeta).map((x) => ({ ...x, ruta: ruta(x) })).sort((x, y) => x.ruta.localeCompare(y.ruta) || x.nombre.localeCompare(y.nombre));
+        ev.target.querySelector(".loading").outerHTML = filas.length ? `<div class="scroll"><table><tr><th>Carpeta</th><th>Archivo</th><th>Modificado</th><th class="n">Tamaño</th><th></th></tr>${filas.map((x) => `<tr><td>${esc(x.ruta)}</td><td>${esc(x.nombre)}</td><td>${x.modificado ? esc(fecha(x.modificado)) : ""}</td><td class="n">${fmt(x.kb)} KB</td><td><a href="/v1/hidrocarburos/archivos/descargar?id=${encodeURIComponent(x.id)}">Descargar</a></td></tr>`).join("")}</table></div>` : "<p class='nota'>Todavía no hay archivos.</p>";
+      });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar el almacén</b><span>${esc(e.message)}</span></div>`; }
   }
   const irComun = (sid, texto) => `<a data-ir="tres-${sid}">${texto}</a>`;
 
@@ -681,7 +698,7 @@
     else if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : s.actualizar === "empleo" ? irComun("empleo-long", "Empleo · LONG por región") + " (el Excel tal como lo da el scraper, de una, varias o todas las regiones)" : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
       : `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(s.t.toLowerCase())} en la página.</b><span>Fuente: ${esc(s.fuente)}. Entrará como: ${esc(s.entra.toLowerCase())}.</span></div>`;
     else if (t === "Mapa") panel = `<div class="caja mapa-caja"><div class="fila" style="justify-content:space-between;align-items:center">
-        <p>Mapa de lotes de PERUPETRO que arma el flujo de hidrocarburos (DATA/MAPA en Drive), con la producción, los pozos, las regalías y el canon de cada lote.</p>
+        <p>Mapa de lotes de PERUPETRO que arma el flujo de hidrocarburos (guardado en la página), con la producción, los pozos, las regalías y el canon de cada lote.</p>
         <div class="fila"><a class="btn sec" href="/v1/hidrocarburos/mapa" target="_blank" rel="noopener">Pantalla completa</a><a class="btn sec" href="/v1/hidrocarburos/mapa?descargar=true">Descargar</a></div></div>
         <iframe class="mapa" src="/v1/hidrocarburos/mapa" title="Mapa de lotes de hidrocarburos" sandbox="allow-scripts allow-popups allow-downloads allow-modals" loading="lazy"></iframe></div>`;
     else if (t === "Cuadros" && s.cuadros === "ejecucion") panel = `<div id="cuadros-ejec" data-sector="${id}"></div>`;
@@ -692,8 +709,8 @@
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
-      : s.actualizar === "drive-hidro" ? `<div class="grid2"><div class="caja"><h3>Carpeta DATA del Proyecto Petróleo</h3><div id="drive-caja" data-base="hidrocarburos"></div></div>${cajaSubida("sub-hidro", "Los CSV de la carpeta DATA: PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv. Traen la serie completa y reemplazan lo cargado.")}</div>`
-      : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página: ya no hace falta ponerlo en Drive.`)
+      : s.actualizar === "hidro" ? `<div><div class="caja"><h3>PERUPETRO → página</h3><div id="hidro-caja"></div></div>${cajaSubida("sub-hidro", "Los CSV de producción o canon (PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv). Traen la serie completa y reemplazan lo cargado.")}</div>`
+      : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página.`)
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
       : `<div class="vacio-caja"><b>Cómo entrará: ${esc(s.entra.toLowerCase())}.</b><span>Cuando se construya, aquí estarán su actualización y la carga del archivo del mes de ${esc(r.nombre)}.</span></div>`;
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
@@ -733,7 +750,7 @@
         <div class="caja"><h3>Empleo</h3>${panelBases("p-cempleo", ["empleo"], { deptos: () => LSU, marcar: 1 })}</div>`;
     } else if (id === "act-mef") cuerpo = cajaScraper("mef");
     else if (id === "act-empleo") cuerpo = cajaScraper("empleo");
-    else if (id === "act-drive") cuerpo = '<div class="caja"><h3>Carpeta DATA de hidrocarburos en Drive</h3><p>Lo único que la página aún toma de Drive: los CSV y el mapa que el flujo de hidrocarburos deja en su carpeta DATA. La pesca se sube en la página y el IPC se trae del BCRP.</p><div id="drive-caja"></div></div>';
+    else if (id === "act-hidro") cuerpo = '<div class="caja"><h3>Hidrocarburos: PERUPETRO → página</h3><div id="hidro-caja"></div></div>';
     else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "Cualquier archivo que entienda la página: el .zip de Fiscal/Scrapeo/output, CSV del scraper o PIM_Funcion.xlsx (MEF); los Excel de las DIREPRO o los LONG de los notebooks (pesca); o el Excel del scraper de empleo. La página reconoce de qué sector y región es cada uno. Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.");
     else if (id === "estado") {
       const u = ESTADO.ultima_carga;
@@ -775,7 +792,7 @@
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
     ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
-    if ($("drive-caja")) cajaDrive($("drive-caja"), $("drive-caja").dataset.base || null);
+    if ($("hidro-caja")) cajaHidro($("hidro-caja"));
     if ($("cuadros-empleo")) cuadrosEmpleo(REG[grupo], $("cuadros-empleo"));
     if ($("cuadros-hidro")) cuadrosHidro(REG[grupo], $("cuadros-hidro"));
     if ($("cuadros-pesca")) cuadrosPesca(REG[grupo], $("cuadros-pesca"));
