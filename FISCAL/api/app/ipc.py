@@ -1,8 +1,10 @@
 """IPC de Lima Metropolitana para deflactar el gasto y la inversión (variaciones % reales).
 
 Dos fuentes, la primera que funcione:
-  · la API de estadísticas del BCRP (serie IPC_SERIE_BCRP, por defecto PN01270PM: índice de precios de Lima
-    Metropolitana, dic. 2021 = 100); se consulta en cada sincronización con Drive y con el botón de la página;
+  · la API de estadísticas del BCRP: prueba las series de IPC_SERIE_BCRP (separadas por comas; por defecto la del
+    índice de Lima base dic. 2021 = 100 y la de base anterior) y se queda con la que llega al mes más reciente; una
+    serie que no llega a los últimos 4 meses se descarta (la de base anterior terminó en dic. 2021). Se consulta en
+    cada sincronización con Drive y con el botón de la página;
   · el IPC.xlsx que usa Fiscal_Procesamiento.ipynb (Fecha en la columna B e IPC en la C desde la fila 4), tomado de
     Drive o subido en la página.
 La base del índice no importa: las variaciones reales comparan valores deflactados con la misma serie.
@@ -18,7 +20,8 @@ from sqlalchemy import text
 
 from . import db
 
-SERIE_BCRP = os.environ.get("IPC_SERIE_BCRP", "PN01270PM")
+SERIES_BCRP = [x.strip() for x in os.environ.get("IPC_SERIE_BCRP", "PN38705PM,PN01270PM").split(",") if x.strip()]
+SERIE_BCRP = SERIES_BCRP[0]
 URL_BCRP = "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/{serie}/json/{desde}/{hasta}"
 _MES = {"ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6, "jul": 7, "ago": 8, "set": 9, "sep": 9, "oct": 10, "nov": 11, "dic": 12}
 
@@ -29,11 +32,14 @@ def _tabla():
 
 
 def guardar(serie, fuente):
-    """serie: {'AAAA-MM': valor}. Reemplaza esos meses. Devuelve cuántos guardó."""
+    """serie: {'AAAA-MM': valor}, la serie completa de una fuente: reemplaza todo lo cargado (dos bases distintas del
+    índice no se mezclan). Devuelve cuántos meses guardó."""
     _tabla()
     serie = {p: float(v) for p, v in serie.items() if v is not None and 20 < float(v) < 1000}   # un índice, no una tasa
     ahora = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with db.motor().begin() as cx:
+        if serie:
+            cx.execute(text("DELETE FROM ipc"))
         for p, v in serie.items():
             cx.execute(text("DELETE FROM ipc WHERE periodo = :p"), {"p": p})
             cx.execute(text("INSERT INTO ipc (periodo, valor, fuente, fecha) VALUES (:p, :v, :f, :a)"), {"p": p, "v": v, "f": fuente, "a": ahora})
@@ -55,9 +61,9 @@ def estado():
     return {"meses": int(r[0]), "desde": r[1], "hasta": r[2], "fuente": f[0] if f else None, "actualizado": f[1] if f else None}
 
 
-def de_bcrp(desde_anio=2010, sesion=requests):
-    """{'AAAA-MM': valor} de la API del BCRP. Los periodos vienen como «Ene.2024»."""
-    url = URL_BCRP.format(serie=SERIE_BCRP, desde=f"{desde_anio}-1", hasta=f"{date.today().year}-12")
+def de_bcrp(desde_anio=2010, sesion=requests, serie=None):
+    """{'AAAA-MM': valor} de una serie de la API del BCRP. Los periodos vienen como «Ene.2024»."""
+    url = URL_BCRP.format(serie=serie or SERIE_BCRP, desde=f"{desde_anio}-1", hasta=f"{date.today().year}-12")
     r = sesion.get(url, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
     r.raise_for_status()
     salida = {}
@@ -94,10 +100,30 @@ def es_ipc(nombre):
     return bool(re.match(r"^IPC.*\.xlsx$", nombre, re.I))
 
 
+def _vigente(s, hoy=None):
+    """La serie llega a alguno de los últimos 4 meses (el IPC sale a inicios del mes siguiente)."""
+    hoy = hoy or date.today()
+    limite = (hoy.year * 12 + hoy.month - 1) - 4
+    return bool(s) and int(max(s)[:4]) * 12 + int(max(s)[5:]) - 1 >= limite
+
+
 def actualizar_bcrp():
-    """Trae el IPC del BCRP y lo guarda. Devuelve el texto para el resumen."""
-    s = {k: v for k, v in de_bcrp().items() if 20 < v < 1000}
-    if not s:
-        raise ValueError(f"la serie {SERIE_BCRP} del BCRP no es un índice (¿variación %?); cambia IPC_SERIE_BCRP")
-    n = guardar(s, f"BCRP, serie {SERIE_BCRP}")
-    return f"IPC de Lima (BCRP, {SERIE_BCRP}): {n} meses, hasta {max(s)}."
+    """Trae el IPC del BCRP (la serie vigente que llegue más lejos) y lo guarda. Devuelve el texto para el resumen."""
+    mejores, motivos = [], []
+    for serie in SERIES_BCRP:
+        try:
+            s = {k: v for k, v in de_bcrp(serie=serie).items() if 20 < v < 1000}
+        except Exception as e:
+            motivos.append(f"{serie}: {type(e).__name__}")
+            continue
+        if not s:
+            motivos.append(f"{serie}: no es un índice")
+        elif not _vigente(s):
+            motivos.append(f"{serie}: termina en {max(s)}")
+        else:
+            mejores.append((max(s), serie, s))
+    if not mejores:
+        raise ValueError("ninguna serie del BCRP está al día (" + "; ".join(motivos) + ")")
+    _, serie, s = max(mejores)
+    n = guardar(s, f"BCRP, serie {serie}")
+    return f"IPC de Lima (BCRP, {serie}): {n} meses, hasta {max(s)}."
