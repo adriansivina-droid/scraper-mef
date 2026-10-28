@@ -1,0 +1,59 @@
+# Archivos → API: sube a la página (POST /v1/cargas, lo mismo que «Subir archivos») los archivos de la carpeta cargas/
+# de una rama. Sirve para cargar una base que llegó por otro medio (p. ej. por chat) sin entrar a la página:
+#   1. se suben los archivos a cargas/ en una rama aparte (no en main), p. ej. «cargas»;
+#   2. Actions → «Archivos · cargar en la página» → Run workflow, con esa rama.
+# Usa los mismos secretos que la sincronización con Drive (ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO, ESTUDIOS_API_CLAVE).
+name: Archivos · cargar en la página
+
+on:
+  workflow_dispatch:
+    inputs:
+      rama:
+        description: "Rama con los archivos en la carpeta cargas/"
+        default: "cargas"
+
+permissions:
+  contents: read
+
+jobs:
+  cargar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.rama }}
+          sparse-checkout: cargas
+      - name: Subir a la página
+        env:
+          URL: ${{ secrets.ESTUDIOS_API_URL }}
+          USUARIO: ${{ secrets.ESTUDIOS_API_USUARIO }}
+          CLAVE: ${{ secrets.ESTUDIOS_API_CLAVE }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$USUARIO" ] || [ -z "$CLAVE" ]; then
+            echo "::error::Faltan los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO o ESTUDIOS_API_CLAVE."; exit 1
+          fi
+          args=()
+          for f in cargas/*; do [ -f "$f" ] && args+=(-F "archivos=@$f"); done
+          [ ${#args[@]} -gt 0 ] || { echo "::error::La carpeta cargas/ de la rama ${{ inputs.rama }} está vacía."; exit 1; }
+          # Render puede tardar en responder la primera consulta: hasta 3 intentos
+          for intento in 1 2 3; do
+            codigo=$(curl -sS -o respuesta.json -w '%{http_code}' --max-time 900 -u "$USUARIO:$CLAVE" "${args[@]}" \
+                     "${URL%/}/v1/cargas") || codigo=000
+            [ "$codigo" = "200" ] && break
+            echo "Intento $intento: el API respondió $codigo"; sleep 30
+          done
+          python3 - <<'PY'
+          import json
+          try:
+              r = json.load(open("respuesta.json"))
+          except Exception:
+              r = {"detail": open("respuesta.json").read()[:500]}
+          if "detail" in r:
+              print(f"::error::{r['detail']}")
+              raise SystemExit(1)
+          for base, x in r.get("bases", {}).items():
+              print(f"::notice::{base}: {x['filas']} filas · {x['periodos'][0]} a {x['periodos'][-1]}")
+          for a in r.get("avisos", []):
+              print(f"::notice::{a}")
+          PY
