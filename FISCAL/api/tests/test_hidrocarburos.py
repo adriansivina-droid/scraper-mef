@@ -245,3 +245,17 @@ def test_flujo_usa_el_almacen_en_vez_de_drive(cliente, tmp_path, monkeypatch):
     finally:
         for m in [k for k in sys.modules if k.startswith("googleapiclient")]:
             sys.modules.pop(m)
+
+
+def test_pdf_de_perupetro_van_a_disco(cliente, tmp_path, monkeypatch):
+    """DATA/PDF (~450 MB de PDF públicos) no llena la base: con ALMACEN_LOCAL va a disco (la caché del flujo)."""
+    monkeypatch.setenv("ALMACEN_LOCAL", str(tmp_path / "local"))
+    almacen, drive = _drive()
+    pdf = drive.files().create(body={"name": "PDF", "parents": [almacen.CARPETA_DATA], "mimeType": almacen.CARPETA}, fields="id").execute()["id"]
+    fid = _subir_como_notebook(drive, pdf, "PP_ANUAL_2024.pdf", b"%PDF-1.4 ...", tmp_path, "application/pdf")
+    assert fid == f"disco:{pdf}/PP_ANUAL_2024.pdf" and (tmp_path / "local" / pdf / "PP_ANUAL_2024.pdf").read_bytes() == b"%PDF-1.4 ..."
+    r = drive.files().list(q=f"'{pdf}' in parents and trashed = false").execute()["files"]
+    assert [f["name"] for f in r] == ["PP_ANUAL_2024.pdf"] and drive.files().get_media(fileId=fid).execute() == b"%PDF-1.4 ..."
+    assert [a["nombre"] for a in almacen.arbol()] == ["PDF"]                           # en la base solo queda la carpeta
+    with pytest.raises(FileNotFoundError):
+        almacen.leer(f"disco:{pdf}/../../secreto")

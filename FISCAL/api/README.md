@@ -146,7 +146,9 @@ scrapers del MEF, de empleo y de PERUPETRO, los notebooks fiscales). Drive ya no
   que tenía en Drive: los notebooks no cambian). Al terminar carga la producción, el canon y el mapa. Lo que había en
   Drive se copia una sola vez con «Hidrocarburos · migrar desde Drive» (`hidrocarburos_migrar.yml`: primero `listar`,
   luego `copiar`); hasta entonces el flujo diario no corre, para no perder los históricos. Los archivos guardados se
-  ven y se descargan en la pestaña «Actualizar» del sector hidrocarburos.
+  ven y se descargan en la pestaña «Actualizar» del sector hidrocarburos. Excepción: los PDF anuales de PERUPETRO
+  (DATA/PDF, ~450 MB, públicos) no van a la base para no llenarla: quedan en la caché de GitHub del flujo y, si se
+  pierden, el notebook los vuelve a bajar de PERUPETRO.
 - **Cargar archivos sin abrir la página:** `.github/workflows/cargar_archivos.yml` sube a la página los archivos de la
   carpeta `cargas/` de una rama aparte.
 

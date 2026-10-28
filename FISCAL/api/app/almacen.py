@@ -9,9 +9,14 @@ corren sin cambios (HIDROCARBUROS/automatizacion/ejecutar_notebooks.py lo instal
 `sincronizar` carga en las bases de la página lo nuevo de DATA (producción de líquidos, gas y diaria por lote, canon
 por departamento) y el mapa de lotes. La corre el mismo flujo al terminar, y el botón de la página.
 Los archivos van comprimidos (zlib) y en base64, en una columna de texto (igual en Postgres y en SQLite).
+
+Excepción: DATA/PDF (los PDF anuales de PERUPETRO, ~450 MB, públicos y que el notebook vuelve a bajar si faltan) no va a
+la base, para no llenarla: si ALMACEN_LOCAL apunta a una carpeta, se guarda allí (en GitHub Actions, la caché del flujo).
+La carpeta «PDF» sigue en la base; solo su contenido va a disco.
 """
 import base64
 import json
+import os
 import re
 import threading
 import uuid
@@ -28,6 +33,7 @@ CARPETA_CONTROL = "1TKjS2Wjpnf26oladjhqstmN5c9Irq-Aj"
 RAICES = {CARPETA_DATA: "DATA", CARPETA_CONTROL: "CONTROL"}
 CARPETA = "application/vnd.google-apps.folder"
 MAPAS = ("PP_mapa_lotes_plus.html", "PP_mapa_lotes.html")   # el primero que haya, en ese orden
+EN_DISCO = {"PDF"}                                       # subcarpetas de DATA cuyo contenido no va a la base
 _en_curso = threading.Lock()
 
 
@@ -53,10 +59,46 @@ def _decodificar(texto):
     return zlib.decompress(base64.b64decode(texto)) if texto else b""
 
 
+# ── Carpetas en disco (ALMACEN_LOCAL) ──
+def _disco():
+    d = os.environ.get("ALMACEN_LOCAL", "").strip()
+    return Path(d) if d else None
+
+
+def _carpetas_en_disco():
+    """IDs de las subcarpetas de DATA cuyo contenido va a disco (vacío si no hay ALMACEN_LOCAL)."""
+    if _disco() is None:
+        return set()
+    with db.motor().connect() as cx:
+        filas = cx.execute(text("SELECT id, nombre FROM almacen WHERE padre = :p AND mime = :m"), {"p": CARPETA_DATA, "m": CARPETA}).all()
+    return {i for i, n in filas if n in EN_DISCO}
+
+
+def _ruta_disco(id_):
+    """«disco:<carpeta>/<nombre>» -> ruta, o None si no es de disco."""
+    if not str(id_).startswith("disco:"):
+        return None
+    carpeta, nombre = id_[len("disco:"):].split("/", 1)
+    if "/" in nombre or nombre in ("", ".", ".."):
+        raise FileNotFoundError(id_)
+    return _disco() / carpeta / nombre
+
+
+def _hijos_disco(padre):
+    carpeta = _disco() / padre
+    if not carpeta.is_dir():
+        return []
+    return [{"id": f"disco:{padre}/{f.name}", "name": f.name, "mimeType": "application/pdf" if f.suffix.lower() == ".pdf" else "application/octet-stream",
+             "modifiedTime": datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat().replace("+00:00", "Z"), "size": f.stat().st_size}
+            for f in sorted(carpeta.iterdir()) if f.is_file()]
+
+
 # ── Operaciones básicas ──
 def hijos(padre):
     """[{id, name, mimeType, modifiedTime, size}] de una carpeta."""
     _tabla()
+    if padre in _carpetas_en_disco():
+        return _hijos_disco(padre)
     with db.motor().connect() as cx:
         filas = cx.execute(text("SELECT id, nombre, mime, modificado, tamano FROM almacen WHERE padre = :p ORDER BY nombre"),
                            {"p": padre}).all()
@@ -66,6 +108,11 @@ def hijos(padre):
 def crear(nombre, padre, contenido=None, mime=None, id_=None):
     """Archivo (o carpeta si contenido es None y mime es de carpeta). Devuelve su id."""
     _tabla()
+    if contenido is not None and padre in _carpetas_en_disco():
+        ruta = _disco() / padre / Path(nombre).name
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_bytes(contenido)
+        return f"disco:{padre}/{ruta.name}"
     id_ = id_ or uuid.uuid4().hex
     with db.motor().begin() as cx:
         cx.execute(text("DELETE FROM almacen WHERE id = :i"), {"i": id_})
@@ -78,6 +125,10 @@ def crear(nombre, padre, contenido=None, mime=None, id_=None):
 
 def reemplazar(id_, contenido, nombre=None):
     _tabla()
+    ruta = _ruta_disco(id_)
+    if ruta is not None:
+        ruta.write_bytes(contenido)
+        return
     with db.motor().begin() as cx:
         r = cx.execute(text("UPDATE almacen SET contenido = :c, tamano = :t, modificado = :f" + (", nombre = :n" if nombre else "")
                             + " WHERE id = :i"),
@@ -88,6 +139,11 @@ def reemplazar(id_, contenido, nombre=None):
 
 def leer(id_):
     _tabla()
+    ruta = _ruta_disco(id_)
+    if ruta is not None:
+        if not ruta.is_file():
+            raise FileNotFoundError(id_)
+        return ruta.read_bytes()
     with db.motor().connect() as cx:
         r = cx.execute(text("SELECT contenido FROM almacen WHERE id = :i"), {"i": id_}).first()
     if r is None:

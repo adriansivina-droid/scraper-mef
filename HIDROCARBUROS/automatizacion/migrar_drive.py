@@ -44,6 +44,11 @@ def recorrer(drive, carpeta, ruta):
             yield from recorrer(drive, a["id"], f"{ruta}/{a['name']}")
 
 
+def en_disco(ruta):
+    """DATA/PDF no se copia a la base (los PDF anuales de PERUPETRO: el flujo los vuelve a bajar y los guarda en su caché)."""
+    return ruta.split("/")[0] == "DATA" and len(ruta.split("/")) > 1 and ruta.split("/")[1] in almacen.EN_DISCO
+
+
 def bajar(drive, file_id):
     from googleapiclient.http import MediaIoBaseDownload
     fh = io.BytesIO()
@@ -70,9 +75,12 @@ def main():
                     almacen.crear(a["name"], padre, None, CARPETA, id_=a["id"])
                 continue
             mb = int(a.get("size") or 0) / 1e6
-            x = por_carpeta.setdefault(ruta, [0, 0.0])
-            x[0] += 1
-            x[1] += mb
+            if en_disco(ruta):
+                n, m = por_carpeta.get(ruta, (0, 0.0))
+                por_carpeta[ruta] = (n + 1, m + mb, "no se copia: el flujo los vuelve a bajar de PERUPETRO (caché de GitHub)")
+                continue
+            n, m = por_carpeta.get(ruta, (0, 0.0))
+            por_carpeta[ruta] = (n + 1, m + mb)
             total_mb += mb
             if a["mimeType"].startswith("application/vnd.google-apps."):
                 nativos.append(f"{ruta}/{a['name']}")      # Docs/Hojas de Google: no se pueden bajar tal cual
@@ -84,8 +92,8 @@ def main():
                 almacen.crear(a["name"], padre, bajar(drive, a["id"]), a["mimeType"], id_=a["id"])
                 copiados += 1
                 print(f"  ✔ {ruta}/{a['name']} ({mb:.1f} MB)", flush=True)
-        lineas += [f"| {r} | {n} | {m:.1f} |" for r, (n, m) in sorted(por_carpeta.items())]
-    lineas += ["", f"**Total: {total_mb:.1f} MB** en Drive ({(time.time() - t0) / 60:.1f} min)."]
+        lineas += [f"| {r} | {x[0]} | {x[1]:.1f}{' · ' + x[2] if len(x) > 2 else ''} |" for r, x in sorted(por_carpeta.items())]
+    lineas += ["", f"**Total a copiar: {total_mb:.1f} MB** ({(time.time() - t0) / 60:.1f} min)."]
     if nativos:
         lineas.append(f"- No se copian (documentos de Google, no archivos): {', '.join(nativos[:20])}")
     if modo == "copiar":
