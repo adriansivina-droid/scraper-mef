@@ -272,7 +272,29 @@ def long_uca(ruta, historico=None):
 
 
 # ─── Lectura para el API ───
-BASE_DE_HOJA_LONG = {'lorpesca': 'pesca-loreto', 'smnpesca': 'pesca-san-martin', 'ucapesca': 'pesca-ucayali'}
+BASE_DE_HOJA_LONG = {'lorpesca': 'pesca-loreto', 'smnpesca': 'pesca-san-martin', 'ucapesca': 'pesca-ucayali',
+                     'pescasmn': 'pesca-san-martin', 'pescauca': 'pesca-ucayali'}   # las dos últimas: bases históricas
+MES_TEXTO = {'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'ago': 8, 'set': 9, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12}
+
+
+def historico_a_long(base_id, df):
+    """Las bases históricas de la sucursal (hojas PESCA_SMN 2006-2022 y PESCA_UCA 2010-2025) al formato del LONG:
+    mes «Ene.»/«Feb» a número, VBP a precios de 2007 y los nombres de estado, origen y especie del crudo."""
+    df = df.rename(columns=lambda c: _texto(c).upper())
+    df['MES'] = [int(m) if str(m).strip().isdigit() else MES_TEXTO.get(_clave(m)[:3]) for m in df['MES']]
+    df = df[df['MES'].notna()].copy()
+    df['VOLUMEN'] = pd.to_numeric(df['VOLUMEN'], errors='coerce').fillna(0)
+    if base_id == 'pesca-san-martin':
+        df['ESTADO'] = df['ESTADO'].map(lambda e: _texto(str(e).replace(' - ', '')).upper().replace('SECO-SALADO', 'SECO SALADO'))
+        df['ORIGEN'] = df['ORIGEN'].replace({'Otros': 'Extracción de ríos'})          # lo que llega de otros dptos., como en el crudo
+        for c in ('ESPECIE', 'ESPECIE_OK'):
+            df[c] = df[c].replace({'Camarón': 'Camarón gigante'})
+        df['ESPECIE_OK'] = df['ESPECIE_OK'].replace({'Varios': 'Otras'})
+        df['VBP'] = df.VOLUMEN * df.ESTADO_OK.map(PRECIOS).fillna(0) * df.DEPARTAMENTO.eq('SAN MARTÍN')
+        return df[SMN_COLUMNAS]
+    df['ESPECIES_CORREGIDO'] = df['ESPECIES'].map(lambda e: _texto(e).title() if str(e).isupper() else _texto(e))
+    df['VBP'] = df.VOLUMEN * df.TIPO.map(UCA_PRECIOS).fillna(0)
+    return df[UCA_COLUMNAS]
 DEPTO = {'pesca-loreto': '16', 'pesca-san-martin': '22', 'pesca-ucayali': '25'}
 COLUMNAS = {'pesca-loreto': LOR_COLUMNAS, 'pesca-san-martin': SMN_COLUMNAS, 'pesca-ucayali': UCA_COLUMNAS}
 NUMERICAS = {'AÑO', 'MES', 'VOLUMEN', 'VBP'}
@@ -284,7 +306,7 @@ def reconocer(ruta):
     hojas = {_clave(h): h for h in xls.sheet_names}
     for clave, base_id in BASE_DE_HOJA_LONG.items():
         # el crudo de San Martín también tiene una hoja SMN_PESCA: el LONG se distingue por sus columnas
-        if clave in hojas and {'AÑO', 'MES', 'VOLUMEN'} <= set(pd.read_excel(xls, hojas[clave], nrows=0).columns):
+        if clave in hojas and {'AÑO', 'MES', 'VOLUMEN'} <= {_texto(c).upper() for c in pd.read_excel(xls, hojas[clave], nrows=0).columns}:
             return base_id, hojas[clave]
     if 'porespecies' in hojas or sum(h.startswith('desemb') for h in hojas) >= 3:
         return 'pesca-loreto', None
@@ -328,6 +350,8 @@ def leer(archivos, historico):
     for n, ruta, base_id, hoja in archivos:
         if hoja:
             df = pd.read_excel(ruta, sheet_name=hoja)
+            if _clave(hoja) in ('pescasmn', 'pescauca'):
+                df = historico_a_long(base_id, df)
             faltan = [c for c in COLUMNAS[base_id] if c not in df.columns]
             if faltan:
                 AVISOS.append(f'{Path(ruta).name}: faltan las columnas {", ".join(faltan)}; no se cargó.')

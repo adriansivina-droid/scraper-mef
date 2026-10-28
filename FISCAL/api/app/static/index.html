@@ -418,22 +418,35 @@
       const fila = (f) => `<tr class="${f.nivel === 0 ? "total" : ""}"><td>${f.nivel ? "&nbsp;&nbsp;&nbsp;" : ""}${esc(f.nombre)} <span class="nota">(${esc(f.unidad)})</span></td>
         <td class="n">${mill(f.mes_b)}</td><td class="n">${mill(f.mes_a)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td>
         <td class="n">${mill(f.acum_b)}</td><td class="n">${mill(f.acum_a)}</td><td class="n ${cls(f.var_acum)}">${pct(f.var_acum)}</td></tr>`;
-      const c7 = c.cuadro_07 ? `<div class="caja"><h3>Cuadro Nº 07 · LORETO: INDICADORES DEL SECTOR PESQUERO</h3><p>(Toneladas; peces ornamentales en miles de unidades)</p>
-        <div class="scroll"><table><tr><th></th><th class="n">${mes} ${b}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th></tr>
-        ${c.cuadro_07.map((f) => `<tr class="${f.nivel === 0 ? "total" : ""}"><td>${f.nivel ? "&nbsp;&nbsp;&nbsp;" : ""}${esc(f.nombre)}</td><td class="n">${mill(f.antes)}</td><td class="n">${mill(f.ahora)}</td><td class="n ${cls(f.var)}">${pct(f.var)}</td></tr>`).join("")}</table></div>
-        <p class="nota">1/ por estado · 2/ por especie · 3/ por destino. Mismas filas que el Cuadro Nº 07 del notebook de Loreto.</p></div>` : "";
+      const ent = (v) => v == null ? "" : Math.round(v).toLocaleString("es-PE");
+      const vs = (v) => v == null ? "-" : pct(v);
+      const sx = c.sintesis;
+      const sintesis = `<div class="caja cuadro-sintesis"><h3 style="text-align:center">${esc(sx.titulo)}</h3><p style="text-align:center;margin:0 auto">${esc(sx.unidad)}</p>
+        <div class="scroll"><table><tr><th rowspan="2"></th><th colspan="2" class="n" style="text-align:center">${esc(mes)}</th><th rowspan="2" class="n">Var. %</th><th colspan="2" class="n" style="text-align:center">Enero - ${esc(mes)}</th><th rowspan="2" class="n">Var. %</th></tr>
+          <tr><th class="n">${b}</th><th class="n">${a}</th><th class="n">${b}</th><th class="n">${a}</th></tr>
+          ${sx.filas.map((f) => f.solo_var ? `<tr class="total"><td>${esc(f.nombre)}</td><td></td><td></td><td class="n ${cls(f.var_mes)}">${vs(f.var_mes)}</td><td></td><td></td><td class="n ${cls(f.var_acum)}">${vs(f.var_acum)}</td></tr>`
+            : `<tr class="${f.nivel < 2 ? "fuerte" : ""}"><td style="padding-left:${10 + f.nivel * 16}px">${esc(f.nombre)}</td><td class="n">${ent(f.mes_b)}</td><td class="n">${ent(f.mes_a)}</td><td class="n ${cls(f.var_mes)}">${vs(f.var_mes)}</td><td class="n">${ent(f.acum_b)}</td><td class="n">${ent(f.acum_a)}</td><td class="n ${cls(f.var_acum)}">${vs(f.var_acum)}</td></tr>`).join("")}</table></div>
+        ${sx.notas.map((x) => `<p class="nota">${esc(x)}</p>`).join("")}</div>`;
+      const t7 = c.cuadro_07, porAnio = t7.anios.map((y) => [y, t7.columnas.map((col, i) => [col, i]).filter(([, i]) => t7.anio_de_columna[i] === y)]);
+      const c7 = `<div class="caja"><h3>Cuadro N° 07 · ${esc(t7.titulo)}</h3><p>${esc(t7.unidad)} · ${b} y ${a} (el Excel trae toda la historia)</p>
+        <div class="scroll"><table class="c07"><tr><th></th>${porAnio.map(([y, cols]) => `<th colspan="${cols.length + 1}" style="text-align:center">${y}</th>`).join("")}</tr>
+          <tr><th></th>${porAnio.map(([y, cols]) => cols.map(([col]) => `<th class="n">${esc(col.split(" ")[0])}</th>`).join("") + `<th class="n tot">Total ${y}</th>`).join("")}</tr>
+          ${t7.filas.map((f) => f.titulo ? `<tr class="grupo"><td colspan="${t7.columnas.length + t7.anios.length + 1}"><b>${esc(f.nombre)}</b></td></tr>`
+            : `<tr class="${f.nivel === 0 ? "total" : ""}"><td style="padding-left:${10 + f.nivel * 14}px;white-space:nowrap">${esc(f.nombre)}</td>${porAnio.map(([y, cols]) => cols.map(([, i]) => `<td class="n">${ent(f.meses[i])}</td>`).join("") + `<td class="n tot">${ent(f.totales[y])}</td>`).join("")}</tr>`).join("")}</table></div>
+        ${t7.notas.map((x) => `<p class="nota">${esc(x)}</p>`).join("")}</div>`;
       caja.innerHTML = `${selectorEjec(c, clave, `<button class="btn" type="button" id="${clave}-x">Descargar en Excel</button>`)}
         <div class="stats tiles">
           <div class="stat"><small>VBP · ${esc(mes)} ${a}</small><b>S/ ${mill(vb.mes_a)} mil</b>${delta(vb.var_mes)}<span>soles de 2007 · ${esc(mes.toLowerCase())} ${b}: ${mill(vb.mes_b)}</span></div>
           <div class="stat"><small>VBP · Ene.-${m3}. ${a}</small><b>S/ ${mill(vb.acum_a)} mil</b>${delta(vb.var_acum)}<span>Ene.-${m3}. ${b}: ${mill(vb.acum_b)}</span></div>
           <div class="stat"><small>${esc(prod.nombre)} · ${esc(mes)} ${a}</small><b>${num(prod)} ${esc(prod.unidad)}</b>${delta(prod.var_mes)}<span>acumulado: ${mill(prod.acum_a)} (${pct(prod.var_acum)} %)</span></div>
         </div>
-        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: PRODUCCIÓN PESQUERA</h3><p>(Valor bruto en miles de soles de 2007 y volúmenes; variación %)</p>
+        ${sintesis}
+        ${c7}
+        <details class="caja"><summary><b>Detalle: valor bruto y volúmenes</b></summary>
           <div class="scroll"><table><tr><th></th><th class="n">${mes} ${b}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Ene.-${m3}. ${b}</th><th class="n">Ene.-${m3}. ${a}</th><th class="n">Var. %</th></tr>${c.filas.map(fila).join("")}</table></div>
-          <p class="nota">Fuente: ${esc(c.fuente)}. VBP a precios de 2007 (ver Parámetros).</p></div>
+          <p class="nota">Fuente: ${esc(c.fuente)}. VBP a precios de 2007 (ver Parámetros).</p></details>
         <div class="caja"><h3>Valor bruto pesquero mes a mes · ${a} vs ${b}</h3><p>(Miles de soles de 2007)</p>${leyenda([["anio-a", a], ["anio-b", b]])}<div class="scroll">${barrasAnios(c.mensual, a, b)}</div></div>
-        <div class="caja"><h3>VBP: variación % respecto al mismo mes del año anterior</h3><div class="scroll">${barrasVar(c.interanual.filter((x) => x.var != null), 760)}</div></div>
-        ${c7}`;
+        <div class="caja"><h3>VBP: variación % respecto al mismo mes del año anterior</h3><div class="scroll">${barrasVar(c.interanual.filter((x) => x.var != null), 760)}</div></div>`;
       const cambiar = () => { st.periodo = $(`${clave}-p`).value; st.comparar = $(`${clave}-c`).value; if (st.comparar >= st.periodo.slice(0, 4)) st.comparar = ""; cuadrosPesca(r, caja); };
       $(`${clave}-p`).addEventListener("change", cambiar); $(`${clave}-c`).addEventListener("change", cambiar);
       $(`${clave}-x`).addEventListener("click", () => { window.location.href = `/v1/cuadros/pesca?${new URLSearchParams({ departamento: r.cod, periodo: c.periodo, comparar: c.comparar, formato: "xlsx" })}`; });

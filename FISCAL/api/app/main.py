@@ -354,6 +354,7 @@ def cuadro_pesca(departamento: str = Query(..., pattern=r"^(16|22|25)$"), period
     if formato == "xlsx":
         return Response(pesca_cuadros.excel(region, c), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(f"Pesca {region} {c['periodo']} vs {c['comparar']}.xlsx"))
+    c.pop("_formato", None)
     return {"region": region, "cuadros": c}
 
 

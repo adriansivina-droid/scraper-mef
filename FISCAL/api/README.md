@@ -225,7 +225,12 @@ En cada región, Sector pesca → Cuadros:
 - producción pesquera: VBP (miles de soles de 2007) y volúmenes por estado, especie y origen, del mes y del Ene.-Mes
   contra el año que se elija;
 - gráficos: VBP mes a mes de los dos años y su variación interanual;
-- en Loreto, el Cuadro Nº 07 del mes contra el mismo mes del otro año, con las filas de `cuadro_07` del notebook;
+- con los formatos de la sucursal («Formato Cuadros …» de cada región):
+  - «Producción pesquera» de la síntesis (mes y Ene.-Mes, y la fila SECTOR PESCA con la variación del VBP);
+  - el Cuadro Nº 07 mes a mes con el total de cada año (en la página, los dos años comparados; en el Excel, toda la
+    historia);
+- las bases históricas de la sucursal (hojas `PESCA_SMN`, 2006-2022, y `PESCA_UCA`, 2010-2025) se suben en «Subir
+  archivos»: se llevan al formato del LONG (mes a número, VBP a precios de 2007, nombres del crudo);
 - descarga en Excel (`app/pesca_cuadros.py`).
 
 ## Ejecución del presupuesto (fase 3)
