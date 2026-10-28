@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import archivos, carga, db, drive, ejecucion, empleo, hidrocarburos, ipc, mef, pesca_cuadros
+from . import almacen, archivos, carga, db, ejecucion, empleo, hidrocarburos, ipc, mef, pesca_cuadros
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -181,23 +181,53 @@ async def cargas(archivos_subidos: list[UploadFile] = File(..., alias="archivos"
     return carga.cargar(f"subida del {date.today().isoformat()}: {', '.join(n for n, _ in contenido)[:200]}", contenido)
 
 
-@app.get("/v1/drive", dependencies=[Depends(acceso)])
-def drive_estado():
-    """Si la sincronización con Drive está configurada, sus carpetas y la última sincronización."""
-    return {"configurado": drive.configurado(), "carpetas": drive.CARPETAS, "ultima": drive.ultima()}
+@app.get("/v1/hidrocarburos/almacen", dependencies=[Depends(acceso)])
+def hidro_almacen():
+    """Lo que el flujo de hidrocarburos guarda en la página (archivos y MB de DATA y CONTROL), la última carga en las bases
+    y las últimas corridas del flujo en GitHub."""
+    salida = {"resumen": almacen.resumen(), "ultima": almacen.ultima(), "configurado": mef.configurado(), "corridas": []}
+    if mef.configurado():
+        try:
+            salida["corridas"] = mef.corridas(nombre="hidrocarburos")
+        except (mef.ErrorGitHub, OSError) as e:
+            salida["error"] = str(e)
+    return salida
 
 
-@app.post("/v1/drive/sincronizar", dependencies=[Depends(acceso)])
-def drive_sincronizar(todo: bool = False, origen: str = Query("botón de la página", max_length=60)):
-    """Carga los archivos nuevos o modificados de la carpeta DATA de hidrocarburos en Drive (todos, con todo=true)."""
-    if not drive.configurado():
-        raise HTTPException(503, "Falta la credencial de Drive (variable GOOGLE_DRIVE_CREDENCIAL en Render).")
+@app.post("/v1/hidrocarburos/cargar", dependencies=[Depends(acceso)])
+def hidro_cargar(todo: bool = False, origen: str = Query("botón de la página", max_length=60)):
+    """Vuelve a cargar en las bases los CSV nuevos o modificados del almacén (todos, con todo=true) y el mapa."""
     try:
-        return drive.sincronizar(origen=origen, todo=todo)
-    except drive.SincronizacionEnCurso as e:
+        return almacen.sincronizar(origen=origen, todo=todo)
+    except almacen.SincronizacionEnCurso as e:
         raise HTTPException(409, str(e))
-    except Exception as e:                       # credencial vencida, carpeta sin permiso, Drive caído…
-        raise HTTPException(502, f"No se pudo leer Drive: {e}")
+
+
+@app.post("/v1/hidrocarburos/actualizar", dependencies=[Depends(acceso)])
+def hidro_actualizar(modo: str = Query("diario", pattern="^(diario|mensual)$")):
+    """Lanza en GitHub Actions el flujo de hidrocarburos (PERUPETRO; mensual: también el canon municipal del MEF)."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
+    try:
+        mef.lanzar(nombre="hidrocarburos", inputs={"modo": modo})
+    except (mef.ErrorGitHub, OSError) as e:
+        raise HTTPException(502, str(e))
+    return {"lanzado": True, "modo": modo}
+
+
+@app.get("/v1/hidrocarburos/archivos", dependencies=[Depends(acceso)])
+def hidro_archivos():
+    """Carpetas y archivos del almacén de hidrocarburos (sin el contenido)."""
+    return {"archivos": almacen.arbol(), "raices": almacen.RAICES}
+
+
+@app.get("/v1/hidrocarburos/archivos/descargar", dependencies=[Depends(acceso)])
+def hidro_archivo(id: str = Query(..., max_length=80)):
+    try:
+        nombre, contenido = almacen.descargar(id)
+    except FileNotFoundError:
+        raise HTTPException(404, "No hay ese archivo en el almacén.")
+    return Response(contenido, media_type="application/octet-stream", headers=_adjunto(nombre))
 
 
 @app.get("/v1/mef", dependencies=[Depends(acceso)])

@@ -1,12 +1,13 @@
 """Hidrocarburos: producción fiscalizada por lote y canon petrolero (PERUPETRO).
 
-Entran los CSV que el flujo diario de HIDROCARBUROS/ (PP_Produccion_Lotes.ipynb) deja en la carpeta DATA de Drive:
+Entran los CSV que el flujo diario de HIDROCARBUROS/ (PP_Produccion_Lotes.ipynb) deja en la carpeta DATA del almacén de
+la página (almacen.py; antes, en Drive):
   · PP_produccion_lote_mes_<ini>-<fin>.csv      petróleo, LGN y condensado (BARRILES, BPD) por año, mes y lote;
   · PP_produccion_gas_lote_mes_<ini>-<fin>.csv  gas natural (MPC, MMPCD) por año, mes y lote;
   · PP_canon_departamento_mes.csv               canon y sobrecanon transferido por departamento (MM S/);
   · PP_produccion_diaria.csv                    producción diaria por lote: la suma del mes cubre los meses que la
     estadística mensual aún no publica (va con dos o tres meses de rezago), y el mes en curso sale como parcial.
-El API solo los lee (drive.sincronizar_hidrocarburos o subiéndolos en la página); el flujo de hidrocarburos no cambia.
+El API solo los lee (almacen.sincronizar, al terminar el flujo o con el botón, o subiéndolos en la página).
 
 También arma lo de la síntesis de Loreto y Ucayali: producción del mes y acumulada por producto y lote, contra el
 mismo periodo del año anterior; la producción diaria promedio de 25 meses; el anexo mensual por lote (13 meses) y el

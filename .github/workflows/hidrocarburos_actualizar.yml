@@ -1,8 +1,11 @@
-# Actualización automática del Proyecto Petróleo (HIDROCARBUROS/): corre los notebooks sin Colab y guarda todo en Drive.
+# Actualización automática del Proyecto Petróleo (HIDROCARBUROS/): corre los notebooks sin Colab y guarda todo en la
+# página (almacén de la base, FISCAL/api/app/almacen.py, en vez de Drive); al terminar carga la producción, el canon y
+# el mapa en la página.
 #   · diario (07:00 hora de Lima): producción de PERUPETRO (incluye la diaria, canon y regalías) → mapas
 #   · mensual (el día 5): además, el canon municipal del MEF del año anterior y el actual
-#   · a mano: Actions → «Hidrocarburos · actualización» → Run workflow (eliges diario o mensual)
-# Requiere el secreto GOOGLE_DRIVE_CREDENCIAL (ver HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb).
+#   · a mano: Actions → «Hidrocarburos · actualización» → Run workflow (eliges diario o mensual), o el botón
+#     «Actualizar desde PERUPETRO» de la página
+# Requiere el secreto DATABASE_URL. Antes, una sola vez: «Hidrocarburos · migrar desde Drive» (copia lo que había en Drive).
 name: Hidrocarburos · actualización
 
 on:
@@ -34,21 +37,12 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: HIDROCARBUROS/automatizacion/requirements.txt
+          cache-dependency-path: |
+            HIDROCARBUROS/automatizacion/requirements.txt
+            FISCAL/api/requirements.txt
 
       - name: Instalar librerías
-        run: pip install -r HIDROCARBUROS/automatizacion/requirements.txt
-
-      - name: Credencial de Drive
-        env:
-          CRED: ${{ secrets.GOOGLE_DRIVE_CREDENCIAL }}
-        run: |
-          if [ -z "$CRED" ]; then
-            echo "::error::Falta el secreto GOOGLE_DRIVE_CREDENCIAL (ver HIDROCARBUROS/automatizacion/PP_Credencial_Drive.ipynb)"
-            exit 1
-          fi
-          printf '%s' "$CRED" > "$RUNNER_TEMP/drive.json"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/drive.json" >> "$GITHUB_ENV"
+        run: pip install -r HIDROCARBUROS/automatizacion/requirements.txt -r FISCAL/api/requirements.txt
 
       - name: Elegir modo
         id: modo
@@ -62,9 +56,11 @@ jobs:
           echo "modo=$M" >> "$GITHUB_OUTPUT"
           echo "Modo: $M"
 
-      - name: Ejecutar notebooks
+      - name: Ejecutar notebooks y cargar en la página
         env:
           PP_TRABAJO: ${{ runner.temp }}/pp
+          PP_ALMACEN: pagina
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PYTHONUNBUFFERED: "1"
         run: python HIDROCARBUROS/automatizacion/ejecutar_notebooks.py "${{ steps.modo.outputs.modo }}"
 
@@ -84,7 +80,3 @@ jobs:
           path: ${{ runner.temp }}/descarga/Mapa de Hidrocarburos - Perú.html
           retention-days: 14
           if-no-files-found: ignore
-
-      - name: Borrar la credencial
-        if: always()
-        run: rm -f "$RUNNER_TEMP/drive.json"

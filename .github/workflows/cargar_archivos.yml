@@ -2,7 +2,7 @@
 # de una rama. Sirve para cargar una base que llegó por otro medio (p. ej. por chat) sin entrar a la página:
 #   1. se suben los archivos a cargas/ en una rama aparte (no en main), p. ej. «cargas»;
 #   2. Actions → «Archivos · cargar en la página» → Run workflow, con esa rama.
-# Usa los mismos secretos que la sincronización con Drive (ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO, ESTUDIOS_API_CLAVE).
+# Usa los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE (los valores de Render).
 name: Archivos · cargar en la página
 
 on:

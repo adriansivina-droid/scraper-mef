@@ -12,9 +12,8 @@ import pytest
 from openpyxl import load_workbook
 from sqlalchemy import text
 
-from app import db, drive
+from app import db
 from tests.test_api import cliente_http
-from tests.test_pesca import DriveFalsa
 
 ANALISIS = Path(__file__).resolve().parents[3] / "HIDROCARBUROS" / "analisis" / "Loreto_Ucayali_datos_mensuales.xlsx"
 DEPTO = {"95": "LORETO", "8": "LORETO", "192": "LORETO", "67": "LORETO", "39": "LORETO", "131": "UCAYALI / HUANUCO", "31-C": ""}
@@ -113,21 +112,57 @@ def test_cuadro_ucayali_y_excel(cliente):
     assert cliente.get("/v1/cuadros/hidrocarburos?departamento=22").json()["cuadros"] is None
 
 
-def test_drive_toma_solo_los_csv_de_hidrocarburos(cliente, monkeypatch):
+def _drive():
+    """La API de Drive que ven los notebooks (en GitHub Actions apunta al almacén de la página)."""
+    from app import almacen
+    return almacen, almacen.build("drive", "v3", cache_discovery=False)
+
+
+def _subir_como_notebook(drive, carpeta, nombre, datos, tmp_path, mime="text/csv"):
+    from app import almacen
+    ruta = tmp_path / nombre
+    ruta.write_bytes(datos)
+    return drive.files().create(body={"name": nombre, "parents": [carpeta]}, media_body=almacen.MediaFileUpload(str(ruta), mimetype=mime),
+                                fields="id", supportsAllDrives=True).execute()["id"]
+
+
+def test_almacen_imita_a_drive(cliente, tmp_path):
+    almacen, drive = _drive()
+    assert almacen.vacio()
+    fid = _subir_como_notebook(drive, almacen.CARPETA_DATA, "PP_LOTES_GEO.csv", b"LOTE\n95\n", tmp_path)
+    sub = drive.files().create(body={"name": "PDF", "parents": [almacen.CARPETA_DATA], "mimeType": "application/vnd.google-apps.folder"},
+                               fields="id", supportsAllDrives=True).execute()["id"]
+    r = drive.files().list(q=f"'{almacen.CARPETA_DATA}' in parents and trashed = false", fields="nextPageToken, files(id,name,mimeType)",
+                           supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+    assert {f["name"]: f["id"] for f in r["files"]} == {"PP_LOTES_GEO.csv": fid, "PDF": sub} and "nextPageToken" not in r
+    (tmp_path / "PP_LOTES_GEO.csv").write_bytes(b"LOTE\n95\n8\n")
+    drive.files().update(fileId=fid, media_body=almacen.MediaFileUpload(str(tmp_path / "PP_LOTES_GEO.csv")), supportsAllDrives=True).execute()
+    fh = io.BytesIO()
+    dl = almacen.MediaIoBaseDownload(fh, drive.files().get_media(fileId=fid, supportsAllDrives=True))
+    hecho = False
+    while not hecho:
+        _, hecho = dl.next_chunk()
+    assert fh.getvalue() == b"LOTE\n95\n8\n" == drive.files().get_media(fileId=fid).execute()
+    assert not almacen.vacio() and almacen.resumen()["DATA"]["archivos"] == 1
+
+
+def test_carga_solo_los_csv_de_hidrocarburos(cliente, tmp_path):
+    almacen, drive = _drive()
     a = csvs()
-    viejo = a["PP_produccion_lote_mes_1994-2026.csv"]
-    carpeta = {"H1": ("PP_produccion_lote_mes_1994-2025.csv", "2026-01-01T00:00:00Z", b"x"),     # de una corrida anterior
-               "H2": ("PP_produccion_lote_mes_1994-2026.csv", "2026-10-28T12:40:00Z", viejo),
-               "H3": ("PP_produccion_gas_lote_mes_1994-2026.csv", "2026-10-28T12:40:00Z", a["PP_produccion_gas_lote_mes_1994-2026.csv"]),
-               "H4": ("PP_canon_departamento_mes.csv", "2026-10-28T12:40:00Z", a["PP_canon_departamento_mes.csv"]),
-               "H5": ("PP_regalias_lote_anio.csv", "2026-10-28T12:40:00Z", b"x"), "H6": ("PP_LOTES_GEO.csv", "2026-10-28T12:40:00Z", b"x")}
-    falsa = DriveFalsa({drive.CARPETAS["hidrocarburos"]: carpeta})
-    monkeypatch.setenv("GOOGLE_DRIVE_CREDENCIAL", "{}")
-    monkeypatch.setattr(drive, "LectorDrive", lambda credencial: falsa)
-    r = cliente.post("/v1/drive/sincronizar").json()
-    assert sorted(falsa.bajados) == ["H2", "H3", "H4"] and r["carpetas"]["hidrocarburos"] == 3
-    assert set(r["bases"]) == {"hidro-produccion", "hidro-canon"}
-    assert cliente.post("/v1/drive/sincronizar").json()["bases"] == {}      # nada nuevo
+    _subir_como_notebook(drive, almacen.CARPETA_DATA, "PP_produccion_lote_mes_1994-2025.csv", b"x", tmp_path)   # de una corrida anterior
+    for n in ["PP_produccion_lote_mes_1994-2026.csv", "PP_produccion_gas_lote_mes_1994-2026.csv", "PP_canon_departamento_mes.csv"]:
+        _subir_como_notebook(drive, almacen.CARPETA_DATA, n, a[n], tmp_path)
+    _subir_como_notebook(drive, almacen.CARPETA_DATA, "PP_regalias_lote_anio.csv", b"x", tmp_path)
+    r = cliente.post("/v1/hidrocarburos/cargar").json()
+    assert set(r["bases"]) == {"hidro-produccion", "hidro-canon"} and len(r["archivos"]) == 3
+    assert cliente.post("/v1/hidrocarburos/cargar").json()["bases"] == {}            # nada nuevo
+    assert len(cliente.post("/v1/hidrocarburos/cargar?todo=true").json()["archivos"]) == 3
+    e = cliente.get("/v1/hidrocarburos/almacen").json()
+    assert e["resumen"]["DATA"]["archivos"] == 5 and e["ultima"]["origen"] == "botón de la página"
+    lista = cliente.get("/v1/hidrocarburos/archivos").json()["archivos"]
+    canon = next(x for x in lista if x["nombre"] == "PP_canon_departamento_mes.csv")
+    d = cliente.get("/v1/hidrocarburos/archivos/descargar", params={"id": canon["id"]})
+    assert d.status_code == 200 and d.content == a["PP_canon_departamento_mes.csv"]
 
 
 def diaria():
@@ -162,22 +197,17 @@ def test_meses_de_la_produccion_diaria(cliente):
     assert {f["FUENTE"] for f in d} == {"PRODUCCIÓN DIARIA · 10 de 31 días"}
 
 
-def test_mapa_desde_drive(cliente, monkeypatch):
+def test_mapa_desde_el_almacen(cliente, tmp_path):
     assert cliente.get("/v1/hidrocarburos/mapa").status_code == 404
-
-    class Falsa(DriveFalsa):
-        def subcarpeta(self, carpeta, nombre):
-            return "MAPA_ID" if carpeta == drive.CARPETAS["hidrocarburos"] and nombre == "MAPA" else None
-
-    falsa = Falsa({drive.CARPETAS["hidrocarburos"]: {"H2": ("PP_produccion_diaria.csv", "2026-10-28T12:40:00Z", diaria())},
-                   "MAPA_ID": {"M1": ("PP_mapa_lotes.html", "2026-10-20T00:00:00Z", b"<html>simple</html>"),
-                               "M2": ("PP_mapa_lotes_plus.html", "2026-10-28T12:50:00Z", "<html>plus · Perú</html>".encode()),
-                               "M3": ("PP_lotes_indicadores.geojson", "2026-10-28T12:50:00Z", b"{}")}})
-    monkeypatch.setenv("GOOGLE_DRIVE_CREDENCIAL", "{}")
-    monkeypatch.setattr(drive, "LectorDrive", lambda credencial: falsa)
-    r = cliente.post("/v1/drive/sincronizar").json()
-    assert sorted(falsa.bajados) == ["H2", "M2"] and "hidro-produccion" in r["bases"]
-    assert any("Mapa de lotes" in a for a in r["avisos"])
+    almacen, drive = _drive()
+    _subir_como_notebook(drive, almacen.CARPETA_DATA, "PP_produccion_diaria.csv", diaria(), tmp_path)
+    mapa = drive.files().create(body={"name": "MAPA", "parents": [almacen.CARPETA_DATA], "mimeType": "application/vnd.google-apps.folder"},
+                                fields="id").execute()["id"]
+    _subir_como_notebook(drive, mapa, "PP_mapa_lotes.html", b"<html>simple</html>", tmp_path, "text/html")
+    _subir_como_notebook(drive, mapa, "PP_mapa_lotes_plus.html", "<html>plus · Perú</html>".encode(), tmp_path, "text/html")
+    _subir_como_notebook(drive, mapa, "PP_lotes_indicadores.geojson", b"{}", tmp_path)
+    r = almacen.sincronizar(origen="GitHub Actions")
+    assert "hidro-produccion" in r["bases"] and any("Mapa de lotes" in a for a in r["avisos"])
     m = cliente.get("/v1/hidrocarburos/mapa")
     assert m.status_code == 200 and m.text == "<html>plus · Perú</html>"
     assert "attachment" in cliente.get("/v1/hidrocarburos/mapa?descargar=true").headers["content-disposition"]
@@ -193,3 +223,25 @@ def test_tabla_vieja_sin_columna_fuente(cliente):
     assert cliente.get("/v1/descargas?base=hidro-produccion&departamento=16&desde=2025-01&hasta=2025-12&formato=json").status_code == 200
     subir(cliente, csvs())
     assert cliente.get("/v1/cuadros/hidrocarburos?departamento=16").json()["cuadros"]["periodo"] == "2025-12"
+
+
+def test_flujo_usa_el_almacen_en_vez_de_drive(cliente, tmp_path, monkeypatch):
+    """ejecutar_notebooks.py con PP_ALMACEN=pagina: «googleapiclient» de los notebooks queda apuntando al almacén, y con
+    el almacén vacío no corre (no se pierden los históricos que estaban en Drive)."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "HIDROCARBUROS" / "automatizacion"))
+    import ejecutar_notebooks as en
+    for m in [k for k in sys.modules if k.startswith("googleapiclient")]:
+        monkeypatch.delitem(sys.modules, m)
+    with pytest.raises(SystemExit, match="migrar desde Drive"):
+        en.usar_almacen_de_la_pagina()
+    almacen, drive = _drive()
+    _subir_como_notebook(drive, almacen.CARPETA_CONTROL, "CONTROL PP produccion.csv", b"x", tmp_path)
+    en.usar_almacen_de_la_pagina()
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload  # noqa: F401
+    try:
+        assert build is almacen.build and MediaFileUpload is almacen.MediaFileUpload
+    finally:
+        for m in [k for k in sys.modules if k.startswith("googleapiclient")]:
+            sys.modules.pop(m)
