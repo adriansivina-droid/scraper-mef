@@ -1,7 +1,8 @@
 # Fase 2 · scraper del MEF en el servidor: corre FISCAL/Fiscal_Scraper.ipynb sin Colab y carga lo que baja en la base de
 # datos del API (Neon), igual que subir el .zip de Scrapeo/output en la página.
 #   · cada mes, los días 2 y 21 (06:00 hora de Lima): año en curso hasta el último mes cerrado (el MEF ajusta los meses
-#     anteriores, por eso se vuelve a bajar todo el año)
+#     anteriores, por eso se vuelve a bajar todo el año), en dos tramos seguidos (enero-junio y julio en adelante), cada
+#     uno en su job: con 3 consultas simultáneas el año entero no entra en las 6 horas de un job
 #   · a mano: Actions → «Fiscal · scraper del MEF» → Run workflow (eliges el periodo) o el botón «Actualizar desde el MEF»
 # Requiere el secreto DATABASE_URL. Los CSV quedan como artefacto de la corrida (30 días).
 name: Fiscal · scraper del MEF
@@ -13,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       desde:
-        description: "Desde (AAAA-MM). Vacío: enero del año en curso"
+        description: "Desde (AAAA-MM). Vacío: el año en curso, en dos tramos. Con periodo: un solo job (hasta ~10 meses)"
         type: string
         default: ""
       hasta:
@@ -25,9 +26,9 @@ on:
         type: boolean
         default: false
       consultas:
-        description: "Consultas simultáneas al MEF (bájalo a 2-3 si salen errores de «la URL no aplicó el filtro»)"
+        description: "Consultas simultáneas al MEF (con 6 salieron errores de «la URL no aplicó el filtro»)"
         type: string
-        default: "6"
+        default: "3"
 
 concurrency:
   group: fiscal-scraper
@@ -38,6 +39,12 @@ permissions:
 
 jobs:
   raspar:
+    strategy:
+      max-parallel: 1                    # los tramos van uno tras otro (en paralelo serían 6 consultas al MEF)
+      fail-fast: false
+      matrix:
+        tramo: [1, 2]
+    name: raspar (tramo ${{ matrix.tramo }})
     runs-on: ubuntu-latest
     timeout-minutes: 355                 # máximo de GitHub: 360 (con 25 departamentos, mejor un año por corrida)
     steps:
@@ -58,11 +65,17 @@ jobs:
           DESDE: ${{ inputs.desde }}
           HASTA: ${{ inputs.hasta }}
           PRUEBA: ${{ inputs.prueba }}
-          FISCAL_WORKERS: ${{ inputs.consultas || '6' }}
+          FISCAL_WORKERS: ${{ inputs.consultas || '3' }}
+          TRAMO: ${{ matrix.tramo }}
           FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
           PYTHONUNBUFFERED: "1"            # el avance se ve en vivo en los registros (sin esto sale todo al final)
         run: |
+          if [ -n "$DESDE$HASTA" ] || [ "$PRUEBA" = "true" ]; then
+            # con periodo elegido (o prueba) corre todo en el tramo 1
+            [ "$TRAMO" = "2" ] && { echo "Periodo elegido a mano: todo va en el tramo 1."; exit 0; }
+          fi
           args=()
+          [ -z "$DESDE$HASTA" ] && [ "$PRUEBA" != "true" ] && args+=(--tramo "$TRAMO")
           [ -n "$DESDE" ] && args+=(--desde "$DESDE")
           [ -n "$HASTA" ] && args+=(--hasta "$HASTA")
           [ "$PRUEBA" = "true" ] && args+=(--prueba)
@@ -72,7 +85,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scrapeo-output
+          name: scrapeo-output-tramo${{ matrix.tramo }}
           path: ${{ runner.temp }}/fiscal/Fiscal/Scrapeo/output
           retention-days: 30
           if-no-files-found: ignore

@@ -349,7 +349,7 @@
           <label class="chk"><input type="checkbox" id="mef-prueba"> Prueba rápida (un mes, solo Loreto, no carga)</label>`
         : `<label class="campo" for="emp-reg">Regiones<select id="emp-reg"><option value="LOR,SMN,UCA">Loreto · San Martín · Ucayali</option><option value="TODAS">Todas las regiones</option></select></label>`}
         <button class="btn" type="button" id="${cual}-lanzar">${mef ? "Actualizar desde el MEF" : "Actualizar empleo"}</button></div>
-      <p class="nota">${mef ? "Vacío = año en curso hasta el último mes cerrado. Con 25 departamentos, un año completo toma unas 2 a 3 horas: para periodos largos, un año por corrida." : ""}</p>
+      <p class="nota">${mef ? "Vacío = año en curso hasta el último mes cerrado, en dos tramos seguidos (enero-junio y julio en adelante). Con 25 departamentos toma unos 30 minutos por mes: con periodo elegido, hasta unos 10 meses por corrida." : ""}</p>
       <div id="${cual}-res" aria-live="polite"></div><div id="${cual}-corridas"><div class="loading"><span class="spin"></span>Consultando GitHub…</div></div></div>`;
   }
   async function atarScraper(cual) {
