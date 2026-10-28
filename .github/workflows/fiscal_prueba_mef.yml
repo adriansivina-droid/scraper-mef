@@ -1,0 +1,29 @@
+# Fase 2 · prueba de conexión: ¿responde Consulta Amigable del MEF desde GitHub? ¿se puede escribir en Neon?
+# Solo a mano: Actions → «Fiscal · prueba de conexión al MEF» → Run workflow. No guarda nada.
+# El resultado aparece en el resumen de la corrida (Summary). Requiere el secreto DATABASE_URL.
+name: Fiscal · prueba de conexión al MEF
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar librerías
+        run: pip install requests==2.32.3 beautifulsoup4==4.12.3 sqlalchemy==2.0.36 "psycopg[binary]==3.2.3"
+
+      - name: Probar MEF y Neon
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python FISCAL/automatizacion/prueba_mef.py
