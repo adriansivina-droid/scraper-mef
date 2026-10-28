@@ -114,9 +114,14 @@ def test_sin_ipc_queda_nominal(cliente):  # noqa: F811
 
 
 def test_ipc_del_bcrp(cliente, monkeypatch):  # noqa: F811
-    monkeypatch.setattr(ipc, "de_bcrp", lambda: {"2026-08": 113.1, "2026-09": 113.4, "2026-10": 0.2})   # 0,2 % no es un índice
+    series = {"PN38705PM": {"2026-08": 113.1, "2026-09": 113.4, "2026-10": 0.2},     # 0,2 % no es un índice
+              "PN01270PM": {"2021-11": 100.1, "2021-12": 100.5}}                    # base anterior: terminó en 2021
+    monkeypatch.setattr(ipc, "de_bcrp", lambda serie=None: series[serie])
     r = cliente.post("/v1/ipc/actualizar").json()
-    assert r["meses"] == 2 and r["hasta"] == "2026-09" and r["fuente"].startswith("BCRP")
+    assert r["meses"] == 2 and r["hasta"] == "2026-09" and r["fuente"] == "BCRP, serie PN38705PM"
+    series["PN38705PM"] = {"2021-12": 100.0}                                          # ninguna al día: no se toca lo cargado
+    assert cliente.post("/v1/ipc/actualizar").status_code == 502
+    assert cliente.get("/v1/ipc").json()["hasta"] == "2026-09"
 
 
 def test_excel(datos):
@@ -137,7 +142,7 @@ def test_lee_la_respuesta_del_bcrp(monkeypatch):
 
     class Sesion:
         def get(self, url, **k):
-            assert "/PN01270PM/json/2010-1/" in url
+            assert "/PN38705PM/json/2010-1/" in url
             return Resp()
 
     monkeypatch.undo()                                    # la función real (conftest la reemplaza para no salir a la red)
