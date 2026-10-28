@@ -270,10 +270,12 @@ por genérica, inversión por función).
 - **Anexos** (último ítem del índice de cada región): todos los anexos de la síntesis en su orden y numeración (junio
   2026), con el formato BCRP y Copiar / SVG / PNG. Los de sectores que aún no entran a la página (agrícola,
   manufactura, exportaciones, importaciones, crédito, depósitos, morosidad) aparecen como pendientes.
-- **Contraste** (pestaña de Gasto corriente e Inversión pública): el cuadro de la página, lo que bajó el scraper del
-  MEF, contra el publicado en cada síntesis (`app/sintesis_publicada.json`), nivel por nivel: *coincide* (hasta 0,1
-  millón), *diferencia menor* (hasta 1 %: el MEF sigue registrando devengados después del cierre del informe) o
-  *revisar*. Para contrastar otro mes, se agregan las cifras de su síntesis al JSON. «API · revisar» también lo imprime.
+- **Contraste** (pestaña de Gasto corriente e Inversión pública): lo que tiene la página contra lo **publicado por el
+  MEF** en la vista anual de Consulta Amigable. El scraper la consulta en cada corrida y la deja en sus CSV de CONTROL;
+  la página los guarda (`app/controles.py`, tabla `mef_controles`) y compara, por bloque (genérica, fuente, función,
+  PIM), nivel y año, ese total con la suma de lo que tiene guardado: *coincide* (hasta S/ 5 por mes), *mes en curso*
+  (del año actual, el MEF ya suma lo devengado en el mes abierto) o *revisar*. «API · revisar» también lo imprime, y
+  «Fiscal · cargar controles» trae los CONTROL de corridas anteriores.
 
 ## Endpoints
 
@@ -301,7 +303,8 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/variaciones` | Variaciones alarmantes de la inversión (`departamento`, `periodo`, `comparar`) |
 | GET | `/v1/proyectos` | Proyectos detrás de las variaciones del último mes calculado |
 | POST | `/v1/proyectos/actualizar` | Lanza la consulta de proyectos en GitHub Actions |
-| GET | `/v1/contraste/ejecucion?departamento=&sector=` | Cuadro de ejecución de la página contra el de las síntesis publicadas |
+| GET | `/v1/contraste/ejecucion?departamento=&sector=` | Lo guardado en la página contra lo publicado por el MEF (vista anual, de los CONTROL del scraper) |
+| POST | `/v1/bcrp/excel` | Excel de un cuadro de «Cuadros y gráficos BCRP» con el formato de la síntesis |
 | GET | `/v1/fiscal/archivos` | Excel de los notebooks fiscales guardados (procesamiento, variaciones, proyectos) |
 | GET | `/v1/fiscal/archivos/descargar?nombre=` | Descarga uno de esos Excel |
 | POST | `/v1/fiscal/procesar` | Lanza `Fiscal_Procesamiento` en GitHub Actions |

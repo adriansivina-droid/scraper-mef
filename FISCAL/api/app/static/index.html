@@ -605,7 +605,9 @@
     const columnas = [...cols.slice(0, iTot < 0 ? cols.length : iTot).map((x) => ({ etq: x.etq, anio: x.anio })), { etq: "Ene.-Dic.", anio: "Total", total: true }, ...(iTot < 0 ? [] : cols.slice(iTot)).map((x) => ({ etq: x.etq, anio: x.anio }))];
     const valores = (f) => [...cols.slice(0, iTot < 0 ? cols.length : iTot).map((x) => f.meses[x.i]), f.totales[String(b)], ...(iTot < 0 ? [] : cols.slice(iTot)).map((x) => f.meses[x.i])];
     const [t7t, t7l] = partirLlamada(t7.titulo);
-    items.push({ clave: "a0", tipo: "ANEXO", num: (N.a || [])[0], nombre: t7t, svg: (n) => B.anexo({ numero: n, titulo: t7t, llamada: t7l, unidad: t7.unidad, columnas, dec: 0,
+    // en Loreto y San Martín es el Cuadro N° 07 (indicadores del sector pesquero); en Ucayali, el anexo de producción pesquera
+    const esAnexo = grupo === "uca";
+    items.push({ clave: "a0", tipo: esAnexo ? "ANEXO" : "CUADRO", num: esAnexo ? (N.a || [])[0] : "07", nombre: t7t, svg: (n) => B.anexo({ numero: n, titulo: t7t, llamada: t7l, unidad: t7.unidad, columnas, dec: 0,
       filas: t7.filas.map((f) => f.titulo ? { nombre: f.nombre, tipo: "grupo" } : { nombre: f.nombre, tipo: f.nivel === 0 ? "grupo" : "item", valores: valores(f) }), notas: sinElab(t7.notas) }) });
     const g = c.interanual.filter((x) => x.var != null);
     if (g.length) items.push({ clave: "g", tipo: "GRÁFICO", num: N.g, nombre: `${R}: VARIACIÓN DEL VALOR BRUTO DE LA PRODUCCIÓN PESQUERA`, svg: (n) => B.barras({ numero: n,
@@ -700,10 +702,10 @@
     const valorNum = (it) => numBcrp[`${clave}-${it.clave}`] ?? (it.num ?? "");
     const listos = items.map((it, k) => [it, k]).filter(([it]) => it.svg);
     caja.innerHTML = `<div class="fila controles">${controles}<button class="btn sec" type="button" id="${clave}-todo"${listos.length ? "" : " disabled"}>Descargar todos (SVG)</button></div>
-      <p class="lead">Con el formato de la síntesis. <b>Copiar</b> deja la imagen lista para pegar en Word (Ctrl+V); <b>SVG</b> es vectorial (en Word: Insertar → Imágenes) y no pierde nitidez al ampliarla. Cambia el número si el informe lo pide.</p>
+      <p class="lead">Con el formato de la síntesis. <b>Copiar</b> deja la imagen lista para pegar en Word (Ctrl+V); <b>SVG</b> es vectorial (en Word: Insertar → Imágenes) y no pierde nitidez al ampliarla; <b>Excel</b> lo baja con el mismo formato. Cambia el número si el informe lo pide.</p>
       ${items.map((it, k) => it.svg ? `<div class="caja bcrp-item"><div class="fila" style="justify-content:space-between;align-items:center">
           <label class="campo bcrp-num">${esc(it.tipo === "ANEXO" ? "Anexo" : it.tipo === "CUADRO" ? "Cuadro N°" : "Gráfico N°")}<input type="text" inputmode="numeric" data-k="${k}" value="${esc(valorNum(it))}" size="3"></label>
-          <div class="fila"><button class="btn" type="button" data-copiar="${k}">Copiar</button><button class="btn sec" type="button" data-svg="${k}">SVG</button><button class="btn sec" type="button" data-png="${k}">PNG</button></div></div>
+          <div class="fila"><button class="btn" type="button" data-copiar="${k}">Copiar</button><button class="btn sec" type="button" data-svg="${k}">SVG</button><button class="btn sec" type="button" data-png="${k}">PNG</button><button class="btn sec" type="button" data-xlsx="${k}">Excel</button></div></div>
         <div class="bcrp-prev" id="${clave}-v${k}"></div><div class="bcrp-msj" id="${clave}-m${k}" aria-live="polite"></div></div>`
         : `<div class="vacio-caja bcrp-pendiente"><b>${esc(etiqueta(it, it.num))} · ${esc(it.nombre)}</b><span>${esc(it.pendiente)}</span></div>`).join("")}`;
     const svgDe = (k) => items[k].svg(etiqueta(items[k], valorNum(items[k])));
@@ -716,6 +718,8 @@
     const nombreDe = (k) => `${etiqueta(items[k], valorNum(items[k]))} ${items[k].nombre}`;
     caja.querySelectorAll("[data-svg]").forEach((bt) => bt.addEventListener("click", () => { const k = +bt.dataset.svg; B.descargar(svgDe(k), nombreDe(k)); }));
     caja.querySelectorAll("[data-png]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.png; try { await B.descargarPng(svgDe(k), nombreDe(k)); } catch (e) { avisar(k, e.message, false); } }));
+    caja.querySelectorAll("[data-xlsx]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.xlsx;
+      try { svgDe(k); await B.excel(B.ultimo, nombreDe(k)); } catch (e) { avisar(k, e.message, false); } }));
     $(`${clave}-todo`).addEventListener("click", async () => { for (const [, k] of listos) { B.descargar(svgDe(k), nombreDe(k)); await new Promise((ok) => setTimeout(ok, 350)); } });
   }
   const selectorMes = (clave, meses, actual) => `<label class="campo" for="${clave}-p">Mes del informe<select id="${clave}-p">${meses.map((m) => `<option value="${m}"${m === actual ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>`;
@@ -768,22 +772,22 @@
     $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; anexosBCRP(r, caja); });
   }
 
-  // ── Contraste: lo que bajó el scraper del MEF contra lo publicado en las síntesis (app/sintesis_publicada.json) ──
-  async function contrasteSintesis(sector, r, caja) {
-    caja.innerHTML = '<div class="loading"><span class="spin"></span>Comparando con las síntesis publicadas…</div>';
+  // ── Contraste: lo que tiene la página contra lo publicado por el MEF (vista anual de Consulta Amigable, de los CSV de CONTROL del scraper) ──
+  async function contrasteMEF(sector, r, caja) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Comparando con lo publicado por el MEF…</div>';
     try {
       const x = (await api(`/v1/contraste/ejecucion?departamento=${r.cod}&sector=${sector}`)).contraste;
-      const chip = { coincide: '<span class="chip ok">coincide</span>', "diferencia menor": '<span class="chip vacio">diferencia menor</span>', revisar: '<span class="chip error">revisar</span>' };
-      const cab = ["mes año ant.", "mes", "Var. %", "Ene.-mes año ant.", "Ene.-mes", "Var. %"];
-      const celda = (p, q, d, k) => `<td class="n">${k % 3 === 2 ? pct(p) : mill(p)}<br><small class="nota">${q == null ? "—" : k % 3 === 2 ? pct(q) : mill(q)}${d && Math.abs(d) >= 0.05 ? ` <b class="${Math.abs(d) > 0.15 && k % 3 !== 2 ? "baja" : ""}">(${d > 0 ? "+" : ""}${k % 3 === 2 ? pct(d) : mill(d)})</b>` : ""}</small></td>`;
-      caja.innerHTML = `<p class="lead">El cuadro de la página (lo que bajó el scraper del MEF) contra el publicado en cada síntesis, nivel por nivel. En cada celda: arriba la página, abajo lo publicado y, entre paréntesis, la diferencia.
-          <b>Coincide</b>: hasta 0,1 millón de diferencia. <b>Diferencia menor</b>: hasta 1 % (el MEF sigue registrando devengados después del cierre del informe). <b>Revisar</b>: más que eso.</p>
-        ${x.length ? x.map((b) => `<div class="caja"><h3>${esc(b.titulo || b.periodo)}${b.fecha_datos ? ` · síntesis con datos al ${esc(b.fecha_datos)}` : ""}</h3>
-          ${b.error ? `<p class="nota">${esc(b.error)}</p>` : `<div class="scroll"><table><tr><th>Nivel</th>${cab.map((h) => `<th class="n">${h}</th>`).join("")}<th>Estado</th></tr>
-            ${b.filas.map((f) => `<tr class="${f.nivel === "Total" ? "total" : ""}"><td>${esc(f.nivel)}</td>${f.pagina.map((p, k) => celda(p, f.publicado[k], f.dif[k], k)).join("")}<td>${chip[f.estado]}</td></tr>`).join("")}</table></div>
-            ${b.real ? "" : '<p class="nota">La página no tiene el IPC de ese mes: sus Var. % son nominales y la síntesis las da reales.</p>'}`}</div>`).join("")
-          : '<div class="vacio-caja"><b>No hay síntesis publicadas para comparar.</b><span>Se agregan en FISCAL/api/app/sintesis_publicada.json.</span></div>'}
-        <p class="nota">Otras pruebas que ya hace el scraper en cada corrida: suma de los meses contra la vista anual del MEF y PIM por nivel contra el total («cuadre interno»; ERRORES = 0 en el resumen de GitHub).</p>`;
+      const chip = { coincide: '<span class="chip ok">coincide</span>', "mes en curso": '<span class="chip vacio">mes en curso</span>', revisar: '<span class="chip error">revisar</span>' };
+      const sol = (v) => v == null ? "" : Math.round(v).toLocaleString("es-PE");
+      const bloques = [...new Set(x.map((f) => f.bloque))];
+      caja.innerHTML = `<p class="lead">En cada corrida, el scraper del MEF consulta también la <b>vista anual de Consulta Amigable</b> (lo que publica el MEF para todo el año) y la guarda en sus CSV de CONTROL.
+          Aquí se compara con lo que la página tiene guardado para ese año, por nivel de gobierno. <b>Coincide</b>: la diferencia no pasa de S/ 5 por mes.
+          <b>Mes en curso</b>: del año actual, el MEF ya suma lo devengado en el mes abierto, que la página trae cuando se cierra. <b>Revisar</b>: falta o sobra algo.</p>
+        ${x.length ? bloques.map((b) => `<div class="caja"><h3>${esc(b)}</h3><div class="scroll"><table><tr><th>Año</th><th>Nivel</th><th>Meses en la página</th><th class="n">Publicado por el MEF (S/)</th><th class="n">En la página (S/)</th><th class="n">Diferencia (S/)</th><th>Estado</th><th>Consultado</th></tr>
+            ${x.filter((f) => f.bloque === b).map((f) => `<tr><td>${f.anio}</td><td>${esc(f.nivel)}</td><td>${esc(f.meses)}</td><td class="n">${sol(f.mef)}</td><td class="n">${sol(f.pagina)}</td>
+              <td class="n ${f.estado === "revisar" ? "baja" : ""}">${f.dif > 0 ? "+" : ""}${sol(f.dif)}</td><td>${chip[f.estado]}</td><td>${f.fecha ? esc(fecha(f.fecha)) : ""}</td></tr>`).join("")}</table></div></div>`).join("")
+          : '<div class="vacio-caja"><b>Todavía no hay controles del MEF guardados.</b><span>Se guardan solos en la próxima corrida del scraper del MEF (sus CSV de CONTROL), o subiendo esos CSV en «Subir archivos».</span></div>'}
+        <p class="nota">Si algo sale en «revisar», vuelve a correr el scraper para ese año: reemplaza los meses y vuelve a consultar la vista anual.</p>`;
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo comparar</b><span>${esc(e.message)}</span></div>`; }
   }
 
@@ -1016,7 +1020,7 @@
     if ($("archivos-fiscal")) archivosFiscales(REG[grupo], $("archivos-fiscal"));
     if ($("bcrp")) cuadrosBCRP($("bcrp").dataset.sector, REG[grupo], $("bcrp"));
     if ($("anexos-bcrp")) anexosBCRP(REG[grupo], $("anexos-bcrp"));
-    if ($("contraste")) contrasteSintesis($("contraste").dataset.sector, REG[grupo], $("contraste"));
+    if ($("contraste")) contrasteMEF($("contraste").dataset.sector, REG[grupo], $("contraste"));
     window.scrollTo(0, 0);
   }
   $("sel-movil").addEventListener("change", (ev) => { location.hash = ev.target.value; });

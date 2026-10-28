@@ -10,12 +10,12 @@ from pathlib import Path
 from urllib.parse import quote
 
 import pandas as pd
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import almacen, archivos, carga, db, ejecucion, empleo, hidrocarburos, ipc, mef, pesca_cuadros
+from . import almacen, archivos, bcrp_excel, carga, controles, db, ejecucion, empleo, hidrocarburos, ipc, mef, pesca_cuadros
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -365,16 +365,26 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
     return {"region": region, "cuadros": c, "ipc": ipc.estado()}
 
 
+@app.post("/v1/bcrp/excel", dependencies=[Depends(acceso)])
+def bcrp_excel_(cuerpo: dict = Body(...)):
+    """Excel de un cuadro de «Cuadros y gráficos BCRP» con el formato de la síntesis: {tipo: cuadro|anexo|barras, spec, nombre}."""
+    tipo, spec = cuerpo.get("tipo"), cuerpo.get("spec")
+    if tipo not in ("cuadro", "anexo", "barras") or not isinstance(spec, dict):
+        raise HTTPException(422, "Falta el tipo (cuadro, anexo o barras) o los datos del cuadro.")
+    try:
+        contenido = bcrp_excel.libro(tipo, spec)
+    except (KeyError, TypeError, ValueError) as e:
+        raise HTTPException(422, f"No se pudo armar el Excel: {e}")
+    nombre = re.sub(r"[^\w\- .°]+", "", str(cuerpo.get("nombre") or "Cuadro BCRP"))[:100] or "Cuadro BCRP"
+    return Response(contenido, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=_adjunto(f"{nombre}.xlsx"))
+
+
 @app.get("/v1/contraste/ejecucion", dependencies=[Depends(acceso)])
 def contraste_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector: str = Query("gasto", pattern="^(gasto|inversion)$")):
-    """El cuadro de ejecución de la página (lo que bajó el scraper del MEF) contra el publicado en las síntesis
-    (app/sintesis_publicada.json), mes por mes y nivel por nivel."""
+    """Lo que tiene la página contra lo publicado por el MEF en la vista anual de Consulta Amigable (los CSV de CONTROL
+    del scraper), por bloque, nivel de gobierno y año."""
     _ejecucion(departamento, "", "")
-    niveles = list(NIVELES.values())
-    panel = (ejecucion.panel_gasto(db.leer("gasto-dev-generica", [departamento], niveles, "1990-01", "2100-12")) if sector == "gasto"
-             else _panel_inversion(departamento))
-    referencias = json.loads((Path(__file__).parent / "sintesis_publicada.json").read_text(encoding="utf-8"))
-    return {"contraste": ejecucion.contraste(sector, panel, ipc.serie(), {k: v for k, v in referencias.items() if not k.startswith("_")}, departamento)}
+    return {"contraste": controles.contraste(departamento, sector)}
 
 
 def _panel_muni(departamento):

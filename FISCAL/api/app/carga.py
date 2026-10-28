@@ -4,7 +4,7 @@ las bases del catálogo.
 Se reconocen los archivos por su nombre, el mismo que usan Fiscal_Scraper y los scrapers anteriores:
   DEV Funcion.<Nivel> AAAA - Mes MM - ….csv   DEV InvFuente.<Nivel> …   DEV Generica.<Nivel> …   DEV Deuda.<Nivel> …
   DEV Fuente.<Nivel> …   PIM Funcion AAAA - ….csv   PIM Funcion.Municipalidad AAAA - ….csv
-Los archivos CONTROL y LOG se ignoran. Los CSV de PERUPETRO (PP_produccion_lote_mes_…, PP_produccion_gas_lote_mes_…,
+Los CSV de CONTROL del scraper del MEF van a controles.py (contraste con lo publicado); los LOG se ignoran. Los CSV de PERUPETRO (PP_produccion_lote_mes_…, PP_produccion_gas_lote_mes_…,
 PP_canon_departamento_mes.csv) van a hidrocarburos.py. Los Excel de pesca (crudos de las DIREPRO o LONG de los notebooks) se reconocen
 por sus hojas: ver pesca.py.
 """
@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import db, empleo, hidrocarburos, ipc, pesca
+from . import controles, db, empleo, hidrocarburos, ipc, pesca
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -223,12 +223,16 @@ def cargar(origen, archivos):
             else:
                 (Path(tmp) / nombre).write_bytes(contenido)
         bases, avisos = leer_archivos(tmp)
+        # los CSV de CONTROL del scraper del MEF: lo publicado en la vista anual de Consulta Amigable (pestaña «Contraste»)
+        n_ctl = controles.guardar([(r.name, controles.leer(r.name, pd.read_csv(r, encoding="utf-8-sig"))) for r in Path(tmp).rglob("CONTROL*.csv")])
     resumen = {"bases": {}, "avisos": avisos_ipc + avisos}
+    if n_ctl:
+        resumen["avisos"].append(f"Controles del MEF (vista anual de Consulta Amigable): {n_ctl} filas guardadas para el contraste.")
     for base_id, df in bases.items():
         filas = db.guardar(base_id, df)
         resumen["bases"][base_id] = {"filas": filas, "departamentos": sorted(df["_depto"].unique().tolist()),
                                      "periodos": sorted({f"{a}" if m == 0 else f"{a}-{m:02d}" for a, m in zip(df["_anio"], df["_mes"])})}
-    if not bases and not avisos_ipc:
+    if not bases and not avisos_ipc and not n_ctl:
         resumen["avisos"].append("No se encontró ningún archivo de los scrapers, de pesca, de empleo ni de hidrocarburos en lo que subiste.")
     db.registrar_carga(origen, resumen)
     return resumen

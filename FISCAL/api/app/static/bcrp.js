@@ -39,7 +39,9 @@
   const envolver = (W, H, cuerpo) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Math.ceil(H)}" viewBox="0 0 ${W} ${Math.ceil(H)}" font-family="${FUENTE}" fill="${TINTA}"><rect width="100%" height="100%" fill="#fff"/>${cuerpo}</svg>`;
 
   // ── Cuadro del texto: spec = {numero, titulo, llamada, unidad, cab: [[{t, span, linea}]], filas: [{c: [..], b, ind, sep, total}], notas, minCol}
+  const api = { ultimo: null };                          // el último cuadro dibujado (tipo y spec), para el Excel
   function cuadro(spec) {
+    api.ultimo = { tipo: "cuadro", spec };
     const F = 11, filaH = 16, pad = 8, nCols = spec.filas.reduce((m, f) => Math.max(m, f.c.length), 0);
     // anchos: la primera columna, lo que pida su texto (con sangría); las demás, el más ancho de su columna
     const w = Array.from({ length: nCols }, (_, j) => {
@@ -84,6 +86,7 @@
   // ── Anexo (horizontal): cabecera gris, años arriba, separador antes y después del total, rótulos repetidos a la derecha.
   // spec = {numero, titulo, llamada, unidad, rotulo, columnas: [{etq, anio, total}], filas: [{nombre, valores, tipo}], dec, notas}
   function anexo(spec) {
+    api.ultimo = { tipo: "anexo", spec };
     const F = 10, filaH = 15, pad = 6, dec = spec.dec ?? 1;
     const etqW = Math.ceil(Math.max(130, ...spec.filas.map((f) => ancho(f.nombre, F, f.tipo !== "item") + 18)));
     const cw = spec.columnas.map((c, j) => Math.ceil(Math.max(c.total ? 50 : 38, ...spec.filas.map((f) => ancho(num((f.valores || [])[j], dec), F, f.tipo !== "item") + pad * 2))));
@@ -134,6 +137,7 @@
     return [1, 2, 2.5, 3, 5, 10].map((k) => k * pot).find((k) => k >= bruto) || 10 * pot;
   }
   function barras(spec) {
+    api.ultimo = { tipo: "barras", spec };
     const p = spec.puntos.filter((x) => x.valor != null), dec = spec.dec ?? 1, W = 640, izq = 46, der = 12, arr = 66, abajo = 22, alto = 250;
     const ult = p.length ? p[p.length - 1].periodo.split(" ")[0].replace(".", "") : "";
     let lo = Math.min(0, ...p.map((x) => x.valor)), hi = Math.max(0, ...p.map((x) => x.valor));
@@ -190,5 +194,12 @@
   }
   async function descargarPng(svg, nombre) { bajar(await png(svg), nombreArchivo(nombre) + ".png"); }
 
-  window.BCRP = { cuadro, anexo, barras, descargar, descargarPng, copiar, num, var1, ELABORACION };
+  // Excel con el mismo formato: lo arma el servidor (POST /v1/bcrp/excel) con el tipo y los datos del cuadro
+  async function excel(ultimo, nombre) {
+    const r = await fetch("/v1/bcrp/excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...ultimo, nombre }) });
+    if (!r.ok) throw new Error(`No se pudo armar el Excel (${r.status}).`);
+    bajar(await r.blob(), nombreArchivo(nombre) + ".xlsx");
+  }
+
+  window.BCRP = Object.assign(api, { cuadro, anexo, barras, descargar, descargarPng, copiar, excel, num, var1, ELABORACION });
 })();
