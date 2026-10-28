@@ -64,7 +64,7 @@
     pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Drive, cada día a las 7:30 a. m., o subiendo el Excel", bases: (r) => [r.pesca], actualizar: "drive",
       lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: ["Producción pesquera (VBP a precios de 2007)", "Cuadro Nº 07 · Indicadores del sector pesquero (Loreto)"] },
     hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Scraper diario de PERUPETRO (7:00 a. m.) → Drive → página (7:30 y 9:00 a. m.)",
-      bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "drive-hidro", cuadros: "hidrocarburos",
+      bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "drive-hidro", cuadros: "hidrocarburos", mapa: true,
       lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
     manu: { t: "Sector manufactura", estado: "falta", fuente: "DIREPRO y encuesta BCRP a empresas industriales", entra: "Archivo mensual",
       lead: "Índice de volumen físico de la manufactura.", cuadros: ["Índice de volumen físico", "Anexo de producción manufacturera"] },
@@ -335,8 +335,8 @@
         `<tr class="${f.lote === "Total" ? "total" : ""}"><td>${esc(f.lote)}</td><td class="n">${fmt1(f.mes_anterior)}</td><td class="n">${fmt1(f.mes)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td><td class="n">${fmt1(f.acum_anterior)}</td><td class="n">${fmt1(f.acum)}</td><td class="n ${cls(f.var_acum)}">${pct(f.var_acum)}</td></tr>`).join("")).join("");
       const gr = c.grafico, g = gr ? gr.serie : [], max = Math.max(0.001, ...g.map((x) => x.valor)), W = 760, H = 245, base0 = 195, bw = W / Math.max(g.length, 1);
       const barras = g.map((x, i) => { const h = x.valor / max * 160;
-        return `<rect class="pos" x="${i * bw + bw * 0.18}" y="${base0 - h}" width="${bw * 0.64}" height="${Math.max(h, 1)}"><title>${esc(x.periodo)}: ${fmt1(x.valor)}${x.var == null ? "" : ` (${pct(x.var)} %)`}</title></rect>
-          <text class="val" x="${i * bw + bw / 2}" y="${base0 - h - 4}" text-anchor="middle">${fmt1(x.valor)}</text>`; }).join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
+        return `<rect class="${x.parcial ? "parcial" : "pos"}" x="${i * bw + bw * 0.18}" y="${base0 - h}" width="${bw * 0.64}" height="${Math.max(h, 1)}"><title>${esc(x.periodo)}: ${fmt1(x.valor)}${x.var == null ? "" : ` (${pct(x.var)} %)`}</title></rect>
+          <text class="val" x="${i * bw + bw / 2}" y="${base0 - h - 4}" text-anchor="middle">${fmt1(x.valor)}${x.parcial ? "*" : ""}</text>`; }).join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
       const anexos = c.anexo.map((b) => `<div class="caja"><h3>${esc(r.nombre)}: producción de ${esc(b.producto.toLowerCase())} por lote</h3><p>(${esc(b.unidad.charAt(0).toUpperCase() + b.unidad.slice(1))})</p>
           <div class="scroll"><table><tr><th>Mes</th>${b.lotes.map((l) => `<th class="n">${esc(l)}</th>`).join("")}<th class="n">Total</th></tr>${b.filas.map((f) => `<tr><td>${esc(f.periodo)}</td>${b.lotes.map((l) => `<td class="n">${fmt1(f[l])}</td>`).join("")}<td class="n"><b>${fmt1(f.Total)}</b></td></tr>`).join("")}</table></div></div>`).join("");
       const k = c.canon;
@@ -348,9 +348,10 @@
           <button class="btn" type="button" id="hid-xlsx">Descargar los cuadros en Excel</button></div>
         <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: PRODUCCIÓN DE HIDROCARBUROS</h3><p>(Producción fiscalizada)</p>
           <div class="scroll"><table><tr><th>Producto / lote</th><th class="n">${mes} ${a - 1}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Ene.-${m3}. ${a - 1}</th><th class="n">Ene.-${m3}. ${a}</th><th class="n">Var. %</th></tr>${cuadro}</table></div>
-          <p class="nota">Fuente: PERUPETRO, producción fiscalizada mensual por lote (estadística anual y mensual).</p></div>
+          <p class="nota">Fuente: PERUPETRO, producción fiscalizada mensual por lote (estadística anual y mensual)${c.de_diaria.length ? `; ${esc(c.de_diaria.length > 1 ? `${c.de_diaria[0]} a ${c.de_diaria[c.de_diaria.length - 1]}` : c.de_diaria[0])}: suma de la producción diaria, porque la estadística mensual aún no los publica` : ""}.${c.parcial ? ` ${esc(c.parcial.periodo)} va solo en el gráfico: es parcial (${c.parcial.dias} de ${c.parcial.de} días).` : ""}</p></div>
         ${gr ? `<div class="caja"><h3>Gráfico · Producción de ${esc(gr.producto.toLowerCase())}</h3><p>(${esc(gr.unidad.charAt(0).toUpperCase() + gr.unidad.slice(1))})</p>
-          <div class="scroll"><svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Producción diaria promedio por mes"><line class="eje" x1="0" x2="${W}" y1="${base0}" y2="${base0}"></line>${barras}</svg></div></div>` : ""}
+          <div class="scroll"><svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Producción diaria promedio por mes"><line class="eje" x1="0" x2="${W}" y1="${base0}" y2="${base0}"></line>${barras}</svg></div>
+          ${gr.serie.some((x) => x.parcial) ? `<p class="nota">* ${esc(c.parcial.periodo)}: promedio de los ${c.parcial.dias} días reportados en la producción diaria de PERUPETRO.</p>` : ""}</div>` : ""}
         ${anexos}${canon}`;
       $("hid-p").addEventListener("change", (ev) => cuadrosHidro(r, caja, ev.target.value));
       $("hid-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/hidrocarburos?departamento=${r.cod}&periodo=${c.periodo}&formato=xlsx`; });
@@ -453,7 +454,7 @@
   // ── Página de un sector de una región ──
   function sectorRegion() {
     const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
-    const tabs = ["Datos", "Cuadros", "Actualizar", ...(s.extra || [])];
+    const tabs = ["Datos", "Cuadros", ...(s.mapa ? ["Mapa"] : []), "Actualizar", ...(s.extra || [])];
     const t = pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
@@ -461,6 +462,10 @@
     if (t === "Datos" && id === "empleo") panel = `<div class="caja"><h3>Empleo · ${esc(r.nombre)}</h3><p>Todos los meses disponibles del MTPE (desde enero 2016). Para varias regiones o grupos, usa ${irComun("empleo-long", "Empleo · LONG por región")}.</p>${cajaLong(r.nombre)}</div>`;
     else if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : s.actualizar === "empleo" ? irComun("empleo-long", "Empleo · LONG por región") + " (el Excel tal como lo da el scraper, de una, varias o todas las regiones)" : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
       : `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(s.t.toLowerCase())} en la página.</b><span>Fuente: ${esc(s.fuente)}. Entrará como: ${esc(s.entra.toLowerCase())}.</span></div>`;
+    else if (t === "Mapa") panel = `<div class="caja mapa-caja"><div class="fila" style="justify-content:space-between;align-items:center">
+        <p>Mapa de lotes de PERUPETRO que arma el flujo de hidrocarburos (DATA/MAPA en Drive), con la producción, los pozos, las regalías y el canon de cada lote.</p>
+        <div class="fila"><a class="btn sec" href="/v1/hidrocarburos/mapa" target="_blank" rel="noopener">Pantalla completa</a><a class="btn sec" href="/v1/hidrocarburos/mapa?descargar=true">Descargar</a></div></div>
+        <iframe class="mapa" src="/v1/hidrocarburos/mapa" title="Mapa de lotes de hidrocarburos" sandbox="allow-scripts allow-popups allow-downloads allow-modals" loading="lazy"></iframe></div>`;
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`

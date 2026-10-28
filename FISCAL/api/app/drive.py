@@ -26,6 +26,7 @@ CARPETAS = {
     "pesca-ucayali": os.environ.get("DRIVE_CRUDOS_UCAYALI", "1AEEvAfbtJwbkW773mKg-BIsDwjigjCg9"),
     "hidrocarburos": os.environ.get("DRIVE_HIDROCARBUROS_DATA", "1dOOcsVyw915yKg6BzSdICVfCpYTiyeaq"),
 }
+MAPAS = ("PP_mapa_lotes_plus.html", "PP_mapa_lotes.html")   # el primero que haya, en ese orden
 REGION = {"pesca-loreto": "Loreto", "pesca-san-martin": "San Martín", "pesca-ucayali": "Ucayali", "hidrocarburos": "Hidrocarburos"}
 API = "https://www.googleapis.com/drive/v3/files"
 _en_curso = threading.Lock()
@@ -76,6 +77,16 @@ class LectorDrive:
                 aceptar = aceptar or (lambda n: n.lower().endswith(".xlsx") and not n.startswith("~$"))
                 return [a for a in archivos if aceptar(a["name"])]
 
+    def subcarpeta(self, carpeta, nombre):
+        """ID de la subcarpeta con ese nombre, o None."""
+        q = (f"'{carpeta}' in parents and trashed = false and name = '{nombre}' "
+             "and mimeType = 'application/vnd.google-apps.folder'")
+        r = self.sesion.get(API, params={"q": q, "fields": "files(id)", "supportsAllDrives": "true",
+                                         "includeItemsFromAllDrives": "true"}, timeout=60)
+        r.raise_for_status()
+        f = r.json().get("files", [])
+        return f[0]["id"] if f else None
+
     def bajar(self, file_id):
         r = self.sesion.get(f"{API}/{file_id}", params={"alt": "media", "supportsAllDrives": "true"}, timeout=300)
         r.raise_for_status()
@@ -121,6 +132,13 @@ def _listar(lector, base_id, carpeta):
         t = hidrocarburos.tipo(a["name"])
         if t not in ultimos or a["modifiedTime"] > ultimos[t]["modifiedTime"]:
             ultimos[t] = a
+    # el mapa de lotes (DATA/MAPA/PP_mapa_lotes_plus.html; si no está, el simple) se guarda aparte para la página
+    mapa = lector.subcarpeta(carpeta, "MAPA") if hasattr(lector, "subcarpeta") else None
+    if mapa:
+        htmls = {a["name"]: a for a in lector.listar(mapa, lambda n: n in MAPAS)}
+        elegido = next((htmls[n] for n in MAPAS if n in htmls), None)
+        if elegido:
+            ultimos["mapa"] = elegido
     return list(ultimos.values())
 
 
@@ -134,17 +152,25 @@ def sincronizar(origen="botón de la página", todo=False, lector=None):
         vistos = {} if todo else _vistos()
         listados = {base_id: _listar(lector, base_id, carpeta) for base_id, carpeta in CARPETAS.items()}
         nuevos = [(base_id, a) for base_id, lista in listados.items() for a in lista if vistos.get(a["id"]) != a["modifiedTime"]]
-        if nuevos:
+        mapas = [a for _, a in nuevos if a["name"] in MAPAS]
+        datos = [(b, a) for b, a in nuevos if a["name"] not in MAPAS]
+        for a in mapas:                                 # el mapa no es una base: se guarda tal cual para la página
+            db.guardar_documento("mapa-hidrocarburos", lector.bajar(a["id"]).decode("utf-8", "replace"), a["modifiedTime"])
+        if datos:
             usados, archivos = set(), []
-            for _, a in nuevos:
+            for _, a in datos:
                 nombre = _nombre_unico(a["name"], usados)
                 usados.add(nombre)
                 archivos.append((nombre, lector.bajar(a["id"])))
-            resumen = carga.cargar(f"Drive ({origen}): {', '.join(a['name'] for _, a in nuevos)}"[:250], archivos)
+            resumen = carga.cargar(f"Drive ({origen}): {', '.join(a['name'] for _, a in datos)}"[:250], archivos)
+        elif mapas:
+            resumen = {"bases": {}, "avisos": []}
         else:
             hay = ", ".join(f"{REGION[b]}: {len(lista)}" for b, lista in listados.items())
             resumen = {"bases": {}, "avisos": [f"No hay archivos nuevos ni modificados en las carpetas de Drive "
                                                f"(archivos en cada carpeta · {hay})."]}
+        if mapas:
+            resumen["avisos"].append(f"Mapa de lotes de hidrocarburos actualizado ({mapas[0]['name']}).")
         resumen["archivos"] = [{"base": b, "nombre": a["name"]} for b, a in nuevos]
         resumen["carpetas"] = {b: len(lista) for b, lista in listados.items()}
         ahora = datetime.now(timezone.utc).isoformat(timespec="microseconds")   # ordena las sincronizaciones

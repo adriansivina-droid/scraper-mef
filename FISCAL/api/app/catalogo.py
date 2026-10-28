@@ -87,9 +87,10 @@ BASES = {b.id: b for b in [
          descripcion="MTPE (PLAME y T-Registro): trabajadores asalariados privados formales por mes, región y actividad económica."),
     # Hidrocarburos (HIDROCARBUROS/perupetro_produccion.md): los CSV que el flujo diario deja en Drive (DATA)
     Base("hidro-produccion", "hidrocarburos", "Producción fiscalizada por lote", "Producción de hidrocarburos", "HIDROCARBUROS",
-         ["AÑO", "MES", "DEPARTAMENTO", "ZONA", "OPERADOR", "LOTE", "LOTE_HISTORICO", "PRODUCTO", "UNIDAD", "VOLUMEN", "PROMEDIO_DIARIO"],
-         [8, 6, 18, 14, 28, 10, 14, 14, 10, 14, 14], valor="VOLUMEN", usa_niveles=False, reemplaza_periodo=True,
-         descripcion="PERUPETRO: petróleo, LGN y condensado (barriles) y gas natural (MPC) fiscalizados por mes, lote y operador."),
+         ["AÑO", "MES", "DEPARTAMENTO", "ZONA", "OPERADOR", "LOTE", "LOTE_HISTORICO", "PRODUCTO", "UNIDAD", "VOLUMEN", "PROMEDIO_DIARIO", "FUENTE"],
+         [8, 6, 18, 14, 28, 10, 14, 14, 10, 14, 14, 34], valor="VOLUMEN", usa_niveles=False, reemplaza_periodo=True,
+         descripcion="PERUPETRO: petróleo, LGN y condensado (barriles) y gas natural (MPC) fiscalizados por mes, lote y operador. "
+                     "Los meses que la estadística mensual aún no publica salen de la producción diaria."),
     Base("hidro-canon", "hidrocarburos", "Canon y sobrecanon petrolero transferido", "Canon petrolero", "CANON PETROLERO",
          ["AÑO", "MES", "DEPARTAMENTO", "CANON_MM_SOLES"], [8, 6, 18, 16], valor="CANON_MM_SOLES", usa_niveles=False,
          reemplaza_periodo=True, formato_valor="#,##0.00",

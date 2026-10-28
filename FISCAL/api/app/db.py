@@ -50,6 +50,12 @@ def guardar(base_id, df):
         return 0
     m = motor()
     with m.begin() as cx:
+        if existe(b.tabla):                            # una columna nueva del catálogo se agrega a la tabla existente
+            tiene = {c["name"] for c in inspect(cx).get_columns(b.tabla)}
+            for col in b.columnas:
+                if col not in tiene:
+                    tipo = "DOUBLE PRECISION" if pd.api.types.is_numeric_dtype(df[col]) else "TEXT"
+                    cx.execute(text(f'ALTER TABLE "{b.tabla}" ADD COLUMN "{col}" {tipo}'))
         if existe(b.tabla) and b.reemplaza_periodo:
             # la serie completa: se borra el tramo de periodos que trae, en todos los departamentos (un lote puede
             # cambiar de departamento cuando se cruza con el mapa)
@@ -127,3 +133,25 @@ def ultima_carga():
     with motor().connect() as cx:
         r = cx.execute(text("SELECT fecha, origen, resumen FROM cargas ORDER BY id DESC LIMIT 1")).first()
     return None if r is None else {"fecha": r[0], "origen": r[1], "resumen": json.loads(r[2])}
+
+
+# ── Documentos (p. ej. el mapa de lotes de hidrocarburos): un archivo por nombre ──
+def _documentos():
+    with motor().begin() as cx:
+        cx.execute(text("CREATE TABLE IF NOT EXISTS documentos (nombre TEXT PRIMARY KEY, contenido TEXT, modificado TEXT, fecha TEXT)"))
+
+
+def guardar_documento(nombre, contenido, modificado):
+    _documentos()
+    with motor().begin() as cx:
+        cx.execute(text("DELETE FROM documentos WHERE nombre = :n"), {"n": nombre})
+        cx.execute(text("INSERT INTO documentos (nombre, contenido, modificado, fecha) VALUES (:n, :c, :m, :f)"),
+                   {"n": nombre, "c": contenido, "m": modificado, "f": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+
+
+def documento(nombre):
+    """(contenido, modificado) o None."""
+    _documentos()
+    with motor().connect() as cx:
+        r = cx.execute(text("SELECT contenido, modificado FROM documentos WHERE nombre = :n"), {"n": nombre}).first()
+    return None if r is None else (r[0], r[1])

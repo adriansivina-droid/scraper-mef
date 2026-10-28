@@ -197,6 +197,12 @@ El flujo diario de `HIDROCARBUROS/` (07:00 en Lima, sin cambios) deja en la carp
 | `PP_produccion_lote_mes_<ini>-<fin>.csv` (petróleo, LGN, condensado; barriles) | `hidro-produccion` | HIDROCARBUROS |
 | `PP_produccion_gas_lote_mes_<ini>-<fin>.csv` (gas natural; MPC) | `hidro-produccion` | HIDROCARBUROS |
 | `PP_canon_departamento_mes.csv` (canon y sobrecanon transferido; MM S/) | `hidro-canon` | CANON PETROLERO |
+| `PP_produccion_diaria.csv` (producción diaria por lote) | `hidro-produccion` (FUENTE «PRODUCCIÓN DIARIA · n de N días») | HIDROCARBUROS |
+| `MAPA/PP_mapa_lotes_plus.html` (o `PP_mapa_lotes.html`) | el mapa de la pestaña «Mapa» (tabla `documentos`) | — |
+
+La estadística mensual de PERUPETRO va con dos o tres meses de rezago; los meses que aún no trae se completan con la
+suma de la producción diaria (columna FUENTE). El mes en curso es parcial: no entra en el cuadro ni en el anexo, y en el
+gráfico va como promedio de los días reportados, marcado con «*».
 
 Los CSV traen la serie completa: cada carga reemplaza los meses que trae en todos los departamentos. El departamento
 sale de la columna `DEPARTAMENTO` (la que asigna el mapa de lotes; «UCAYALI / HUANUCO» va a Ucayali); si falta, de
@@ -209,7 +215,8 @@ en miles de barriles, gas natural en millones de pies cúbicos) y lote, del mes 
 año anterior; el gráfico de producción diaria promedio (25 meses); el anexo mensual por lote (13 meses) y el canon
 transferido al departamento; todo se descarga en Excel. Comprobado con el texto de Loreto 2025
 (`HIDROCARBUROS/analisis`): 7,9 millones de barriles (+22,9 %), Lote 95 +5,9 % (`tests/test_hidrocarburos.py`).
-Falta el precio del crudo (Reuters), que no está en DATA.
+Falta el precio del crudo (Reuters), que no está en DATA. La pestaña **Mapa** muestra el mapa de lotes del flujo de
+hidrocarburos (`/v1/hidrocarburos/mapa`, aislado en un iframe), con botones de pantalla completa y descarga.
 
 ## Endpoints
 
