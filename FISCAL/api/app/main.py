@@ -551,11 +551,15 @@ def sunat_corregir(tabla: str, cuerpo: dict = Body(...)):
     filas = cuerpo.get("filas")
     if not isinstance(filas, list):
         raise HTTPException(422, "Falta la lista «filas».")
+    # solo se reprocesan las filas que la corrección toca (empresas, partidas, descripciones); el resto, toda la base
+    solo = None
     try:
         if tabla == "empresas":
             sunat_expo.actualizar_empresas(filas)
+            solo = ("RUC", [re.sub(r"\D", "", str(f.get("RUC") or "")) for f in filas])
         elif tabla == "partidas":
             sunat_expo.actualizar_partidas(filas)
+            solo = ("PARTIDA", [re.sub(r"\D", "", str(f.get("PARTIDA") or "")).zfill(10) for f in filas])
         elif tabla == "equivalencias":
             sunat_expo.actualizar_equivalencias(filas)
         elif tabla == "reglas":
@@ -564,9 +568,12 @@ def sunat_corregir(tabla: str, cuerpo: dict = Body(...)):
             sunat_expo.guardar_tabla("condiciones", pd.DataFrame([f for f in filas if str(f.get("contiene") or "").strip()], columns=sunat_expo.TABLAS["condiciones"]))
         elif tabla == "nombres":
             sunat_expo.asignar_nombres(filas)
+            solo = ("DESCRIPCION", [d for f in filas if str(f.get("nombre") or "").strip() for d in (f.get("descripciones") or [])])
         elif tabla == "unificar":
+            descs = []
             for f in filas:
-                sunat_expo.unificar(f.get("contiene"), f.get("nombre"))
+                descs += sunat_expo.unificar(f.get("contiene"), f.get("nombre"))
+            solo = ("DESCRIPCION", descs)
         elif tabla == "terminos":
             sunat_expo.guardar_tabla("terminos", pd.DataFrame([f for f in filas if str(f.get("contiene") or "").strip() and str(f.get("nombre") or "").strip()],
                                                               columns=sunat_expo.TABLAS["terminos"]))
@@ -574,6 +581,8 @@ def sunat_corregir(tabla: str, cuerpo: dict = Body(...)):
             raise HTTPException(404, f"No hay tabla {tabla!r}.")
     except ValueError as e:
         raise HTTPException(422, str(e))
+    if solo is not None:
+        return {"filas": sunat_expo.reprocesar(*solo), "parcial": True}
     return {"filas": sunat_expo.reprocesar()}
 
 
