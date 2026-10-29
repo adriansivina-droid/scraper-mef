@@ -33,9 +33,16 @@ CRUDAS = ["aduana", "ubigeo", "ruc11", "ano_mes", "fecembar", "pais", "partorig"
 COLUMNAS = ["AÑO", "MES", "DEPARTAMENTO", "RUC", "EMPRESA", "PARTIDA", "DESCRIPCION", "PRODUCTO", "TIPO", "CATEGORIA",
             "TIPO_ESTAD", "RUBRO_ESTAD", "COD_PAIS", "PAIS", "CONTINENTE", "COD_ADUANA", "ADUANA", "FECHA_EMBARQUE", "KILOS",
             "CANTIDAD", "UNIDAD", "BORRAR_PARA", "ESTADO", "MOTIVO", "FOB_USD", "FOB"]
-# grupo del ESTAD de cada categoría de PARTIDA (el primero que exista en la región)
-GRUPO_DE = {"2.1": ["forestales", "maderas y sus manufacturas"], "2.2": ["pesqueros"], "2.3": ["animales vivos"],
-            "2.4": ["agropecuarios"], "2.5": ["resto"], "1.2": ["petroleo crudo y derivados"], "1.1": ["agricolas (cafe)", "agricolas"]}
+# grupo del ESTAD de cada categoría de PARTIDA (el primero que exista en la región). Se reconoce por el nombre, no por el
+# número: ANUAL_PRO 2023 numeraba 2.3 animales vivos y 2.4 agropecuarios; desde 2024, al revés.
+GRUPO_DE = {"maderas": ["forestales", "maderas y sus manufacturas"], "pesqueros": ["pesqueros"], "animales": ["animales vivos"],
+            "agropecuarios": ["agropecuarios"], "resto": ["resto"], "petroleo": ["petroleo crudo y derivados"], "cafe": ["agricolas (cafe)", "agricolas"]}
+
+
+def _categoria(categoria):
+    """«2.1. MADERAS Y SUS MANUFACTURAS» -> «maderas»; «1.2. PETRÓLEO Y SUS DERIVADOS» -> «petroleo»; sin grupo -> «»."""
+    c = _clave(re.sub(r"^[\d.\s]+", "", str(categoria or "")))
+    return next((k for k in GRUPO_DE if c.startswith(k)), "")
 # reglas obligatorias de limpieza (se pueden cambiar en la página)
 REGLAS_INICIALES = [
     {"departamento": "LOR", "campo": "partida", "valor": "0901", "motivo": "Loreto no exporta café: lo embarca una empresa de otra región."},
@@ -46,7 +53,11 @@ EQUIVALENCIAS_INICIALES = [
     {"departamento": "SMN", "producto": p, "rubro": "Cacao (derivados)"} for p in ("Cacao en manteca", "Cacao en pasta", "Cacao en polvo", "Cacao residuos")
 ] + [{"departamento": "SMN", "producto": "Aceite vegetal de sacha inchi", "rubro": "Aceite vegetal"},
      {"departamento": "SMN", "producto": "Puros", "rubro": "Puros, cigarros y pack"},
-     {"departamento": "SMN", "producto": "Tabaco", "rubro": "Tabaco negro y rubio"}]
+     {"departamento": "SMN", "producto": "Tabaco", "rubro": "Tabaco negro y rubio"},
+     # como se armó el ESTAD 2024-2026 (comparación fila por fila con ANUAL_PRO)
+     {"departamento": "UCA", "producto": "Filete de paiche", "rubro": "Pescado congelado"},
+     {"departamento": "UCA", "producto": "Filete de paiche congelado", "rubro": "Pescado congelado"}] + [
+    {"departamento": "LOR", "producto": p, "rubro": "Peces ornamentales"} for p in ("Alevinos de paiche", "Anguilas", "Camarones")]
 
 
 def _clave(s):
@@ -129,7 +140,7 @@ def es_anual_pro(ruta):
         wb = load_workbook(ruta, read_only=True)
         nombres = set(wb.sheetnames)
         wb.close()
-        return {"UNICOS", "PARTIDA"} <= nombres
+        return "UNICOS" in nombres and bool({"PARTIDA", "LISTA SUNAT"} & nombres)     # «LISTA SUNAT» desde 2024
     except Exception:
         return False
 
@@ -169,12 +180,17 @@ def cargar_diccionarios(ruta):
         viejo = leer_tabla("empresas")
         guardar_tabla("empresas", pd.concat([viejo[~viejo["RUC"].astype(str).isin(nuevo["RUC"])], nuevo], ignore_index=True))
         avisos.append(f"Empresas (EMPRESAS): {len(nuevo)} RUC.")
-    p = pd.read_excel(ruta, sheet_name="PARTIDA", dtype=str)
+    hojas = load_workbook(ruta, read_only=True).sheetnames
+    p = pd.read_excel(ruta, sheet_name="LISTA SUNAT" if "LISTA SUNAT" in hojas else "PARTIDA", dtype=str)
     p.columns = [str(c).strip() for c in p.columns]
     if "PARTIDA_TEXTO" in p.columns:
         prod_col = next((c for c in p.columns if c.startswith("PRODUCTO") and "✔" in c), None)
-        tabla = pd.DataFrame({"PARTIDA": p["PARTIDA_TEXTO"].str.strip().str.zfill(10), "TIPO": p.get("|"), "CATEGORIA": p.get("CATEGORIA"),
-                              "PRODUCTO": p[prod_col] if prod_col else None, "DESCRIPCION": p.get("PRODUCTO"), "NOTA": p.get("NOTA")})
+        if prod_col:                                 # 2023: «|» = tipo, «PRODUCTO ✔» = nombre común, «PRODUCTO» = descripción
+            tabla = pd.DataFrame({"PARTIDA": p["PARTIDA_TEXTO"].str.strip().str.zfill(10), "TIPO": p.get("|"), "CATEGORIA": p.get("CATEGORIA"),
+                                  "PRODUCTO": p[prod_col], "DESCRIPCION": p.get("PRODUCTO"), "NOTA": p.get("NOTA")})
+        else:                                        # desde 2024 (LISTA SUNAT): TIPO, CATEGORIA, DESCRIPCION, PRODUCTO
+            tabla = pd.DataFrame({"PARTIDA": p["PARTIDA_TEXTO"].str.strip().str.zfill(10), "TIPO": p.get("TIPO"), "CATEGORIA": p.get("CATEGORIA"),
+                                  "PRODUCTO": p.get("PRODUCTO"), "DESCRIPCION": p.get("DESCRIPCION"), "NOTA": p.get("NOTA")})
         guardar_tabla("partidas", tabla.dropna(subset=["PARTIDA"]))
         avisos.append(f"Partidas (PARTIDA): {len(tabla)}, {int(tabla['TIPO'].notna().sum())} clasificadas.")
     return avisos
@@ -211,10 +227,11 @@ def estructura_estad(depto):
 
 
 def _parecido(producto, rubro):
-    """«Tabaco» ~ «Tabaco negro y rubio», «Manteca vegetal de palma» ~ «Manteca vegetal», «Pescado congelado» ~
-    «Pescado congelado (paiche)»; pero «Cacao en grano» no es «Cacao (derivados)»."""
+    """El producto, igual o más específico que la fila: «Manteca vegetal de palma» ~ «Manteca vegetal», «Pescado congelado»
+    ~ «Pescado congelado (paiche)». No al revés: la «Manteca vegetal» genérica no es «Manteca vegetal de palma» (el ESTAD
+    la deja en Resto); «Tabaco» -> «Tabaco negro y rubio» va por equivalencia. «Cacao en grano» no es «Cacao (derivados)»."""
     a, b, sin_par = _clave(producto), _clave(rubro), _clave(re.sub(r"\s*\(.*\)$", "", rubro))
-    return a in (b, sin_par) or a.startswith(b + " ") or b.startswith(a + " ")
+    return a in (b, sin_par) or a.startswith(b + " ")
 
 
 def ubicar(est, corto, tipo, categoria, producto, equivalencias):
@@ -234,14 +251,14 @@ def ubicar(est, corto, tipo, categoria, producto, equivalencias):
     t = str(tipo or "")[:1]
     if t == "3" or not t:
         return (otras["rubro"], otras["rubro"]) if otras else (None, None)
-    cat = str(categoria or "")[:3]
+    cat = _categoria(categoria)
     prod_filas = [f for f in est if f["nivel"] == "producto"]
     # tradicionales: petróleo y café a su grupo; el café sin grupo propio va a «Café en grano» de agropecuarios
     candidatos = []
     for nombre in GRUPO_DE.get(cat, []):
         candidatos += [f for f in est if f["nivel"] == "grupo" and _clave(f["rubro"]) == nombre and
                        (t != "2" or (nt and f["tipo"] == nt["rubro"]))]
-    if cat == "1.1" and not candidatos:
+    if cat == "cafe" and not candidatos:
         f = next((f for f in prod_filas if _parecido(producto or "Café en grano", f["rubro"])), None)
         if f:
             return f["tipo"], f["rubro"]
@@ -255,7 +272,7 @@ def ubicar(est, corto, tipo, categoria, producto, equivalencias):
     f = next((f for f in hijos if _clave(producto) == _clave(f["rubro"])), None) or next((f for f in hijos if _parecido(producto, f["rubro"])), None)
     if f:
         return f["tipo"], f["rubro"]
-    if cat == "2.1":
+    if cat == "maderas":
         f = next((f for f in hijos if _clave(f["rubro"]) == "otros acabados"), None)
         if f:
             return f["tipo"], f["rubro"]
@@ -368,7 +385,8 @@ def leer(archivos):
         if df.empty:
             continue
         cuenta = df.groupby("ESTADO")["FOB"].agg(["count", "sum"])
-        avisos.append(f"{ruta.name}: base mensual {df['AÑO'].min()}-{df['MES'].min():02d} a {df['AÑO'].max()}-{df['MES'].max():02d}, " +
+        per = sorted(set(zip(df["AÑO"], df["MES"])))
+        avisos.append(f"{ruta.name}: base mensual {per[0][0]}-{per[0][1]:02d} a {per[-1][0]}-{per[-1][1]:02d}, " +
                       ", ".join(f"{k} {int(v['count'])} filas ({v['sum']:,.0f} mil US$)".replace(",", " ") for k, v in cuenta.iterrows()) + ".")
         partes.append(df.assign(_archivo=n))
     return ({"expo-sunat": pd.concat(partes, ignore_index=True)} if partes else {}), avisos
@@ -380,10 +398,13 @@ def reprocesar():
     if base is None or base.empty:
         return 0
     df, _ = procesar(base)
-    from .catalogo import BASES
+    from .catalogo import BASES, INTERNAS
+    b = BASES["expo-sunat"]
+    # borrar y volver a escribir en una sola transacción: si algo se corta a la mitad, la base queda como estaba
     with db.motor().begin() as cx:
-        cx.execute(text(f'DELETE FROM "{BASES["expo-sunat"].tabla}"'))
-    return db.guardar("expo-sunat", df)
+        cx.execute(text(f'DELETE FROM "{b.tabla}"'))
+        df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
+    return len(df)
 
 
 # ── Revisión, ESTAD propuesto y cuadros de texto ──

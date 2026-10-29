@@ -148,3 +148,25 @@ def test_resumen_export(cliente):
     titulos = {d["titulo"]: d for d in x["destacados"]}
     assert titulos["Producto estrella del mes"]["valor"] == "Barriles de petróleo crudo"
     assert titulos["Empresas exportadoras"]["valor"] == "2"
+
+
+def test_anual_pro_desde_2024_lista_sunat_y_categorias_renumeradas(cliente):
+    """Desde 2024 la hoja PARTIDA se llama LISTA SUNAT (TIPO, CATEGORIA, DESCRIPCION, PRODUCTO) y agropecuarios es 2.3."""
+    wb = load_workbook(io.BytesIO(anual_pro()))
+    vieja = wb["PARTIDA"]
+    filas = [[c.value for c in r] for r in vieja.iter_rows(min_row=2)]
+    wb.remove(vieja)
+    nueva = wb.create_sheet("LISTA SUNAT")
+    nueva.append(["PARTIDA", "PARTIDA_TEXTO", "TIPO", "CATEGORIA", "DESCRIPCION", "PRODUCTO", "NOTA"])
+    for partida, texto, tipo, cat, prod, desc, nota in filas:
+        cat = (cat or "").replace("2.4. AGROPECUARIOS", "2.3. AGROPECUARIOS") or None
+        nueva.append([partida, texto, tipo, cat, desc, prod, nota])
+    buf = io.BytesIO()
+    wb.save(buf)
+    r = subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": buf.getvalue()})
+    assert any("Partidas (PARTIDA): 5, 4 clasificadas" in a for a in r["avisos"])
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO EN GRANO SECO", "CATEGORIA"] == "2.3. AGROPECUARIOS"
+    assert ago.loc["CACAO EN GRANO SECO", "RUBRO_ESTAD"] == "Cacao en grano"           # por el nombre de la categoría
+    assert sunat_expo._categoria("2.4. ANIMALES VIVOS") == "animales" and sunat_expo._categoria("3.5. OTROS") == ""
