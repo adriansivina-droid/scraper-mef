@@ -124,6 +124,15 @@ BASES = {b.id: b for b in [
          descripcion="Base mensual de exportaciones con los diccionarios de ANUAL_PRO (producto, categoría, país, aduana, empresa) y el "
                      "estado de cada fila: ok (entra a los cuadros), verificar, borrar o clasificar. FOB en miles de US$ "
                      "(ROUND por fila, como la hoja ORIGEN); FOB_USD sin redondear."),
+    # Base mensual de importaciones por la aduana de Iquitos (sunat_impo.py)
+    Base("impo-base", "comercio", "Base mensual de importaciones (aduana de Iquitos, detalle)", "Importaciones · base mensual", "BASE MENSUAL IMPO",
+         ["AÑO", "MES", "DEPARTAMENTO", "ADUANA", "RUC", "EMPRESA", "PARTIDA", "PRODUCTO", "COD_CUODE", "TIPO", "CATEGORIA",
+          "DESC_CUODE", "RUBRO_ESTAD", "COD_PAIS", "PAIS", "CONTINENTE", "KILOS", "FLETE", "SEGURO", "CIF", "ESTADO", "MOTIVO",
+          "FOB_USD", "FOB"],
+         [8, 6, 12, 8, 13, 40, 12, 32, 9, 20, 32, 34, 30, 8, 18, 12, 10, 10, 10, 12, 11, 30, 12, 10],
+         valor="FOB", usa_niveles=False, departamentos=("16",),
+         descripcion="Importaciones de la aduana de Iquitos con la clasificación del proyecto ANUAL_PRO - IMPORTACIONES (CUODE o "
+                     "partida manual), empresa, producto y país. FOB en miles de US$ (ROUND por fila, como el CUADRO 16)."),
 ]}
 
 # columnas internas para filtrar (no salen en las descargas)

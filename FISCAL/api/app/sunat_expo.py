@@ -479,7 +479,8 @@ ORDINAL = {"m": ["el primero", "el segundo", "el tercero", "el cuarto", "el quin
 
 
 def _pct(v):
-    return f"{v:.1f}".replace(".", ",")
+    """3332.2 -> «3 332,2» (como la síntesis: miles con espacio, decimales con coma)."""
+    return f"{v:,.1f}".replace(",", " ").replace(".", ",")
 
 
 def _y(lista):

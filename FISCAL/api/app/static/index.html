@@ -77,8 +77,9 @@
       lead: "Trabajadores asalariados privados formales por rama de actividad económica.", cuadros: "empleo" },
     expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["expo-estad"], sinActualizar: true,
       lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos. En «Base mensual», la base del mes se limpia, se revisa y arma el ESTAD; «Resumen Export» trae los datos destacados y el borrador de la síntesis.", cuadros: "exportaciones", extra: ["Base mensual", "Resumen Export"] },
-    impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos", entra: "Subiendo en la página el ESTAD de Loreto", bases: () => ["impo-estad"], actualizar: "estad",
-      lead: "Importaciones por la aduana de Iquitos según uso o destino económico (FOB), desde el ESTAD de Loreto.", cuadros: "importaciones" },
+    impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["impo-estad"], sinActualizar: true,
+      lead: "Importaciones por la aduana de Iquitos según uso o destino económico (FOB): Cuadro N° 16 y anexo. En «Base mensual» se clasifica la base del mes (CUODE) y arma el ESTAD; «Resumen Import» trae los datos destacados y el borrador de la síntesis.",
+      cuadros: "importaciones", extra: ["Resumen Import", "Base mensual"] },
     credito: { t: "Crédito", estado: "falta", fuente: "SBS", entra: "Scraper de la web de la SBS, por construir",
       lead: "Saldos de crédito del sistema financiero por tipo, sin Banco de la Nación ni Agrobanco, y morosidad.", cuadros: ["Crédito por tipo", "Tasa de morosidad"] },
     depositos: { t: "Depósitos", estado: "falta", fuente: "SBS y AFP", entra: "Scraper de la web de la SBS, por construir",
@@ -462,7 +463,7 @@
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
     try {
       const c = (await api(`/v1/cuadros/exportaciones?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo, flujo })}`)).cuadros;
-      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay ${expo ? "exportaciones" : "importaciones"} de ${esc(r.nombre)} en la página.</b><span>${expo ? "Sube la base del mes en «Base mensual» y pásala al ESTAD." : "Sube el ESTAD de Loreto en «Actualizar»."}</span></div>`; return; }
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay ${expo ? "exportaciones" : "importaciones"} de ${esc(r.nombre)} en la página.</b><span>${expo ? "Sube la base del mes en «Base mensual» y pásala al ESTAD." : "Sube la base del mes en «Base mensual» y pásala al ESTAD."}</span></div>`; return; }
       const a = c.anio, b = c.comparar, mes = c.titulo_mes, m3 = mes.slice(0, 3), d = c.dec, R = r.nombre.toUpperCase();
       const nd = (v) => v == null ? "" : v.toLocaleString("es-PE", { minimumFractionDigits: d, maximumFractionDigits: d });
       const vs = (v) => v == null ? "-" : pct(v), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
@@ -583,27 +584,83 @@
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo revisar la base mensual</b><span>${esc(e.message)}</span></div>`; }
   }
 
+  // ── Base mensual de importaciones (aduana de Iquitos): clasificación por CUODE, revisión y ESTAD propuesto ──
+  async function baseImpo(caja) {
+    const clave = "bi", st = estadoEjec(clave), mil = (v) => v == null ? "" : fmt(v);
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Revisando la base mensual…</div>';
+    try {
+      const x = (await api(`/v1/importaciones/base?${new URLSearchParams({ periodo: st.periodo })}`)).revision;
+      if (!x) { caja.innerHTML = '<div class="vacio-caja"><b>Todavía no hay base mensual de importaciones.</b><span>Sube arriba el M_AAAAMM.xlsx del mes (o el ANUAL_PRO - IMPORTACIONES, que trae los diccionarios).</span></div>'; return; }
+      const ETQ = { ok: "entra al cuadro", clasificar: "sin clasificar", "otra aduana": "otra aduana" };
+      const est = x.estados.map((e) => `<div class="stat"><small>${esc(ETQ[e.ESTADO] || e.ESTADO)}</small><b>${fmt(e.filas)} filas</b><span>${mil(e.fob)} mil US$</span></div>`).join("");
+      const cats = x.categorias;
+      const empresas = x.empresas.length ? `<div class="scroll"><table><tr><th>RUC</th><th>Productos</th><th class="n">FOB (mil US$)</th><th>Razón social</th></tr>
+          ${x.empresas.map((e, i) => `<tr><td>${esc(e.ruc)}</td><td>${esc(e.productos.join(", "))}</td><td class="n">${mil(e.fob)}</td><td><input data-emp="${i}" size="34" placeholder="(o búscala en el padrón)"></td></tr>`).join("")}</table></div>
+          <div class="fila"><button class="btn" type="button" id="${clave}-gemp">Guardar y reprocesar</button><button class="btn sec" type="button" id="${clave}-padron">Buscar razón social en el padrón de RUC</button><span class="nota" id="${clave}-padres"></span></div>`
+        : '<p class="nota">Todas las empresas tienen razón social.</p>';
+      const partidas = x.partidas.length ? `<div class="scroll"><table><tr><th>Partida</th><th>CUODE</th><th>Producto</th><th class="n">FOB</th><th>Uso o destino (categoría)</th><th>Nombre común</th></tr>
+          ${x.partidas.map((p, i) => `<tr><td>${esc(p.partida)}</td><td>${esc(p.cuode || "")}</td><td>${esc(p.producto)}</td><td class="n">${mil(p.fob)}</td>
+            <td><select data-par="${i}" data-c="CATEGORIA"><option value="">${esc(p.categoria || "—")}</option>${cats.map((c) => `<option>${esc(c[1])}</option>`).join("")}</select></td><td><input data-par="${i}" data-c="PRODUCTO" size="22"></td></tr>`).join("")}</table></div>
+          <div class="fila"><button class="btn" type="button" id="${clave}-gpar">Guardar y reprocesar</button><span class="nota">La categoría elegida queda como «MANUAL»: gana al CUODE de la fila.</span></div>`
+        : '<p class="nota">Todas las partidas tienen clasificación y nombre común.</p>';
+      const pr = x.propuesta;
+      const propuesta = pr ? `<div class="scroll"><table><tr><th>Fila del Cuadro N° 16</th><th class="n">Base mensual (propuesto)</th><th class="n">ESTAD cargado</th><th class="n">Diferencia</th></tr>
+          ${pr.filas.map((f) => `<tr class="${f.nivel !== "producto" ? "fuerte" : ""}"><td style="padding-left:${f.nivel === "producto" ? 26 : 10}px">${esc(f.rubro)}</td><td class="n">${mil(f.sunat)}</td><td class="n">${f.estad == null ? "—" : mil(f.estad)}</td>
+            <td class="n ${f.dif && Math.abs(f.dif) >= 1 ? "baja" : ""}">${f.dif == null ? "" : mil(f.dif)}</td></tr>`).join("")}</table></div>
+          <div class="fila"><button class="btn" type="button" id="${clave}-pasar">Pasar al ESTAD (${esc(etqMes(x.periodo))})</button><button class="btn sec" type="button" id="${clave}-xls">Descargar en Excel (con el detalle)</button>
+          <span class="nota">${pr.hay_estad ? "El mes ya está en el ESTAD: pasarlo lo reemplaza con lo de la base mensual." : "El mes aún no está en el ESTAD."}</span></div><div id="${clave}-pres"></div>` : '<p class="nota">Falta la estructura del Cuadro N° 16 (ESTAD de importaciones de Loreto).</p>';
+      caja.innerHTML = `<div class="fila controles"><label class="campo" for="${clave}-p">Mes<select id="${clave}-p">${[...x.meses].reverse().map((m) => `<option value="${m}"${m === x.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
+          <a class="btn sec" href="/v1/descargas?base=impo-base&departamento=16&desde=${x.periodo}&hasta=${x.periodo}">Descargar la base del mes</a></div>
+        <div class="stats tiles">${est}</div>
+        <div class="caja"><h3>1 · Empresas sin razón social (${x.empresas.length})</h3><p>Sus filas sí entran al cuadro; falta el nombre para el resumen.</p>${empresas}</div>
+        <div class="caja"><h3>2 · Partidas sin clasificar o sin nombre común (${x.partidas.length})</h3><p>Sin CUODE ni tipo en la partida (no entran al cuadro hasta clasificarlas) o con el producto «SIN DESCRIPCIÓN».</p>${partidas}</div>
+        <div class="caja"><h3>3 · ESTAD propuesto · ${esc(etqMes(x.periodo))}</h3><p>Como el CUADRO 16 del proyecto: por categoría, FOB redondeado a miles fila por fila (miles de US$), contra el ESTAD cargado.</p>${propuesta}</div>
+        <div id="${clave}-res" aria-live="polite"></div>`;
+      const res = $(`${clave}-res`), recargar = () => baseImpo(caja);
+      const enviar = async (tabla, filas, boton) => {
+        boton.disabled = true; boton.textContent = "Guardando y reprocesando…";
+        try { await api(`/v1/importaciones/base/${tabla}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filas }) }); recargar(); }
+        catch (e) { boton.disabled = false; boton.textContent = "Reintentar"; res.innerHTML = `<div class="err-box"><b>No se pudo guardar</b><span>${esc(e.message)}</span></div>`; }
+      };
+      $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; recargar(); });
+      if ($(`${clave}-gemp`)) $(`${clave}-gemp`).addEventListener("click", (ev) => enviar("empresas", x.empresas.map((e, i) => ({ RUC: e.ruc, RAZON_SOCIAL: caja.querySelector(`[data-emp="${i}"]`).value.trim() })).filter((f) => f.RAZON_SOCIAL), ev.target));
+      if ($(`${clave}-gpar`)) $(`${clave}-gpar`).addEventListener("click", (ev) => enviar("partidas", x.partidas.map((p, i) => ({ PARTIDA: p.partida,
+        CATEGORIA: caja.querySelector(`[data-par="${i}"][data-c="CATEGORIA"]`).value || null, PRODUCTO: caja.querySelector(`[data-par="${i}"][data-c="PRODUCTO"]`).value.trim() || null })).filter((f) => f.CATEGORIA || f.PRODUCTO), ev.target));
+      if ($(`${clave}-pasar`)) $(`${clave}-pasar`).addEventListener("click", async (ev) => {
+        if (!confirm(`¿Pasar al ESTAD de importaciones lo que sale de la base mensual para ${etqMes(x.periodo)}?${pr.hay_estad ? " Reemplaza lo que hay de ese mes." : ""}`)) return;
+        ev.target.disabled = true;
+        try { const k = await api(`/v1/importaciones/estad?${new URLSearchParams({ periodo: x.periodo })}`, { method: "POST" });
+          ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); $(`${clave}-pres`).innerHTML = `<div class="ok-box"><b>Listo: ${fmt(k.filas)} filas en el ESTAD de ${esc(etqMes(x.periodo))}.</b><span>El Cuadro N° 16 y el anexo ya lo usan.</span></div>`; }
+        catch (e) { ev.target.disabled = false; $(`${clave}-pres`).innerHTML = `<div class="err-box"><b>No se pudo</b><span>${esc(e.message)}</span></div>`; } });
+      if ($(`${clave}-xls`)) $(`${clave}-xls`).addEventListener("click", () => { window.location.href = `/v1/importaciones/estad.xlsx?${new URLSearchParams({ periodo: x.periodo })}`; });
+      if ($(`${clave}-padron`)) $(`${clave}-padron`).addEventListener("click", async (ev) => {
+        ev.target.disabled = true; const m = $(`${clave}-padres`);
+        try { const k = await api("/v1/exportaciones/padron", { method: "POST" }); m.textContent = `Lanzado en GitHub: ${k.pendientes} RUC sin razón social. Vuelve en unos minutos y recarga.`; }
+        catch (e) { ev.target.disabled = false; m.textContent = e.message; } });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo revisar la base mensual</b><span>${esc(e.message)}</span></div>`; }
+  }
+
   // ── Resumen Export: datos destacados de la base mensual: productos, destinos, aduanas y empresas, y el borrador de sus párrafos ──
-  async function resumenSunat(r, caja) {
-    const clave = `rs-${grupo}`, st = estadoEjec(clave), mil = (v) => B.num(v, 0), p1 = (v) => v == null ? "" : B.num(v, 1);
+  async function resumenSunat(r, caja, flujo = "expo") {
+    const impo = flujo === "impo", clave = `rs-${flujo}-${grupo}`, st = estadoEjec(clave), mil = (v) => B.num(v, 0), p1 = (v) => v == null ? "" : B.num(v, 1);
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando el resumen…</div>';
     try {
-      const x = (await api(`/v1/exportaciones/resumen?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo })}`)).resumen;
-      if (!x) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay base mensual de exportaciones de ${esc(r.nombre)}.</b><span>Súbela en la pestaña «Base mensual».</span></div>`; return; }
+      const x = (await api(impo ? `/v1/importaciones/resumen?${new URLSearchParams({ periodo: st.periodo })}` : `/v1/exportaciones/resumen?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo })}`)).resumen;
+      if (!x) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay base mensual de ${impo ? "importaciones" : "exportaciones"} de ${esc(r.nombre)}.</b><span>Súbela en la pestaña «Base mensual».</span></div>`; return; }
       const mes = x.nombre_mes.charAt(0).toUpperCase() + x.nombre_mes.slice(1), am = `Enero-${x.nombre_mes}`;
       const tabla = (t, lista, col) => `<div class="caja"><h3>${esc(t)}</h3><div class="scroll"><table><tr><th>${esc(col)}</th><th class="n">Miles de US$</th><th class="n">%</th><th>Principales productos</th></tr>
-        ${lista.length ? lista.map((e) => `<tr><td>${esc(e.nombre)}</td><td class="n">${mil(e.fob)}</td><td class="n">${p1(e.pct)}</td><td>${esc(e.productos.join(", "))}</td></tr>`).join("") : '<tr><td colspan="4" class="nota">Sin exportaciones.</td></tr>'}</table></div></div>`;
+        ${lista.length ? lista.map((e) => `<tr><td>${esc(e.nombre)}</td><td class="n">${mil(e.fob)}</td><td class="n">${p1(e.pct)}</td><td>${esc(e.productos.join(", "))}</td></tr>`).join("") : `<tr><td colspan="4" class="nota">Sin ${impo ? "importaciones" : "exportaciones"}.</td></tr>`}</table></div></div>`;
       const bloque = (k, titulo, col) => `<div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))">${tabla(`${titulo} · ${mes} ${x.anio}`, x["mes"][k], col)}${tabla(`${titulo} · ${am} ${x.anio}`, x.acumulado[k], col)}</div>`;
       const tile = (t, d) => `<div class="stat"><small>${esc(t)}</small><b>US$ ${B.num(d.total / 1000, 2)} mill.</b>${d.var == null ? "" : delta(d.var)}<span>${d.anterior == null ? "sin el mismo periodo del año anterior en la base" : `${x.anio - 1}: ${B.num(d.anterior / 1000, 2)}`}</span></div>`;
       caja.innerHTML = `<div class="fila controles"><label class="campo" for="${clave}-p">Mes<select id="${clave}-p">${[...x.meses].reverse().map((m) => `<option value="${m}"${m === x.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
           <span class="nota">Solo las filas ok de la base mensual (las que entran a los cuadros).</span></div>
-        <div class="stats tiles">${tile(`Exportaciones · ${mes} ${x.anio}`, x.mes)}${tile(`${am} ${x.anio}`, x.acumulado)}</div>
+        <div class="stats tiles">${tile(`${impo ? "Importaciones" : "Exportaciones"} · ${mes} ${x.anio}`, x.mes)}${tile(`${am} ${x.anio}`, x.acumulado)}</div>
         ${x.destacados.length ? `<div class="destacados">${x.destacados.map((d) => `<div class="destacado"><small>${esc(d.titulo)}</small><b>${esc(d.valor)}</b><span>${esc(d.detalle)}</span></div>`).join("")}</div>` : ""}
         <div class="caja"><div class="fila" style="justify-content:space-between;align-items:center"><h3>Borrador para la síntesis</h3><button class="btn" type="button" id="${clave}-cop">Copiar texto</button></div>
-          ${x.textos.map((t) => `<p class="parrafo">${esc(t)}</p>`).join("")}<p class="nota" id="${clave}-msj">Revísalo antes de pegarlo: nombra los dos productos con más valor de cada destino y aduana.</p></div>
-        ${bloque("productos", "Principales productos", "Producto")}${bloque("destinos", "Mercados de destino", "País")}${bloque("continentes", "Por continente", "Continente")}
-        ${bloque("aduanas", "Aduanas", "Aduana")}${bloque("empresas", "Empresas exportadoras", "Empresa")}`;
-      $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; resumenSunat(r, caja); });
+          ${x.textos.map((t) => `<p class="parrafo">${esc(t)}</p>`).join("")}<p class="nota" id="${clave}-msj">Revísalo antes de pegarlo: ${impo ? "nombra los dos usos o destinos con más valor y sus principales productos" : "nombra los dos productos con más valor de cada destino y aduana"}.</p></div>
+        ${bloque("productos", "Principales productos", "Producto")}${impo ? bloque("aduanas", "Por uso o destino económico", "Uso o destino") : ""}${bloque("destinos", impo ? "Países de origen" : "Mercados de destino", "País")}${bloque("continentes", "Por continente", "Continente")}
+        ${impo ? "" : bloque("aduanas", "Aduanas", "Aduana")}${bloque("empresas", impo ? "Empresas importadoras" : "Empresas exportadoras", "Empresa")}`;
+      $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; resumenSunat(r, caja, flujo); });
       $(`${clave}-cop`).addEventListener("click", async () => { try { await navigator.clipboard.writeText(x.textos.join("\n\n")); $(`${clave}-msj`).textContent = "Copiado: pégalo en Word con Ctrl+V."; }
         catch (e) { $(`${clave}-msj`).textContent = "Este navegador no deja copiar: selecciona el texto a mano."; } });
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar el resumen</b><span>${esc(e.message)}</span></div>`; }
@@ -983,7 +1040,7 @@
     return `<div class="${ok ? "ok-box" : "err-box"}"><b>${esc(tit)}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
   }
   function cajaSubida(clave, texto) {
-    return `<div class="caja"><h3>Subir archivos a mano</h3><p>${texto}</p><div class="fila"><input type="file" id="${clave}-arch" multiple accept=".zip,.csv,.xlsx">
+    return `<div class="caja"><h3>Subir archivos a mano</h3><p>${texto}</p><div class="fila"><input type="file" id="${clave}-arch" multiple accept=".zip,.csv,.xlsx,.xlsm">
       <button class="btn" type="button" id="${clave}-subir">Cargar a la base de datos</button></div><div id="${clave}-res" aria-live="polite"></div></div>`;
   }
   function atarSubida(clave) {
@@ -1113,8 +1170,10 @@
     else if (t === "Archivos") panel = '<div id="archivos-fiscal"></div>';
     else if (t === BCRP_TAB) panel = `<div id="bcrp" data-sector="${id}"></div>`;
     else if (t === ANEXOS_TAB) panel = '<div id="anexos-bcrp"></div>';
+    else if (t === "Base mensual" && id === "impo") panel = `${cajaSubida("sub-impo", "La base mensual de importaciones tal como llega (M_AAAAMM.xlsx: aduana, ruc, partida, fob, flete, seguro, kilos, pais_adqui, cuode, periodo, …) o el ANUAL_PRO - IMPORTACIONES (.xlsm: sus diccionarios PARTIDAS, CUODE y UNICOS y su hoja ORIGEN). Entran las filas de la aduana de Iquitos (226).")}<div id="base-impo"></div>`;
     else if (t === "Base mensual") panel = `${cajaSubida("sub-sunat", "La base mensual de exportaciones (X_AAAAMM.xlsx, tal como llega: aduana, ubigeo, ruc11, ano_mes, …, ubigeo_dep) o un ANUAL_PRO_AAAA.xlsx (sus diccionarios UNICOS y PARTIDA y su hoja ORIGEN). Sirve para las tres regiones: cada fila va a su departamento.")}<div id="sunat-expo"></div>`;
     else if (t === "Resumen Export") panel = '<div id="resumen-sunat"></div>';
+    else if (t === "Resumen Import") panel = '<div id="resumen-sunat" data-flujo="impo"></div>';
     else if (t === "Contraste") panel = `<div id="contraste" data-sector="${id}"></div>`;
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
@@ -1201,14 +1260,15 @@
     document.querySelectorAll("#sector .dep").forEach((c) => c.addEventListener("change", () => { paneles.mefDeps = [...document.querySelectorAll(".dep")].filter((x) => x.checked).map((x) => x.value); vistaPrevia("p-mef"); }));
     if ($("el-vista")) atarEmpleoLong();
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
-    ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat"].forEach(atarSubida);
+    ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
     if ($("hidro-caja")) cajaHidro($("hidro-caja"));
     if ($("cuadros-empleo")) cuadrosEmpleo(REG[grupo], $("cuadros-empleo"));
     if ($("cuadros-hidro")) cuadrosHidro(REG[grupo], $("cuadros-hidro"));
     if ($("cuadros-pesca")) cuadrosPesca(REG[grupo], $("cuadros-pesca"));
     if ($("sunat-expo")) sunatExpo(REG[grupo], $("sunat-expo"));
-    if ($("resumen-sunat")) resumenSunat(REG[grupo], $("resumen-sunat"));
+    if ($("resumen-sunat")) resumenSunat(REG[grupo], $("resumen-sunat"), $("resumen-sunat").dataset.flujo || "expo");
+    if ($("base-impo")) baseImpo($("base-impo"));
     if ($("cuadros-expo")) cuadrosExpo(REG[grupo], $("cuadros-expo"), $("cuadros-expo").dataset.flujo);
     if ($("cuadros-ejec")) cuadrosEjecucion($("cuadros-ejec").dataset.sector, REG[grupo], $("cuadros-ejec"));
     if ($("variaciones")) variacionesAlarmantes(REG[grupo], $("variaciones"));
