@@ -1,0 +1,37 @@
+# Consulta de solo lectura al API publicado: imprime la respuesta (JSON) de una ruta GET /v1/… en el registro.
+# Sirve para revisar datos de la página sin entrar a ella (p. ej. los cuadros de un sector para redactar la síntesis).
+#   · a mano: Actions → «API · consultar» → Run workflow, con la ruta (p. ej. /v1/cuadros/pesca?departamento=16&periodo=2025-12)
+# Usa los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE.
+name: API · consultar
+
+on:
+  workflow_dispatch:
+    inputs:
+      ruta:
+        description: "Ruta GET del API, empieza con /v1/"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  consultar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Consultar
+        env:
+          URL: ${{ secrets.ESTUDIOS_API_URL }}
+          USUARIO: ${{ secrets.ESTUDIOS_API_USUARIO }}
+          CLAVE: ${{ secrets.ESTUDIOS_API_CLAVE }}
+          RUTA: ${{ inputs.ruta }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, re, urllib.request
+          ruta = os.environ["RUTA"].strip()
+          if not re.fullmatch(r"/v1/[\w/\-.]*(\?[\w=&%,.\-:]*)?", ruta) or "formato=xlsx" in ruta:
+              raise SystemExit("::error::La ruta debe ser un GET /v1/… que devuelva JSON")
+          url, auth = os.environ["URL"].rstrip("/"), base64.b64encode(f"{os.environ['USUARIO']}:{os.environ['CLAVE']}".encode()).decode()
+          r = urllib.request.urlopen(urllib.request.Request(url + ruta, headers={"Authorization": "Basic " + auth}), timeout=300)
+          print(json.dumps(json.load(r), ensure_ascii=False, separators=(",", ":")))
+          PY
