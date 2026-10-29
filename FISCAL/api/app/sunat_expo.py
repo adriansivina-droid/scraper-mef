@@ -64,9 +64,23 @@ EQUIVALENCIAS_INICIALES = [
 EQUIVALENCIAS_RETIRADAS = [("SMN", "manteca vegetal", "")]
 # condiciones por DCOM: una fila del ESTAD exige que la descripción lo diga expresamente; si no, la fila va a «Resto».
 # No se aplican a las descripciones asignadas a mano en PROD_UNICOS.
-CONDICIONES_INICIALES = [
-    {"departamento": "SMN", "rubro": "Manteca vegetal de palma", "contiene": "PALMA",
-     "motivo": "Tiene que decir expresamente que es de palma; si no, va a Resto."},
+CONDICIONES_INICIALES = []        # (la de «Manteca vegetal de palma exige PALMA» se retiró: la COBES 380 es de palmiste sin decirlo)
+# términos de la DCOM -> nombre común, para las descripciones que no están en PROD_UNICOS (PROD_UNICOS siempre manda).
+# Marcas y códigos comerciales investigados; el más largo que aparezca en la descripción gana.
+TERMINOS_INICIALES = [
+    {"departamento": "", "contiene": "COBES 380", "nombre": "Manteca vegetal de palmiste", "fuente": "COBES/CEBES 380: 100 % aceite de palmiste (CBS)"},
+    {"departamento": "", "contiene": "CEBES 380", "nombre": "Manteca vegetal de palmiste", "fuente": "COBES/CEBES 380: 100 % aceite de palmiste (CBS)"},
+    {"departamento": "", "contiene": "RBD 35", "nombre": "Manteca vegetal de palma", "fuente": "Manteca RBD 35: 100 % aceite de palma"},
+    {"departamento": "", "contiene": "NH 3942", "nombre": "Manteca vegetal de palma", "fuente": "Las DCOM dicen «MANTECA DE PALMA NH 3942»"},
+    {"departamento": "", "contiene": "MANCINA", "nombre": "Manteca vegetal de palma", "fuente": "Mancina: grasa vegetal de palma y sus fracciones"},
+    {"departamento": "", "contiene": "MANTECA TROPICAL", "nombre": "Manteca vegetal de palma", "fuente": "Tropical: manteca vegetal de aceite de palma"},
+    {"departamento": "", "contiene": "MANPAN", "nombre": "Manteca vegetal de palma", "fuente": "Manpan: palma y palmiste; PROD_UNICOS la registra como de palma"},
+    {"departamento": "", "contiene": "WHIPPCREAM", "nombre": "Manteca vegetal de palmiste", "fuente": "Grasa para crema batida (láurica, de palmiste); confianza media"},
+    {"departamento": "", "contiene": "WCREAM", "nombre": "Manteca vegetal de palmiste", "fuente": "Grasa para crema batida (láurica, de palmiste); confianza media"},
+    {"departamento": "", "contiene": "TROPICAL COBER", "nombre": "Manteca vegetal de palmiste", "fuente": "Grasa de cobertura (láurica, de palmiste); confianza media"},
+    {"departamento": "", "contiene": "COBERTHEL", "nombre": "Manteca vegetal de palma", "fuente": "Como en PROD_UNICOS"},
+    {"departamento": "", "contiene": "MANGAL", "nombre": "Manteca vegetal de palma", "fuente": "Como en PROD_UNICOS"},
+    {"departamento": "", "contiene": "LA GRANJA", "nombre": "Manteca vegetal de palma", "fuente": "Manteca La Granja: las DCOM dicen «MANTECA DE PALMA LA GRANJA»"},
 ]
 
 
@@ -90,7 +104,8 @@ TABLAS = {"partidas": ["PARTIDA", "TIPO", "CATEGORIA", "PRODUCTO", "DESCRIPCION"
           "aduanas": ["COD", "ADUANA"],
           "reglas": ["departamento", "campo", "valor", "motivo"],
           "equivalencias": ["departamento", "producto", "rubro", "contiene"],
-          "condiciones": ["departamento", "rubro", "contiene", "motivo"]}
+          "condiciones": ["departamento", "rubro", "contiene", "motivo"],
+          "terminos": ["departamento", "contiene", "nombre", "fuente"]}
 
 
 def _tabla(nombre):
@@ -106,6 +121,8 @@ def leer_tabla(nombre):
             return pd.DataFrame(EQUIVALENCIAS_INICIALES, columns=TABLAS[nombre])
         if nombre == "condiciones":
             return pd.DataFrame(CONDICIONES_INICIALES, columns=TABLAS[nombre])
+        if nombre == "terminos":
+            return pd.DataFrame(TERMINOS_INICIALES, columns=TABLAS[nombre])
         return pd.DataFrame(columns=TABLAS[nombre])
     with db.motor().connect() as cx:
         df = pd.read_sql(text(f'SELECT * FROM "{t}"'), cx)
@@ -344,7 +361,15 @@ def procesar(crudo):
     out["TIPO"] = out["PARTIDA"].map(part["TIPO"]) if len(part) else None
     out["CATEGORIA"] = out["PARTIDA"].map(part["CATEGORIA"]) if len(part) else None
     corregido = out["DESCRIPCION"].map(unicos) if len(unicos) else pd.Series(None, index=out.index)
-    out["PRODUCTO"] = corregido.where(corregido.notna() & (corregido.astype(str).str.strip() != ""), out["PARTIDA"].map(part["PRODUCTO"]) if len(part) else None)
+    # nombre común: PROD_UNICOS (descripción exacta) > términos de la DCOM (marcas investigadas) > nombre de la partida
+    terminos = sorted(leer_tabla("terminos").to_dict("records"), key=lambda t: -len(_clave(t.get("contiene"))))
+    def por_termino(desc, dep):
+        d = _clave(desc)
+        return next((t["nombre"] for t in terminos if _clave(t.get("contiene")) and _clave(t.get("contiene")) in d
+                     and str(t.get("departamento") or "").upper() in ("", CORTO[dep]) and isinstance(t.get("nombre"), str)), None)
+    termino = pd.Series([por_termino(d, dep) for d, dep in zip(out["DESCRIPCION"], out["_depto"])], index=out.index)
+    de_partida = out["PARTIDA"].map(part["PRODUCTO"]) if len(part) else pd.Series(None, index=out.index)
+    out["PRODUCTO"] = corregido.where(corregido.notna() & (corregido.astype(str).str.strip() != ""), termino.where(termino.notna(), de_partida))
     out["PAIS"] = out["COD_PAIS"].map(paises["PAIS"]) if len(paises) else None
     out["CONTINENTE"] = out["COD_PAIS"].map(paises["CONTINENTE"]) if len(paises) else None
     out["ADUANA"] = out["COD_ADUANA"].map(aduanas) if len(aduanas) else None
@@ -667,7 +692,7 @@ def revision(depto, periodo=None):
             "categorias": sorted({(str(t), str(c)) for t, c in leer_tabla("partidas")[["TIPO", "CATEGORIA"]].dropna().itertuples(index=False)}),
             "propuesta": propuesta(depto, a, m, mes),
             "reglas": leer_tabla("reglas").to_dict("records"), "equivalencias": leer_tabla("equivalencias").to_dict("records"),
-            "condiciones": leer_tabla("condiciones").to_dict("records"),
+            "condiciones": leer_tabla("condiciones").to_dict("records"), "terminos": leer_tabla("terminos").to_dict("records"),
             "descripciones": descripciones_nuevas(df[(df["AÑO"] == a) & (df["MES"] == m)])}
 
 
@@ -756,7 +781,7 @@ def asignar_nombres(filas):
 
 
 # ── Diccionarios en Excel (para editarlos en bloque) ──
-HOJAS_DICCIONARIO = {"PARTIDA": "partidas", "PROD_UNICOS": "unicos", "EMPRESAS": "empresas", "PAISES": "paises", "ADUANA": "aduanas",
+HOJAS_DICCIONARIO = {"PARTIDA": "partidas", "PROD_UNICOS": "unicos", "TERMINOS": "terminos", "EMPRESAS": "empresas", "PAISES": "paises", "ADUANA": "aduanas",
                      "REGLAS": "reglas", "EQUIVALENCIAS": "equivalencias", "CONDICIONES": "condiciones"}
 LEEME_EXPO = "Diccionarios de exportaciones (página del Departamento de Estudios Económicos)"
 

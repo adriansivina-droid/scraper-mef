@@ -551,6 +551,9 @@ def sunat_corregir(tabla: str, cuerpo: dict = Body(...)):
             sunat_expo.guardar_tabla("condiciones", pd.DataFrame([f for f in filas if str(f.get("contiene") or "").strip()], columns=sunat_expo.TABLAS["condiciones"]))
         elif tabla == "nombres":
             sunat_expo.asignar_nombres(filas)
+        elif tabla == "terminos":
+            sunat_expo.guardar_tabla("terminos", pd.DataFrame([f for f in filas if str(f.get("contiene") or "").strip() and str(f.get("nombre") or "").strip()],
+                                                              columns=sunat_expo.TABLAS["terminos"]))
         else:
             raise HTTPException(404, f"No hay tabla {tabla!r}.")
     except ValueError as e:

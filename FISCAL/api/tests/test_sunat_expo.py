@@ -218,3 +218,15 @@ def test_equivalencia_retirada_no_se_aplica(cliente):
                                                             {"departamento": "LOR", "producto": "Anguilas", "rubro": "Peces ornamentales"}]))
     eq = sunat_expo.leer_tabla("equivalencias")
     assert list(eq["producto"]) == ["Anguilas"]
+
+
+def test_terminos_de_la_dcom(cliente):
+    """Un término de la DCOM da el nombre común a lo que no está en PROD_UNICOS; PROD_UNICOS siempre manda."""
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    cliente.post("/v1/exportaciones/sunat/terminos", json={"filas": [{"contiene": "SECO", "nombre": "Cacao seco", "fuente": "x"},
+                                                                     {"contiene": "PETROLEO", "nombre": "Petróleo crudo", "fuente": "x"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["PETROLEO CRUDO", "PRODUCTO"] == "Petróleo crudo"                 # no estaba en PROD_UNICOS
+    assert ago.loc["CACAO EN GRANO SECO", "PRODUCTO"] == "Cacao en grano"            # PROD_UNICOS manda sobre el término
+    assert sunat_expo.leer_tabla("condiciones").empty                                # sin la condición «PALMA»
