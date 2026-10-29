@@ -55,13 +55,24 @@ EQUIVALENCIAS_INICIALES = [
      {"departamento": "SMN", "producto": "Puros", "rubro": "Puros, cigarros y pack"},
      {"departamento": "SMN", "producto": "Tabaco", "rubro": "Tabaco negro y rubio"},
      # como se armó el ESTAD 2024-2026 (comparación fila por fila con ANUAL_PRO)
-     {"departamento": "SMN", "producto": "Manteca vegetal", "rubro": "Manteca vegetal de palma"},
      {"departamento": "UCA", "producto": "Filete de paiche", "rubro": "Pescado congelado"},
      {"departamento": "UCA", "producto": "Filete de paiche congelado", "rubro": "Pescado congelado"}] + [
     {"departamento": "LOR", "producto": p, "rubro": "Peces ornamentales"} for p in ("Alevinos de paiche", "Anguilas", "Camarones")]
 
 
+# equivalencias que existieron y se retiraron (si quedaron guardadas en la página, no se aplican)
+EQUIVALENCIAS_RETIRADAS = [("SMN", "manteca vegetal", "")]
+# condiciones por DCOM: una fila del ESTAD exige que la descripción lo diga expresamente; si no, la fila va a «Resto».
+# No se aplican a las descripciones asignadas a mano en PROD_UNICOS.
+CONDICIONES_INICIALES = [
+    {"departamento": "SMN", "rubro": "Manteca vegetal de palma", "contiene": "PALMA",
+     "motivo": "Tiene que decir expresamente que es de palma; si no, va a Resto."},
+]
+
+
 def _clave(s):
+    if s is None or (isinstance(s, float) and s != s):     # vacío (None o NaN de una celda vacía)
+        return ""
     s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
     return " ".join(s.split())
 
@@ -78,7 +89,8 @@ TABLAS = {"partidas": ["PARTIDA", "TIPO", "CATEGORIA", "PRODUCTO", "DESCRIPCION"
           "paises": ["COD", "PAIS", "CONTINENTE"],
           "aduanas": ["COD", "ADUANA"],
           "reglas": ["departamento", "campo", "valor", "motivo"],
-          "equivalencias": ["departamento", "producto", "rubro"]}
+          "equivalencias": ["departamento", "producto", "rubro", "contiene"],
+          "condiciones": ["departamento", "rubro", "contiene", "motivo"]}
 
 
 def _tabla(nombre):
@@ -92,12 +104,18 @@ def leer_tabla(nombre):
             return pd.DataFrame(REGLAS_INICIALES, columns=TABLAS[nombre])
         if nombre == "equivalencias":
             return pd.DataFrame(EQUIVALENCIAS_INICIALES, columns=TABLAS[nombre])
+        if nombre == "condiciones":
+            return pd.DataFrame(CONDICIONES_INICIALES, columns=TABLAS[nombre])
         return pd.DataFrame(columns=TABLAS[nombre])
     with db.motor().connect() as cx:
         df = pd.read_sql(text(f'SELECT * FROM "{t}"'), cx)
     for c in TABLAS[nombre]:
         if c not in df.columns:
             df[c] = None
+    if nombre == "equivalencias":
+        retiradas = {(d, p, c) for d, p, c in EQUIVALENCIAS_RETIRADAS}
+        clave = list(zip(df["departamento"].fillna("").str.upper(), df["producto"].map(_clave), df["contiene"].map(_clave)))
+        df = df[[k not in retiradas for k in clave]]
     return df[TABLAS[nombre]]
 
 
@@ -235,7 +253,7 @@ def _parecido(producto, rubro):
     return a in (b, sin_par) or a.startswith(b + " ")
 
 
-def ubicar(est, corto, tipo, categoria, producto, equivalencias):
+def ubicar(est, corto, tipo, categoria, producto, equivalencias, descripcion=""):
     """(tipo del ESTAD, rubro del ESTAD) de una fila ok; (None, None) si la región no tiene ESTAD."""
     if not est:
         return None, None
@@ -243,7 +261,12 @@ def ubicar(est, corto, tipo, categoria, producto, equivalencias):
     otras = next((f for f in tipos if _clave(f["rubro"]).startswith("otras")), None)
     nt = next((f for f in tipos if "no tradicionales" in _clave(f["rubro"])), None)
     tr = next((f for f in tipos if _clave(f["rubro"]) == "productos tradicionales"), None)
-    eq = {(_clave(e["producto"])): e["rubro"] for e in equivalencias if str(e.get("departamento") or "").upper() in ("", corto)}
+    # una equivalencia con «contiene» solo vale si la descripción lo dice; esas van primero
+    desc = _clave(descripcion)
+    eq = {}
+    for e in sorted(equivalencias, key=lambda e: not _clave(e.get("contiene"))):
+        if str(e.get("departamento") or "").upper() in ("", corto) and (not _clave(e.get("contiene")) or _clave(e.get("contiene")) in desc):
+            eq.setdefault(_clave(e["producto"]), e["rubro"])
     # equivalencia explícita: el producto va a esa fila, esté donde esté (también los tipo 3)
     if _clave(producto) in eq:
         f = next((f for f in est if _clave(f["rubro"]) == _clave(eq[_clave(producto)]) and f["nivel"] != "total"), None)
@@ -349,8 +372,24 @@ def procesar(crudo):
         else:
             estado.append("ok"); motivo.append("")
     out["ESTADO"], out["MOTIVO"] = estado, motivo
-    ubic = [ubicar(estructuras[dep], CORTO[dep], t, c, p, equivalencias) if e == "ok" else (None, None)
-            for dep, t, c, p, e in zip(out["_depto"], out["TIPO"], out["CATEGORIA"], out["PRODUCTO"], out["ESTADO"])]
+    ubic = [ubicar(estructuras[dep], CORTO[dep], t, c, p, equivalencias, dsc) if e == "ok" else (None, None)
+            for dep, t, c, p, e, dsc in zip(out["_depto"], out["TIPO"], out["CATEGORIA"], out["PRODUCTO"], out["ESTADO"], out["DESCRIPCION"])]
+    # condiciones por DCOM (no para lo asignado a mano en PROD_UNICOS)
+    condiciones = leer_tabla("condiciones").to_dict("records")
+    a_mano = set(unicos.index) if len(unicos) else set()
+    motivos = list(out["MOTIVO"])
+    for i, (dep, dsc, (t_e, r_e)) in enumerate(zip(out["_depto"], out["DESCRIPCION"], ubic)):
+        if r_e is None or dsc in a_mano:
+            continue
+        for c in condiciones:
+            if str(c.get("departamento") or "").upper() in ("", CORTO[dep]) and _clave(c.get("rubro")) == _clave(r_e) \
+                    and _clave(c.get("contiene")) and _clave(c.get("contiene")) not in _clave(dsc):
+                resto = next((f for f in estructuras[dep] if f["nivel"] == "grupo" and _clave(f["rubro"]) == "resto"), None)
+                if resto:
+                    ubic[i] = (resto["tipo"], resto["rubro"])
+                    motivos[i] = f"La descripción no dice «{c['contiene']}»: va a Resto (no a {r_e})"
+                break
+    out["MOTIVO"] = motivos
     out["TIPO_ESTAD"], out["RUBRO_ESTAD"] = [u[0] for u in ubic], [u[1] for u in ubic]
     out["_anio"], out["_mes"], out["_nivel"] = out["AÑO"], out["MES"], ""
     return out[COLUMNAS + ["_anio", "_mes", "_depto", "_nivel"]].reset_index(drop=True), len(fuera)
@@ -627,7 +666,149 @@ def revision(depto, periodo=None):
             "rubros": [f["rubro"] for f in est if f["nivel"] in ("producto", "grupo")] + [f["rubro"] for f in est if f["nivel"] == "tipo" and _clave(f["rubro"]).startswith("otras")],
             "categorias": sorted({(str(t), str(c)) for t, c in leer_tabla("partidas")[["TIPO", "CATEGORIA"]].dropna().itertuples(index=False)}),
             "propuesta": propuesta(depto, a, m, mes),
-            "reglas": leer_tabla("reglas").to_dict("records"), "equivalencias": leer_tabla("equivalencias").to_dict("records")}
+            "reglas": leer_tabla("reglas").to_dict("records"), "equivalencias": leer_tabla("equivalencias").to_dict("records"),
+            "condiciones": leer_tabla("condiciones").to_dict("records"),
+            "descripciones": descripciones_nuevas(df[(df["AÑO"] == a) & (df["MES"] == m)])}
+
+
+# ── Nombres comunes: descripciones nuevas con un nombre sugerido ──
+_RUIDO = set("marca modelo uso restitucion derechos aranc cod cajas caja lote lotes para con sin los las del una por kgs kilos kilo "
+             "unidades unid bolsas sacos saco bags bag net each granel consumo humano comercializacion industrial exportacion".split())
+
+
+def _fichas(texto):
+    """Palabras que distinguen una descripción (sin números, marcas, lotes ni palabras de trámite)."""
+    return {w for w in re.findall(r"[a-z]{3,}", _clave(texto)) if w not in _RUIDO}
+
+
+class Sugeridor:
+    """El nombre común de la descripción ya asignada (PROD_UNICOS) que más se le parece (palabras en común / total)."""
+
+    def __init__(self, unicos):
+        self.nombres, self.fichas, self.indice = [], [], {}
+        for original, corregido in unicos.items():
+            f = _fichas(original)
+            if not f or not isinstance(corregido, str):
+                continue
+            k = len(self.nombres)
+            self.nombres.append(corregido)
+            self.fichas.append(f)
+            for w in f:
+                self.indice.setdefault(w, []).append(k)
+
+    def sugerir(self, texto):
+        f = _fichas(texto)
+        votos = {}
+        for w in f:
+            for k in self.indice.get(w, ()):
+                votos[k] = votos.get(k, 0) + 1
+        mejor, puntaje = None, 0.0
+        for k, comunes in votos.items():
+            p = comunes / len(f | self.fichas[k])
+            if p > puntaje:
+                mejor, puntaje = self.nombres[k], p
+        return mejor, round(puntaje, 2)
+
+
+def _confirma(nombre, descripcion):
+    """¿La descripción menciona el nombre común? (al menos una palabra que lo distinga, por su raíz)."""
+    raices = {w[:5] for w in _fichas(nombre)}
+    return not raices or any(w[:5] in raices for w in _fichas(descripcion))
+
+
+def descripciones_nuevas(mes, limite=60):
+    """Del mes: las descripciones que no están en PROD_UNICOS (el nombre común salió de la partida), agrupadas por partida
+    y nombre, con la sugerencia (la descripción asignada más parecida) y cuántas no mencionan el nombre que recibieron.
+    Primero las que piden atención (nombre genérico, sugerencia distinta o sin confirmar en la DCOM), por FOB."""
+    unicos = leer_tabla("unicos").drop_duplicates("PRODUCTO_ORIGINAL").set_index("PRODUCTO_ORIGINAL")["PRODUCTO_CORREGIDO"]
+    nuevas = mes[(mes["ESTADO"] == "ok") & ~mes["DESCRIPCION"].isin(set(unicos.index))]
+    if nuevas.empty:
+        return []
+    sug = Sugeridor(unicos)
+    grupos = []
+    for (partida, nombre), g in nuevas.groupby(["PARTIDA", "PRODUCTO"], dropna=False):
+        descs = g.groupby("DESCRIPCION")["FOB"].sum().sort_values(ascending=False)
+        votos = {}
+        for d, fob in descs.items():
+            n, p = sug.sugerir(d)
+            if n and p >= 0.4:
+                votos[n] = votos.get(n, 0) + max(fob, 0.5) * p
+        sugerido = max(votos, key=votos.get) if votos else None
+        sin_confirmar = int(sum(not _confirma(str(nombre), d) for d in descs.index))
+        generico = bool(re.search(r"dem[aá]s|otros|sin descripci|verificar|/", str(nombre), re.I))
+        alerta = generico or sin_confirmar > 0           # la sugerencia es una pista, no una alerta
+        grupos.append({"partida": partida, "nombre": nombre, "fob": float(g["FOB"].sum()), "descripciones": len(descs), "sin_confirmar": sin_confirmar,
+                       "sugerido": sugerido if sugerido and _clave(sugerido) != _clave(nombre) else None, "generico": generico, "alerta": alerta, "rubro": g["RUBRO_ESTAD"].iloc[0],
+                       "ejemplos": list(descs.index[:3]), "todas": list(descs.index)})
+    grupos.sort(key=lambda x: (not x["alerta"], -x["fob"]))
+    return grupos[:limite]
+
+
+def asignar_nombres(filas):
+    """filas: [{descripciones: [...], nombre}] -> PROD_UNICOS (descripción -> nombre común), para este y los meses siguientes."""
+    un = leer_tabla("unicos")
+    nuevas = [{"PRODUCTO_ORIGINAL": d, "PRODUCTO_CORREGIDO": str(f["nombre"]).strip()} for f in filas if str(f.get("nombre") or "").strip()
+              for d in (f.get("descripciones") or [])]
+    if nuevas:
+        nn = pd.DataFrame(nuevas)
+        guardar_tabla("unicos", pd.concat([un[~un["PRODUCTO_ORIGINAL"].isin(nn["PRODUCTO_ORIGINAL"])], nn], ignore_index=True))
+    return len(nuevas)
+
+
+# ── Diccionarios en Excel (para editarlos en bloque) ──
+HOJAS_DICCIONARIO = {"PARTIDA": "partidas", "PROD_UNICOS": "unicos", "EMPRESAS": "empresas", "PAISES": "paises", "ADUANA": "aduanas",
+                     "REGLAS": "reglas", "EQUIVALENCIAS": "equivalencias", "CONDICIONES": "condiciones"}
+LEEME_EXPO = "Diccionarios de exportaciones (página del Departamento de Estudios Económicos)"
+
+
+def diccionarios_excel(leeme=LEEME_EXPO, hojas=None, lector=None):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    hojas, lector = hojas or HOJAS_DICCIONARIO, lector or leer_tabla
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "LEEME"
+    for t in [leeme, "Edita las hojas y súbelas en «Base mensual» (o en «Subir archivos»): cada hoja reemplaza su tabla y se reprocesa la base.",
+              "No cambies los encabezados. Una hoja que borres no se toca.", "PARTIDA: TIPO y CATEGORIA como «2. PRODUCTOS NO TRADICIONALES» / «2.3. AGROPECUARIOS»."]:
+        ws.append([t])
+    ws["A1"].font = Font(bold=True)
+    for hoja, tabla in hojas.items():
+        w = wb.create_sheet(hoja)
+        df = lector(tabla)
+        w.append(list(df.columns))
+        for r in df.itertuples(index=False):
+            w.append([None if (isinstance(v, float) and pd.isna(v)) else v for v in r])
+        for c in w[1]:
+            c.font = Font(bold=True)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def es_diccionario(ruta, leeme=LEEME_EXPO):
+    try:
+        wb = load_workbook(ruta, read_only=True)
+        ok = "LEEME" in wb.sheetnames and str(next(wb["LEEME"].iter_rows(max_row=1, values_only=True))[0] or "").startswith(leeme)
+        wb.close()
+        return ok
+    except Exception:
+        return False
+
+
+def cargar_diccionario_excel(ruta, hojas=None, guardar=None, columnas=None):
+    hojas, guardar, columnas = hojas or HOJAS_DICCIONARIO, guardar or guardar_tabla, columnas or TABLAS
+    avisos = []
+    nombres = load_workbook(ruta, read_only=True).sheetnames
+    for hoja, tabla in hojas.items():
+        if hoja not in nombres:
+            continue
+        df = pd.read_excel(ruta, sheet_name=hoja, dtype=str)
+        faltan = [c for c in columnas[tabla] if c not in df.columns]
+        if faltan:
+            avisos.append(f"{hoja}: faltan las columnas {', '.join(faltan)}; no se cargó.")
+            continue
+        avisos.append(f"{hoja}: {guardar(tabla, df.dropna(how='all'))} filas.")
+    return avisos
 
 
 def actualizar_empresas(filas):
@@ -664,12 +845,12 @@ def actualizar_partidas(filas):
 def actualizar_equivalencias(filas):
     eq = leer_tabla("equivalencias")
     for f in filas:
-        dep, prod = str(f.get("departamento") or "").upper(), str(f.get("producto") or "").strip()
+        dep, prod, cont = str(f.get("departamento") or "").upper(), str(f.get("producto") or "").strip(), str(f.get("contiene") or "").strip()
         if not prod:
             continue
-        eq = eq[~((eq["departamento"].fillna("").str.upper() == dep) & (eq["producto"].map(_clave) == _clave(prod)))]
+        eq = eq[~((eq["departamento"].fillna("").str.upper() == dep) & (eq["producto"].map(_clave) == _clave(prod)) & (eq["contiene"].map(_clave) == _clave(cont)))]
         if not f.get("borrar") and f.get("rubro"):
-            eq = pd.concat([eq, pd.DataFrame([{"departamento": dep, "producto": prod, "rubro": f["rubro"]}])], ignore_index=True)
+            eq = pd.concat([eq, pd.DataFrame([{"departamento": dep, "producto": prod, "rubro": f["rubro"], "contiene": cont or None}])], ignore_index=True)
     guardar_tabla("equivalencias", eq)
 
 

@@ -81,3 +81,17 @@ def test_importaciones_base_mensual(cliente):
     assert res["textos"][0].startswith("Las importaciones por la aduana de Iquitos fueron de USD 7,8 millones en agosto de 2026")
     assert "bienes de capital para la industria (perforadoras de pozos" in res["textos"][0]
     assert res["destacados"][0]["valor"] == "Perforadoras de pozos"
+
+
+def test_importaciones_nombres_y_diccionarios(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_-_IMPORTACIONES.xlsm": anual_impo()})
+    subir(cliente, **{"M_202608.xlsx": base_agosto()})
+    x = cliente.get("/v1/importaciones/base?periodo=2026-08").json()["revision"]
+    assert {n["original"] for n in x["nombres"]} == {"Pescado congelado", "Azúcar de caña"}     # Perforadoras sí está en PROD_UNICOS
+    cliente.post("/v1/importaciones/base/nombres", json={"filas": [{"original": "Azúcar de caña", "nombre": "Azúcar"}]})
+    df = datos(cliente, "impo-base", "16").query("MES == 8").set_index("PARTIDA")
+    assert df.loc["1701140000", "PRODUCTO"] == "Azúcar"
+    r = cliente.get("/v1/importaciones/diccionarios.xlsx")
+    assert {"LEEME", "PARTIDAS", "CUODE", "PROD_UNICOS"} <= set(load_workbook(io.BytesIO(r.content)).sheetnames)
+    r = subir(cliente, **{"dic_impo.xlsx": r.content})
+    assert any("Importaciones: base mensual reprocesada" in a for a in r["avisos"])

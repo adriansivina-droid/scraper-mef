@@ -107,6 +107,14 @@ def leer_archivos(raiz):
             if estad:
                 de_estad.append((n_archivo, ruta, estad))
                 continue
+            if sunat_expo.es_diccionario(ruta):            # diccionarios de exportaciones editados en Excel
+                avisos += [f"{ruta.name}: {a}" for a in sunat_expo.cargar_diccionario_excel(ruta)]
+                avisos.append(f"Exportaciones: base mensual reprocesada ({sunat_expo.reprocesar()} filas).")
+                continue
+            if sunat_impo.es_diccionario(ruta):            # diccionarios de importaciones editados en Excel
+                avisos += [f"{ruta.name}: {a}" for a in sunat_impo.cargar_diccionario_excel(ruta)]
+                avisos.append(f"Importaciones: base mensual reprocesada ({sunat_impo.reprocesar()} filas).")
+                continue
             if sunat_expo.es_anual_pro(ruta):              # ANUAL_PRO: diccionarios (UNICOS, PARTIDA) y su hoja ORIGEN
                 de_sunat.append((n_archivo, ruta, "anual"))
                 continue

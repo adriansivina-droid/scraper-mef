@@ -4,6 +4,7 @@ import io
 import zipfile
 from pathlib import Path
 
+import pandas as pd
 from openpyxl import Workbook, load_workbook
 
 from app import sunat_expo
@@ -170,3 +171,50 @@ def test_anual_pro_desde_2024_lista_sunat_y_categorias_renumeradas(cliente):
     assert ago.loc["CACAO EN GRANO SECO", "CATEGORIA"] == "2.3. AGROPECUARIOS"
     assert ago.loc["CACAO EN GRANO SECO", "RUBRO_ESTAD"] == "Cacao en grano"           # por el nombre de la categoría
     assert sunat_expo._categoria("2.4. ANIMALES VIVOS") == "animales" and sunat_expo._categoria("3.5. OTROS") == ""
+
+
+def test_nombres_condiciones_y_diccionarios(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    x = cliente.get("/v1/exportaciones/sunat?departamento=16&periodo=2026-08").json()["revision"]
+    d = {g["nombre"]: g for g in x["descripciones"]}
+    # PETROLEO CRUDO no está en PROD_UNICOS: tomó el nombre de la partida, que la descripción sí menciona
+    assert d["Barriles de petróleo crudo"]["todas"] == ["PETROLEO CRUDO"] and d["Barriles de petróleo crudo"]["sin_confirmar"] == 0
+    # asignar un nombre común: queda en PROD_UNICOS
+    cliente.post("/v1/exportaciones/sunat/nombres", json={"filas": [{"descripciones": ["PETROLEO CRUDO"], "nombre": "Petróleo crudo"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["PETROLEO CRUDO", "PRODUCTO"] == "Petróleo crudo"
+    # equivalencia con «contiene»: solo vale si la descripción lo dice
+    cliente.post("/v1/exportaciones/sunat/empresas", json={"filas": [{"RUC": "20999999999", "BORRAR_PARA": "OK"}]})
+    cliente.post("/v1/exportaciones/sunat/equivalencias", json={"filas": [{"departamento": "LOR", "producto": "Cacao", "contiene": "TOSTADO", "rubro": "Cacao en grano"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO", "RUBRO_ESTAD"] == "Resto"                                   # «Cacao» genérico y la DCOM no dice TOSTADO
+    cliente.post("/v1/exportaciones/sunat/equivalencias", json={"filas": [{"departamento": "LOR", "producto": "Cacao", "rubro": "Cacao en grano"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO", "RUBRO_ESTAD"] == "Cacao en grano"
+    # condición por DCOM: la fila «Cacao en grano» exige «GRANO»; lo asignado a mano en PROD_UNICOS no se toca
+    cliente.post("/v1/exportaciones/sunat/condiciones", json={"filas": [{"departamento": "LOR", "rubro": "Cacao en grano", "contiene": "GRANO", "motivo": "x"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO", "RUBRO_ESTAD"] == "Resto" and "GRANO" in ago.loc["CACAO", "MOTIVO"]
+    assert ago.loc["CACAO EN GRANO SECO", "RUBRO_ESTAD"] == "Cacao en grano"
+    # diccionarios en Excel: bajar, editar una partida y volver a subir
+    r = cliente.get("/v1/exportaciones/diccionarios.xlsx")
+    wb = load_workbook(io.BytesIO(r.content))
+    assert {"LEEME", "PARTIDA", "PROD_UNICOS", "EMPRESAS", "CONDICIONES"} <= set(wb.sheetnames)
+    ws = wb["PARTIDA"]
+    for fila in ws.iter_rows(min_row=2):
+        if fila[0].value == "4407999000":
+            fila[1].value, fila[2].value, fila[3].value = "2. PRODUCTOS NO TRADICIONALES", "2.1. MADERAS Y SUS MANUFACTURAS", "Madera tornillo"
+    buf = io.BytesIO()
+    wb.save(buf)
+    r = subir(cliente, **{"diccionarios.xlsx": buf.getvalue()})
+    assert any("reprocesada" in a for a in r["avisos"])
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["MADERA TORNILLO", "ESTADO"] == "ok" and ago.loc["MADERA TORNILLO", "RUBRO_ESTAD"] == "Otros acabados"
+
+
+def test_equivalencia_retirada_no_se_aplica(cliente):
+    sunat_expo.guardar_tabla("equivalencias", pd.DataFrame([{"departamento": "SMN", "producto": "Manteca vegetal", "rubro": "Manteca vegetal de palma"},
+                                                            {"departamento": "LOR", "producto": "Anguilas", "rubro": "Peces ornamentales"}]))
+    eq = sunat_expo.leer_tabla("equivalencias")
+    assert list(eq["producto"]) == ["Anguilas"]
