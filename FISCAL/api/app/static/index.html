@@ -75,7 +75,7 @@
       lead: "Despachos de cemento en la región, indicador adelantado de la construcción.", cuadros: ["Despachos de cemento (t)"] },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
       lead: "Trabajadores asalariados privados formales por rama de actividad económica.", cuadros: "empleo" },
-    expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Subiendo en la página el ESTAD de la región", bases: () => ["expo-estad"], actualizar: "estad",
+    expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["expo-estad"], sinActualizar: true,
       lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos. En «Base mensual», la base del mes se limpia, se revisa y arma el ESTAD; «Resumen Export» trae los datos destacados y el borrador de la síntesis.", cuadros: "exportaciones", extra: ["Base mensual", "Resumen Export"] },
     impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos", entra: "Subiendo en la página el ESTAD de Loreto", bases: () => ["impo-estad"], actualizar: "estad",
       lead: "Importaciones por la aduana de Iquitos según uso o destino económico (FOB), desde el ESTAD de Loreto.", cuadros: "importaciones" },
@@ -462,7 +462,7 @@
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
     try {
       const c = (await api(`/v1/cuadros/exportaciones?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo, flujo })}`)).cuadros;
-      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay ${expo ? "exportaciones" : "importaciones"} de ${esc(r.nombre)} en la página.</b><span>Sube el ESTAD de la región en «Actualizar».</span></div>`; return; }
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay ${expo ? "exportaciones" : "importaciones"} de ${esc(r.nombre)} en la página.</b><span>${expo ? "Sube la base del mes en «Base mensual» y pásala al ESTAD." : "Sube el ESTAD de Loreto en «Actualizar»."}</span></div>`; return; }
       const a = c.anio, b = c.comparar, mes = c.titulo_mes, m3 = mes.slice(0, 3), d = c.dec, R = r.nombre.toUpperCase();
       const nd = (v) => v == null ? "" : v.toLocaleString("es-PE", { minimumFractionDigits: d, maximumFractionDigits: d });
       const vs = (v) => v == null ? "-" : pct(v), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
@@ -1093,7 +1093,7 @@
     // primero lo del informe (cuadros, gráficos, mapa, revisiones); al final, los datos y la actualización
     const DE_DATOS = ["Archivos", "Base mensual"], extra = s.extra || [];
     const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
-      ...extra.filter((x) => !DE_DATOS.includes(x)), "Datos", ...extra.filter((x) => DE_DATOS.includes(x)), "Actualizar"];
+      ...extra.filter((x) => !DE_DATOS.includes(x)), "Datos", ...extra.filter((x) => DE_DATOS.includes(x)), ...(s.sinActualizar ? [] : ["Actualizar"])];
     const t = s.cuadros === "anexos" ? ANEXOS_TAB : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
