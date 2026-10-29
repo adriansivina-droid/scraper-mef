@@ -16,6 +16,10 @@ on:
       periodos:
         description: "Meses AAAA-MM separados por comas"
         required: true
+      reprocesar:
+        description: "Reprocesar antes la base mensual con los diccionarios y equivalencias del momento"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -33,6 +37,7 @@ jobs:
           FLUJO: ${{ inputs.flujo }}
           DEPTO: ${{ inputs.departamento }}
           PERIODOS: ${{ inputs.periodos }}
+          REPROCESAR: ${{ inputs.reprocesar }}
         run: |
           python3 - <<'PY'
           import base64, json, os, re, urllib.parse, urllib.request
@@ -41,9 +46,15 @@ jobs:
           periodos = [p.strip() for p in os.environ["PERIODOS"].split(",") if p.strip()]
           if flujo not in ("expo", "impo") or not all(re.fullmatch(r"\d{4}-\d{2}", p) for p in periodos):
               raise SystemExit("::error::flujo debe ser expo o impo, y los periodos AAAA-MM separados por comas")
-          def pedir(ruta, metodo="GET"):
-              r = urllib.request.urlopen(urllib.request.Request(url + ruta, method=metodo, headers={"Authorization": "Basic " + auth}), timeout=300)
+          def pedir(ruta, metodo="GET", cuerpo=None):
+              datos = None if cuerpo is None else json.dumps(cuerpo).encode()
+              cab = {"Authorization": "Basic " + auth, **({"Content-Type": "application/json"} if datos else {})}
+              r = urllib.request.urlopen(urllib.request.Request(url + ruta, data=datos, method=metodo, headers=cab), timeout=600)
               return json.load(r)
+          if os.environ.get("REPROCESAR", "true") == "true":
+              # una corrección vacía vuelve a procesar toda la base (diccionarios, reglas y equivalencias del momento)
+              r = pedir("/v1/exportaciones/sunat/equivalencias" if flujo == "expo" else "/v1/importaciones/base/empresas", "POST", {"filas": []})
+              print(f"::notice::Base mensual reprocesada: {r['filas']} filas")
           for p in periodos:
               if flujo == "expo":
                   rev = pedir("/v1/exportaciones/sunat?" + urllib.parse.urlencode({"departamento": depto, "periodo": p}))["revision"]
