@@ -1088,7 +1088,10 @@
   // ── Página de un sector de una región ──
   function sectorRegion() {
     const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
-    const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : ["Datos", "Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []), "Actualizar", ...(s.extra || [])];
+    // primero lo del informe (cuadros, gráficos, mapa, revisiones); al final, los datos y la actualización
+    const DE_DATOS = ["Archivos", "Base mensual"], extra = s.extra || [];
+    const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
+      ...extra.filter((x) => !DE_DATOS.includes(x)), "Datos", ...extra.filter((x) => DE_DATOS.includes(x)), "Actualizar"];
     const t = s.cuadros === "anexos" ? ANEXOS_TAB : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
