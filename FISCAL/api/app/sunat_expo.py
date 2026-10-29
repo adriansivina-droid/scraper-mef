@@ -461,15 +461,39 @@ def leer(archivos):
     return ({"expo-sunat": pd.concat(partes, ignore_index=True)} if partes else {}), avisos
 
 
-def reprocesar():
-    """Vuelve a procesar toda la base con los diccionarios y reglas del momento (tras una corrección en la página)."""
+def reprocesar(columna=None, valores=None):
+    """Vuelve a procesar la base con los diccionarios y reglas del momento (tras una corrección en la página).
+    Con columna y valores (p. ej. RUC de las empresas corregidas), solo esas filas: mucha menos transferencia que bajar y
+    subir toda la base. Borrar y volver a escribir va en una sola transacción: si algo se corta, la base queda como estaba."""
+    from .catalogo import BASES, INTERNAS
+    b = BASES["expo-sunat"]
+    if not db.existe(b.tabla):
+        return 0
+    if columna is not None:
+        valores = sorted({str(v) for v in (valores or []) if v is not None and str(v) != ""})
+        if not valores:
+            return 0
+        trozos = [valores[i:i + 400] for i in range(0, len(valores), 400)]
+        filtro = lambda tr: (f'"{columna}" IN ({", ".join(":v" + str(i) for i in range(len(tr)))})', {f"v{i}": v for i, v in enumerate(tr)})
+        partes = []
+        with db.motor().connect() as cx:
+            for tr in trozos:
+                w, prm = filtro(tr)
+                partes.append(pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE {w}'), cx, params=prm))
+        base = pd.concat(partes, ignore_index=True).reindex(columns=b.columnas) if partes else pd.DataFrame(columns=b.columnas)
+        if base.empty:
+            return 0
+        df, _ = procesar(base)
+        with db.motor().begin() as cx:
+            for tr in trozos:
+                w, prm = filtro(tr)
+                cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE {w}'), prm)
+            df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
+        return len(df)
     base = db.leer_todo("expo-sunat")
     if base is None or base.empty:
         return 0
     df, _ = procesar(base)
-    from .catalogo import BASES, INTERNAS
-    b = BASES["expo-sunat"]
-    # borrar y volver a escribir en una sola transacción: si algo se corta a la mitad, la base queda como estaba
     with db.motor().begin() as cx:
         cx.execute(text(f'DELETE FROM "{b.tabla}"'))
         df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
@@ -808,7 +832,7 @@ def descripciones_nuevas(mes, limite=60):
 
 def unificar(contiene, nombre):
     """Todas las descripciones que contienen el texto (las de PROD_UNICOS y las de la base) quedan en PROD_UNICOS con ese
-    nombre común. Devuelve cuántas."""
+    nombre común. Devuelve esas descripciones."""
     k = _clave(contiene)
     if len(k) < 3 or not str(nombre or "").strip():
         raise ValueError("Escribe el texto (al menos 3 letras) y el nombre común.")
@@ -817,7 +841,8 @@ def unificar(contiene, nombre):
     descs = set(un.loc[un["PRODUCTO_ORIGINAL"].map(_clave).str.contains(k, regex=False), "PRODUCTO_ORIGINAL"])
     if base is not None:
         descs |= set(base.loc[base["DESCRIPCION"].map(_clave).str.contains(k, regex=False), "DESCRIPCION"])
-    return asignar_nombres([{"descripciones": sorted(descs), "nombre": str(nombre).strip()}])
+    asignar_nombres([{"descripciones": sorted(descs), "nombre": str(nombre).strip()}])
+    return sorted(descs)
 
 
 def asignar_nombres(filas):
