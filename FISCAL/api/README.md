@@ -271,8 +271,11 @@ El flujo de ANUAL_PRO (hoja ORIGEN y tablas dinámicas) en la página (`sunat_ex
      asignada más parecida). Lo que se escribe queda en PROD_UNICOS para los meses siguientes. En importaciones: las
      partidas cuyo producto es aún el texto del arancel.
    - *Cambiar la clasificación de una partida* ya clasificada (tipo, categoría, nombre común; en importaciones, MANUAL).
-   - *Condiciones por DCOM*: una fila del ESTAD exige que la descripción lo diga (hoy: «Manteca vegetal de palma» exige
-     «PALMA» en San Martín; si no, va a Resto). No se aplican a lo asignado a mano en PROD_UNICOS.
+   - *Nombre común*: PROD_UNICOS (descripción exacta) siempre manda; si la descripción no está, los *términos de la DCOM*
+     (marcas y códigos comerciales investigados: COBES/CEBES 380 → manteca de palmiste, RBD 35 → manteca de palma, …,
+     con su fuente); si no, el nombre de la partida. Los términos se editan en la página y en el Excel de diccionarios.
+   - *Condiciones por DCOM*: una fila del ESTAD exige que la descripción lo diga; si no, va a Resto. Sin condiciones por
+     defecto (la de «PALMA» se retiró: hay mantecas de palmiste que no lo dicen).
    - *Equivalencias* con «solo si la DCOM dice…».
    - *Diccionarios en Excel*: se descargan (PARTIDA, PROD_UNICOS, EMPRESAS, PAISES, ADUANA, reglas, equivalencias,
      condiciones; en importaciones PARTIDAS, CUODE, PROD_UNICOS, EMPRESAS, PAISES), se editan y se vuelven a subir: cada
