@@ -178,6 +178,7 @@ def _barras(ws, s):
     ch.dataLabels.numFmt = "#,##0" + ("." + "0" * dec if dec else "")
     ch.y_axis.numFmt = "#,##0.0"
     ch.y_axis.majorGridlines = None
+    ch.y_axis.delete = bool(s.get("sinEje"))          # la variación anual de exportaciones va sin eje, como en las SERIES
     ch.height, ch.width = 9, 22
     ws.add_chart(ch, f"D{r}")
     _notas(ws, s.get("notas"), r + len(puntos) + 2)

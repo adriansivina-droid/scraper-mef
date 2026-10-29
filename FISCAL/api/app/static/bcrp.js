@@ -131,7 +131,8 @@
   }
 
   // ── Gráfico de barras: spec = {numero, titulo, unidad, puntos: [{periodo: "Jun. 2025", valor} o {etq: "2026*", valor}], dec, tope, notas}
-  // con «etq» cada barra lleva su rótulo (p. ej. años); con «tope», las barras más altas se cortan ahí y llevan su valor real
+  // con «etq» cada barra lleva su rótulo (p. ej. años); con «tope», las barras más altas se cortan ahí y llevan su valor real;
+  // «sinEje» quita el eje vertical (también se quita solo si hay barras cortadas)
   const INICIAL = { Ene: "E", Feb: "F", Mar: "M", Abr: "A", May: "M", Jun: "J", Jul: "J", Ago: "A", Set: "S", Oct: "O", Nov: "N", Dic: "D" };
   function pasoBonito(rango, n = 7) {
     const bruto = rango / n, pot = 10 ** Math.floor(Math.log10(bruto || 1));
@@ -149,10 +150,13 @@
     const Y = (v) => arr + (hi - v) / (hi - lo) * alto, bw = (W - izq - der) / Math.max(p.length, 1);
     const h = cabecera(spec, W, 18), out = [h.svg];
     // eje Y con marcas cada «paso»; eje X en el cero
-    for (let v = lo; v <= hi + 1e-9; v += paso) {
-      out.push(`<line x1="${izq - 4}" x2="${izq}" y1="${Y(v)}" y2="${Y(v)}" stroke="#808080" stroke-width="0.8"/><text x="${izq - 7}" y="${Y(v) + 3.5}" text-anchor="end" font-size="9.5">${esc(num(v, 1))}</text>`);
+    // sin eje vertical (como en las SERIES) cuando hay barras cortadas o se pide: la escala engañaría; cada barra lleva su valor
+    if (!spec.sinEje && !p.some((x) => alto_(x.valor) !== x.valor)) {
+      for (let v = lo; v <= hi + 1e-9; v += paso) {
+        out.push(`<line x1="${izq - 4}" x2="${izq}" y1="${Y(v)}" y2="${Y(v)}" stroke="#808080" stroke-width="0.8"/><text x="${izq - 7}" y="${Y(v) + 3.5}" text-anchor="end" font-size="9.5">${esc(num(v, 1))}</text>`);
+      }
+      out.push(`<line x1="${izq}" x2="${izq}" y1="${Y(hi)}" y2="${Y(lo)}" stroke="#808080" stroke-width="0.8"/>`);
     }
-    out.push(`<line x1="${izq}" x2="${izq}" y1="${Y(hi)}" y2="${Y(lo)}" stroke="#808080" stroke-width="0.8"/>`);
     p.forEach((x, i) => {
       const [m, a] = conEtq ? [String(x.etq), ""] : x.periodo.split(" "), mm = m.replace(".", ""), resalta = !conEtq && mm === ult, v = alto_(x.valor);
       const x0 = izq + i * bw + bw * 0.16, wv = bw * 0.68, yv = Y(Math.max(v, 0)), hv = Math.max(Math.abs(Y(v) - Y(0)), 0.8);
