@@ -265,6 +265,19 @@ El flujo de ANUAL_PRO (hoja ORIGEN y tablas dinámicas) en la página (`sunat_ex
    (`/v1/exportaciones/resumen`). La página no muestra el nombre SUNAT salvo en la nota «Fuente: SUNAT.» de los
    cuadros de la síntesis.
 
+6. **Nombres comunes y clasificación** (exportaciones e importaciones, «Base mensual»):
+   - *Descripciones nuevas*: las del mes que no están en PROD_UNICOS (tomaron el nombre de su partida), agrupadas por
+     partida, con alerta si el nombre es genérico o la descripción no lo menciona, y un nombre sugerido (la descripción ya
+     asignada más parecida). Lo que se escribe queda en PROD_UNICOS para los meses siguientes. En importaciones: las
+     partidas cuyo producto es aún el texto del arancel.
+   - *Cambiar la clasificación de una partida* ya clasificada (tipo, categoría, nombre común; en importaciones, MANUAL).
+   - *Condiciones por DCOM*: una fila del ESTAD exige que la descripción lo diga (hoy: «Manteca vegetal de palma» exige
+     «PALMA» en San Martín; si no, va a Resto). No se aplican a lo asignado a mano en PROD_UNICOS.
+   - *Equivalencias* con «solo si la DCOM dice…».
+   - *Diccionarios en Excel*: se descargan (PARTIDA, PROD_UNICOS, EMPRESAS, PAISES, ADUANA, reglas, equivalencias,
+     condiciones; en importaciones PARTIDAS, CUODE, PROD_UNICOS, EMPRESAS, PAISES), se editan y se vuelven a subir: cada
+     hoja reemplaza su tabla y la base se reprocesa.
+
 Con SUNAT 2023 (X_202301-202312) la página llega a las mismas 24 696 filas ok que la hoja ORIGEN depurada a mano.
 
 ### Importaciones (aduana de Iquitos): «Base mensual» y «Resumen Import»

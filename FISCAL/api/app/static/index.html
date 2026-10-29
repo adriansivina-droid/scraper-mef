@@ -531,21 +531,37 @@
           ${x.a_resto.map((p, i) => `<tr><td>${esc(p.producto)}</td><td>${esc(p.categoria || "")}</td><td class="n">${mil(p.fob)}</td><td>${sel(rubros, "Resto", `data-res="${i}"`)}</td></tr>`).join("")}</table></div>
           <div class="fila"><button class="btn" type="button" id="${clave}-gres">Guardar equivalencias y reprocesar</button></div>` : '<p class="nota">Ningún producto va a «Resto».</p>';
       const m3 = etqMes(x.periodo);
+      const nombres = x.descripciones.length ? `<div class="scroll"><table><tr><th>Partida</th><th>Nombre que recibió</th><th class="n">FOB</th><th>Descripciones (ejemplos)</th><th>Nombre común</th></tr>
+          ${x.descripciones.map((d, i) => `<tr class="${d.alerta ? "alerta" : ""}"><td>${esc(d.partida)}</td><td>${esc(d.nombre || "")}${d.generico ? ' <span class="chip falta">genérico</span>' : ""}${d.sin_confirmar ? ` <span class="chip vacio">${d.sin_confirmar} de ${d.descripciones} no lo mencionan</span>` : ""}<br><span class="nota">${esc(d.rubro || "")}</span></td>
+            <td class="n">${mil(d.fob)}</td><td style="max-width:420px;font-size:12px"><span class="nota">${d.descripciones} descripción(es):</span> ${d.ejemplos.map((e) => esc(e.length > 110 ? e.slice(0, 110) + "…" : e)).join("<br>")}</td>
+            <td><input data-nom="${i}" list="${clave}-noms" value="${esc(d.sugerido || "")}" placeholder="${esc(d.nombre || "")}" size="24">${d.sugerido ? '<br><span class="nota">sugerido por una descripción parecida</span>' : ""}</td></tr>`).join("")}</table></div>
+          <datalist id="${clave}-noms">${[...new Set(x.descripciones.flatMap((d) => [d.nombre, d.sugerido]).filter(Boolean))].map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
+          <div class="fila"><button class="btn" type="button" id="${clave}-gnom">Guardar nombres y reprocesar</button><span class="nota">Solo se guardan las filas con nombre escrito; vacío = sigue con el nombre de su partida.</span></div>`
+        : '<p class="nota">Todas las descripciones del mes ya tienen nombre común en PROD_UNICOS.</p>';
+      const cambiarPartida = `<div class="fila"><label class="campo">Partida<input id="${clave}-cp-part" size="12" placeholder="0901119000"></label>
+          <label class="campo">Categoría<select id="${clave}-cp-cat"><option value="">(sin cambio)</option>${cats.map((c) => `<option value="${esc(c[1])}" data-tipo="${esc(c[0])}">${esc(c[1])}</option>`).join("")}</select></label>
+          <label class="campo">Nombre común<input id="${clave}-cp-prod" size="24"></label><button class="btn" type="button" id="${clave}-cp">Guardar y reprocesar</button></div>`;
       const reglas = x.reglas.map((g, i) => `<tr data-regla="${i}"><td>${sel(["", "LOR", "SMN", "UCA"], g.departamento || "", 'data-c="departamento"')}</td><td>${sel(["partida", "descripcion", "producto", "ruc"], g.campo, 'data-c="campo"')}</td>
           <td><input data-c="valor" value="${esc(g.valor || "")}" size="14"></td><td><input data-c="motivo" value="${esc(g.motivo || "")}" size="40"></td></tr>`).join("");
       caja.innerHTML = `<div class="fila controles"><label class="campo" for="${clave}-p">Mes<select id="${clave}-p">${[...x.meses].reverse().map((m) => `<option value="${m}"${m === x.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
-          <a class="btn sec" href="/v1/descargas?base=expo-sunat&departamento=${r.cod}&desde=${x.periodo}&hasta=${x.periodo}">Descargar la base del mes</a></div>
+          <a class="btn sec" href="/v1/descargas?base=expo-sunat&departamento=${r.cod}&desde=${x.periodo}&hasta=${x.periodo}">Descargar la base del mes</a>
+          <a class="btn sec" href="/v1/exportaciones/diccionarios.xlsx" title="PARTIDA, PROD_UNICOS, EMPRESAS, PAISES, ADUANA, reglas, equivalencias y condiciones: edítalos en Excel y súbelos arriba">Diccionarios en Excel</a></div>
         <div class="stats tiles">${est}</div>
         <div class="caja"><h3>1 · Empresas por verificar (${x.empresas.length})</h3><p>Empresas nuevas o con BORRAR PARA vacío, en toda la base: sus filas no entran a los cuadros hasta que se revisen.</p>${empresas}
           <div class="fila"><button class="btn sec" type="button" id="${clave}-padron">Buscar razón social en el padrón de RUC</button><span id="${clave}-padres" class="nota">Corre en GitHub (baja el padrón reducido, unos minutos).</span></div></div>
         <div class="caja"><h3>2 · Partidas sin clasificar (${x.partidas.length})</h3><p>Partidas que no están en el diccionario (hoja PARTIDA): elige su categoría y su nombre común.</p>${partidas}</div>
-        <div class="caja"><h3>3 · ESTAD propuesto · ${esc(m3)}</h3><p>La tabla dinámica de las filas ok, fila por fila del ESTAD de ${esc(r.nombre)} (miles de US$), contra el ESTAD cargado.</p>${propuesta}</div>
-        <div class="caja"><h3>4 · Productos que van a «Resto»</h3><p>No tienen fila propia en el ESTAD. Si alguno debe ir a otra fila, elígela: queda como equivalencia para los meses siguientes.</p>${resto}</div>
-        <details class="caja"><summary><b>5 · Reglas de limpieza (obligatorias)</b> y equivalencias</summary>
+        <div class="caja"><h3>3 · Nombres comunes de las descripciones nuevas · ${esc(m3)}</h3><p>Descripciones del mes que no están en PROD_UNICOS: tomaron el nombre de su partida. Arriba, las que piden atención (nombre genérico o que la descripción no menciona). Escribe o acepta el nombre común: queda en PROD_UNICOS para los meses siguientes.</p>${nombres}</div>
+        <div class="caja"><h3>4 · Cambiar la clasificación de una partida</h3><p>Para corregir una partida ya clasificada (tipo, categoría y nombre común de la hoja PARTIDA).</p>${cambiarPartida}</div>
+        <div class="caja"><h3>5 · ESTAD propuesto · ${esc(m3)}</h3><p>La tabla dinámica de las filas ok, fila por fila del ESTAD de ${esc(r.nombre)} (miles de US$), contra el ESTAD cargado.</p>${propuesta}</div>
+        <div class="caja"><h3>6 · Productos que van a «Resto»</h3><p>No tienen fila propia en el ESTAD. Si alguno debe ir a otra fila, elígela: queda como equivalencia para los meses siguientes.</p>${resto}</div>
+        <details class="caja"><summary><b>7 · Reglas de limpieza (obligatorias), condiciones por DCOM y equivalencias</b></summary>
           <p>Cada regla borra las filas que cumplan: partida que empieza con…, descripción que contiene…, producto o RUC. Departamento vacío = las tres regiones. Para quitar una regla, deja vacío su valor.</p>
           <div class="scroll"><table id="${clave}-reglas"><tr><th>Región</th><th>Campo</th><th>Valor</th><th>Motivo</th></tr>${reglas}</table></div>
           <div class="fila"><button class="btn sec" type="button" id="${clave}-areg">Agregar regla</button><button class="btn" type="button" id="${clave}-greg">Guardar reglas y reprocesar</button></div>
-          <h4>Equivalencias (producto → fila del ESTAD)</h4><table><tr><th>Región</th><th>Producto</th><th>Fila del ESTAD</th><th></th></tr>${x.equivalencias.map((e, i) => `<tr><td>${esc(e.departamento || "todas")}</td><td>${esc(e.producto)}</td><td>${esc(e.rubro)}</td><td><button class="btn sec" type="button" data-qeq="${i}">Quitar</button></td></tr>`).join("")}</table></details>
+          <h4>Condiciones por DCOM</h4><p class="nota">Una fila del ESTAD exige que la descripción lo diga expresamente (p. ej. «Manteca vegetal de palma» exige «PALMA»); si no lo dice, va a «Resto». No se aplica a lo asignado a mano en PROD_UNICOS. Para quitar una, deja vacío el texto.</p>
+          <div class="scroll"><table id="${clave}-conds"><tr><th>Región</th><th>Fila del ESTAD</th><th>La DCOM debe decir</th><th>Motivo</th></tr>${x.condiciones.map((c, i) => `<tr data-cond="${i}"><td>${sel(["", "LOR", "SMN", "UCA"], c.departamento || "", 'data-c="departamento"')}</td><td>${sel(rubros, c.rubro, 'data-c="rubro"')}</td><td><input data-c="contiene" value="${esc(c.contiene || "")}" size="12"></td><td><input data-c="motivo" value="${esc(c.motivo || "")}" size="36"></td></tr>`).join("")}</table></div>
+          <div class="fila"><button class="btn sec" type="button" id="${clave}-acond">Agregar condición</button><button class="btn" type="button" id="${clave}-gcond">Guardar condiciones y reprocesar</button></div>
+          <h4>Equivalencias (producto → fila del ESTAD)</h4><table><tr><th>Región</th><th>Producto</th><th>Solo si la DCOM dice</th><th>Fila del ESTAD</th><th></th></tr>${x.equivalencias.map((e, i) => `<tr><td>${esc(e.departamento || "todas")}</td><td>${esc(e.producto)}</td><td>${esc(e.contiene || "")}</td><td>${esc(e.rubro)}</td><td><button class="btn sec" type="button" data-qeq="${i}">Quitar</button></td></tr>`).join("")}</table></details>
         <div id="${clave}-res" aria-live="polite"></div>`;
       const res = $(`${clave}-res`), recargar = () => sunatExpo(r, caja);
       const enviar = async (tabla, filas, boton) => {
@@ -565,6 +581,14 @@
         const filas = x.a_resto.map((p, i) => ({ departamento: r.corto, producto: p.producto, rubro: caja.querySelector(`[data-res="${i}"]`).value })).filter((f) => f.rubro !== "Resto");
         enviar("equivalencias", filas, ev.target); });
       caja.querySelectorAll("[data-qeq]").forEach((b) => b.addEventListener("click", () => { const e = x.equivalencias[+b.dataset.qeq]; enviar("equivalencias", [{ ...e, borrar: true }], b); }));
+      if ($(`${clave}-gnom`)) $(`${clave}-gnom`).addEventListener("click", (ev) => enviar("nombres", x.descripciones.map((d, i) => ({ descripciones: d.todas, nombre: caja.querySelector(`[data-nom="${i}"]`).value.trim() })).filter((f) => f.nombre), ev.target));
+      $(`${clave}-cp`).addEventListener("click", (ev) => { const op = $(`${clave}-cp-cat`).selectedOptions[0];
+        const f = { PARTIDA: $(`${clave}-cp-part`).value.trim(), PRODUCTO: $(`${clave}-cp-prod`).value.trim() || undefined, ...(op && op.value ? { CATEGORIA: op.value, TIPO: op.dataset.tipo } : {}) };
+        if (!/^\d{6,10}$/.test(f.PARTIDA) || (!f.CATEGORIA && !f.PRODUCTO)) { res.innerHTML = '<div class="err-box"><b>Escribe la partida (10 dígitos) y la categoría o el nombre común</b></div>'; return; }
+        enviar("partidas", [f], ev.target); });
+      $(`${clave}-acond`).addEventListener("click", () => { const t = $(`${clave}-conds`), i = t.rows.length - 1;
+        t.insertAdjacentHTML("beforeend", `<tr data-cond="${i}"><td>${sel(["", "LOR", "SMN", "UCA"], r.corto, 'data-c="departamento"')}</td><td>${sel(rubros, rubros[0], 'data-c="rubro"')}</td><td><input data-c="contiene" size="12"></td><td><input data-c="motivo" size="36"></td></tr>`); });
+      $(`${clave}-gcond`).addEventListener("click", (ev) => enviar("condiciones", [...caja.querySelectorAll("[data-cond]")].map((tr) => Object.fromEntries([...tr.querySelectorAll("[data-c]")].map((el) => [el.dataset.c, el.value.trim()]))), ev.target));
       $(`${clave}-areg`).addEventListener("click", () => { const t = $(`${clave}-reglas`), i = t.rows.length - 1;
         t.insertAdjacentHTML("beforeend", `<tr data-regla="${i}"><td>${sel(["", "LOR", "SMN", "UCA"], r.corto, 'data-c="departamento"')}</td><td>${sel(["partida", "descripcion", "producto", "ruc"], "partida", 'data-c="campo"')}</td><td><input data-c="valor" size="14"></td><td><input data-c="motivo" size="40"></td></tr>`); });
       $(`${clave}-greg`).addEventListener("click", (ev) => {
@@ -603,6 +627,9 @@
             <td><select data-par="${i}" data-c="CATEGORIA"><option value="">${esc(p.categoria || "—")}</option>${cats.map((c) => `<option>${esc(c[1])}</option>`).join("")}</select></td><td><input data-par="${i}" data-c="PRODUCTO" size="22"></td></tr>`).join("")}</table></div>
           <div class="fila"><button class="btn" type="button" id="${clave}-gpar">Guardar y reprocesar</button><span class="nota">La categoría elegida queda como «MANUAL»: gana al CUODE de la fila.</span></div>`
         : '<p class="nota">Todas las partidas tienen clasificación y nombre común.</p>';
+      const nombres = x.nombres.length ? `<div class="scroll"><table><tr><th>Partida</th><th>Texto del arancel</th><th>Uso o destino</th><th class="n">FOB</th><th>Nombre común</th></tr>
+          ${x.nombres.map((n, i) => `<tr><td>${esc(n.partida)}</td><td>${esc(n.original)}</td><td>${esc(n.categoria || "")}</td><td class="n">${mil(n.fob)}</td><td><input data-nom="${i}" value="${esc(n.sugerido || "")}" size="24">${n.sugerido ? '<br><span class="nota">sugerido</span>' : ""}</td></tr>`).join("")}</table></div>
+          <div class="fila"><button class="btn" type="button" id="${clave}-gnom">Guardar nombres y reprocesar</button></div>` : '<p class="nota">Todos los productos del mes tienen nombre común.</p>';
       const pr = x.propuesta;
       const propuesta = pr ? `<div class="scroll"><table><tr><th>Fila del Cuadro N° 16</th><th class="n">Base mensual (propuesto)</th><th class="n">ESTAD cargado</th><th class="n">Diferencia</th></tr>
           ${pr.filas.map((f) => `<tr class="${f.nivel !== "producto" ? "fuerte" : ""}"><td style="padding-left:${f.nivel === "producto" ? 26 : 10}px">${esc(f.rubro)}</td><td class="n">${mil(f.sunat)}</td><td class="n">${f.estad == null ? "—" : mil(f.estad)}</td>
@@ -610,11 +637,16 @@
           <div class="fila"><button class="btn" type="button" id="${clave}-pasar">Pasar al ESTAD (${esc(etqMes(x.periodo))})</button><button class="btn sec" type="button" id="${clave}-xls">Descargar en Excel (con el detalle)</button>
           <span class="nota">${pr.hay_estad ? "El mes ya está en el ESTAD: pasarlo lo reemplaza con lo de la base mensual." : "El mes aún no está en el ESTAD."}</span></div><div id="${clave}-pres"></div>` : '<p class="nota">Falta la estructura del Cuadro N° 16 (ESTAD de importaciones de Loreto).</p>';
       caja.innerHTML = `<div class="fila controles"><label class="campo" for="${clave}-p">Mes<select id="${clave}-p">${[...x.meses].reverse().map((m) => `<option value="${m}"${m === x.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
-          <a class="btn sec" href="/v1/descargas?base=impo-base&departamento=16&desde=${x.periodo}&hasta=${x.periodo}">Descargar la base del mes</a></div>
+          <a class="btn sec" href="/v1/descargas?base=impo-base&departamento=16&desde=${x.periodo}&hasta=${x.periodo}">Descargar la base del mes</a>
+          <a class="btn sec" href="/v1/importaciones/diccionarios.xlsx" title="PARTIDAS, CUODE, PROD_UNICOS, EMPRESAS y PAISES: edítalos en Excel y súbelos arriba">Diccionarios en Excel</a></div>
         <div class="stats tiles">${est}</div>
         <div class="caja"><h3>1 · Empresas sin razón social (${x.empresas.length})</h3><p>Sus filas sí entran al cuadro; falta el nombre para el resumen.</p>${empresas}</div>
         <div class="caja"><h3>2 · Partidas sin clasificar o sin nombre común (${x.partidas.length})</h3><p>Sin CUODE ni tipo en la partida (no entran al cuadro hasta clasificarlas) o con el producto «SIN DESCRIPCIÓN».</p>${partidas}</div>
-        <div class="caja"><h3>3 · ESTAD propuesto · ${esc(etqMes(x.periodo))}</h3><p>Como el CUADRO 16 del proyecto: por categoría, FOB redondeado a miles fila por fila (miles de US$), contra el ESTAD cargado.</p>${propuesta}</div>
+        <div class="caja"><h3>3 · Nombres comunes (${x.nombres.length})</h3><p>Partidas del mes cuyo producto es todavía el texto del arancel (no está en PROD_UNICOS). Escribe o acepta el nombre común: queda para los meses siguientes.</p>${nombres}</div>
+        <div class="caja"><h3>4 · Cambiar la clasificación de una partida</h3><p>Queda como «MANUAL»: gana al CUODE de la fila.</p><div class="fila"><label class="campo">Partida<input id="${clave}-cp-part" size="12"></label>
+          <label class="campo">Uso o destino<select id="${clave}-cp-cat"><option value="">(sin cambio)</option>${cats.map((c) => `<option>${esc(c[1])}</option>`).join("")}</select></label><label class="campo">Nombre común<input id="${clave}-cp-prod" size="24"></label>
+          <button class="btn" type="button" id="${clave}-cp">Guardar y reprocesar</button></div></div>
+        <div class="caja"><h3>5 · ESTAD propuesto · ${esc(etqMes(x.periodo))}</h3><p>Como el CUADRO 16 del proyecto: por categoría, FOB redondeado a miles fila por fila (miles de US$), contra el ESTAD cargado.</p>${propuesta}</div>
         <div id="${clave}-res" aria-live="polite"></div>`;
       const res = $(`${clave}-res`), recargar = () => baseImpo(caja);
       const enviar = async (tabla, filas, boton) => {
@@ -624,6 +656,10 @@
       };
       $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; recargar(); });
       if ($(`${clave}-gemp`)) $(`${clave}-gemp`).addEventListener("click", (ev) => enviar("empresas", x.empresas.map((e, i) => ({ RUC: e.ruc, RAZON_SOCIAL: caja.querySelector(`[data-emp="${i}"]`).value.trim() })).filter((f) => f.RAZON_SOCIAL), ev.target));
+      if ($(`${clave}-gnom`)) $(`${clave}-gnom`).addEventListener("click", (ev) => enviar("nombres", x.nombres.map((n, i) => ({ original: n.original, nombre: caja.querySelector(`[data-nom="${i}"]`).value.trim() })).filter((f) => f.nombre), ev.target));
+      $(`${clave}-cp`).addEventListener("click", (ev) => { const f = { PARTIDA: $(`${clave}-cp-part`).value.trim(), CATEGORIA: $(`${clave}-cp-cat`).value || null, PRODUCTO: $(`${clave}-cp-prod`).value.trim() || null };
+        if (!/^\d{6,10}$/.test(f.PARTIDA) || (!f.CATEGORIA && !f.PRODUCTO)) { res.innerHTML = '<div class="err-box"><b>Escribe la partida (10 dígitos) y el uso o destino o el nombre común</b></div>'; return; }
+        enviar("partidas", [f], ev.target); });
       if ($(`${clave}-gpar`)) $(`${clave}-gpar`).addEventListener("click", (ev) => enviar("partidas", x.partidas.map((p, i) => ({ PARTIDA: p.partida,
         CATEGORIA: caja.querySelector(`[data-par="${i}"][data-c="CATEGORIA"]`).value || null, PRODUCTO: caja.querySelector(`[data-par="${i}"][data-c="PRODUCTO"]`).value.trim() || null })).filter((f) => f.CATEGORIA || f.PRODUCTO), ev.target));
       if ($(`${clave}-pasar`)) $(`${clave}-pasar`).addEventListener("click", async (ev) => {

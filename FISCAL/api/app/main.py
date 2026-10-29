@@ -449,13 +449,21 @@ def sunat_revision(departamento: str, periodo: str = ""):
     """Estado de la base de SUNAT de la región: filas por estado, empresas por verificar, partidas sin clasificar,
     productos que van a «Resto», el ESTAD propuesto contra el cargado, y destinos, aduanas y empresas del mes."""
     _depto_expo(departamento)
-    r = sunat_expo.revision(departamento, periodo or None)
-    return json.loads(json.dumps({"revision": r}, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
+    return _json({"revision": sunat_expo.revision(departamento, periodo or None)})
 
 
 # ── Importaciones por la aduana de Iquitos (sunat_impo.py): base mensual, revisión, paso al ESTAD y resumen ──
 def _json(x):
-    return json.loads(json.dumps(x, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
+    """A JSON: los números de numpy como números y los NaN (celdas vacías) como null."""
+    def limpio(v):
+        if isinstance(v, dict):
+            return {k: limpio(w) for k, w in v.items()}
+        if isinstance(v, (list, tuple)):
+            return [limpio(w) for w in v]
+        if hasattr(v, "item"):
+            v = v.item()
+        return None if isinstance(v, float) and v != v else v
+    return json.loads(json.dumps(limpio(x), default=str))
 
 
 @app.get("/v1/importaciones/base", dependencies=[Depends(acceso)])
@@ -473,6 +481,8 @@ def impo_corregir(tabla: str, cuerpo: dict = Body(...)):
         sunat_impo.actualizar_empresas(filas)
     elif tabla == "partidas":
         sunat_impo.actualizar_partidas(filas)
+    elif tabla == "nombres":
+        sunat_impo.asignar_nombres(filas)
     else:
         raise HTTPException(404, f"No hay tabla {tabla!r}.")
     return {"filas": sunat_impo.reprocesar()}
@@ -494,6 +504,20 @@ def impo_propuesta_excel(periodo: str):
                     headers=_adjunto(f"ESTAD propuesto importaciones {periodo}.xlsx"))
 
 
+@app.get("/v1/exportaciones/diccionarios.xlsx", dependencies=[Depends(acceso)])
+def expo_diccionarios():
+    """Los diccionarios de exportaciones (PARTIDA, PROD_UNICOS, EMPRESAS, PAISES, ADUANA, reglas, equivalencias y
+    condiciones) en un Excel para editarlos en bloque; se vuelve a subir en «Base mensual»."""
+    return Response(sunat_expo.diccionarios_excel(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers=_adjunto("Diccionarios exportaciones.xlsx"))
+
+
+@app.get("/v1/importaciones/diccionarios.xlsx", dependencies=[Depends(acceso)])
+def impo_diccionarios():
+    return Response(sunat_impo.diccionarios_excel(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers=_adjunto("Diccionarios importaciones.xlsx"))
+
+
 @app.get("/v1/importaciones/resumen", dependencies=[Depends(acceso)])
 def impo_resumen(periodo: str = ""):
     return _json({"resumen": sunat_impo.resumen(periodo or None)})
@@ -504,8 +528,7 @@ def sunat_resumen(departamento: str, periodo: str = ""):
     """Resumen de la base de SUNAT para la síntesis: total, productos, destinos, aduanas y empresas del mes y de
     enero-mes (filas ok), y el borrador de los párrafos de mercados y aduanas."""
     _depto_expo(departamento)
-    r = sunat_expo.resumen(departamento, periodo or None)
-    return json.loads(json.dumps({"resumen": r}, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
+    return _json({"resumen": sunat_expo.resumen(departamento, periodo or None)})
 
 
 @app.post("/v1/exportaciones/sunat/{tabla}", dependencies=[Depends(acceso)])
@@ -524,6 +547,10 @@ def sunat_corregir(tabla: str, cuerpo: dict = Body(...)):
             sunat_expo.actualizar_equivalencias(filas)
         elif tabla == "reglas":
             sunat_expo.guardar_tabla("reglas", pd.DataFrame([f for f in filas if str(f.get("valor") or "").strip()], columns=sunat_expo.TABLAS["reglas"]))
+        elif tabla == "condiciones":
+            sunat_expo.guardar_tabla("condiciones", pd.DataFrame([f for f in filas if str(f.get("contiene") or "").strip()], columns=sunat_expo.TABLAS["condiciones"]))
+        elif tabla == "nombres":
+            sunat_expo.asignar_nombres(filas)
         else:
             raise HTTPException(404, f"No hay tabla {tabla!r}.")
     except ValueError as e:

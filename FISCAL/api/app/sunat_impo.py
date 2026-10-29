@@ -18,7 +18,7 @@ from openpyxl import load_workbook
 from sqlalchemy import text
 
 from . import db
-from .sunat_expo import MESES, _clave, _minus, _pct, _r0, _r1, _y
+from .sunat_expo import MESES, Sugeridor, _clave, _minus, _pct, _r0, _r1, _y
 
 ADUANA_IQUITOS = "226"
 CRUDAS = ["aduana", "ruc", "partida", "fob", "flete", "seguro", "kilos", "pais_adqui", "cuode", "periodo"]
@@ -298,8 +298,54 @@ def revision(periodo=None):
                  "categoria": g["CATEGORIA"].iloc[0] if g["CATEGORIA"].notna().any() else None} for p, g in falta.groupby("PARTIDA")]
     cu = leer_tabla("cuode")
     return {"periodo": periodo, "meses": meses, "estados": estados, "empresas": sorted(sin_rs, key=lambda x: -x["fob"]),
-            "partidas": sorted(partidas, key=lambda x: -x["fob"]), "propuesta": propuesta(a, m, mes),
+            "partidas": sorted(partidas, key=lambda x: -x["fob"]), "propuesta": propuesta(a, m, mes), "nombres": nombres_sin_corregir(mes),
             "categorias": sorted({(str(t), str(c)) for t, c in cu[["TIPO", "CATEGORIA"]].dropna().itertuples(index=False)})}
+
+
+def nombres_sin_corregir(mes):
+    """Partidas del mes cuyo nombre es aún el texto del arancel (no está en PROD_UNICOS), con un nombre común sugerido."""
+    part = leer_tabla("partidas").drop_duplicates("PARTIDA").set_index("PARTIDA")["PRODUCTO"]
+    unicos = leer_tabla("unicos").drop_duplicates("PRODUCTO_ORIGINAL").set_index("PRODUCTO_ORIGINAL")["PRODUCTO_CORREGIDO"]
+    ok = mes[mes["ESTADO"] == "ok"]
+    sug = Sugeridor(unicos)
+    salida = []
+    for partida, g in ok.groupby("PARTIDA"):
+        original = part.get(partida)
+        if not isinstance(original, str) or original in unicos.index:
+            continue
+        n, p = sug.sugerir(original)
+        salida.append({"partida": partida, "original": original, "fob": float(g["FOB"].sum()), "categoria": g["CATEGORIA"].iloc[0],
+                       "sugerido": n if p >= 0.4 else None})
+    return sorted(salida, key=lambda x: -x["fob"])
+
+
+def asignar_nombres(filas):
+    """filas: [{original, nombre}] -> PROD_UNICOS (texto del arancel -> nombre común)."""
+    un = leer_tabla("unicos")
+    nuevas = pd.DataFrame([{"PRODUCTO_ORIGINAL": f["original"], "PRODUCTO_CORREGIDO": str(f["nombre"]).strip()}
+                           for f in filas if f.get("original") and str(f.get("nombre") or "").strip()])
+    if len(nuevas):
+        guardar_tabla("unicos", pd.concat([un[~un["PRODUCTO_ORIGINAL"].isin(nuevas["PRODUCTO_ORIGINAL"])], nuevas], ignore_index=True))
+    return len(nuevas)
+
+
+HOJAS_DICCIONARIO = {"PARTIDAS": "partidas", "CUODE": "cuode", "PROD_UNICOS": "unicos", "EMPRESAS": "empresas", "PAISES": "paises"}
+LEEME_IMPO = "Diccionarios de importaciones (página del Departamento de Estudios Económicos)"
+
+
+def diccionarios_excel():
+    from .sunat_expo import diccionarios_excel as hacer
+    return hacer(LEEME_IMPO, HOJAS_DICCIONARIO, leer_tabla)
+
+
+def es_diccionario(ruta):
+    from .sunat_expo import es_diccionario as es
+    return es(ruta, LEEME_IMPO)
+
+
+def cargar_diccionario_excel(ruta):
+    from .sunat_expo import cargar_diccionario_excel as cargar
+    return cargar(ruta, HOJAS_DICCIONARIO, guardar_tabla, TABLAS)
 
 
 def actualizar_empresas(filas):
