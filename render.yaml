@@ -8,6 +8,10 @@ services:
     plan: starter
     region: virginia
     healthCheckPath: /salud    # cada cambio en main se vuelve a desplegar solo (valor por defecto)
+    # solo se despliega cuando cambia la página (ahorra minutos de construcción: la factura queda en el plan Starter)
+    buildFilter:
+      paths:
+        - FISCAL/api/**
     envVars:
       - key: DATABASE_URL
         sync: false
