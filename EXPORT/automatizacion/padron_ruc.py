@@ -1,7 +1,7 @@
 """Razón social de los RUC nuevos de exportaciones (GitHub Actions, .github/workflows/expo_padron_ruc.yml).
 
-Lo mismo que razon_social_ruc.py (Colab), pero con los RUC que la página tiene pendientes: los de la base de SUNAT
-que no tienen razón social en la tabla de empresas. Baja el padrón reducido de SUNAT (~300 MB comprimido), se queda con
+Lo mismo que razon_social_ruc.py (Colab), pero con los RUC que la página tiene pendientes: los de las bases mensuales
+de exportaciones e importaciones que no tienen razón social en sus tablas de empresas. Baja el padrón reducido de SUNAT (~300 MB comprimido), se queda con
 esos RUC (RUC, RAZON_SOCIAL, ESTADO, CONDICION), los guarda en la tabla de empresas (las nuevas quedan con BORRAR PARA
 vacío: por verificar en la página) y vuelve a procesar la base.
 Necesita DATABASE_URL (la misma base de la página).
@@ -16,7 +16,7 @@ import requests
 
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
-from app import sunat_expo  # noqa: E402
+from app import sunat_expo, sunat_impo  # noqa: E402
 
 URL = "http://www2.sunat.gob.pe/padron_reducido_ruc.zip"
 
@@ -48,17 +48,18 @@ def buscar(rucs, contenido=None):
 
 
 def main():
-    rucs = sunat_expo.pendientes_ruc()
-    print(f"RUC sin razón social: {len(rucs)}")
+    expo, impo = sunat_expo.pendientes_ruc(), sunat_impo.pendientes_ruc()
+    rucs = sorted(set(expo) | set(impo))
+    print(f"RUC sin razón social: {len(rucs)} ({len(expo)} de exportaciones, {len(impo)} de importaciones)")
     if not rucs:
         return
     df = buscar(rucs)
-    n = sunat_expo.guardar_padron(df)
+    n = sunat_expo.guardar_padron(df[df["RUC"].isin(expo)]) + sunat_impo.guardar_padron(df)
     faltan = sorted(set(rucs) - set(df["RUC"]))
     print(f"Encontrados en el padrón: {n} de {len(rucs)}")
     if faltan:
         print(f"::warning::No están en el padrón: {', '.join(faltan)}")
-    print(f"Base reprocesada: {sunat_expo.reprocesar()} filas")
+    print(f"Bases reprocesadas: exportaciones {sunat_expo.reprocesar()} filas, importaciones {sunat_impo.reprocesar()} filas")
 
 
 if __name__ == "__main__":

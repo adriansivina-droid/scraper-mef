@@ -267,6 +267,26 @@ El flujo de ANUAL_PRO (hoja ORIGEN y tablas dinámicas) en la página (`sunat_ex
 
 Con SUNAT 2023 (X_202301-202312) la página llega a las mismas 24 696 filas ok que la hoja ORIGEN depurada a mano.
 
+### Importaciones (aduana de Iquitos): «Base mensual» y «Resumen Import»
+
+El flujo de ANUAL_PRO - IMPORTACIONES (proyecto) en la página (`sunat_impo.py`, base `impo-base`):
+1. Subir una vez el **ANUAL_PRO - IMPORTACIONES** (.xlsm o .xlsx): diccionarios PARTIDAS (con la tabla CUODE), UNICOS
+   (PAISES, EMPRESAS, PROD_UNICOS) y su hoja ORIGEN.
+2. Cada mes, la base tal como llega (**M_AAAAMM.xlsx**: aduana, ruc, partida, fob, flete, seguro, kilos, pais_adqui,
+   cuode, periodo…). **No hay limpieza**: entran todas las filas de la aduana de Iquitos (226); las de otra aduana se
+   marcan y no entran.
+3. Clasificación como la hoja ORIGEN: la partida manda si su FUENTE es MANUAL y tiene tipo; si no, el CUODE de la fila;
+   si no hay CUODE, la partida; si nada, «clasificar». CIF = FOB + flete + seguro; producto de la partida corregido
+   con PROD_UNICOS; empresa y país por código.
+4. **ESTAD propuesto** (Cuadro N° 16): por categoría, FOB redondeado a miles fila por fila (como el CUADRO 16), contra
+   el ESTAD cargado; «Pasar al ESTAD» lo guarda. Revisión: empresas sin razón social (padrón de RUC) y partidas sin
+   clasificar o sin nombre común (la categoría elegida queda como MANUAL).
+5. **Resumen Import**: datos destacados y el borrador de los párrafos de la síntesis («Las importaciones por la aduana
+   de Iquitos fueron de USD … millones en … provenientes de …; las compras correspondieron principalmente a …»).
+
+Con las bases 2024–2026 el total coincide con el ESTAD casi todos los meses; la clasificación por CUODE difiere del
+ESTAD antiguo, que ponía azúcar o aceite de soya en «Bienes no duraderos» (el CUODE los pone en «Materias para industria»).
+
 El antiguo scraper de Infotrade (EXPORT/*.ipynb) ya no se usa.
 
 ## Ejecución del presupuesto (fase 3)

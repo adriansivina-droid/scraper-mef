@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import almacen, archivos, bcrp_excel, carga, controles, db, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, mef, pesca_cuadros, sunat_expo
+from . import almacen, archivos, bcrp_excel, carga, controles, db, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, mef, pesca_cuadros, sunat_expo, sunat_impo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -453,6 +453,52 @@ def sunat_revision(departamento: str, periodo: str = ""):
     return json.loads(json.dumps({"revision": r}, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
 
 
+# ── Importaciones por la aduana de Iquitos (sunat_impo.py): base mensual, revisión, paso al ESTAD y resumen ──
+def _json(x):
+    return json.loads(json.dumps(x, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
+
+
+@app.get("/v1/importaciones/base", dependencies=[Depends(acceso)])
+def impo_revision(periodo: str = ""):
+    return _json({"revision": sunat_impo.revision(periodo or None)})
+
+
+@app.post("/v1/importaciones/base/{tabla}", dependencies=[Depends(acceso)])
+def impo_corregir(tabla: str, cuerpo: dict = Body(...)):
+    """Correcciones: empresas (razón social) o partidas (categoría manual y nombre común). Luego se reprocesa la base."""
+    filas = cuerpo.get("filas")
+    if not isinstance(filas, list):
+        raise HTTPException(422, "Falta la lista «filas».")
+    if tabla == "empresas":
+        sunat_impo.actualizar_empresas(filas)
+    elif tabla == "partidas":
+        sunat_impo.actualizar_partidas(filas)
+    else:
+        raise HTTPException(404, f"No hay tabla {tabla!r}.")
+    return {"filas": sunat_impo.reprocesar()}
+
+
+@app.post("/v1/importaciones/estad", dependencies=[Depends(acceso)])
+def impo_pasar(periodo: str):
+    a, m = _periodo_expo(periodo)
+    try:
+        return {"filas": sunat_impo.pasar_al_estad(a, m)}
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/v1/importaciones/estad.xlsx", dependencies=[Depends(acceso)])
+def impo_propuesta_excel(periodo: str):
+    a, m = _periodo_expo(periodo)
+    return Response(sunat_impo.excel_propuesta(a, m), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers=_adjunto(f"ESTAD propuesto importaciones {periodo}.xlsx"))
+
+
+@app.get("/v1/importaciones/resumen", dependencies=[Depends(acceso)])
+def impo_resumen(periodo: str = ""):
+    return _json({"resumen": sunat_impo.resumen(periodo or None)})
+
+
 @app.get("/v1/exportaciones/resumen", dependencies=[Depends(acceso)])
 def sunat_resumen(departamento: str, periodo: str = ""):
     """Resumen de la base de SUNAT para la síntesis: total, productos, destinos, aduanas y empresas del mes y de
@@ -592,7 +638,7 @@ def expo_padron():
         mef.lanzar(nombre="padron", inputs={})
     except (mef.ErrorGitHub, OSError) as e:
         raise HTTPException(502, str(e))
-    return {"lanzado": True, "pendientes": len(sunat_expo.pendientes_ruc())}
+    return {"lanzado": True, "pendientes": len(set(sunat_expo.pendientes_ruc()) | set(sunat_impo.pendientes_ruc()))}
 
 
 @app.get("/v1/exportaciones/padron", dependencies=[Depends(acceso)])
@@ -603,7 +649,7 @@ def expo_padron_corridas():
             corr = mef.corridas(3, nombre="padron")
         except (mef.ErrorGitHub, OSError):
             corr = []
-    return {"configurado": mef.configurado(), "pendientes": sunat_expo.pendientes_ruc(), "corridas": corr}
+    return {"configurado": mef.configurado(), "pendientes": sorted(set(sunat_expo.pendientes_ruc()) | set(sunat_impo.pendientes_ruc())), "corridas": corr}
 
 
 @app.get("/v1/ipc", dependencies=[Depends(acceso)])

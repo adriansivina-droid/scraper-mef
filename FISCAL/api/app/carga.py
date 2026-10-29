@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import controles, db, empleo, exportaciones, hidrocarburos, ipc, pesca, sunat_expo
+from . import controles, db, empleo, exportaciones, hidrocarburos, ipc, pesca, sunat_expo, sunat_impo
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -95,9 +95,12 @@ def leer_archivos(raiz):
     """-> {base_id: DataFrame con las columnas de la base + columnas internas}, avisos."""
     raiz = Path(raiz)
     por_bloque, avisos = {}, []
-    pim, pim_muni, de_pesca, de_empleo, de_hidro, de_estad, de_sunat = [], [], [], [], [], [], []
+    pim, pim_muni, de_pesca, de_empleo, de_hidro, de_estad, de_sunat, de_impo = [], [], [], [], [], [], [], []
     for n_archivo, ruta in enumerate(sorted(raiz.rglob("*"))):
         if not ruta.is_file() or ruta.name.startswith(("CONTROL", "LOG", ".")):
+            continue
+        if ruta.suffix.lower() == ".xlsm" and sunat_impo.es_anual_pro(ruta):   # ANUAL_PRO - IMPORTACIONES (con macros)
+            de_impo.append((n_archivo, ruta, "anual"))
             continue
         if ruta.suffix.lower() == ".xlsx":
             estad = exportaciones.reconocer(ruta)          # ESTADLO / ESTADSMN / ESTADUCA (exportaciones e importaciones)
@@ -106,6 +109,12 @@ def leer_archivos(raiz):
                 continue
             if sunat_expo.es_anual_pro(ruta):              # ANUAL_PRO: diccionarios (UNICOS, PARTIDA) y su hoja ORIGEN
                 de_sunat.append((n_archivo, ruta, "anual"))
+                continue
+            if sunat_impo.es_anual_pro(ruta):              # ANUAL_PRO - IMPORTACIONES
+                de_impo.append((n_archivo, ruta, "anual"))
+                continue
+            if sunat_impo.es_base(ruta):                   # base mensual de importaciones (M_AAAAMM.xlsx)
+                de_impo.append((n_archivo, ruta, "base"))
                 continue
             if sunat_expo.es_sunat(ruta):                  # base mensual de SUNAT (X_AAAAMM.xlsx)
                 de_sunat.append((n_archivo, ruta, "sunat"))
@@ -196,6 +205,12 @@ def leer_archivos(raiz):
         de_la_sunat, avisos_sunat = sunat_expo.leer(de_sunat)
         bases.update(de_la_sunat)
         avisos += avisos_sunat
+    if de_impo:
+        if bases.get("impo-estad") is not None:
+            db.guardar("impo-estad", bases["impo-estad"].copy())
+        de_la_impo, avisos_impo = sunat_impo.leer(de_impo)
+        bases.update(de_la_impo)
+        avisos += avisos_impo
     if de_pesca:
         de_la_pesca, avisos_pesca = pesca.leer(de_pesca, db.leer_todo)
         bases.update(de_la_pesca)
