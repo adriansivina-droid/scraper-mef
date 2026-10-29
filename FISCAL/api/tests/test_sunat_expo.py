@@ -230,3 +230,13 @@ def test_terminos_de_la_dcom(cliente):
     assert ago.loc["PETROLEO CRUDO", "PRODUCTO"] == "Petróleo crudo"                 # no estaba en PROD_UNICOS
     assert ago.loc["CACAO EN GRANO SECO", "PRODUCTO"] == "Cacao en grano"            # PROD_UNICOS manda sobre el término
     assert sunat_expo.leer_tabla("condiciones").empty                                # sin la condición «PALMA»
+
+
+def test_unificar_producto(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    r = cliente.post("/v1/exportaciones/sunat/unificar", json={"filas": [{"contiene": "cacao", "nombre": "Cacao en grano"}]})
+    assert r.status_code == 200
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert set(ago.loc[["CACAO", "CACAO TOSTADO", "CACAO EN GRANO SECO"], "PRODUCTO"]) == {"Cacao en grano"}
+    assert cliente.post("/v1/exportaciones/sunat/unificar", json={"filas": [{"contiene": "ca", "nombre": "x"}]}).status_code == 422

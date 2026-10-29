@@ -551,6 +551,9 @@ def sunat_corregir(tabla: str, cuerpo: dict = Body(...)):
             sunat_expo.guardar_tabla("condiciones", pd.DataFrame([f for f in filas if str(f.get("contiene") or "").strip()], columns=sunat_expo.TABLAS["condiciones"]))
         elif tabla == "nombres":
             sunat_expo.asignar_nombres(filas)
+        elif tabla == "unificar":
+            for f in filas:
+                sunat_expo.unificar(f.get("contiene"), f.get("nombre"))
         elif tabla == "terminos":
             sunat_expo.guardar_tabla("terminos", pd.DataFrame([f for f in filas if str(f.get("contiene") or "").strip() and str(f.get("nombre") or "").strip()],
                                                               columns=sunat_expo.TABLAS["terminos"]))
