@@ -137,6 +137,19 @@ def estado():
     return {"bases": db.disponibilidad(), "ultima_carga": db.ultima_carga()}
 
 
+@app.get("/v1/estado/espacio", dependencies=[Depends(acceso)])
+def estado_espacio():
+    """Cuánto ocupa la base de datos y cada tabla (MB), para cuidar el límite del plan gratuito de Neon (0,5 GB)."""
+    from sqlalchemy import text as _t
+    with db.motor().connect() as cx:
+        if db.motor().dialect.name != "postgresql":
+            return {"total_mb": None, "tablas": []}
+        total = cx.execute(_t("SELECT pg_database_size(current_database())")).scalar()
+        filas = cx.execute(_t("SELECT relname, pg_total_relation_size(relid), n_live_tup FROM pg_catalog.pg_stat_user_tables "
+                              "ORDER BY 2 DESC")).all()
+    return {"total_mb": round(total / 2**20, 1), "tablas": [{"tabla": n, "mb": round(t / 2**20, 1), "filas": int(f or 0)} for n, t, f in filas]}
+
+
 @app.get("/v1/descargas/vista-previa", dependencies=[Depends(acceso)])
 def vista_previa(base: str = "", departamento: str = "", nivel: str = "", desde: str = "", hasta: str = "", filas: int = Query(12, le=100)):
     bases, deptos, niveles = _filtros(base, departamento, nivel, desde, hasta)

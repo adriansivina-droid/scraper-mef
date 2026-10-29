@@ -527,7 +527,7 @@
           <span class="nota">${pr.hay_estad ? "El mes ya está en el ESTAD: pasarlo lo reemplaza con lo de la base mensual." : "El mes aún no está en el ESTAD."}</span></div><div id="${clave}-pres"></div>`
         : '<p class="nota">Sube primero el ESTAD de la región: la propuesta usa sus filas.</p>';
       const rubros = x.rubros;
-      const resto = x.a_resto.length ? `<div class="scroll"><table><tr><th>Producto</th><th>Categoría</th><th class="n">FOB (todo el periodo)</th><th>Fila del ESTAD</th></tr>
+      const resto = x.a_resto.length ? `<div class="scroll"><table><tr><th>Producto</th><th>Categoría</th><th class="n">FOB (últimos 12 meses)</th><th>Fila del ESTAD</th></tr>
           ${x.a_resto.map((p, i) => `<tr><td>${esc(p.producto)}</td><td>${esc(p.categoria || "")}</td><td class="n">${mil(p.fob)}</td><td>${sel(rubros, "Resto", `data-res="${i}"`)}</td></tr>`).join("")}</table></div>
           <div class="fila"><button class="btn" type="button" id="${clave}-gres">Guardar equivalencias y reprocesar</button></div>` : '<p class="nota">Ningún producto va a «Resto».</p>';
       const m3 = etqMes(x.periodo);

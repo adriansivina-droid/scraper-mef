@@ -477,6 +477,36 @@ def reprocesar():
 
 
 # ── Revisión, ESTAD propuesto y cuadros de texto ──
+def _meses_base(depto):
+    """Los meses que tiene la base de la región (sin bajar las filas: ahorra transferencia de la base de datos)."""
+    from .catalogo import BASES
+    t = BASES["expo-sunat"].tabla
+    if not db.existe(t):
+        return []
+    with db.motor().connect() as cx:
+        filas = cx.execute(text(f'SELECT DISTINCT _anio, _mes FROM "{t}" WHERE _depto = :d'), {"d": depto}).all()
+    return sorted(f"{int(a)}-{int(m):02d}" for a, m in filas)
+
+
+def _base_estados(depto, estados):
+    """Solo las filas de la región con esos estados (p. ej. las pendientes de revisar), de todos los meses."""
+    from .catalogo import BASES
+    b = BASES["expo-sunat"]
+    if not db.existe(b.tabla):
+        return pd.DataFrame(columns=b.columnas)
+    params = {"d": depto, **{f"e{i}": e for i, e in enumerate(estados)}}
+    with db.motor().connect() as cx:
+        df = pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE _depto = :d AND "ESTADO" IN ({", ".join(":e" + str(i) for i in range(len(estados)))})'), cx, params=params)
+    return df.reindex(columns=b.columnas)
+
+
+def _mes_antes(periodo, n):
+    a, m = int(periodo[:4]), int(periodo[5:7]) - n
+    while m < 1:
+        a, m = a - 1, m + 12
+    return f"{a}-{m:02d}"
+
+
 def _base(depto, desde="1990-01", hasta="2100-12"):
     return db.leer("expo-sunat", [depto], [], desde, hasta)
 
@@ -634,16 +664,17 @@ def _destacados(ok, df, sel, ant, hay_ant, a, m):
 
 def resumen(depto, periodo=None):
     """Del mes y de enero-mes (filas ok): total, productos, destinos, continentes, aduanas y empresas, con su
-    variación contra el mismo periodo del año anterior (si está en la base) y el borrador de los párrafos de la síntesis."""
-    df = _base(depto)
-    if df.empty:
+    variación contra el mismo periodo del año anterior (si está en la base) y el borrador de los párrafos de la síntesis.
+    Baja solo el año elegido y el anterior."""
+    meses = _meses_base(depto)
+    if not meses:
         return None
+    periodo = periodo if periodo in meses else meses[-1]
+    a, m = int(periodo[:4]), int(periodo[5:7])
+    df = _base(depto, f"{a - 1}-01", f"{a}-12")
     df["AÑO"], df["MES"] = df["AÑO"].astype(int), df["MES"].astype(int)
     ok = df[df["ESTADO"] == "ok"].copy()
     ok["EMPRESA_NOMBRE"] = ok["EMPRESA"].str.replace(r"^\d{11}\s*-\s*", "", regex=True).str.strip()
-    meses = sorted({f"{a}-{m:02d}" for a, m in zip(df["AÑO"], df["MES"])})
-    periodo = periodo if periodo in meses else meses[-1]
-    a, m = int(periodo[:4]), int(periodo[5:7])
     sel = {"mes": ok[(ok["AÑO"] == a) & (ok["MES"] == m)], "acumulado": ok[(ok["AÑO"] == a) & (ok["MES"] <= m)]}
     ant = {"mes": ok[(ok["AÑO"] == a - 1) & (ok["MES"] == m)], "acumulado": ok[(ok["AÑO"] == a - 1) & (ok["MES"] <= m)]}
     hay_ant = bool(((df["AÑO"] == a - 1) & (df["MES"] == m)).any())
@@ -662,19 +693,21 @@ def resumen(depto, periodo=None):
 
 
 def revision(depto, periodo=None):
-    df = _base(depto)
-    if df.empty:
+    """Baja solo lo que muestra: el mes, las filas pendientes (de toda la base) y los últimos 12 meses para «Resto»."""
+    meses = _meses_base(depto)
+    if not meses:
         return None
-    df["AÑO"], df["MES"] = df["AÑO"].astype(int), df["MES"].astype(int)
-    meses = sorted({f"{a}-{m:02d}" for a, m in zip(df["AÑO"], df["MES"])})
     periodo = periodo if periodo in meses else meses[-1]
     a, m = int(periodo[:4]), int(periodo[5:7])
-    mes = df[(df["AÑO"] == a) & (df["MES"] == m)]
-    acum = df[(df["AÑO"] == a) & (df["MES"] <= m)]
+    doce = _base(depto, _mes_antes(periodo, 11), periodo)
+    doce["AÑO"], doce["MES"] = doce["AÑO"].astype(int), doce["MES"].astype(int)
+    mes = doce[(doce["AÑO"] == a) & (doce["MES"] == m)]
+    pend = _base_estados(depto, ["verificar", "clasificar"])
+    pend["AÑO"], pend["MES"] = pend["AÑO"].astype(int), pend["MES"].astype(int)
     estados = mes.groupby("ESTADO")["FOB"].agg(["count", "sum"]).reset_index().rename(columns={"count": "filas", "sum": "fob"}).to_dict("records")
     emp = leer_tabla("empresas")
     emp = emp.assign(RUC=emp["RUC"].astype(str)).drop_duplicates("RUC", keep="last").set_index("RUC")
-    ver = df[df["ESTADO"] == "verificar"]
+    ver = pend[pend["ESTADO"] == "verificar"]
     empresas = []
     for ruc, g in ver.groupby("RUC"):
         e = emp.loc[ruc] if ruc in emp.index else None
@@ -683,9 +716,9 @@ def revision(depto, periodo=None):
                          "meses": sorted({f"{x}-{y:02d}" for x, y in zip(g["AÑO"], g["MES"])}),
                          "productos": g.groupby("PRODUCTO")["FOB"].sum().sort_values(ascending=False).head(3).index.tolist() or g["DESCRIPCION"].head(2).tolist(),
                          "estado_sunat": None if e is None else _txt(e["ESTADO_SUNAT"])})
-    cla = df[df["ESTADO"] == "clasificar"]
+    cla = pend[pend["ESTADO"] == "clasificar"]
     partidas = [{"partida": p, "fob": float(g["FOB"].sum()), "filas": len(g), "descripcion": g["DESCRIPCION"].iloc[0]} for p, g in cla.groupby("PARTIDA")]
-    ok = df[df["ESTADO"] == "ok"]
+    ok = doce[doce["ESTADO"] == "ok"]
     resto = ok[ok["RUBRO_ESTAD"].fillna("").isin(["Resto"])]
     a_resto = [{"producto": p, "categoria": g["CATEGORIA"].iloc[0], "fob": float(g["FOB"].sum())} for p, g in resto.groupby("PRODUCTO") if g["FOB"].sum() > 0]
     est = estructura_estad(depto)
@@ -697,7 +730,7 @@ def revision(depto, periodo=None):
             "propuesta": propuesta(depto, a, m, mes),
             "reglas": leer_tabla("reglas").to_dict("records"), "equivalencias": leer_tabla("equivalencias").to_dict("records"),
             "condiciones": leer_tabla("condiciones").to_dict("records"), "terminos": leer_tabla("terminos").to_dict("records"),
-            "descripciones": descripciones_nuevas(df[(df["AÑO"] == a) & (df["MES"] == m)])}
+            "descripciones": descripciones_nuevas(mes)}
 
 
 # ── Nombres comunes: descripciones nuevas con un nombre sugerido ──
