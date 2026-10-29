@@ -55,6 +55,7 @@ EQUIVALENCIAS_INICIALES = [
      {"departamento": "SMN", "producto": "Puros", "rubro": "Puros, cigarros y pack"},
      {"departamento": "SMN", "producto": "Tabaco", "rubro": "Tabaco negro y rubio"},
      # como se armó el ESTAD 2024-2026 (comparación fila por fila con ANUAL_PRO)
+     {"departamento": "SMN", "producto": "Manteca vegetal", "rubro": "Manteca vegetal de palma"},
      {"departamento": "UCA", "producto": "Filete de paiche", "rubro": "Pescado congelado"},
      {"departamento": "UCA", "producto": "Filete de paiche congelado", "rubro": "Pescado congelado"}] + [
     {"departamento": "LOR", "producto": p, "rubro": "Peces ornamentales"} for p in ("Alevinos de paiche", "Anguilas", "Camarones")]
