@@ -1,0 +1,45 @@
+# Vigilante de costos: cada lunes revisa el tamaño de la base de datos de la página. Si pasa del 80 % del límite gratuito
+# de Neon (0,5 GB), el flujo falla y GitHub avisa por correo, para liberar espacio antes de que la página se frene.
+# La meta es que la factura mensual sea solo el plan Starter de Render (~US$ 7): Neon y GitHub Actions en planes gratuitos.
+#   · solo: lunes 08:13 hora de Lima · a mano: Actions → «Costos · vigilar» → Run workflow
+# Usa los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE.
+name: Costos · vigilar
+
+on:
+  schedule:
+    - cron: "13 13 * * 1"          # 13:13 UTC = 08:13 en Lima
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vigilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Tamaño de la base de datos
+        env:
+          URL: ${{ secrets.ESTUDIOS_API_URL }}
+          USUARIO: ${{ secrets.ESTUDIOS_API_USUARIO }}
+          CLAVE: ${{ secrets.ESTUDIOS_API_CLAVE }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, time, urllib.request
+          url, auth = os.environ["URL"].rstrip("/"), base64.b64encode(f"{os.environ['USUARIO']}:{os.environ['CLAVE']}".encode()).decode()
+          for intento in range(3):                    # Render puede tardar en despertar
+              try:
+                  r = json.load(urllib.request.urlopen(urllib.request.Request(url + "/v1/estado/espacio", headers={"Authorization": "Basic " + auth}), timeout=120))
+                  break
+              except Exception as e:
+                  print(f"Intento {intento + 1}: {e}"); time.sleep(30)
+          else:
+              raise SystemExit("::error::No respondió el API")
+          total, LIMITE, AVISO = r["total_mb"], 512, 400
+          print(f"Base de datos: {total} MB de {LIMITE} MB ({total / LIMITE:.0%})")
+          for t in r["tablas"][:8]:
+              print(f"  {t['tabla']}: {t['mb']} MB ({t['filas']} filas)")
+          if total > AVISO:
+              raise SystemExit(f"::error::La base usa {total} MB (más del 80 % del límite gratuito de Neon). Hay que liberar espacio.")
+          print(f"::notice::Base de datos: {total} MB ({total / LIMITE:.0%} del límite gratuito). Todo en orden.")
+          PY

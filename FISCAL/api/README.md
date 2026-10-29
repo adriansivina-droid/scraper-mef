@@ -71,6 +71,16 @@ los cuadros y anexos del mes por región.
 - Loreto reemplaza el consumo y los ornamentales por separado: subir uno no borra el otro.
 - Ucayali llega con los 12 meses del año: los meses en cero después del último con datos no se guardan.
 
+## Costos: solo el plan Starter de Render (~US$ 7 al mes)
+
+- **Render**: único pago (Starter). Despliega solo cuando cambia `FISCAL/api` (`buildFilter` en `render.yaml`; si el
+  servicio se creó a mano, poner lo mismo en Settings → Build Filters → Included Paths). No crear otros servicios.
+- **Neon**: plan gratuito, sin tarjeta: si se pasa de un límite, se frena en vez de cobrar. Límites aproximados: 0,5 GB de
+  almacenamiento, ~5 GB de transferencia al mes. Para cuidarlos, la revisión y el resumen de la base mensual bajan solo
+  lo que muestran y una corrección reprocesa solo sus filas. El flujo «Costos · vigilar» revisa cada lunes el tamaño de la
+  base y falla (aviso por correo) si pasa de 400 MB.
+- **GitHub Actions**: gratis mientras el repositorio sea público; si se pasa a privado, dejar el «spending limit» en US$ 0.
+
 ## Desplegar en Render + Neon (una sola vez)
 
 Render corre el API (plan Starter, unos US$7 al mes) y Neon guarda la base Postgres (plan gratuito, que alcanza para
