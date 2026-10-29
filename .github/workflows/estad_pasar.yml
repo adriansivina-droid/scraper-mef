@@ -1,0 +1,61 @@
+# Base mensual → ESTAD: lo mismo que el botón «Pasar al ESTAD» de la página, para varios meses a la vez (p. ej. para
+# corregir meses del ESTAD con la base mensual). Antes de pasar cada mes muestra el propuesto contra el ESTAD cargado.
+#   · a mano: Actions → «Base mensual · pasar al ESTAD» → Run workflow
+# Usa los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE (los de «Archivos · cargar en la página»).
+name: Base mensual · pasar al ESTAD
+
+on:
+  workflow_dispatch:
+    inputs:
+      flujo:
+        description: "expo (exportaciones) o impo (importaciones, aduana de Iquitos)"
+        default: "expo"
+      departamento:
+        description: "16, 22 o 25 (importaciones: 16)"
+        default: "25"
+      periodos:
+        description: "Meses AAAA-MM separados por comas"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  pasar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Pasar los meses al ESTAD
+        env:
+          URL: ${{ secrets.ESTUDIOS_API_URL }}
+          USUARIO: ${{ secrets.ESTUDIOS_API_USUARIO }}
+          CLAVE: ${{ secrets.ESTUDIOS_API_CLAVE }}
+          FLUJO: ${{ inputs.flujo }}
+          DEPTO: ${{ inputs.departamento }}
+          PERIODOS: ${{ inputs.periodos }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, re, urllib.parse, urllib.request
+          url, auth = os.environ["URL"].rstrip("/"), base64.b64encode(f"{os.environ['USUARIO']}:{os.environ['CLAVE']}".encode()).decode()
+          flujo, depto = os.environ["FLUJO"].strip(), os.environ["DEPTO"].strip()
+          periodos = [p.strip() for p in os.environ["PERIODOS"].split(",") if p.strip()]
+          if flujo not in ("expo", "impo") or not all(re.fullmatch(r"\d{4}-\d{2}", p) for p in periodos):
+              raise SystemExit("::error::flujo debe ser expo o impo, y los periodos AAAA-MM separados por comas")
+          def pedir(ruta, metodo="GET"):
+              r = urllib.request.urlopen(urllib.request.Request(url + ruta, method=metodo, headers={"Authorization": "Basic " + auth}), timeout=300)
+              return json.load(r)
+          for p in periodos:
+              if flujo == "expo":
+                  rev = pedir("/v1/exportaciones/sunat?" + urllib.parse.urlencode({"departamento": depto, "periodo": p}))["revision"]
+                  ruta = "/v1/exportaciones/sunat-estad?" + urllib.parse.urlencode({"departamento": depto, "periodo": p})
+              else:
+                  rev = pedir("/v1/importaciones/base?" + urllib.parse.urlencode({"periodo": p}))["revision"]
+                  ruta = "/v1/importaciones/estad?" + urllib.parse.urlencode({"periodo": p})
+              if not rev or rev["periodo"] != p or not rev.get("propuesta"):
+                  print(f"::warning::{p}: no está en la base mensual; no se pasó"); continue
+              for f in rev["propuesta"]["filas"]:
+                  if f.get("dif"):
+                      print(f"  {p} {f['rubro']}: base {f['sunat']:.0f} · ESTAD {f['estad']:.0f} · dif {f['dif']:+.0f}")
+              r = pedir(ruta, "POST")
+              print(f"::notice::{p}: {r['filas']} filas pasadas al ESTAD ({flujo}, {depto})")
+          PY
