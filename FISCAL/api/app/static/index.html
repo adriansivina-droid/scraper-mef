@@ -73,9 +73,9 @@
       lead: "Despachos de cemento en la región, indicador adelantado de la construcción.", cuadros: ["Despachos de cemento (t)"] },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
       lead: "Trabajadores asalariados privados formales por rama de actividad económica.", cuadros: "empleo" },
-    expo: { t: "Exportaciones", fuente: "SUNAT · ESTAD de la región (miles de US$)", entra: "Subiendo en la página el ESTAD de la región", bases: () => ["expo-estad"], actualizar: "estad",
-      lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos. En «SUNAT», la base mensual se limpia, se revisa y arma el ESTAD del mes.", cuadros: "exportaciones", extra: ["SUNAT"] },
-    impo: { t: "Importaciones", fuente: "SUNAT · ESTAD de Loreto, aduana de Iquitos", entra: "Subiendo en la página el ESTAD de Loreto", bases: () => ["impo-estad"], actualizar: "estad",
+    expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Subiendo en la página el ESTAD de la región", bases: () => ["expo-estad"], actualizar: "estad",
+      lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos. En «Base mensual», la base del mes se limpia, se revisa y arma el ESTAD; «Resumen Export» trae los datos destacados y el borrador de la síntesis.", cuadros: "exportaciones", extra: ["Base mensual", "Resumen Export"] },
+    impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos", entra: "Subiendo en la página el ESTAD de Loreto", bases: () => ["impo-estad"], actualizar: "estad",
       lead: "Importaciones por la aduana de Iquitos según uso o destino económico (FOB), desde el ESTAD de Loreto.", cuadros: "importaciones" },
     credito: { t: "Crédito", estado: "falta", fuente: "SBS", entra: "Scraper de la web de la SBS, por construir",
       lead: "Saldos de crédito del sistema financiero por tipo, sin Banco de la Nación ni Agrobanco, y morosidad.", cuadros: ["Crédito por tipo", "Tasa de morosidad"] },
@@ -495,13 +495,13 @@
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
   }
 
-  // ── Base mensual de SUNAT: estado de las filas, revisión (empresas, partidas, productos), ESTAD propuesto ──
+  // ── Base mensual de exportaciones: estado de las filas, revisión (empresas, partidas, productos), ESTAD propuesto ──
   async function sunatExpo(r, caja) {
     const clave = `su-${grupo}`, st = estadoEjec(clave), mil = (v) => v == null ? "" : fmt(v);
-    caja.innerHTML = '<div class="loading"><span class="spin"></span>Revisando la base de SUNAT…</div>';
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Revisando la base mensual…</div>';
     try {
       const x = (await api(`/v1/exportaciones/sunat?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo })}`)).revision;
-      if (!x) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay base de SUNAT de ${esc(r.nombre)}.</b><span>Sube arriba el X_AAAAMM.xlsx del mes (o un ANUAL_PRO con su hoja ORIGEN). Primero conviene subir un ANUAL_PRO: trae los diccionarios (UNICOS y PARTIDA).</span></div>`; return; }
+      if (!x) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay base mensual de exportaciones de ${esc(r.nombre)}.</b><span>Sube arriba el X_AAAAMM.xlsx del mes (o un ANUAL_PRO con su hoja ORIGEN). Primero conviene subir un ANUAL_PRO: trae los diccionarios (UNICOS y PARTIDA).</span></div>`; return; }
       const ETQ = { ok: ["ok", "entra a los cuadros"], verificar: ["vacio", "por verificar"], borrar: ["falta", "se borra"], clasificar: ["error", "sin clasificar"] };
       const est = x.estados.map((e) => `<div class="stat"><small>${esc(ETQ[e.ESTADO] ? ETQ[e.ESTADO][1] : e.ESTADO)}</small><b>${fmt(e.filas)} filas</b><span>${mil(e.fob)} mil US$</span></div>`).join("");
       const sel = (opts, v, attrs) => `<select ${attrs}>${opts.map((o) => `<option value="${esc(o)}"${o === v ? " selected" : ""}>${esc(o || "—")}</option>`).join("")}</select>`;
@@ -513,21 +513,20 @@
           <div class="fila"><button class="btn" type="button" id="${clave}-gemp">Guardar empresas y reprocesar</button><span class="nota">OK = entra a los cuadros; cualquier otra cosa (p. ej. «LOR SMN UCA») = se borra; vacío = sigue por verificar.</span></div>`
         : '<p class="nota">No hay empresas por verificar.</p>';
       const cats = x.categorias;
-      const partidas = x.partidas.length ? `<div class="scroll"><table><tr><th>Partida</th><th>Descripción (SUNAT)</th><th class="n">FOB</th><th>Categoría</th><th>Producto (nombre común)</th></tr>
+      const partidas = x.partidas.length ? `<div class="scroll"><table><tr><th>Partida</th><th>Descripción declarada</th><th class="n">FOB</th><th>Categoría</th><th>Producto (nombre común)</th></tr>
           ${x.partidas.map((p, i) => `<tr><td>${esc(p.partida)}</td><td>${esc(p.descripcion)}</td><td class="n">${mil(p.fob)}</td><td>${sel(["", ...cats.map((c) => c[1])], "", `data-par="${i}" data-campo="CATEGORIA"`)}</td><td><input data-par="${i}" data-campo="PRODUCTO" size="22"></td></tr>`).join("")}</table></div>
           <div class="fila"><button class="btn" type="button" id="${clave}-gpar">Guardar partidas y reprocesar</button></div>` : '<p class="nota">Todas las partidas están clasificadas.</p>';
       const pr = x.propuesta, nivelInd = { total: 0, tipo: 0, grupo: 1, producto: 2 };
-      const propuesta = pr ? `<div class="scroll"><table><tr><th>Fila del ESTAD</th><th class="n">SUNAT (propuesto)</th><th class="n">ESTAD cargado</th><th class="n">Diferencia</th></tr>
+      const propuesta = pr ? `<div class="scroll"><table><tr><th>Fila del ESTAD</th><th class="n">Base mensual (propuesto)</th><th class="n">ESTAD cargado</th><th class="n">Diferencia</th></tr>
           ${pr.filas.map((f) => `<tr class="${f.nivel === "total" || f.nivel === "tipo" ? "fuerte" : ""}"><td style="padding-left:${10 + nivelInd[f.nivel] * 16}px">${esc(f.rubro)}</td><td class="n">${mil(f.sunat)}</td><td class="n">${f.estad == null ? "—" : mil(f.estad)}</td>
             <td class="n ${f.dif ? (Math.abs(f.dif) >= 1 ? "baja" : "") : ""}">${f.dif == null ? "" : mil(f.dif)}</td></tr>`).join("")}</table></div>
           <div class="fila"><button class="btn" type="button" id="${clave}-pasar">Pasar al ESTAD (${esc(etqMes(x.periodo))})</button><button class="btn sec" type="button" id="${clave}-xls">Descargar en Excel (con el detalle)</button>
-          <span class="nota">${pr.hay_estad ? "El mes ya está en el ESTAD: pasarlo lo reemplaza con lo de SUNAT." : "El mes aún no está en el ESTAD."}</span></div><div id="${clave}-pres"></div>`
+          <span class="nota">${pr.hay_estad ? "El mes ya está en el ESTAD: pasarlo lo reemplaza con lo de la base mensual." : "El mes aún no está en el ESTAD."}</span></div><div id="${clave}-pres"></div>`
         : '<p class="nota">Sube primero el ESTAD de la región: la propuesta usa sus filas.</p>';
       const rubros = x.rubros;
       const resto = x.a_resto.length ? `<div class="scroll"><table><tr><th>Producto</th><th>Categoría</th><th class="n">FOB (todo el periodo)</th><th>Fila del ESTAD</th></tr>
           ${x.a_resto.map((p, i) => `<tr><td>${esc(p.producto)}</td><td>${esc(p.categoria || "")}</td><td class="n">${mil(p.fob)}</td><td>${sel(rubros, "Resto", `data-res="${i}"`)}</td></tr>`).join("")}</table></div>
           <div class="fila"><button class="btn" type="button" id="${clave}-gres">Guardar equivalencias y reprocesar</button></div>` : '<p class="nota">Ningún producto va a «Resto».</p>';
-      const top = (t, lista) => `<div class="scroll"><h4>${esc(t)}</h4><table><tr><th></th><th class="n">mil US$</th><th class="n">%</th><th>Principales productos</th></tr>${lista.map((e) => `<tr><td>${esc(e.nombre)}</td><td class="n">${mil(e.fob)}</td><td class="n">${e.pct == null ? "" : pct(e.pct)}</td><td>${esc(e.productos.join(", "))}</td></tr>`).join("")}</table></div>`;
       const m3 = etqMes(x.periodo);
       const reglas = x.reglas.map((g, i) => `<tr data-regla="${i}"><td>${sel(["", "LOR", "SMN", "UCA"], g.departamento || "", 'data-c="departamento"')}</td><td>${sel(["partida", "descripcion", "producto", "ruc"], g.campo, 'data-c="campo"')}</td>
           <td><input data-c="valor" value="${esc(g.valor || "")}" size="14"></td><td><input data-c="motivo" value="${esc(g.motivo || "")}" size="40"></td></tr>`).join("");
@@ -535,13 +534,11 @@
           <a class="btn sec" href="/v1/descargas?base=expo-sunat&departamento=${r.cod}&desde=${x.periodo}&hasta=${x.periodo}">Descargar la base del mes</a></div>
         <div class="stats tiles">${est}</div>
         <div class="caja"><h3>1 · Empresas por verificar (${x.empresas.length})</h3><p>Empresas nuevas o con BORRAR PARA vacío, en toda la base: sus filas no entran a los cuadros hasta que se revisen.</p>${empresas}
-          <div class="fila"><button class="btn sec" type="button" id="${clave}-padron">Buscar razón social en el padrón de SUNAT</button><span id="${clave}-padres" class="nota">Corre en GitHub (baja el padrón reducido, unos minutos).</span></div></div>
+          <div class="fila"><button class="btn sec" type="button" id="${clave}-padron">Buscar razón social en el padrón de RUC</button><span id="${clave}-padres" class="nota">Corre en GitHub (baja el padrón reducido, unos minutos).</span></div></div>
         <div class="caja"><h3>2 · Partidas sin clasificar (${x.partidas.length})</h3><p>Partidas que no están en el diccionario (hoja PARTIDA): elige su categoría y su nombre común.</p>${partidas}</div>
         <div class="caja"><h3>3 · ESTAD propuesto · ${esc(m3)}</h3><p>La tabla dinámica de las filas ok, fila por fila del ESTAD de ${esc(r.nombre)} (miles de US$), contra el ESTAD cargado.</p>${propuesta}</div>
         <div class="caja"><h3>4 · Productos que van a «Resto»</h3><p>No tienen fila propia en el ESTAD. Si alguno debe ir a otra fila, elígela: queda como equivalencia para los meses siguientes.</p>${resto}</div>
-        <div class="caja"><h3>5 · Para la síntesis: destinos, aduanas y empresas · ${esc(m3)}</h3><div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))">${top("Destinos del mes", x.destinos.mes)}${top("Destinos, enero-" + m3.split(" ")[0].toLowerCase(), x.destinos.acumulado)}
-          ${top("Aduanas del mes", x.aduanas.mes)}${top("Aduanas, enero-" + m3.split(" ")[0].toLowerCase(), x.aduanas.acumulado)}${top("Empresas del mes", x.empresas_top.mes)}${top("Empresas, enero-" + m3.split(" ")[0].toLowerCase(), x.empresas_top.acumulado)}</div></div>
-        <details class="caja"><summary><b>6 · Reglas de limpieza (obligatorias)</b> y equivalencias</summary>
+        <details class="caja"><summary><b>5 · Reglas de limpieza (obligatorias)</b> y equivalencias</summary>
           <p>Cada regla borra las filas que cumplan: partida que empieza con…, descripción que contiene…, producto o RUC. Departamento vacío = las tres regiones. Para quitar una regla, deja vacío su valor.</p>
           <div class="scroll"><table id="${clave}-reglas"><tr><th>Región</th><th>Campo</th><th>Valor</th><th>Motivo</th></tr>${reglas}</table></div>
           <div class="fila"><button class="btn sec" type="button" id="${clave}-areg">Agregar regla</button><button class="btn" type="button" id="${clave}-greg">Guardar reglas y reprocesar</button></div>
@@ -571,7 +568,7 @@
         const filas = [...caja.querySelectorAll("[data-regla]")].map((tr) => Object.fromEntries([...tr.querySelectorAll("[data-c]")].map((el) => [el.dataset.c, el.value.trim()])));
         enviar("reglas", filas, ev.target); });
       if ($(`${clave}-pasar`)) $(`${clave}-pasar`).addEventListener("click", async (ev) => {
-        if (!confirm(`¿Pasar al ESTAD de ${r.nombre} lo que sale de SUNAT para ${etqMes(x.periodo)}?${pr.hay_estad ? " Reemplaza lo que hay de ese mes." : ""}`)) return;
+        if (!confirm(`¿Pasar al ESTAD de ${r.nombre} lo que sale de la base mensual para ${etqMes(x.periodo)}?${pr.hay_estad ? " Reemplaza lo que hay de ese mes." : ""}`)) return;
         ev.target.disabled = true;
         try { const k = await api(`/v1/exportaciones/sunat-estad?${new URLSearchParams({ departamento: r.cod, periodo: x.periodo })}`, { method: "POST" });
           ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); $(`${clave}-pres`).innerHTML = `<div class="ok-box"><b>Listo: ${fmt(k.filas)} filas en el ESTAD de ${esc(etqMes(x.periodo))}.</b><span>Los cuadros, el anexo y los gráficos ya lo usan.</span></div>`; }
@@ -581,7 +578,33 @@
         ev.target.disabled = true; const m = $(`${clave}-padres`);
         try { const k = await api("/v1/exportaciones/padron", { method: "POST" }); m.textContent = `Lanzado en GitHub: ${k.pendientes} RUC sin razón social. Vuelve en unos minutos y recarga.`; }
         catch (e) { ev.target.disabled = false; m.textContent = e.message; } });
-    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo revisar la base de SUNAT</b><span>${esc(e.message)}</span></div>`; }
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo revisar la base mensual</b><span>${esc(e.message)}</span></div>`; }
+  }
+
+  // ── Resumen Export: datos destacados de la base mensual: productos, destinos, aduanas y empresas, y el borrador de sus párrafos ──
+  async function resumenSunat(r, caja) {
+    const clave = `rs-${grupo}`, st = estadoEjec(clave), mil = (v) => B.num(v, 0), p1 = (v) => v == null ? "" : B.num(v, 1);
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando el resumen…</div>';
+    try {
+      const x = (await api(`/v1/exportaciones/resumen?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo })}`)).resumen;
+      if (!x) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay base mensual de exportaciones de ${esc(r.nombre)}.</b><span>Súbela en la pestaña «Base mensual».</span></div>`; return; }
+      const mes = x.nombre_mes.charAt(0).toUpperCase() + x.nombre_mes.slice(1), am = `Enero-${x.nombre_mes}`;
+      const tabla = (t, lista, col) => `<div class="caja"><h3>${esc(t)}</h3><div class="scroll"><table><tr><th>${esc(col)}</th><th class="n">Miles de US$</th><th class="n">%</th><th>Principales productos</th></tr>
+        ${lista.length ? lista.map((e) => `<tr><td>${esc(e.nombre)}</td><td class="n">${mil(e.fob)}</td><td class="n">${p1(e.pct)}</td><td>${esc(e.productos.join(", "))}</td></tr>`).join("") : '<tr><td colspan="4" class="nota">Sin exportaciones.</td></tr>'}</table></div></div>`;
+      const bloque = (k, titulo, col) => `<div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))">${tabla(`${titulo} · ${mes} ${x.anio}`, x["mes"][k], col)}${tabla(`${titulo} · ${am} ${x.anio}`, x.acumulado[k], col)}</div>`;
+      const tile = (t, d) => `<div class="stat"><small>${esc(t)}</small><b>US$ ${B.num(d.total / 1000, 2)} mill.</b>${d.var == null ? "" : delta(d.var)}<span>${d.anterior == null ? "sin el mismo periodo del año anterior en la base" : `${x.anio - 1}: ${B.num(d.anterior / 1000, 2)}`}</span></div>`;
+      caja.innerHTML = `<div class="fila controles"><label class="campo" for="${clave}-p">Mes<select id="${clave}-p">${[...x.meses].reverse().map((m) => `<option value="${m}"${m === x.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
+          <span class="nota">Solo las filas ok de la base mensual (las que entran a los cuadros).</span></div>
+        <div class="stats tiles">${tile(`Exportaciones · ${mes} ${x.anio}`, x.mes)}${tile(`${am} ${x.anio}`, x.acumulado)}</div>
+        ${x.destacados.length ? `<div class="destacados">${x.destacados.map((d) => `<div class="destacado"><small>${esc(d.titulo)}</small><b>${esc(d.valor)}</b><span>${esc(d.detalle)}</span></div>`).join("")}</div>` : ""}
+        <div class="caja"><div class="fila" style="justify-content:space-between;align-items:center"><h3>Borrador para la síntesis</h3><button class="btn" type="button" id="${clave}-cop">Copiar texto</button></div>
+          ${x.textos.map((t) => `<p class="parrafo">${esc(t)}</p>`).join("")}<p class="nota" id="${clave}-msj">Revísalo antes de pegarlo: nombra los dos productos con más valor de cada destino y aduana.</p></div>
+        ${bloque("productos", "Principales productos", "Producto")}${bloque("destinos", "Mercados de destino", "País")}${bloque("continentes", "Por continente", "Continente")}
+        ${bloque("aduanas", "Aduanas", "Aduana")}${bloque("empresas", "Empresas exportadoras", "Empresa")}`;
+      $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; resumenSunat(r, caja); });
+      $(`${clave}-cop`).addEventListener("click", async () => { try { await navigator.clipboard.writeText(x.textos.join("\n\n")); $(`${clave}-msj`).textContent = "Copiado: pégalo en Word con Ctrl+V."; }
+        catch (e) { $(`${clave}-msj`).textContent = "Este navegador no deja copiar: selecciona el texto a mano."; } });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar el resumen</b><span>${esc(e.message)}</span></div>`; }
   }
 
   async function cuadrosEjecucion(sector, r, caja) {
@@ -900,7 +923,7 @@
   // ── Anexos: los de la síntesis de cada región, en su orden (junio 2026). [sector, n° de anexo del sector] o [sector, título] si aún no hay datos
   const ANEXOS_TAB = "Anexos BCRP";
   const PENDIENTES = { agro: "Producción agrícola (MIDAGRI / dirección regional de agricultura)", manu1: "Producción manufacturera · índice de volumen físico (año 2007 = 100)",
-    manu2: "Producción manufacturera · variación porcentual", expo: "Exportaciones por grupo de productos (SUNAT)", impo: "Importaciones FOB según uso o destino económico - Aduana de Iquitos",
+    manu2: "Producción manufacturera · variación porcentual", expo: "Exportaciones por grupo de productos", impo: "Importaciones FOB según uso o destino económico - Aduana de Iquitos",
     credito: "Crédito (SBS)", depositos: "Depósitos (SBS)", morosidad: "Tasa de morosidad (SBS)" };
   const ANEXOS_SINTESIS = {
     lor: [["agro"], ["hidro", 0], ["manu1"], ["manu2"], ["empleo", 0], ["expo", 0], ["impo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
@@ -1085,7 +1108,8 @@
     else if (t === "Archivos") panel = '<div id="archivos-fiscal"></div>';
     else if (t === BCRP_TAB) panel = `<div id="bcrp" data-sector="${id}"></div>`;
     else if (t === ANEXOS_TAB) panel = '<div id="anexos-bcrp"></div>';
-    else if (t === "SUNAT") panel = `${cajaSubida("sub-sunat", "La base mensual de SUNAT (X_AAAAMM.xlsx, tal como llega: aduana, ubigeo, ruc11, ano_mes, …, ubigeo_dep) o un ANUAL_PRO_AAAA.xlsx (sus diccionarios UNICOS y PARTIDA y su hoja ORIGEN). Sirve para las tres regiones: cada fila va a su departamento.")}<div id="sunat-expo"></div>`;
+    else if (t === "Base mensual") panel = `${cajaSubida("sub-sunat", "La base mensual de exportaciones (X_AAAAMM.xlsx, tal como llega: aduana, ubigeo, ruc11, ano_mes, …, ubigeo_dep) o un ANUAL_PRO_AAAA.xlsx (sus diccionarios UNICOS y PARTIDA y su hoja ORIGEN). Sirve para las tres regiones: cada fila va a su departamento.")}<div id="sunat-expo"></div>`;
+    else if (t === "Resumen Export") panel = '<div id="resumen-sunat"></div>';
     else if (t === "Contraste") panel = `<div id="contraste" data-sector="${id}"></div>`;
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
@@ -1179,6 +1203,7 @@
     if ($("cuadros-hidro")) cuadrosHidro(REG[grupo], $("cuadros-hidro"));
     if ($("cuadros-pesca")) cuadrosPesca(REG[grupo], $("cuadros-pesca"));
     if ($("sunat-expo")) sunatExpo(REG[grupo], $("sunat-expo"));
+    if ($("resumen-sunat")) resumenSunat(REG[grupo], $("resumen-sunat"));
     if ($("cuadros-expo")) cuadrosExpo(REG[grupo], $("cuadros-expo"), $("cuadros-expo").dataset.flujo);
     if ($("cuadros-ejec")) cuadrosEjecucion($("cuadros-ejec").dataset.sector, REG[grupo], $("cuadros-ejec"));
     if ($("variaciones")) variacionesAlarmantes(REG[grupo], $("variaciones"));

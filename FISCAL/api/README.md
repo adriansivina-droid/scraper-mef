@@ -240,7 +240,7 @@ Cuadros (`/v1/cuadros/exportaciones?departamento=16&periodo=AAAA-MM[&flujo=impo]
   corta las barras de más de 250 %), circulares de no tradicionales (6 principales + Otros, año anterior y enero-mes) y
   los 5 principales productos de enero-mes y del mes.
 
-### Base mensual de SUNAT (pestaña «SUNAT» de Exportaciones)
+### Base mensual (pestañas «Base mensual» y «Resumen Export» de Exportaciones)
 
 El flujo de ANUAL_PRO (hoja ORIGEN y tablas dinámicas) en la página (`sunat_expo.py`, base `expo-sunat`):
 1. Subir un **ANUAL_PRO_AAAA.xlsx** una vez: carga los diccionarios (UNICOS: PROD_UNICOS, PAISES, EMPRESAS, ADUANA; y
@@ -257,6 +257,13 @@ El flujo de ANUAL_PRO (hoja ORIGEN y tablas dinámicas) en la página (`sunat_ex
    grupo; dentro del grupo, al producto del mismo nombre o de la equivalencia; maderas sin fila propia a «Otros
    acabados»; lo demás a «Resto»; tipo 3 a «Otras exportaciones»), contra el ESTAD cargado. «Pasar al ESTAD» lo guarda
    como el ESTAD del mes y los cuadros lo usan. También destinos, aduanas y empresas del mes y del acumulado.
+
+5. **Resumen Export**: datos destacados del mes (producto estrella, principal destino y continente, cuántos países,
+   productos y empresas; con el año anterior en la base, nuevos mercados y el producto que más creció; récord mensual),
+   el borrador de los párrafos de la síntesis (mercados de destino y aduanas, como «El primero adquirió…; el segundo…»)
+   y las tablas de productos, destinos, continentes, aduanas y empresas del mes y de enero-mes
+   (`/v1/exportaciones/resumen`). La página no muestra el nombre SUNAT salvo en la nota «Fuente: SUNAT.» de los
+   cuadros de la síntesis.
 
 Con SUNAT 2023 (X_202301-202312) la página llega a las mismas 24 696 filas ok que la hoja ORIGEN depurada a mano.
 

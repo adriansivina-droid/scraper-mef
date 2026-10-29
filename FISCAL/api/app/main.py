@@ -453,6 +453,15 @@ def sunat_revision(departamento: str, periodo: str = ""):
     return json.loads(json.dumps({"revision": r}, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
 
 
+@app.get("/v1/exportaciones/resumen", dependencies=[Depends(acceso)])
+def sunat_resumen(departamento: str, periodo: str = ""):
+    """Resumen de la base de SUNAT para la síntesis: total, productos, destinos, aduanas y empresas del mes y de
+    enero-mes (filas ok), y el borrador de los párrafos de mercados y aduanas."""
+    _depto_expo(departamento)
+    r = sunat_expo.resumen(departamento, periodo or None)
+    return json.loads(json.dumps({"resumen": r}, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
+
+
 @app.post("/v1/exportaciones/sunat/{tabla}", dependencies=[Depends(acceso)])
 def sunat_corregir(tabla: str, cuerpo: dict = Body(...)):
     """Correcciones de la revisión: empresas (BORRAR PARA, nota), partidas (tipo, categoría, producto), equivalencias

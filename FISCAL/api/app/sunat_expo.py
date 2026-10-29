@@ -368,7 +368,7 @@ def leer(archivos):
         if df.empty:
             continue
         cuenta = df.groupby("ESTADO")["FOB"].agg(["count", "sum"])
-        avisos.append(f"{ruta.name}: SUNAT {df['AÑO'].min()}-{df['MES'].min():02d} a {df['AÑO'].max()}-{df['MES'].max():02d}, " +
+        avisos.append(f"{ruta.name}: base mensual {df['AÑO'].min()}-{df['MES'].min():02d} a {df['AÑO'].max()}-{df['MES'].max():02d}, " +
                       ", ".join(f"{k} {int(v['count'])} filas ({v['sum']:,.0f} mil US$)".replace(",", " ") for k, v in cuenta.iterrows()) + ".")
         partes.append(df.assign(_archivo=n))
     return ({"expo-sunat": pd.concat(partes, ignore_index=True)} if partes else {}), avisos
@@ -436,12 +436,137 @@ def pasar_al_estad(depto, anio, mes):
 
 
 def _top(ok, campo, n=5):
-    tot = ok["FOB"].sum()
-    g = ok.groupby(campo)["FOB"].sum().sort_values(ascending=False)
+    tot = ok["FOB_USD"].sum()
+    g = ok.assign(**{campo: ok[campo].fillna("(sin dato)")}).groupby(campo)["FOB_USD"].sum().sort_values(ascending=False)
     salida = []
     for k, v in g.head(n).items():
-        prods = ok[ok[campo] == k].groupby("PRODUCTO")["FOB"].sum().sort_values(ascending=False).head(3)
-        salida.append({"nombre": k, "fob": float(v), "pct": round(v / tot * 100, 1) if tot else None, "productos": [p for p, x in prods.items() if x > 0]})
+        if v <= 0:
+            continue
+        prods = ok[ok[campo].fillna("(sin dato)") == k].groupby("PRODUCTO")["FOB_USD"].sum().sort_values(ascending=False).head(3)
+        salida.append({"nombre": k, "fob": float(v) / 1000, "pct": float(_r1(v / tot * 100)) if tot else None,
+                       "productos": [p for p, x in prods.items() if x > 0]})
+    return salida
+
+
+def _r1(v):
+    return float(Decimal(repr(float(v))).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)) + 0.0
+
+
+# ── Resumen para la síntesis: destinos, aduanas, empresas y el borrador de sus párrafos ──
+MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"]
+ORDINAL = {"m": ["el primero", "el segundo", "el tercero", "el cuarto", "el quinto"], "f": ["la primera", "la segunda", "la tercera", "la cuarta", "la quinta"]}
+
+
+def _pct(v):
+    return f"{v:.1f}".replace(".", ",")
+
+
+def _y(lista):
+    lista = [x for x in lista if x]
+    return lista[0] if len(lista) == 1 else ", ".join(lista[:-1]) + " y " + lista[-1] if lista else ""
+
+
+def _minus(p):
+    return p[:1].lower() + p[1:] if p and not p[:2].isupper() else p
+
+
+def _detalle(top, genero, verbo):
+    """«El primero adquirió cacao; el segundo, madera aserrada; y el cuarto y el quinto, madera aserrada»: los seguidos
+    con los mismos productos se juntan."""
+    grupos = []
+    for i, t in enumerate(top):
+        prods = _y([_minus(p) for p in t["productos"][:2]])
+        if grupos and grupos[-1][1] == prods:
+            grupos[-1][0].append(i)
+        else:
+            grupos.append([[i], prods])
+    partes = []
+    for k, (idx, prods) in enumerate(grupos):
+        quien = _y([ORDINAL[genero][i] for i in idx])
+        partes.append(f"{quien} {verbo} {prods}" if k == 0 else f"{quien}, {prods}")
+    frase = partes[0] if len(partes) == 1 else "; ".join(partes[:-1]) + "; y " + partes[-1]
+    return frase[0].upper() + frase[1:]
+
+
+def _texto_destinos(top, cuando):
+    if not top:
+        return ""
+    partes = _y([f"{t['nombre']} ({_pct(t['pct'])} por ciento)" for t in top])
+    if len(top) == 1:
+        return f"{cuando}, el principal mercado de destino fue {partes}, que adquirió {_y([_minus(p) for p in top[0]['productos'][:2]])}, principalmente."
+    return f"{cuando}, los principales mercados de destino fueron: {partes}. {_detalle(top, 'm', 'adquirió')}, principalmente."
+
+
+def _texto_aduanas(top, cuando):
+    if not top:
+        return ""
+    if len(top) == 1:
+        t = top[0]
+        return (f"Asimismo, las exportaciones {cuando} se realizaron a través de la aduana {t['nombre']} ({_pct(t['pct'])} por ciento), "
+                f"con envíos de {_y([_minus(p) for p in t['productos'][:2]])}, principalmente.")
+    partes = _y([f"{t['nombre']} ({_pct(t['pct'])} por ciento)" for t in top[:3]])
+    return f"Asimismo, las exportaciones {cuando} se realizaron a través de las aduanas: {partes}. {_detalle(top[:3], 'f', 'registró mayores movimientos de')}, principalmente."
+
+
+def _destacados(ok, df, sel, ant, hay_ant, a, m):
+    """Datos que llaman la atención, solo los que la base permite: producto y destino principales, cuántos países,
+    productos y empresas; con el año anterior en la base, nuevos mercados y lo que más creció; y si el mes es récord."""
+    nombre, d, da = MESES[m - 1], sel["mes"], sel["acumulado"]
+    salida = []
+    tot = d["FOB_USD"].sum()
+    if tot <= 0:
+        return salida
+    prod = d.groupby("PRODUCTO")["FOB_USD"].sum().sort_values(ascending=False)
+    salida.append({"titulo": "Producto estrella del mes", "valor": prod.index[0],
+                   "detalle": f"{_pct(_r1(prod.iloc[0] / tot * 100))} % de lo exportado en {nombre} (US$ {_pct(_r1(prod.iloc[0] / 1e6))} millones)"})
+    pais = d.groupby(d["PAIS"].fillna("(sin dato)"))["FOB_USD"].sum().sort_values(ascending=False)
+    salida.append({"titulo": "Principal destino", "valor": pais.index[0], "detalle": f"compró el {_pct(_r1(pais.iloc[0] / tot * 100))} % de las exportaciones del mes"})
+    cont = d.groupby(d["CONTINENTE"].fillna("(sin dato)"))["FOB_USD"].sum().sort_values(ascending=False)
+    salida.append({"titulo": "Continente principal", "valor": cont.index[0], "detalle": f"{_pct(_r1(cont.iloc[0] / tot * 100))} % del valor del mes"})
+    salida.append({"titulo": "Llegamos a", "valor": f"{d['PAIS'].nunique()} países",
+                   "detalle": f"en {nombre}; {da['PAIS'].nunique()} países en lo que va del año"})
+    salida.append({"titulo": "Productos exportados", "valor": f"{d['PRODUCTO'].nunique()}", "detalle": f"en {nombre}; {da['PRODUCTO'].nunique()} en lo que va del año"})
+    salida.append({"titulo": "Empresas exportadoras", "valor": f"{d['RUC'].nunique()}", "detalle": f"en {nombre}; {da['RUC'].nunique()} en lo que va del año"})
+    if hay_ant:
+        antes = set(ant["acumulado"]["PAIS"].dropna())
+        nuevos = da[~da["PAIS"].isin(antes)].groupby("PAIS")["FOB_USD"].sum().sort_values(ascending=False)
+        if len(nuevos):
+            salida.append({"titulo": "Nuevos mercados", "valor": f"{len(nuevos)}", "detalle": "no compraron en el mismo periodo del año anterior: " + _y(list(nuevos.index[:4]))})
+        crec = (da.groupby("PRODUCTO")["FOB_USD"].sum() - ant["acumulado"].groupby("PRODUCTO")["FOB_USD"].sum()).dropna().sort_values(ascending=False)
+        if len(crec) and crec.iloc[0] > 0:
+            salida.append({"titulo": "El que más creció", "valor": crec.index[0], "detalle": f"US$ {_pct(_r1(crec.iloc[0] / 1e6))} millones más que en enero-{nombre} del año anterior"})
+    mensual = ok.groupby(["AÑO", "MES"])["FOB_USD"].sum()
+    if len(mensual) >= 13 and mensual.idxmax() == (a, m):
+        salida.append({"titulo": "Récord", "valor": f"{nombre.capitalize()} {a}", "detalle": f"el mayor valor mensual desde {MESES[df['MES'].min() - 1]} {df['AÑO'].min()}"})
+    return salida
+
+
+def resumen(depto, periodo=None):
+    """Del mes y de enero-mes (filas ok): total, productos, destinos, continentes, aduanas y empresas, con su
+    variación contra el mismo periodo del año anterior (si está en la base) y el borrador de los párrafos de la síntesis."""
+    df = _base(depto)
+    if df.empty:
+        return None
+    df["AÑO"], df["MES"] = df["AÑO"].astype(int), df["MES"].astype(int)
+    ok = df[df["ESTADO"] == "ok"].copy()
+    ok["EMPRESA_NOMBRE"] = ok["EMPRESA"].str.replace(r"^\d{11}\s*-\s*", "", regex=True).str.strip()
+    meses = sorted({f"{a}-{m:02d}" for a, m in zip(df["AÑO"], df["MES"])})
+    periodo = periodo if periodo in meses else meses[-1]
+    a, m = int(periodo[:4]), int(periodo[5:7])
+    sel = {"mes": ok[(ok["AÑO"] == a) & (ok["MES"] == m)], "acumulado": ok[(ok["AÑO"] == a) & (ok["MES"] <= m)]}
+    ant = {"mes": ok[(ok["AÑO"] == a - 1) & (ok["MES"] == m)], "acumulado": ok[(ok["AÑO"] == a - 1) & (ok["MES"] <= m)]}
+    hay_ant = bool(((df["AÑO"] == a - 1) & (df["MES"] == m)).any())
+    salida = {"periodo": periodo, "meses": meses, "nombre_mes": MESES[m - 1], "anio": a, "hay_anterior": hay_ant}
+    for k, d in sel.items():
+        tot, tot_b = d["FOB_USD"].sum() / 1000, ant[k]["FOB_USD"].sum() / 1000
+        salida[k] = {"total": tot, "anterior": tot_b if hay_ant else None,
+                     "var": _r1((tot / tot_b - 1) * 100) if hay_ant and tot_b else None,
+                     "productos": _top(d, "PRODUCTO", 8), "destinos": _top(d, "PAIS"), "continentes": _top(d, "CONTINENTE", 6),
+                     "aduanas": _top(d, "ADUANA"), "empresas": _top(d, "EMPRESA_NOMBRE")}
+    salida["destacados"] = _destacados(ok, df, sel, ant, hay_ant, a, m)
+    cuando_m, cuando_a = f"En {MESES[m - 1]} {a}", (f"En el periodo enero-{MESES[m - 1]} {a}" if m > 1 else f"En enero {a}")
+    salida["textos"] = [x for x in (_texto_destinos(salida["mes"]["destinos"], cuando_m), _texto_aduanas(salida["mes"]["aduanas"], f"en {MESES[m - 1]} {a}"),
+                                    _texto_destinos(salida["acumulado"]["destinos"], cuando_a) if m > 1 else "") if x]
     return salida
 
 
@@ -473,16 +598,12 @@ def revision(depto, periodo=None):
     resto = ok[ok["RUBRO_ESTAD"].fillna("").isin(["Resto"])]
     a_resto = [{"producto": p, "categoria": g["CATEGORIA"].iloc[0], "fob": float(g["FOB"].sum())} for p, g in resto.groupby("PRODUCTO") if g["FOB"].sum() > 0]
     est = estructura_estad(depto)
-    ok_m, ok_a = mes[mes["ESTADO"] == "ok"], acum[acum["ESTADO"] == "ok"]
     return {"periodo": periodo, "meses": meses, "estados": estados,
             "empresas": sorted(empresas, key=lambda x: -x["fob"]), "partidas": sorted(partidas, key=lambda x: -x["fob"]),
             "a_resto": sorted(a_resto, key=lambda x: -x["fob"]),
             "rubros": [f["rubro"] for f in est if f["nivel"] in ("producto", "grupo")] + [f["rubro"] for f in est if f["nivel"] == "tipo" and _clave(f["rubro"]).startswith("otras")],
             "categorias": sorted({(str(t), str(c)) for t, c in leer_tabla("partidas")[["TIPO", "CATEGORIA"]].dropna().itertuples(index=False)}),
             "propuesta": propuesta(depto, a, m, mes),
-            "destinos": {"mes": _top(ok_m, "PAIS"), "acumulado": _top(ok_a, "PAIS")},
-            "aduanas": {"mes": _top(ok_m, "ADUANA"), "acumulado": _top(ok_a, "ADUANA")},
-            "empresas_top": {"mes": _top(ok_m, "EMPRESA"), "acumulado": _top(ok_a, "EMPRESA")},
             "reglas": leer_tabla("reglas").to_dict("records"), "equivalencias": leer_tabla("equivalencias").to_dict("records")}
 
 
@@ -566,15 +687,15 @@ def excel_propuesta(depto, anio, mes):
     ws = wb.active
     ws.title = "ESTAD propuesto"
     ws.append([f"{NOMBRE[depto]}: EXPORTACIONES FOB POR GRUPO DE PRODUCTOS · {anio}-{mes:02d}"])
-    ws.append(["(Miles de US dólares) · desde la base de SUNAT (filas ok)"])
-    ws.append(["Rubro", "SUNAT (propuesto)", "ESTAD cargado", "Diferencia"])
+    ws.append(["(Miles de US dólares) · desde la base mensual (filas ok)"])
+    ws.append(["Rubro", "Base mensual (propuesto)", "ESTAD cargado", "Diferencia"])
     for f in (p or {}).get("filas", []):
         ws.append([("   " * {"total": 0, "tipo": 0, "grupo": 1, "producto": 2}[f["nivel"]]) + f["rubro"], f["sunat"], f["estad"], f["dif"]])
         if f["nivel"] in ("total", "tipo"):
             ws.cell(ws.max_row, 1).font = Font(bold=True)
     ws.column_dimensions["A"].width = 36
     det = _base(depto, f"{anio}-{mes:02d}", f"{anio}-{mes:02d}")
-    w2 = wb.create_sheet("Detalle SUNAT")
+    w2 = wb.create_sheet("Detalle")
     w2.append(COLUMNAS)
     for r in det[COLUMNAS].itertuples(index=False):
         w2.append([None if (isinstance(v, float) and pd.isna(v)) else v for v in r])

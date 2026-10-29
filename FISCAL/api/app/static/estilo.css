@@ -220,3 +220,9 @@ details.caja > summary { cursor: pointer; }
 .bcrp-msj { min-height: 1.2em; font-size: 13px; margin-top: 6px; }
 .bcrp-msj.ok { color: var(--teal); }
 .bcrp-msj.mal { color: var(--error); }
+.parrafo { text-align: justify; line-height: 1.55; margin: 8px 0; max-width: 92ch; }
+.destacados { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; margin: 14px 0; }
+.destacado { border: 1px solid var(--hair); border-left: 4px solid var(--teal); border-radius: 10px; padding: 12px 14px; background: var(--paper); display: flex; flex-direction: column; gap: 4px; }
+.destacado small { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; opacity: .75; }
+.destacado b { font-size: 20px; line-height: 1.2; color: var(--navy); font-family: var(--display); }
+.destacado span { font-size: 13px; opacity: .85; }
