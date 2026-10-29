@@ -95,7 +95,6 @@ def test_flujo_sunat_completo(cliente):
     prop = {f["rubro"]: f for f in x["propuesta"]["filas"]}
     assert prop["Petróleo crudo y derivados"]["sunat"] == 17033 and prop["Petróleo crudo y derivados"]["dif"] == 0
     assert prop["TOTAL EXPORTACIONES"]["sunat"] == 17033 + 290 + 1
-    assert x["destinos"]["mes"][0]["nombre"] == "Brasil"
 
     # revisión: la empresa nueva pasa a OK, la partida se clasifica como madera y va a «Otros acabados»
     assert cliente.post("/v1/exportaciones/sunat/empresas", json={"filas": [{"RUC": "20999999999", "BORRAR_PARA": "OK"}]}).status_code == 200
@@ -117,7 +116,7 @@ def test_flujo_sunat_completo(cliente):
     s = {f["nombre"]: f for f in c["sintesis"]}
     assert s["Petróleo crudo y derivados"]["mes_a"] == 17.03 and s["Maderas y sus manufacturas"]["mes_a"] == 0.01
     r = cliente.get("/v1/exportaciones/sunat-estad.xlsx?departamento=16&periodo=2026-08")
-    assert load_workbook(io.BytesIO(r.content)).sheetnames == ["ESTAD propuesto", "Detalle SUNAT"]
+    assert load_workbook(io.BytesIO(r.content)).sheetnames == ["ESTAD propuesto", "Detalle"]
 
 
 def test_padron_de_ruc(cliente):
@@ -138,3 +137,14 @@ def test_padron_de_ruc(cliente):
     assert "20999999999" not in sunat_expo.pendientes_ruc()
     x = cliente.get("/v1/exportaciones/sunat?departamento=16&periodo=2026-08").json()["revision"]
     assert x["empresas"][0]["razon_social"] == "NUEVA EXPORTADORA SAC"          # sigue por verificar (BORRAR PARA vacío)
+
+
+def test_resumen_export(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    x = cliente.get("/v1/exportaciones/resumen?departamento=16&periodo=2026-08").json()["resumen"]
+    assert x["nombre_mes"] == "agosto" and x["mes"]["destinos"][0]["nombre"] == "Brasil"
+    assert x["textos"][0].startswith("En agosto 2026, el principal mercado de destino fue Brasil (100,0 por ciento)")
+    titulos = {d["titulo"]: d for d in x["destacados"]}
+    assert titulos["Producto estrella del mes"]["valor"] == "Barriles de petróleo crudo"
+    assert titulos["Empresas exportadoras"]["valor"] == "2"

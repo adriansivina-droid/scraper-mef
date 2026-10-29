@@ -19,7 +19,7 @@ GRUPOS = {"inversion": "Inversión · genérica 2.6", "gasto": "Gasto total · t
           "pesca": "Pesca · DIREPRO, VBP a precios de 2007",
           "empleo": "Empleo · MTPE, Planilla Electrónica",
           "hidrocarburos": "Hidrocarburos · PERUPETRO",
-          "comercio": "Exportaciones e importaciones · ESTAD (SUNAT)"}
+          "comercio": "Exportaciones e importaciones · ESTAD"}
 
 
 @dataclass(frozen=True)
@@ -115,13 +115,13 @@ BASES = {b.id: b for b in [
          descripcion="ESTAD de Loreto (16.Import): importaciones FOB por la aduana de Iquitos según uso o destino económico, "
                      "en miles de US$."),
     # Base mensual de SUNAT procesada en la página (sunat_expo.py): una fila por declaración, con su estado
-    Base("expo-sunat", "comercio", "Base de SUNAT procesada (detalle por declaración)", "Exportaciones SUNAT", "SUNAT",
+    Base("expo-sunat", "comercio", "Base mensual de exportaciones (detalle por declaración)", "Exportaciones · base mensual", "BASE MENSUAL",
          ["AÑO", "MES", "DEPARTAMENTO", "RUC", "EMPRESA", "PARTIDA", "DESCRIPCION", "PRODUCTO", "TIPO", "CATEGORIA",
           "TIPO_ESTAD", "RUBRO_ESTAD", "COD_PAIS", "PAIS", "CONTINENTE", "COD_ADUANA", "ADUANA", "FECHA_EMBARQUE", "KILOS",
           "CANTIDAD", "UNIDAD", "BORRAR_PARA", "ESTADO", "MOTIVO", "FOB_USD", "FOB"],
          [8, 6, 14, 13, 40, 12, 50, 28, 28, 28, 28, 26, 8, 20, 12, 8, 20, 10, 10, 10, 8, 14, 11, 40, 14, 10],
          valor="FOB", usa_niveles=False, departamentos=("16", "22", "25"),
-         descripcion="Base mensual de SUNAT con los diccionarios de ANUAL_PRO (producto, categoría, país, aduana, empresa) y el "
+         descripcion="Base mensual de exportaciones con los diccionarios de ANUAL_PRO (producto, categoría, país, aduana, empresa) y el "
                      "estado de cada fila: ok (entra a los cuadros), verificar, borrar o clasificar. FOB en miles de US$ "
                      "(ROUND por fila, como la hoja ORIGEN); FOB_USD sin redondear."),
 ]}
