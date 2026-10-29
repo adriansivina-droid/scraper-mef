@@ -16,6 +16,9 @@ on:
       periodos:
         description: "Meses AAAA-MM separados por comas"
         required: true
+      unificar:
+        description: "Opcional (exportaciones): unificar un producto antes, TEXTO=NOMBRE COMÚN (p. ej. COBES 380=Manteca vegetal de palmiste)"
+        default: ""
       reprocesar:
         description: "Reprocesar antes la base mensual con los diccionarios y equivalencias del momento"
         type: boolean
@@ -38,6 +41,7 @@ jobs:
           DEPTO: ${{ inputs.departamento }}
           PERIODOS: ${{ inputs.periodos }}
           REPROCESAR: ${{ inputs.reprocesar }}
+          UNIFICAR: ${{ inputs.unificar }}
         run: |
           python3 - <<'PY'
           import base64, json, os, re, urllib.parse, urllib.request
@@ -51,7 +55,11 @@ jobs:
               cab = {"Authorization": "Basic " + auth, **({"Content-Type": "application/json"} if datos else {})}
               r = urllib.request.urlopen(urllib.request.Request(url + ruta, data=datos, method=metodo, headers=cab), timeout=600)
               return json.load(r)
-          if os.environ.get("REPROCESAR", "true") == "true":
+          if os.environ.get("UNIFICAR", "").strip() and flujo == "expo":
+              texto, _, nombre = os.environ["UNIFICAR"].partition("=")
+              r = pedir("/v1/exportaciones/sunat/unificar", "POST", {"filas": [{"contiene": texto.strip(), "nombre": nombre.strip()}]})
+              print(f"::notice::Unificado «{texto.strip()}» como «{nombre.strip()}»; base reprocesada: {r['filas']} filas")
+          elif os.environ.get("REPROCESAR", "true") == "true":
               # una corrección vacía vuelve a procesar toda la base (diccionarios, reglas y equivalencias del momento)
               r = pedir("/v1/exportaciones/sunat/equivalencias" if flujo == "expo" else "/v1/importaciones/base/empresas", "POST", {"filas": []})
               print(f"::notice::Base mensual reprocesada: {r['filas']} filas")

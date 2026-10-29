@@ -81,6 +81,10 @@ TERMINOS_INICIALES = [
     {"departamento": "", "contiene": "COBERTHEL", "nombre": "Manteca vegetal de palma", "fuente": "Como en PROD_UNICOS"},
     {"departamento": "", "contiene": "MANGAL", "nombre": "Manteca vegetal de palma", "fuente": "Como en PROD_UNICOS"},
     {"departamento": "", "contiene": "LA GRANJA", "nombre": "Manteca vegetal de palma", "fuente": "Manteca La Granja: las DCOM dicen «MANTECA DE PALMA LA GRANJA»"},
+    # maderas: el decking es piso exterior grueso (21 mm, S4S E4E); tablillas (techos) y frisos (paredes) siguen su partida
+    {"departamento": "", "contiene": "DECKING", "nombre": "Decking", "fuente": "Decking: piso exterior, grueso y resistente a la intemperie"},
+    {"departamento": "", "contiene": "DECKS", "nombre": "Decking", "fuente": "Decking: piso exterior, grueso y resistente a la intemperie"},
+    {"departamento": "", "contiene": "PISOS DE EXTERIORES", "nombre": "Decking", "fuente": "Madera perfilada para pisos de exteriores = decking"},
 ]
 
 
@@ -767,6 +771,20 @@ def descripciones_nuevas(mes, limite=60):
                        "ejemplos": list(descs.index[:3]), "todas": list(descs.index)})
     grupos.sort(key=lambda x: (not x["alerta"], -x["fob"]))
     return grupos[:limite]
+
+
+def unificar(contiene, nombre):
+    """Todas las descripciones que contienen el texto (las de PROD_UNICOS y las de la base) quedan en PROD_UNICOS con ese
+    nombre común. Devuelve cuántas."""
+    k = _clave(contiene)
+    if len(k) < 3 or not str(nombre or "").strip():
+        raise ValueError("Escribe el texto (al menos 3 letras) y el nombre común.")
+    un = leer_tabla("unicos")
+    base = db.leer_todo("expo-sunat")
+    descs = set(un.loc[un["PRODUCTO_ORIGINAL"].map(_clave).str.contains(k, regex=False), "PRODUCTO_ORIGINAL"])
+    if base is not None:
+        descs |= set(base.loc[base["DESCRIPCION"].map(_clave).str.contains(k, regex=False), "DESCRIPCION"])
+    return asignar_nombres([{"descripciones": sorted(descs), "nombre": str(nombre).strip()}])
 
 
 def asignar_nombres(filas):
