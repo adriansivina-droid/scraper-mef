@@ -226,3 +226,4 @@ details.caja > summary { cursor: pointer; }
 .destacado small { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; opacity: .75; }
 .destacado b { font-size: 20px; line-height: 1.2; color: var(--navy); font-family: var(--display); }
 .destacado span { font-size: 13px; opacity: .85; }
+.mark.logo { width: 40px; height: 40px; background: none; border-radius: 0; object-fit: contain; display: block; }
