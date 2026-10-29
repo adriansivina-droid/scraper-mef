@@ -835,7 +835,7 @@
     if (!expo) return items;
     const va = c.variacion_anual.filter((x) => x.var != null), m3 = mes.slice(0, 3).toLowerCase();
     if (va.length) items.push({ clave: "g1", tipo: "GRÁFICO", num: N.g, nombre: `${R}: VARIACIÓN DE LAS EXPORTACIONES`, svg: (n) => B.barras({ numero: n, titulo: `${R}: EXPORTACIONES`,
-      unidad: grupo === "uca" ? `(Variación % enero-${mes.toLowerCase()} respecto a similar periodo del año anterior)` : "(Variación % respecto al año anterior)", dec: 1, tope: grupo === "lor" ? 250 : null,
+      unidad: grupo === "uca" ? `(Variación % enero-${mes.toLowerCase()} respecto a similar periodo del año anterior)` : "(Variación % respecto al año anterior)", dec: 1, tope: grupo === "lor" ? 250 : null, sinEje: true,
       puntos: va.map((x) => ({ etq: x.etq, valor: x.var })), notas: [...(grupo === "uca" ? [] : [`* Enero-${mes.toLowerCase()}.`]), "Fuente: SUNAT."] }) });
     const nt = c.no_tradicionales, mm = (p) => p.map((x) => ({ nombre: x.nombre, valor: x.valor }));
     if (nt && (nt.anterior.partes.length || nt.actual.partes.length)) items.push({ clave: "g2", tipo: "GRÁFICO", num: N.g2, nombre: `${R}: PRINCIPALES PRODUCTOS NO TRADICIONALES`, svg: (n) => B.circulares({ numero: n,
