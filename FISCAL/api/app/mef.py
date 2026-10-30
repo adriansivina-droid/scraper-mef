@@ -63,6 +63,6 @@ def corridas(cuantas=5, nombre="mef"):
     r = requests.get(f"{_api(nombre)}/runs", headers=_encabezados(), params={"per_page": cuantas}, timeout=30)
     if r.status_code != 200:
         raise _fallo(r)
-    return [{"estado": c["status"], "resultado": c.get("conclusion"), "origen": c["event"], "inicio": c["created_at"],
+    return [{"id": c["id"], "estado": c["status"], "resultado": c.get("conclusion"), "origen": c["event"], "inicio": c["created_at"],
              "actualizado": c["updated_at"], "enlace": c["html_url"], "titulo": c.get("display_title", "")}
             for c in r.json().get("workflow_runs", [])]
