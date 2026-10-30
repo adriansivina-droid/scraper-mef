@@ -269,6 +269,44 @@ def mef_actualizar(desde: str = "", hasta: str = "", prueba: bool = False):
     return {"lanzado": True, "desde": desde or None, "hasta": hasta or None, "prueba": prueba}
 
 
+ARCHIVOS_MEF = {"dev-municipalidad": "inv-dev-municipalidad", "pim-funcion": "inv-pim-funcion", "pim-municipalidad": "inv-pim-municipalidad"}
+
+
+@app.get("/v1/mef/archivos", dependencies=[Depends(acceso)])
+def mef_archivos():
+    """Los tres archivos de los 25 departamentos con scraper propio: qué hay cargado y las últimas corridas."""
+    disp = db.disponibilidad()
+    salida = {"archivos": {a: disp[b] for a, b in ARCHIVOS_MEF.items()}, "configurado": mef.configurado(), "corridas": []}
+    if mef.configurado():
+        try:
+            salida["corridas"] = mef.corridas(6, nombre="archivos")
+        except (mef.ErrorGitHub, OSError) as e:
+            salida["error"] = str(e)
+    return salida
+
+
+@app.post("/v1/mef/archivos/actualizar", dependencies=[Depends(acceso)])
+def mef_archivos_actualizar(archivo: str = Query(..., pattern="^(dev-municipalidad|pim-funcion|pim-municipalidad)$"),
+                            desde: str = "", hasta: str = "", departamentos: str = "TODOS", prueba: bool = False):
+    """Lanza el scraper de un solo archivo (fiscal_archivos.yml): no toca el resto de la base fiscal."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
+    deps = "TODOS" if departamentos.strip().upper() in ("", "TODOS") else departamentos
+    if deps != "TODOS":
+        cods = [c.strip() for c in deps.split(",") if c.strip()]
+        if not cods or any(c not in DEPARTAMENTOS or c in ("98", "99") for c in cods):
+            raise HTTPException(422, f"Departamentos no válidos: {departamentos!r}.")
+        deps = "TODOS" if len(set(cods)) == 25 else ",".join(sorted(set(cods)))
+    try:
+        mef.lanzar(desde, hasta, nombre="archivos",
+                   inputs={"archivo": archivo, "desde": desde, "hasta": hasta, "departamentos": deps, "prueba": bool(prueba)})
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except (mef.ErrorGitHub, OSError) as e:
+        raise HTTPException(502, str(e))
+    return {"lanzado": True, "archivo": archivo, "desde": desde or None, "hasta": hasta or None, "departamentos": deps}
+
+
 @app.get("/v1/empleo", dependencies=[Depends(acceso)])
 def empleo_estado():
     """Si el botón «Actualizar empleo» está configurado y las últimas corridas del scraper de empleo en GitHub."""

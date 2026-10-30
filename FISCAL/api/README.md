@@ -140,6 +140,16 @@ en el notebook, el servidor usa el cambio.
 3. Render → servicio → **Environment** → **Add Environment Variable** → `GITHUB_ACCIONES_TOKEN` = el token → guardar.
    Nunca lo pegues en un chat. Cuando venza, el botón avisará «el token no es válido o venció»: se genera otro igual.
 
+### Los tres archivos de los 25 departamentos, cada uno con su scraper
+
+En **Las tres regiones → Datos → MEF · 3 archivos**: DEV Función · Municipalidad, PIM Función y PIM Función ·
+Municipalidad tienen cada uno su botón **Descargar Excel** (departamentos y periodo a elegir) y su botón **Actualizar
+desde el MEF**, que lanza `.github/workflows/fiscal_archivos.yml`: el mismo notebook, pero solo con el bloque de ese
+archivo (`scraper_servidor.py --archivo dev-municipalidad|pim-funcion|pim-municipalidad --departamentos TODOS|16,22`).
+Reemplaza solo esa base (y, en el devengado municipal, el nivel M de DEV Función de esos departamentos); lo demás de la
+base fiscal no se toca. PIM es anual: basta el año. El scraper completo (días 2 y 21) los sigue trayendo igual.
+Endpoints: `GET /v1/mef/archivos`, `POST /v1/mef/archivos/actualizar?archivo=…&desde=…&hasta=…&departamentos=…`.
+
 ## Todo en la página (sin Drive)
 
 La página guarda todo en su base de datos y usa GitHub Actions solo para lo que necesita un servidor aparte (los
