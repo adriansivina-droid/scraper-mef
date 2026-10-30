@@ -1181,12 +1181,12 @@
         ? `<label class="campo" for="ad-${a.id}">Desde (año)<input type="number" min="2015" max="2099" id="ad-${a.id}" value="${anio(h)}"></label><label class="campo" for="ah-${a.id}">Hasta (año)<input type="number" min="2015" max="2099" id="ah-${a.id}" value="${anio(h)}"></label>`
         : `<label class="campo" for="ad-${a.id}">Desde<input type="month" id="ad-${a.id}" value="${h ? anio(h) + "-01" : ""}"></label><label class="campo" for="ah-${a.id}">Hasta<input type="month" id="ah-${a.id}" value="${esc(h || "")}"></label>`;
       const nuevo = a.anual
-        ? `<label class="campo" for="ud-${a.id}">Año<input type="number" min="2015" max="2099" id="ud-${a.id}" placeholder="año en curso"></label>`
+        ? `<label class="campo" for="ud-${a.id}">Desde (año)<input type="number" min="2015" max="2099" id="ud-${a.id}" placeholder="año en curso"></label><label class="campo" for="uh-${a.id}">Hasta (año)<input type="number" min="2015" max="2099" id="uh-${a.id}" placeholder="igual a desde"></label>`
         : `<label class="campo" for="ud-${a.id}">Desde<input type="month" id="ud-${a.id}"></label><label class="campo" for="uh-${a.id}">Hasta<input type="month" id="uh-${a.id}"></label>`;
       return `<div class="caja"><h3>${esc(a.t)}</h3><p>${esc(a.d)} <span class="nota">Cargado: ${cargado}.</span></p>
         <div class="fila">${periodo}<button class="btn" type="button" data-arch-bajar="${a.id}" ${x.filas ? "" : "disabled"}>Descargar Excel</button></div>
         <div class="fila">${nuevo}<button class="btn sec" type="button" data-arch-act="${a.id}" ${j.configurado ? "" : "disabled"}>Actualizar desde el MEF</button></div>
-        <p class="nota">${a.anual ? "Vacío = el año en curso. Toma unos minutos." : "Vacío = año en curso hasta el último mes cerrado (en dos tramos seguidos). Con los 25 departamentos, un año completo puede tardar varias horas: para un mes, pon el mismo mes en desde y hasta."}</p>
+        <p class="nota">${a.anual ? "Vacío = el año en curso; «hasta» vacío = solo el año «desde». Cada año toma unos minutos." : "Vacío = año en curso hasta el último mes cerrado (en dos tramos seguidos). Con los 25 departamentos, un año completo puede tardar varias horas: para un mes, pon el mismo mes en desde y hasta."}</p>
         <div id="ares-${a.id}" aria-live="polite"></div></div>`;
     };
     caja.innerHTML = `<div class="caja"><h3>Departamentos</h3><div class="fila"><button class="btn sec" type="button" data-adeps="todos">Los 25</button><button class="btn sec" type="button" data-adeps="lsu">Loreto · San Martín · Ucayali</button><button class="btn sec" type="button" data-adeps="ninguno">Ninguno</button></div>
@@ -1228,8 +1228,9 @@
     caja.querySelectorAll("[data-arch-act]").forEach((b) => b.addEventListener("click", async () => {
       const a = ARCH_MEF.find((x) => x.id === b.dataset.archAct), res = $(`ares-${a.id}`), dep = marcados();
       if (!dep.length) { res.innerHTML = '<div class="err-box"><b>Marca al menos un departamento</b></div>'; return; }
-      const d = $(`ud-${a.id}`).value, h = a.anual ? "" : $(`uh-${a.id}`).value;
-      const q = new URLSearchParams({ archivo: a.id, desde: a.anual ? (d ? `${d}-01` : "") : d, hasta: h, departamentos: dep.length === 25 ? "TODOS" : dep.join(",") });
+      const d = $(`ud-${a.id}`).value, h = $(`uh-${a.id}`).value;
+      if (a.anual && h && !d) { res.innerHTML = '<div class="err-box"><b>Falta el año «desde»</b></div>'; return; }
+      const q = new URLSearchParams({ archivo: a.id, desde: a.anual ? (d ? `${d}-01` : "") : d, hasta: a.anual ? (h ? `${h}-12` : "") : h, departamentos: dep.length === 25 ? "TODOS" : dep.join(",") });
       b.disabled = true;
       try { await api(`/v1/mef/archivos/actualizar?${q}`, { method: "POST" }); res.innerHTML = `<div class="ok-box"><b>Scraper de ${esc(a.t)} lanzado</b><span>Solo baja este archivo y reemplaza solo sus datos. La tabla de corridas se actualiza sola; al terminar, la descarga trae lo nuevo.</span></div>`; vigilar(); }
       catch (e) { res.innerHTML = `<div class="err-box"><b>No se pudo lanzar</b><span>${esc(e.message)}</span></div>`; }
