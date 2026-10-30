@@ -1,0 +1,111 @@
+# Scrapers propios de los tres archivos del MEF con los 25 departamentos, independientes del resto de la base fiscal:
+#   · dev-municipalidad → DEV Funcion.Municipalidad (devengado 2.6 por función y municipalidad, mensual)
+#   · pim-funcion       → PIM Funcion (PIM 2.6 por función y nivel de gobierno, anual)
+#   · pim-municipalidad → PIM Funcion.Municipalidad (PIM 2.6 por función y municipalidad, anual)
+# Corre el mismo notebook (FISCAL/Fiscal_Scraper.ipynb) solo con el bloque de ese archivo y carga en la base solo esa base.
+# Se lanza desde la página («MEF · 3 archivos» → Actualizar) o a mano: Actions → este flujo → Run workflow. No tiene
+# horario propio: el scraper completo (fiscal_scraper.yml) los sigue trayendo los días 2 y 21.
+name: Fiscal · archivo del MEF (25 departamentos)
+run-name: "${{ inputs.archivo }} · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.departamentos != 'TODOS' && format(' · {0}', inputs.departamentos) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      archivo:
+        description: "Archivo"
+        type: choice
+        options: [dev-municipalidad, pim-funcion, pim-municipalidad]
+        default: dev-municipalidad
+      desde:
+        description: "Desde (AAAA-MM; en PIM cuenta solo el año). Vacío: año en curso (el devengado, en dos tramos)"
+        type: string
+        default: ""
+      hasta:
+        description: "Hasta (AAAA-MM). Vacío: último mes cerrado (PIM: el mismo año de «desde»)"
+        type: string
+        default: ""
+      departamentos:
+        description: "TODOS o códigos separados por comas (16,22,25)"
+        type: string
+        default: "TODOS"
+      prueba:
+        description: "Prueba rápida (un mes, solo Loreto; no carga en la base)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: fiscal-archivo-${{ inputs.archivo }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  raspar:
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        tramo: [1, 2]
+    name: raspar (tramo ${{ matrix.tramo }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - name: ¿Hace falta este tramo?
+        id: tramo
+        env:
+          TRAMO: ${{ matrix.tramo }}
+          ARCHIVO: ${{ inputs.archivo }}
+          PERIODO: ${{ inputs.desde }}${{ inputs.hasta }}
+          PRUEBA: ${{ inputs.prueba }}
+        run: |
+          # el tramo 2 solo sirve al devengado del año en curso; PIM (anual), un periodo elegido o la prueba van en el tramo 1
+          if [ "$TRAMO" = "2" ] && { [ "$ARCHIVO" != "dev-municipalidad" ] || [ -n "$PERIODO" ] || [ "$PRUEBA" = "true" ]; }; then
+            echo "correr=no" >> "$GITHUB_OUTPUT"; echo "Todo va en el tramo 1."
+          else
+            echo "correr=si" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.tramo.outputs.correr == 'si'
+
+      - uses: actions/setup-python@v5
+        if: steps.tramo.outputs.correr == 'si'
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        if: steps.tramo.outputs.correr == 'si'
+        run: pip install -r FISCAL/api/requirements.txt beautifulsoup4==4.12.3 tqdm==4.67.1
+
+      - name: Raspar el MEF y cargar en la base de datos
+        if: steps.tramo.outputs.correr == 'si'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ARCHIVO: ${{ inputs.archivo }}
+          DESDE: ${{ inputs.desde }}
+          HASTA: ${{ inputs.hasta }}
+          DEPARTAMENTOS: ${{ inputs.departamentos }}
+          PRUEBA: ${{ inputs.prueba }}
+          FISCAL_WORKERS: "3"
+          TRAMO: ${{ matrix.tramo }}
+          FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
+          PYTHONUNBUFFERED: "1"
+        run: |
+          args=(--archivo "$ARCHIVO" --departamentos "${DEPARTAMENTOS:-TODOS}")
+          [ "$ARCHIVO" = "dev-municipalidad" ] && [ -z "$DESDE$HASTA" ] && [ "$PRUEBA" != "true" ] && args+=(--tramo "$TRAMO")
+          [ -n "$DESDE" ] && args+=(--desde "$DESDE")
+          [ -n "$HASTA" ] && args+=(--hasta "$HASTA")
+          [ "$PRUEBA" = "true" ] && args+=(--prueba)
+          python FISCAL/automatizacion/scraper_servidor.py "${args[@]}"
+
+      - name: Guardar los CSV como artefacto
+        if: always() && steps.tramo.outputs.correr == 'si'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.archivo }}-tramo${{ matrix.tramo }}
+          path: ${{ runner.temp }}/fiscal/Fiscal/Scrapeo/output
+          retention-days: 14
+          if-no-files-found: ignore

@@ -69,3 +69,31 @@ def test_token_sin_permiso(cliente, github, monkeypatch):
     monkeypatch.setattr(mef.requests, "post", lambda *a, **k: Respuesta(403))
     r = cliente.post("/v1/mef/actualizar")
     assert r.status_code == 502 and "permiso de Actions" in r.json()["detail"]
+
+
+def test_archivos_propios_lanzan_su_flujo(cliente, github):
+    e = cliente.get("/v1/mef/archivos").json()
+    assert set(e["archivos"]) == {"dev-municipalidad", "pim-funcion", "pim-municipalidad"} and e["archivos"]["pim-funcion"]["filas"] == 0
+    r = cliente.post("/v1/mef/archivos/actualizar?archivo=pim-municipalidad&desde=2026-01&departamentos=22,16")
+    assert r.status_code == 200 and r.json()["departamentos"] == "16,22"
+    url, cuerpo = github[-1][1], github[-1][2]
+    assert url.endswith("/actions/workflows/fiscal_archivos.yml/dispatches")
+    assert cuerpo["inputs"] == {"archivo": "pim-municipalidad", "desde": "2026-01", "hasta": "", "departamentos": "16,22", "prueba": False}
+    todos = ",".join(f"{i:02d}" for i in range(1, 26))
+    assert cliente.post(f"/v1/mef/archivos/actualizar?archivo=dev-municipalidad&departamentos={todos}").json()["departamentos"] == "TODOS"
+    assert cliente.post("/v1/mef/archivos/actualizar?archivo=otro").status_code == 422
+    assert cliente.post("/v1/mef/archivos/actualizar?archivo=pim-funcion&departamentos=98").status_code == 422
+
+
+def test_scraper_de_un_archivo_solo_corre_su_bloque():
+    import re
+    import sys
+    from datetime import date
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "automatizacion"))
+    import scraper_servidor as s
+    fijar = dict(s.ARCHIVOS["dev-municipalidad"]["fijar"], DEPARTAMENTOS_NACIONAL=["16"])
+    lineas = [l for c in s.celdas(fijar) for l in c.split("\n") if re.match(r"^(BLOQUES_|NIVELES_A|DEPARTAMENTOS_NAC)", l)]
+    assert "BLOQUES_MENSUALES = ['Funcion']" in lineas and "BLOQUES_ANUALES = []" in lineas and "NIVELES_A_CORRER = ['M']" in lineas
+    assert s.periodo_anual("", "", date(2026, 10, 30)) == ("2026-01", "2026-01")
+    assert s.periodo_anual("2024-05", "2027-03", date(2026, 10, 30)) == ("2024-01", "2026-01")

@@ -3,6 +3,7 @@
     python FISCAL/automatizacion/scraper_servidor.py                       # año en curso hasta el último mes cerrado
     python FISCAL/automatizacion/scraper_servidor.py --desde 2025-01 --hasta 2026-09
     python FISCAL/automatizacion/scraper_servidor.py --prueba              # PRUEBA_RAPIDA del notebook: un mes, Loreto
+    python FISCAL/automatizacion/scraper_servidor.py --archivo pim-funcion --desde 2026-01   # solo un archivo (ver ARCHIVOS)
 
 Cómo lo hace: lee las celdas de código del notebook (el mismo que se usa en Colab: si cambia allá, cambia aquí), quita
 las líneas «!pip», reemplaza Drive por una carpeta de trabajo y fija el periodo en el BLOQUE 2. Luego carga la carpeta
@@ -24,6 +25,16 @@ FISCAL = AQUI.parent
 NOTEBOOK = FISCAL / "Fiscal_Scraper.ipynb"
 TRABAJO = Path(os.environ.get("FISCAL_TRABAJO", Path.home() / "fiscal_trabajo"))
 RUTA_COLAB = "/content/drive/MyDrive/Fiscal"
+# Scrapers propios de los tres archivos de los 25 departamentos (.github/workflows/fiscal_archivos.yml): el mismo notebook,
+# pero solo con el bloque de ese archivo. Lo demás de la base fiscal no se toca.
+ARCHIVOS = {
+    "dev-municipalidad": {"nombre": "DEV Funcion.Municipalidad", "anual": False,
+                          "fijar": {"NIVELES_A_CORRER": ["M"], "BLOQUES_MENSUALES": ["Funcion"], "BLOQUES_ANUALES": []}},
+    "pim-funcion": {"nombre": "PIM Funcion", "anual": True,
+                    "fijar": {"BLOQUES_MENSUALES": [], "BLOQUES_ANUALES": ["PIM"]}},
+    "pim-municipalidad": {"nombre": "PIM Funcion.Municipalidad", "anual": True,
+                          "fijar": {"BLOQUES_MENSUALES": [], "BLOQUES_ANUALES": ["PIM_Municipalidad"]}},
+}
 
 
 def periodo_por_defecto(hoy=None):
@@ -80,11 +91,23 @@ def celdas(fijar):
     return salida
 
 
-def raspar(desde, hasta, prueba):
+def periodo_anual(desde, hasta, hoy=None):
+    """PIM: es anual, basta enero de cada año (los meses del notebook solo dicen qué años correr). El año en curso, si
+    enero aún no cerró, no se puede pedir."""
+    d0, d1 = periodo_por_defecto(hoy)
+    a0, a1 = int((desde or d1)[:4]), int((hasta or desde or d1)[:4])
+    return f"{a0}-01", f"{min(a1, int(d1[:4]))}-01"
+
+
+def raspar(desde, hasta, prueba, archivo=None, departamentos=None):
     a0, m0 = map(int, desde.split("-"))
     a1, m1 = map(int, hasta.split("-"))
     fijar = {"PRUEBA_RAPIDA": prueba, "AÑO_INICIO": a0, "MES_INICIO": m0, "AÑO_FIN": a1, "MES_FIN": m1,
              "WORKERS": int(os.environ.get("FISCAL_WORKERS", "3"))}   # consultas simultáneas: con 6, el MEF devolvió páginas cruzadas (2026)
+    if archivo:
+        fijar.update(ARCHIVOS[archivo]["fijar"])
+    if departamentos:
+        fijar["DEPARTAMENTOS_NACIONAL"] = departamentos
     (TRABAJO / "Fiscal").mkdir(parents=True, exist_ok=True)
     sustituir_colab()
     g = {"__name__": "__main__", "display": lambda *x, **k: print(*x)}
@@ -108,7 +131,17 @@ def main():
     ap.add_argument("--hasta", default="", help=f"AAAA-MM (por defecto {d1}, el último mes cerrado)")
     ap.add_argument("--prueba", action="store_true", help="PRUEBA_RAPIDA del notebook: solo el mes «desde» y Loreto")
     ap.add_argument("--tramo", type=int, choices=[1, 2], help="sin --desde/--hasta: 1 = enero-junio, 2 = julio-último mes cerrado")
+    ap.add_argument("--archivo", choices=list(ARCHIVOS), help="solo ese archivo de los 25 departamentos (sin el resto de la base fiscal)")
+    ap.add_argument("--departamentos", default="", help="con --archivo: TODOS (por defecto) o códigos separados por comas, p. ej. 16,22,25")
     a = ap.parse_args()
+    deps = None
+    if a.departamentos and a.departamentos.strip().upper() != "TODOS":
+        deps = [c.strip().zfill(2) for c in a.departamentos.split(",") if c.strip()]
+        if not deps or any(not (c.isdigit() and 1 <= int(c) <= 25) for c in deps):
+            sys.exit(f"Departamentos no válidos: {a.departamentos!r} (TODOS o códigos 01-25 separados por comas)")
+    anual = bool(a.archivo and ARCHIVOS[a.archivo]["anual"])
+    if anual:
+        a.desde, a.hasta, a.tramo = *periodo_anual(a.desde, a.hasta), None
     if a.tramo and not (a.desde or a.hasta):
         t = tramo_por_defecto(a.tramo)
         if t is None:
@@ -121,10 +154,12 @@ def main():
             sys.exit(f"Periodo no válido: {p!r} (formato AAAA-MM)")
     if a.prueba:
         hasta = desde
-    lineas = [f"## Scraper del MEF · {desde} a {hasta}{' · PRUEBA' if a.prueba else ''} · {datetime.now():%d/%m/%Y %H:%M}", ""]
+    titulo = f"{ARCHIVOS[a.archivo]['nombre']} · " if a.archivo else ""
+    rango = f"{desde[:4]} a {hasta[:4]}" if anual and desde[:4] != hasta[:4] else desde[:4] if anual else f"{desde} a {hasta}"
+    lineas = [f"## Scraper del MEF · {titulo}{rango}{' · ' + ', '.join(deps) if deps else ''}{' · PRUEBA' if a.prueba else ''} · {datetime.now():%d/%m/%Y %H:%M}", ""]
     t0, ok = time.time(), True
     try:
-        carpeta = raspar(desde, hasta, a.prueba)
+        carpeta = raspar(desde, hasta, a.prueba, a.archivo, deps)
         csvs = sorted(carpeta.rglob("*.csv"))
         logs = [p.name for p in csvs if p.name.startswith("LOG")]
         lineas.append(f"**Raspado: ✅** {len(csvs)} archivos en {(time.time() - t0) / 60:.1f} min.")

@@ -15,7 +15,8 @@ REPO = os.environ.get("GITHUB_REPO", "adriansivina-droid/scraper-mef")
 FLUJOS = {"mef": "fiscal_scraper.yml", "empleo": "empleo_scraper.yml", "proyectos": "fiscal_proyectos.yml",
           "procesamiento": "fiscal_procesamiento.yml",
           "hidrocarburos": "hidrocarburos_actualizar.yml",
-          "padron": "expo_padron_ruc.yml"}   # scrapers que se lanzan desde la página
+          "padron": "expo_padron_ruc.yml",
+          "archivos": "fiscal_archivos.yml"}   # scrapers que se lanzan desde la página
 
 
 def _api(nombre):

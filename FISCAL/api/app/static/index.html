@@ -98,9 +98,9 @@
     lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[2], comunes[3], { id: "anexos" }] },
     smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "manu", "cemento"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
     uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
-    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
+    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["mef-archivos", "bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
-  const C = { panorama: "Panorama de las tres regiones", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
+  const C = { panorama: "Panorama de las tres regiones", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
               "act-empleo": "Scraper de empleo", "act-hidro": "Hidrocarburos (PERUPETRO)", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
   const CORTO = { [V]: "V. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
@@ -1149,6 +1149,84 @@
     });
     const m = await pintar(); if (m && m.corridas.some((c) => c.estado !== "completed")) vigilar();
   }
+  // Los tres archivos de los 25 departamentos, cada uno con su scraper propio (fiscal_archivos.yml) y su descarga
+  const ARCH_MEF = [
+    { id: "dev-municipalidad", base: "inv-dev-municipalidad", t: "DEV Función · Municipalidad", anual: false,
+      d: "Devengado de la genérica 2.6 (inversión) por función y municipalidad, mensual." },
+    { id: "pim-funcion", base: "inv-pim-funcion", t: "PIM Función", anual: true,
+      d: "PIM de la genérica 2.6 por función y nivel de gobierno (nacional, regional y local), anual." },
+    { id: "pim-municipalidad", base: "inv-pim-municipalidad", t: "PIM Función · Municipalidad", anual: true,
+      d: "PIM de la genérica 2.6 por función y municipalidad, anual." }];
+  let sondeoArch = null;
+  async function cajaArchivosMef(caja) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Consultando la base de datos…</div>';
+    let j;
+    try { j = await api("/v1/mef/archivos"); } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar</b><span>${esc(e.message)}</span></div>`; return; }
+    const deps = CAT.departamentos.filter((d) => +d.codigo <= 25).map((d) => d.codigo);
+    const sel = paneles.archDeps || (paneles.archDeps = deps.slice());
+    const anio = (p) => p ? String(p).slice(0, 4) : String(new Date().getFullYear());
+    const tarjeta = (a) => {
+      const x = j.archivos[a.id] || {}, h = x.hasta;
+      const cargado = x.filas ? `${fmt(x.filas)} filas · ${x.departamentos.length} departamentos · ${a.anual ? `${esc(x.desde)}–${esc(x.hasta)}` : `${esc(etqMes(x.desde))} a ${esc(etqMes(x.hasta))}`}` : "todavía sin datos";
+      const periodo = a.anual
+        ? `<label class="campo" for="ad-${a.id}">Desde (año)<input type="number" min="2015" max="2099" id="ad-${a.id}" value="${anio(h)}"></label><label class="campo" for="ah-${a.id}">Hasta (año)<input type="number" min="2015" max="2099" id="ah-${a.id}" value="${anio(h)}"></label>`
+        : `<label class="campo" for="ad-${a.id}">Desde<input type="month" id="ad-${a.id}" value="${h ? anio(h) + "-01" : ""}"></label><label class="campo" for="ah-${a.id}">Hasta<input type="month" id="ah-${a.id}" value="${esc(h || "")}"></label>`;
+      const nuevo = a.anual
+        ? `<label class="campo" for="ud-${a.id}">Año<input type="number" min="2015" max="2099" id="ud-${a.id}" placeholder="año en curso"></label>`
+        : `<label class="campo" for="ud-${a.id}">Desde<input type="month" id="ud-${a.id}"></label><label class="campo" for="uh-${a.id}">Hasta<input type="month" id="uh-${a.id}"></label>`;
+      return `<div class="caja"><h3>${esc(a.t)}</h3><p>${esc(a.d)} <span class="nota">Cargado: ${cargado}.</span></p>
+        <div class="fila">${periodo}<button class="btn" type="button" data-arch-bajar="${a.id}" ${x.filas ? "" : "disabled"}>Descargar Excel</button></div>
+        <div class="fila">${nuevo}<button class="btn sec" type="button" data-arch-act="${a.id}" ${j.configurado ? "" : "disabled"}>Actualizar desde el MEF</button></div>
+        <p class="nota">${a.anual ? "Vacío = el año en curso. Toma unos minutos." : "Vacío = año en curso hasta el último mes cerrado (en dos tramos seguidos). Con los 25 departamentos, un año completo puede tardar varias horas: para un mes, pon el mismo mes en desde y hasta."}</p>
+        <div id="ares-${a.id}" aria-live="polite"></div></div>`;
+    };
+    caja.innerHTML = `<div class="caja"><h3>Departamentos</h3><div class="fila"><button class="btn sec" type="button" data-adeps="todos">Los 25</button><button class="btn sec" type="button" data-adeps="lsu">Loreto · San Martín · Ucayali</button><button class="btn sec" type="button" data-adeps="ninguno">Ninguno</button></div>
+        <div class="deptos">${CAT.departamentos.filter((d) => +d.codigo <= 25).map((d) => `<label for="adep-${d.codigo}"><input type="checkbox" class="adep" id="adep-${d.codigo}" value="${d.codigo}" ${sel.includes(d.codigo) ? "checked" : ""}>${esc(titulo(d.nombre))}</label>`).join("")}</div>
+        <p class="nota">Sirven para la descarga y para la actualización: actualizar solo algunos departamentos es más rápido y reemplaza solo esos.</p></div>
+      ${ARCH_MEF.map(tarjeta).join("")}
+      <div class="caja"><h3>Últimas corridas</h3>${j.configurado ? "" : '<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render. Mientras tanto, estos archivos llegan con el scraper completo del MEF (días 2 y 21).</span></div>'}<div id="arch-corridas"></div></div>`;
+    const marcados = () => [...caja.querySelectorAll(".adep")].filter((c) => c.checked).map((c) => c.value);
+    caja.querySelectorAll("[data-adeps]").forEach((b) => b.addEventListener("click", () => {
+      paneles.archDeps = b.dataset.adeps === "todos" ? deps.slice() : b.dataset.adeps === "lsu" ? LSU.slice() : [];
+      caja.querySelectorAll(".adep").forEach((c) => { c.checked = paneles.archDeps.includes(c.value); });
+    }));
+    caja.querySelectorAll(".adep").forEach((c) => c.addEventListener("change", () => { paneles.archDeps = marcados(); }));
+    const corridas = (lista) => {
+      const c = $("arch-corridas"); if (!c) return;
+      c.innerHTML = (j.error ? `<div class="err-box"><b>No se pudo consultar GitHub</b><span>${esc(j.error)}</span></div>` : "")
+        + (lista.length ? `<div class="scroll"><table><tr><th>Inicio</th><th>Corrida</th><th>Estado</th><th></th></tr>${lista.map((r) => `<tr><td>${esc(fecha(r.inicio))}</td><td>${esc(r.titulo)}</td><td>${ESTADO_CORRIDA(r)}</td><td><a href="${esc(r.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("")}</table></div>` : j.configurado ? '<p class="nota">Todavía no hay corridas.</p>' : "");
+    };
+    corridas(j.corridas);
+    const vigilar = () => {
+      clearInterval(sondeoArch); let vueltas = 0;
+      sondeoArch = setInterval(async () => {
+        if (++vueltas > 120 || !$("arch-corridas")) { clearInterval(sondeoArch); return; }
+        try { const k = await api("/v1/mef/archivos"); j.error = k.error; corridas(k.corridas);
+          if (vueltas > 1 && k.corridas.length && k.corridas.every((r) => r.estado === "completed")) { clearInterval(sondeoArch); ESTADO = await api("/v1/estado"); pintarHasta(); cajaArchivosMef(caja); }
+        } catch (e) { /* se reintenta en la siguiente vuelta */ }
+      }, 20000);
+    };
+    if (j.corridas.some((r) => r.estado !== "completed")) vigilar();
+    caja.querySelectorAll("[data-arch-bajar]").forEach((b) => b.addEventListener("click", () => {
+      const a = ARCH_MEF.find((x) => x.id === b.dataset.archBajar), res = $(`ares-${a.id}`), d = $(`ad-${a.id}`).value, h = $(`ah-${a.id}`).value;
+      const dep = marcados();
+      if (!dep.length) { res.innerHTML = '<div class="err-box"><b>Marca al menos un departamento</b></div>'; return; }
+      if (!d || !h) { res.innerHTML = '<div class="err-box"><b>Elige el periodo</b></div>'; return; }
+      const q = new URLSearchParams({ base: a.base, departamento: dep.join(","), nivel: "nacional,regional,locales",
+        desde: a.anual ? `${d}-01` : d, hasta: a.anual ? `${h}-12` : h, formato: "xlsx" });
+      res.innerHTML = ""; window.location.href = `/v1/descargas?${q}`;
+    }));
+    caja.querySelectorAll("[data-arch-act]").forEach((b) => b.addEventListener("click", async () => {
+      const a = ARCH_MEF.find((x) => x.id === b.dataset.archAct), res = $(`ares-${a.id}`), dep = marcados();
+      if (!dep.length) { res.innerHTML = '<div class="err-box"><b>Marca al menos un departamento</b></div>'; return; }
+      const d = $(`ud-${a.id}`).value, h = a.anual ? "" : $(`uh-${a.id}`).value;
+      const q = new URLSearchParams({ archivo: a.id, desde: a.anual ? (d ? `${d}-01` : "") : d, hasta: h, departamentos: dep.length === 25 ? "TODOS" : dep.join(",") });
+      b.disabled = true;
+      try { await api(`/v1/mef/archivos/actualizar?${q}`, { method: "POST" }); res.innerHTML = `<div class="ok-box"><b>Scraper de ${esc(a.t)} lanzado</b><span>Solo baja este archivo y reemplaza solo sus datos. La tabla de corridas se actualiza sola; al terminar, la descarga trae lo nuevo.</span></div>`; vigilar(); }
+      catch (e) { res.innerHTML = `<div class="err-box"><b>No se pudo lanzar</b><span>${esc(e.message)}</span></div>`; }
+      finally { b.disabled = false; }
+    }));
+  }
   // Hidrocarburos: el flujo de PERUPETRO corre en GitHub y guarda todo en el almacén de la página (ya no en Drive)
   async function cajaHidro(caja) {
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Consultando el almacén…</div>';
@@ -1246,6 +1324,8 @@
       const sects = ["agro", "pesca", "hidro", "manu", "cemento", "empleo", "expo", "impo", "credito", "depositos", "gasto", "inversion"];
       cuerpo = `<p class="lead">Qué sectores van en la síntesis de cada región y en qué estado está cada uno.</p><div class="caja"><div class="scroll"><table><tr><th>Sector</th><th>Loreto</th><th>San Martín</th><th>Ucayali</th></tr>
         ${sects.map((k) => `<tr><td><b>${esc(S[k].t)}</b></td>${["lor", "smn", "uca"].map((g) => planos(g).includes(k) ? `<td><a data-ir="${g}-${k}"><span class="chip ${estadoDe(k, REG[g])}">${ETIQ[estadoDe(k, REG[g])]}</span></a></td>` : '<td><span class="nota">no va en su síntesis</span></td>').join("")}</tr>`).join("")}</table></div></div>`;
+    } else if (id === "mef-archivos") {
+      cuerpo = `<p class="lead">DEV Función · Municipalidad, PIM Función y PIM Función · Municipalidad de los 25 departamentos, cada uno con su propio scraper: se actualizan y se descargan por separado, sin tocar el resto de la base fiscal.</p><div id="arch-mef"></div>`;
     } else if (id === "bases-mef") {
       const deps = CAT.departamentos.filter((d) => d.codigo !== "98");
       const marcados = paneles.mefDeps || (paneles.mefDeps = deps.map((d) => d.codigo));
@@ -1311,6 +1391,7 @@
     ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
     if ($("hidro-caja")) cajaHidro($("hidro-caja"));
+    if ($("arch-mef")) cajaArchivosMef($("arch-mef"));
     if ($("cuadros-empleo")) cuadrosEmpleo(REG[grupo], $("cuadros-empleo"));
     if ($("cuadros-hidro")) cuadrosHidro(REG[grupo], $("cuadros-hidro"));
     if ($("cuadros-pesca")) cuadrosPesca(REG[grupo], $("cuadros-pesca"));
