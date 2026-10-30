@@ -69,6 +69,62 @@ def sustituir_colab():
         sys.modules["IPython"], sys.modules["IPython.display"] = ipy, disp
 
 
+class Avance:
+    """Barra de carga de la página: cuenta las barras tqdm del notebook (un mes, un control, el PIM…) y deja la fracción
+    hecha en la tabla «progreso» de la base (como mucho cada 20 s). Solo en GitHub Actions (GITHUB_RUN_ID) y con base."""
+
+    def __init__(self, g):
+        self.g, self.hechas, self.esperadas, self.ultimo = g, 0, None, 0.0
+        self.corrida, self.tramo = os.environ.get("GITHUB_RUN_ID"), int(os.environ.get("TRAMO") or 1)
+        self.activa = bool(self.corrida and os.environ.get("DATABASE_URL"))
+
+    def _esperadas(self):
+        """Barras que hará el notebook, con su configuración ya fijada (BLOQUE 2)."""
+        g = self.g
+        bm, ba = g.get("BLOQUES_MENSUALES", []), g.get("BLOQUES_ANUALES", [])
+        por_anio = (("PIM" in ba) + ("PIM_Municipalidad" in ba)
+                    + (len(bm) * len(g.get("NIVELES_A_CORRER", [])) if bm and g.get("CONTROL_ANUAL") else 0))
+        return max(1, sum((len(ms) if bm else 0) + por_anio for ms in g.get("PLAN", {}).values()))
+
+    def avisar(self, texto, fraccion=None, forzar=False):
+        if not self.activa or (not forzar and time.time() - self.ultimo < 20):
+            return
+        self.ultimo = time.time()
+        if fraccion is None:
+            fraccion = min(self.hechas / (self.esperadas or self._esperadas()), 0.99)
+        try:
+            sys.path.insert(0, str(FISCAL / "api"))
+            from app import db
+            db.guardar_progreso(self.corrida, self.tramo, fraccion, texto)
+        except Exception as e:       # la barra es un extra: nunca detiene el raspado
+            print(f"(no se pudo guardar el avance: {e})")
+
+    def tqdm(self, real):
+        avance = self
+
+        class Barra:
+            def __init__(self, iterable=None, total=None, desc="", **k):
+                self.iterable, self.desc = iterable, desc or ""
+                self.total = total if total is not None else (len(iterable) if hasattr(iterable, "__len__") else 0)
+                self.interna = real(iterable, total=total, desc=desc, **k)
+
+            def __iter__(self):
+                if not self.total:              # meses sin consultas (p. ej. solo PIM): no cuentan
+                    yield from self.interna
+                    return
+                if avance.esperadas is None:
+                    avance.esperadas = avance._esperadas()
+                for i, x in enumerate(self.interna, 1):
+                    yield x
+                    avance.avisar(self.desc, min((avance.hechas + i / self.total) / avance.esperadas, 0.99))
+                avance.hechas += 1
+                avance.avisar(self.desc, forzar=False)
+
+            def __getattr__(self, nombre):
+                return getattr(self.interna, nombre)
+        return Barra
+
+
 def celdas(fijar):
     """Código del notebook listo para correr aquí: sin «!pip», con la carpeta de trabajo y el periodo fijado."""
     nb = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
@@ -92,11 +148,15 @@ def celdas(fijar):
 
 
 def periodo_anual(desde, hasta, hoy=None):
-    """PIM: es anual, basta enero de cada año (los meses del notebook solo dicen qué años correr). El año en curso, si
-    enero aún no cerró, no se puede pedir."""
+    """PIM: es anual; los meses del notebook solo dicen qué años correr (los meses sin bloques mensuales no consultan
+    nada). Termina en diciembre o en el último mes cerrado: el notebook calibra la consulta con ese último mes (con
+    enero, Consulta Amigable devolvió páginas vacías). El año en curso, si enero aún no cerró, no se puede pedir."""
     d0, d1 = periodo_por_defecto(hoy)
-    a0, a1 = int((desde or d1)[:4]), int((hasta or desde or d1)[:4])
-    return f"{a0}-01", f"{min(a1, int(d1[:4]))}-01"
+    a0, a1 = int((desde or d1)[:4]), min(int((hasta or desde or d1)[:4]), int(d1[:4]))
+    return f"{min(a0, a1)}-01", (d1 if a1 == int(d1[:4]) else f"{a1}-12")
+
+
+AVANCE = [None]
 
 
 def raspar(desde, hasta, prueba, archivo=None, departamentos=None):
@@ -111,6 +171,10 @@ def raspar(desde, hasta, prueba, archivo=None, departamentos=None):
     (TRABAJO / "Fiscal").mkdir(parents=True, exist_ok=True)
     sustituir_colab()
     g = {"__name__": "__main__", "display": lambda *x, **k: print(*x)}
+    avance = AVANCE[0] = Avance(g)
+    import tqdm.auto
+    tqdm.auto.tqdm = avance.tqdm(tqdm.auto.tqdm)      # el notebook hace «from tqdm.auto import tqdm» en el BLOQUE 1
+    avance.avisar("Calibrando la consulta al MEF…", 0.0, forzar=True)
     for i, codigo in enumerate(celdas(fijar), 1):
         print(f"\n── celda {i} ──", flush=True)
         exec(compile(codigo, f"Fiscal_Scraper.ipynb#celda{i}", "exec"), g)
@@ -171,6 +235,8 @@ def main():
             lineas.append("⚠ Falta DATABASE_URL: no se cargó en la base de datos.")
             ok = False
         else:
+            if AVANCE[0]:
+                AVANCE[0].avisar("Cargando en la base de datos…", 0.99, forzar=True)
             r = cargar(carpeta)
             lineas += ["**Carga en la base de datos: ✅**", "", "| Base | Filas | Periodos |", "|---|---|---|"]
             lineas += [f"| {b} | {x['filas']:,} | {x['periodos'][0]} a {x['periodos'][-1]} |" for b, x in r["bases"].items()]
@@ -180,6 +246,8 @@ def main():
         traceback.print_exc()
         lineas.append(f"**❌ {type(e).__name__}: {str(e)[:500]}**")
         ok = False
+    if AVANCE[0]:
+        AVANCE[0].avisar("Terminado" if ok else "Falló: revisa la corrida en GitHub", 1.0 if ok else None, forzar=True)
     texto = "\n".join(lineas)
     print("\n" + texto)
     if os.environ.get("GITHUB_STEP_SUMMARY"):

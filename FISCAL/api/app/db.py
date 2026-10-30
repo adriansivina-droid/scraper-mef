@@ -2,7 +2,7 @@
 import base64
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 from sqlalchemy import create_engine, inspect, text
@@ -142,6 +142,39 @@ def ultima_carga():
     with motor().connect() as cx:
         r = cx.execute(text("SELECT fecha, origen, resumen FROM cargas ORDER BY id DESC LIMIT 1")).first()
     return None if r is None else {"fecha": r[0], "origen": r[1], "resumen": json.loads(r[2])}
+
+
+# ── Avance de los scrapers en GitHub (barra de carga de la página): una fila por corrida y tramo ──
+def _progreso():
+    with motor().begin() as cx:
+        cx.execute(text("CREATE TABLE IF NOT EXISTS progreso (corrida TEXT, tramo INTEGER, fraccion REAL, texto TEXT, fecha TEXT, "
+                        "PRIMARY KEY (corrida, tramo))"))
+
+
+def guardar_progreso(corrida, tramo, fraccion, texto):
+    _progreso()
+    ahora = datetime.now(timezone.utc)
+    with motor().begin() as cx:
+        cx.execute(text("DELETE FROM progreso WHERE (corrida = :c AND tramo = :t) OR fecha < :viejo"),
+                   {"c": str(corrida), "t": int(tramo), "viejo": (ahora - timedelta(days=7)).isoformat(timespec="seconds")})
+        cx.execute(text("INSERT INTO progreso (corrida, tramo, fraccion, texto, fecha) VALUES (:c, :t, :x, :tx, :f)"),
+                   {"c": str(corrida), "t": int(tramo), "x": float(fraccion), "tx": texto[:200], "f": ahora.isoformat(timespec="seconds")})
+
+
+def progreso(corridas):
+    """{corrida: [{tramo, fraccion, texto, fecha}]} de las corridas pedidas."""
+    corridas = [str(c) for c in corridas]
+    if not corridas:
+        return {}
+    _progreso()
+    params = {f"c{i}": c for i, c in enumerate(corridas)}
+    with motor().connect() as cx:
+        filas = cx.execute(text(f"SELECT corrida, tramo, fraccion, texto, fecha FROM progreso WHERE corrida IN "
+                                f"({', '.join(':' + k for k in params)}) ORDER BY tramo"), params).all()
+    salida = {}
+    for c, t, x, tx, f in filas:
+        salida.setdefault(c, []).append({"tramo": t, "fraccion": x, "texto": tx, "fecha": f})
+    return salida
 
 
 # ── Documentos (p. ej. el mapa de lotes de hidrocarburos): un archivo por nombre ──

@@ -1107,6 +1107,15 @@
   }
   const ESTADO_CORRIDA = (c) => c.estado !== "completed" ? (c.estado === "queued" ? '<span class="chip vacio">en cola</span>' : '<span class="chip vacio">corriendo</span>')
     : c.resultado === "success" ? '<span class="chip ok">terminó bien</span>' : c.resultado === "cancelled" ? '<span class="chip falta">cancelada</span>' : '<span class="chip error">falló</span>';
+  // barra de carga de una corrida en curso: el scraper deja su avance en la base (tabla «progreso»), por tramo
+  const barraAvance = (c) => {
+    if (c.estado === "completed") return "";
+    const p = c.progreso || [];
+    if (!p.length) return `<div class="avance"><div class="barra indet"><span></span></div><small>${c.estado === "queued" ? "en cola" : "preparando…"}</small></div>`;
+    return p.map((t) => { const x = Math.round(t.fraccion * 100);
+      return `<div class="avance" title="${esc(t.texto)}"><div class="barra" role="progressbar" aria-valuenow="${x}" aria-valuemin="0" aria-valuemax="100"><span style="width:${x}%"></span></div>
+        <small><b>${x} %</b>${p.length > 1 || t.tramo > 1 ? ` · tramo ${t.tramo}` : ""} · ${esc(t.texto)}</small></div>`; }).join("");
+  };
   let sondeo = null;
   function cajaScraper(cual) {
     const mef = cual === "mef";
@@ -1129,7 +1138,7 @@
         const m = await api(url);
         if (!m.configurado) { caja.innerHTML = '<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render (pasos en FISCAL/api/README.md). Mientras tanto, corre solo en las fechas programadas.</span></div>'; $(`${cual}-lanzar`).disabled = true; return m; }
         caja.innerHTML = (m.error ? `<div class="err-box"><b>No se pudo consultar GitHub</b><span>${esc(m.error)}</span></div>` : "")
-          + (m.corridas.length ? `<div class="scroll"><table><tr><th>Inicio</th><th>Corrida</th><th>Cómo</th><th>Estado</th><th></th></tr>${m.corridas.map((c) => `<tr><td>${esc(fecha(c.inicio))}</td><td>${esc(c.titulo)}</td><td>${c.origen === "schedule" ? "programada" : "a mano"}</td><td>${ESTADO_CORRIDA(c)}</td><td><a href="${esc(c.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("")}</table></div>` : '<p class="nota">Todavía no hay corridas.</p>');
+          + (m.corridas.length ? `<div class="scroll"><table><tr><th>Inicio</th><th>Corrida</th><th>Cómo</th><th>Estado</th><th></th></tr>${m.corridas.map((c) => `<tr><td>${esc(fecha(c.inicio))}</td><td>${esc(c.titulo)}</td><td>${c.origen === "schedule" ? "programada" : "a mano"}</td><td>${ESTADO_CORRIDA(c)}${barraAvance(c)}</td><td><a href="${esc(c.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("")}</table></div>` : '<p class="nota">Todavía no hay corridas.</p>');
         return m;
       } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar GitHub</b><span>${esc(e.message)}</span></div>`; return null; }
     };
@@ -1194,7 +1203,7 @@
     const corridas = (lista) => {
       const c = $("arch-corridas"); if (!c) return;
       c.innerHTML = (j.error ? `<div class="err-box"><b>No se pudo consultar GitHub</b><span>${esc(j.error)}</span></div>` : "")
-        + (lista.length ? `<div class="scroll"><table><tr><th>Inicio</th><th>Corrida</th><th>Estado</th><th></th></tr>${lista.map((r) => `<tr><td>${esc(fecha(r.inicio))}</td><td>${esc(r.titulo)}</td><td>${ESTADO_CORRIDA(r)}</td><td><a href="${esc(r.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("")}</table></div>` : j.configurado ? '<p class="nota">Todavía no hay corridas.</p>' : "");
+        + (lista.length ? `<div class="scroll"><table><tr><th>Inicio</th><th>Corrida</th><th>Estado</th><th></th></tr>${lista.map((r) => `<tr><td>${esc(fecha(r.inicio))}</td><td>${esc(r.titulo)}</td><td>${ESTADO_CORRIDA(r)}${barraAvance(r)}</td><td><a href="${esc(r.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("")}</table></div>` : j.configurado ? '<p class="nota">Todavía no hay corridas.</p>' : "");
     };
     corridas(j.corridas);
     const vigilar = () => {
@@ -1204,7 +1213,7 @@
         try { const k = await api("/v1/mef/archivos"); j.error = k.error; corridas(k.corridas);
           if (vueltas > 1 && k.corridas.length && k.corridas.every((r) => r.estado === "completed")) { clearInterval(sondeoArch); ESTADO = await api("/v1/estado"); pintarHasta(); cajaArchivosMef(caja); }
         } catch (e) { /* se reintenta en la siguiente vuelta */ }
-      }, 20000);
+      }, 15000);
     };
     if (j.corridas.some((r) => r.estado !== "completed")) vigilar();
     caja.querySelectorAll("[data-arch-bajar]").forEach((b) => b.addEventListener("click", () => {

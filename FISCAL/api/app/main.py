@@ -250,9 +250,21 @@ def mef_estado():
     if not mef.configurado():
         return {"configurado": False, "corridas": []}
     try:
-        return {"configurado": True, "corridas": mef.corridas()}
+        return {"configurado": True, "corridas": _con_progreso(mef.corridas())}
     except (mef.ErrorGitHub, OSError) as e:
         return {"configurado": True, "corridas": [], "error": str(e)}
+
+
+def _con_progreso(corridas):
+    """Agrega a las corridas en curso el avance que el scraper deja en la base (barra de carga de la página)."""
+    activas = [c["id"] for c in corridas if c["estado"] != "completed"]
+    try:
+        avance = db.progreso(activas)
+    except Exception:          # sin base de datos la tabla de corridas igual se muestra
+        avance = {}
+    for c in corridas:
+        c["progreso"] = avance.get(str(c["id"]), [])
+    return corridas
 
 
 @app.post("/v1/mef/actualizar", dependencies=[Depends(acceso)])
@@ -279,7 +291,7 @@ def mef_archivos():
     salida = {"archivos": {a: disp[b] for a, b in ARCHIVOS_MEF.items()}, "configurado": mef.configurado(), "corridas": []}
     if mef.configurado():
         try:
-            salida["corridas"] = mef.corridas(6, nombre="archivos")
+            salida["corridas"] = _con_progreso(mef.corridas(6, nombre="archivos"))
         except (mef.ErrorGitHub, OSError) as e:
             salida["error"] = str(e)
     return salida

@@ -35,7 +35,7 @@ def github(monkeypatch):
 
     def get(url, headers=None, params=None, timeout=None):
         llamadas.append(("GET", url, params, headers))
-        return Respuesta(200, {"workflow_runs": [{"status": "in_progress", "conclusion": None, "event": "workflow_dispatch",
+        return Respuesta(200, {"workflow_runs": [{"id": 1, "status": "in_progress", "conclusion": None, "event": "workflow_dispatch",
                                                   "created_at": "2026-10-28T10:00:00Z", "updated_at": "2026-10-28T10:05:00Z",
                                                   "html_url": "https://github.com/x/y/actions/runs/1", "display_title": "Scraper del MEF · año en curso"}]})
     monkeypatch.setattr(mef.requests, "post", post)
@@ -95,5 +95,26 @@ def test_scraper_de_un_archivo_solo_corre_su_bloque():
     fijar = dict(s.ARCHIVOS["dev-municipalidad"]["fijar"], DEPARTAMENTOS_NACIONAL=["16"])
     lineas = [l for c in s.celdas(fijar) for l in c.split("\n") if re.match(r"^(BLOQUES_|NIVELES_A|DEPARTAMENTOS_NAC)", l)]
     assert "BLOQUES_MENSUALES = ['Funcion']" in lineas and "BLOQUES_ANUALES = []" in lineas and "NIVELES_A_CORRER = ['M']" in lineas
-    assert s.periodo_anual("", "", date(2026, 10, 30)) == ("2026-01", "2026-01")
-    assert s.periodo_anual("2024-05", "2027-03", date(2026, 10, 30)) == ("2024-01", "2026-01")
+    assert s.periodo_anual("", "", date(2026, 10, 30)) == ("2026-01", "2026-09")
+    assert s.periodo_anual("2024-05", "2027-03", date(2026, 10, 30)) == ("2024-01", "2026-09")
+    assert s.periodo_anual("2025-01", "", date(2026, 10, 30)) == ("2025-01", "2025-12")
+
+
+def test_barra_de_avance(cliente, github, monkeypatch):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "automatizacion"))
+    import scraper_servidor as s
+    monkeypatch.setenv("GITHUB_RUN_ID", "1")
+    g = {"BLOQUES_MENSUALES": ["Funcion"], "NIVELES_A_CORRER": ["M"], "CONTROL_ANUAL": True, "BLOQUES_ANUALES": [],
+         "PLAN": {2026: ["1", "2", "3"]}}
+    av = s.Avance(g)
+    assert av._esperadas() == 4                      # 3 meses + el control anual
+    Barra = av.tqdm(lambda it, **k: it)
+    list(Barra([], total=0))                          # un mes sin consultas no cuenta
+    for _ in range(2):
+        list(Barra(range(5), desc="2026 Enero"))
+    av.avisar("Control Funcion.M 2026", forzar=True)
+    e = cliente.get("/v1/mef/archivos").json()        # la corrida simulada (id 1) sigue en curso
+    p = e["corridas"][0]["progreso"]
+    assert p == [{"tramo": 1, "fraccion": 0.5, "texto": "Control Funcion.M 2026", "fecha": p[0]["fecha"]}]
