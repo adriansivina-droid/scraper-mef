@@ -23,21 +23,20 @@ scraper (o carga de una plantilla) → base de datos → descargas en Excel → 
 
 | Sección | Cuadros y anexos | Fuente (según los informes) | Cómo entra al API | Estado |
 |---|---|---|---|---|
-| Resumen · otros indicadores | Cuadro 1 | SBS, MEF, DIREPRO y empresas | se arma con los demás módulos | al final |
-| Agropecuario | producción (t), superficie sembrada (ha) · Anexo 1 | MIDAGRI y direcciones regionales | **archivo mensual** que recibe el equipo | falta |
+| Resumen ejecutivo | principales hechos de importancia y Cuadro 1 (otros indicadores) | los sectores de la región con datos | se arma solo en la página con los datos de cada sector | **en el API** |
 | Pesca | producción pesquera y VBP · Anexo 2 | DIREPRO Loreto, San Martín y Ucayali | **archivo mensual**: el Excel de cada DIREPRO se sube en la página (o el LONG de los notebooks de `PESCA/`) | **en el API** |
 | Hidrocarburos (Loreto, Ucayali) | producción y precio · Anexo de petróleo crudo | PERUPETRO; precio, Reuters | scraper en `HIDROCARBUROS/` (diario en GitHub Actions) → almacén de la página → API | **en el API** (producción y canon; falta el precio) |
-| Manufactura | índice de volumen físico · Anexos | DIREPRO y encuesta BCRP a empresas industriales | **archivo mensual** | falta |
 | Empleo | trabajadores asalariados privados formales, por sector · Anexo | MTPE (PLAME y T-Registro) | scraper de `EMPLEO/` en GitHub Actions (o su Excel subido en la página) | **en el API**, con cuadro, gráfico y anexo |
-| Exportaciones | por grupo de productos · Anexo | SUNAT | **archivo mensual** | falta |
-| Importaciones (Loreto) | FOB por uso o destino, aduana de Iquitos · Anexo | SUNAT | **archivo mensual** | falta |
-| Crédito, depósitos y morosidad | saldos, crédito por tipo sin BN ni Agrobanco · Anexos | SBS y AFP | scraper (web de la SBS) | falta |
+| Exportaciones | por grupo de productos · Anexo | SUNAT | **archivo mensual** (base de SUNAT → ESTAD) | **en el API** |
+| Importaciones (Loreto) | FOB por uso o destino, aduana de Iquitos · Anexo | SUNAT | **archivo mensual** (base de SUNAT → ESTAD) | **en el API** |
 | Gasto corriente no financiero | por nivel, mes y acumulado, var. % real · Anexos de ejecución por nivel | MEF, Consulta Amigable | `Fiscal_Scraper` + API | **en el API** (fase 1) |
 | Inversión pública | por nivel, var. % real y avance del PIM · Anexos de inversión por nivel | MEF, Consulta Amigable | `Fiscal_Scraper` + API | **en el API** (fase 1) |
 
-Seis secciones llegan **en archivos mensuales** que el equipo ya recibe (exportaciones, empleo, importaciones,
-agropecuario, manufactura y pesca): entran por la página, en «Actualizar base de datos», igual que hoy los CSV del
-scraper. Solo quedan como scrapers el MEF (hecho), PERUPETRO (hecho) y la SBS.
+Agropecuario, manufactura, despachos de cemento y crédito, depósitos y morosidad se quitaron de la página (noviembre
+2026): no se construyeron. El índice de cada región queda en I. Actividad productiva, II. Aspectos laborales,
+III. Sector externo, IV. Ejecución del presupuesto y V. Anexos. El **Resumen ejecutivo** arma, para el mes elegido,
+los principales hechos de importancia (texto para copiar) y el Cuadro 1 con la variación % del mes y del acumulado de
+cada sector con datos (pesca, hidrocarburos, empleo, exportaciones, importaciones, gasto corriente e inversión).
 
 **Arquitectura:** Render sirve la página y las descargas; Neon guarda los datos; los scrapers (MEF, SBS, PERUPETRO)
 corren en **GitHub Actions** y escriben directo en Neon; los archivos mensuales se suben en la página.
@@ -371,8 +370,8 @@ por genérica, inversión por función).
 ## Anexos y contraste con la síntesis
 
 - **Anexos** (último ítem del índice de cada región): todos los anexos de la síntesis en su orden y numeración (junio
-  2026), con el formato BCRP y Copiar / SVG / PNG. Los de sectores que aún no entran a la página (agrícola,
-  manufactura, exportaciones, importaciones, crédito, depósitos, morosidad) aparecen como pendientes.
+  2026), con el formato BCRP y Copiar / SVG / PNG. Cada anexo conserva su número de la síntesis; los de los sectores
+  que se quitaron de la página (agrícola, manufactura, crédito, depósitos, morosidad) ya no aparecen.
 - **Contraste** (pestaña de Gasto corriente e Inversión pública): lo que tiene la página contra lo **publicado por el
   MEF** en la vista anual de Consulta Amigable. El scraper la consulta en cada corrida y la deja en sus CSV de CONTROL;
   la página los guarda (`app/controles.py`, tabla `mef_controles`) y compara, por bloque (genérica, fuente, función,
