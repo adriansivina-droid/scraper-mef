@@ -1,0 +1,45 @@
+# Gasto por función de un departamento para estudios: PIM y devengado (todas las genéricas) por año, nivel de gobierno,
+# función y genérica, desde la vista anual de Consulta Amigable. No carga en la base: deja un CSV como artefacto.
+name: Fiscal · gasto por función (estudios)
+run-name: "Gasto por función · ${{ inputs.departamento }} · ${{ inputs.desde }}-${{ inputs.hasta }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      departamento:
+        description: "Código del departamento (16 Loreto)"
+        default: "16"
+      desde:
+        description: "Primer año"
+        default: "2016"
+      hasta:
+        description: "Último año"
+        default: "2025"
+
+permissions:
+  contents: read
+
+jobs:
+  raspar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+      - run: pip install -r FISCAL/api/requirements.txt beautifulsoup4==4.12.3
+      - name: Raspar el MEF
+        env:
+          FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
+          PYTHONUNBUFFERED: "1"
+        run: python FISCAL/automatizacion/gasto_funcion.py --departamento "${{ inputs.departamento }}" --desde "${{ inputs.desde }}" --hasta "${{ inputs.hasta }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gasto-funcion-${{ inputs.departamento }}
+          path: ${{ runner.temp }}/fiscal/*.csv
+          retention-days: 30
+          if-no-files-found: ignore
