@@ -1,7 +1,7 @@
 # Gasto por función de un departamento para estudios: PIM y devengado (todas las genéricas) por año, nivel de gobierno,
 # función y genérica, desde la vista anual de Consulta Amigable. No carga en la base: deja un CSV como artefacto.
 name: Fiscal · gasto por función (estudios)
-run-name: "Gasto por función · ${{ inputs.departamento }} · ${{ inputs.desde }}-${{ inputs.hasta }}"
+run-name: "Gasto por función · ${{ inputs.departamento }} · ${{ inputs.desde }}-${{ inputs.hasta }} · ${{ inputs.genericas }}"
 
 on:
   workflow_dispatch:
@@ -15,6 +15,11 @@ on:
       hasta:
         description: "Último año"
         default: "2025"
+      genericas:
+        description: "Desglose por genérica"
+        type: choice
+        options: [todas, sectores, ninguna]
+        default: sectores
 
 permissions:
   contents: read
@@ -35,11 +40,11 @@ jobs:
         env:
           FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
           PYTHONUNBUFFERED: "1"
-        run: python FISCAL/automatizacion/gasto_funcion.py --departamento "${{ inputs.departamento }}" --desde "${{ inputs.desde }}" --hasta "${{ inputs.hasta }}"
+        run: python FISCAL/automatizacion/gasto_funcion.py --departamento "${{ inputs.departamento }}" --desde "${{ inputs.desde }}" --hasta "${{ inputs.hasta }}" --genericas "${{ inputs.genericas }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: gasto-funcion-${{ inputs.departamento }}
+          name: gasto-funcion-${{ inputs.departamento }}-${{ inputs.genericas }}
           path: ${{ runner.temp }}/fiscal/*.csv
           retention-days: 30
           if-no-files-found: ignore
