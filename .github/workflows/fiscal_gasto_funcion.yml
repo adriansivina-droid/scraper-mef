@@ -22,7 +22,7 @@ on:
         default: sectores
 
 permissions:
-  contents: read
+  contents: write   # guarda el CSV en la rama «estudios-datos» (los artefactos no se pueden bajar desde todas partes)
 
 jobs:
   raspar:
@@ -41,6 +41,15 @@ jobs:
           FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
           PYTHONUNBUFFERED: "1"
         run: python FISCAL/automatizacion/gasto_funcion.py --departamento "${{ inputs.departamento }}" --desde "${{ inputs.desde }}" --hasta "${{ inputs.hasta }}" --genericas "${{ inputs.genericas }}"
+      - name: Guardar el CSV en la rama estudios-datos
+        env:
+          TRABAJO: ${{ runner.temp }}/fiscal
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch -q origin estudios-datos; then git checkout -q -B estudios-datos FETCH_HEAD; else git checkout -q --orphan estudios-datos; git rm -rq --cached . ; fi
+          mkdir -p gasto_funcion && cp "$TRABAJO"/*.csv gasto_funcion/
+          git add gasto_funcion && git commit -qm "Gasto por función ${{ inputs.departamento }} ${{ inputs.desde }}-${{ inputs.hasta }} (${{ inputs.genericas }})" && git push -q origin estudios-datos
       - uses: actions/upload-artifact@v4
         if: always()
         with:
