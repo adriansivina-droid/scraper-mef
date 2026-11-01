@@ -27,7 +27,6 @@
     <div class="leyenda" id="leyenda">
       <span><i class="dot ok"></i>Con datos en la página</span>
       <span><i class="dot vacio"></i>Conectado, falta cargar o conectar</span>
-      <span><i class="dot falta"></i>Por construir</span>
     </div>
   </nav>
   <main class="sector" id="sector" tabindex="-1"><div class="cuerpo"><div class="loading"><span class="spin"></span>Cargando…</div></div></main>
@@ -60,19 +59,14 @@
   const INV = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-dev-fuente", "inv-pim-funcion", "inv-pim-municipalidad"];
   const GASTO = ["gasto-dev-generica", "gasto-dev-fuente"];
   const S = {
-    resumen: { t: "Resumen ejecutivo", estado: "falta", fuente: "Todos los sectores del informe", entra: "Se arma con los demás sectores",
-      lead: "Principales hechos de importancia y el Cuadro 1 (otros indicadores) del mes.", cuadros: ["Principales hechos de importancia", "Cuadro 1 · Otros indicadores"] },
-    agro: { t: "Sector agropecuario", estado: "falta", fuente: "MIDAGRI y direcciones regionales de agricultura", entra: "Archivo mensual",
-      lead: "Producción de los principales cultivos y crianzas, y avance de siembras de la campaña.", cuadros: ["Producción agropecuaria (t)", "Superficie sembrada (ha)", "Anexo de producción agrícola"] },
+    resumen: { t: "Resumen ejecutivo", fuente: "Los sectores de la región con datos en la página", entra: "Se arma solo con los datos de cada sector",
+      bases: (r) => [...new Set(planos(Object.keys(REG).find((k) => REG[k] === r)).filter((x) => S[x] && S[x].bases && x !== "anexos" && x !== "resumen").flatMap((x) => S[x].bases(r)))], cuadros: "resumen",
+      lead: "Principales hechos de importancia del mes y el Cuadro 1 (otros indicadores de actividad económica), armados con los datos de cada sector: listos para copiar al informe." },
     pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Subiendo en la página el Excel que envía DIREPRO", bases: (r) => [r.pesca], actualizar: "subir",
       lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: "pesca" },
     hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Flujo diario de PERUPETRO en GitHub (7:00 a. m.), o con el botón",
       bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "hidro", cuadros: "hidrocarburos", mapa: true,
       lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
-    manu: { t: "Sector manufactura", estado: "falta", fuente: "DIREPRO y encuesta BCRP a empresas industriales", entra: "Archivo mensual",
-      lead: "Índice de volumen físico de la manufactura.", cuadros: ["Índice de volumen físico", "Anexo de producción manufacturera"] },
-    cemento: { t: "Despachos de cemento", estado: "falta", fuente: "Empresas cementeras", entra: "Archivo mensual",
-      lead: "Despachos de cemento en la región, indicador adelantado de la construcción.", cuadros: ["Despachos de cemento (t)"] },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
       lead: "Trabajadores asalariados privados formales por rama de actividad económica.", cuadros: "empleo" },
     expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["expo-estad"], sinActualizar: true,
@@ -80,10 +74,6 @@
     impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["impo-estad"], sinActualizar: true,
       lead: "Importaciones por la aduana de Iquitos según uso o destino económico (FOB): Cuadro N° 16 y anexo. En «Base mensual» se clasifica la base del mes (CUODE) y arma el ESTAD; «Resumen Import» trae los datos destacados y el borrador de la síntesis.",
       cuadros: "importaciones", extra: ["Resumen Import", "Base mensual"] },
-    credito: { t: "Crédito", estado: "falta", fuente: "SBS", entra: "Scraper de la web de la SBS, por construir",
-      lead: "Saldos de crédito del sistema financiero por tipo, sin Banco de la Nación ni Agrobanco, y morosidad.", cuadros: ["Crédito por tipo", "Tasa de morosidad"] },
-    depositos: { t: "Depósitos", estado: "falta", fuente: "SBS y AFP", entra: "Scraper de la web de la SBS, por construir",
-      lead: "Saldos de depósitos del sistema financiero por tipo.", cuadros: ["Depósitos por tipo"] },
     gasto: { t: "Gasto corriente no financiero", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => GASTO, actualizar: "mef",
       lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion", extra: ["Contraste", "Archivos"] },
     inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => INV, actualizar: "mef",
@@ -92,17 +82,17 @@
       lead: "Cuadros estadísticos del final del informe, uno por sector, con el formato de la síntesis: listos para copiar o descargar.", cuadros: "anexos" },
   };
   const cap = (titulo, items) => ({ titulo, items });
-  const V = "V. Ejecución del presupuesto de gastos del Gobierno General";
-  const comunes = [cap("II. Aspectos laborales", ["empleo"]), null, cap("IV. Crédito y depósitos", ["credito", "depositos"]), cap(V, ["gasto", "inversion"])];
+  const V = "IV. Ejecución del presupuesto de gastos del Gobierno General";
+  const comunes = [cap("II. Aspectos laborales", ["empleo"]), cap(V, ["gasto", "inversion"])];
   const GRUPOS = {
-    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[2], comunes[3], { id: "anexos" }] },
-    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "manu", "cemento"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
-    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["agro", "pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[2], comunes[3], { id: "anexos", num: "VI" }] },
+    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }] },
+    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }] },
+    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }] },
     tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["mef-archivos", "bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
   const C = { panorama: "Panorama de las tres regiones", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
               "act-empleo": "Scraper de empleo", "act-hidro": "Hidrocarburos (PERUPETRO)", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
-  const CORTO = { [V]: "V. Ejecución del presupuesto" };
+  const CORTO = { [V]: "IV. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
 
   let CAT = null, ESTADO = null, MESES = [], grupo = "lor", id = "resumen";
@@ -1029,9 +1019,6 @@
 
   // ── Anexos: los de la síntesis de cada región, en su orden (junio 2026). [sector, n° de anexo del sector] o [sector, título] si aún no hay datos
   const ANEXOS_TAB = "Anexos BCRP";
-  const PENDIENTES = { agro: "Producción agrícola (MIDAGRI / dirección regional de agricultura)", manu1: "Producción manufacturera · índice de volumen físico (año 2007 = 100)",
-    manu2: "Producción manufacturera · variación porcentual", expo: "Exportaciones por grupo de productos", impo: "Importaciones FOB según uso o destino económico - Aduana de Iquitos",
-    credito: "Crédito (SBS)", depositos: "Depósitos (SBS)", morosidad: "Tasa de morosidad (SBS)" };
   const ANEXOS_SINTESIS = {
     lor: [["agro"], ["hidro", 0], ["manu1"], ["manu2"], ["empleo", 0], ["expo", 0], ["impo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
     smn: [["agro"], ["manu1"], ["manu2"], ["expo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
@@ -1046,9 +1033,7 @@
     })));
     const anexosDe = {};
     sectores.forEach((sid) => { const d = datos[sid]; if (d.c) anexosDe[sid] = itemsBCRP(sid, d.c, R, {}).filter((it) => it.tipo === "ANEXO"); });
-    const items = lista.map(([sid, k], i) => {
-      const num = i + 1;
-      if (k === undefined) return { clave: `p${num}`, tipo: "ANEXO", num, nombre: PENDIENTES[sid], pendiente: "Todavía no entra a la página: se armará cuando se construya este sector." };
+    const items = lista.map(([sid, k], i) => [sid, k, i + 1]).filter(([, k]) => k !== undefined).map(([sid, k, num]) => {   // num: el de la síntesis
       const it = (anexosDe[sid] || [])[k];
       if (it) return { ...it, clave: `${sid}-${k}`, num };
       const d = datos[sid] || {};
@@ -1061,6 +1046,66 @@
     const listos = items.filter((it) => it.svg).length;
     galeriaBCRP(caja, clave, items, `${selectorMes(clave, meses, actual)}<span class="nota">${listos} de ${items.length} anexos con datos</span>`);
     $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; anexosBCRP(r, caja); });
+  }
+
+  // ── Resumen ejecutivo: principales hechos de importancia y Cuadro 1 (otros indicadores), con los datos de cada sector de la región ──
+  const RESUMEN_TAB = "Resumen";
+  // indicadores de cada sector: [nombre, var. % del mes, var. % acumulada, texto del hecho] (var. respecto al mismo periodo del año anterior)
+  function indicadores(sid, c) {
+    const fila = (nombre, vm, va, extra) => ({ sid, nombre, vm, va, extra });
+    if (sid === "pesca") { const f = c.filas[0]; return [fila("Pesca (valor bruto de producción)", f.var_mes, f.var_acum)]; }
+    if (sid === "hidro") return c.bloques.map((b) => { const t = b.filas.find((f) => f.lote === "Total") || {};
+      return fila(`Producción de ${b.producto.toLowerCase()}`, t.var_mes, t.var_acum); });
+    if (sid === "empleo") { const t = c.cuadro.find((f) => f.rama === "Total"); return [fila("Empleo formal privado", t.var_mes, null, `${fmt(t.mes)} trabajadores`)]; }
+    if (sid === "expo" || sid === "impo") { const t = c.sintesis.find((f) => f.total) || {};
+      return [fila(sid === "expo" ? "Exportaciones (valor FOB)" : "Importaciones (valor FOB)", t.var_mes, t.var_acum)]; }
+    if (sid === "gasto" || sid === "inversion") { const t = c.niveles[c.niveles.length - 1];
+      return [fila(sid === "gasto" ? "Gasto corriente no financiero" : "Inversión pública", t.var_mes, t.var_acum,
+                   sid === "inversion" && t.avance != null ? `avance del PIM de ${B.num(t.avance, 1)} %` : (c.real ? "" : "variación nominal"))]; }
+    return [];
+  }
+  const verbo = (v) => v == null ? null : v > 0 ? `creció ${B.num(v, 1)} %` : v < 0 ? `cayó ${B.num(-v, 1)} %` : "no varió";
+  async function resumenEjecutivo(r, caja) {
+    const clave = `res-${grupo}`, st = estadoEjec(clave), R = r.nombre.toUpperCase();
+    const sects = planos(grupo).filter((x) => URL_BCRP(x, r, ""));
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando el resumen con los datos de cada sector…</div>';
+    const traer = async (sid, periodo) => { try { return (await api(URL_BCRP(sid, r, periodo))).cuadros; } catch (e) { return { error: e.message }; } };
+    // el mes del informe: el elegido o el último del MEF (el que más se actualiza); cada sector se pide en ese mes
+    let datos = Object.fromEntries(await Promise.all(sects.map(async (sid) => [sid, await traer(sid, st.periodo)])));
+    const ultimos = sects.map((sid) => datos[sid] && (datos[sid].ultimo || datos[sid].periodo)).filter(Boolean).sort();
+    const ult = ultimos.pop() || MESES[MESES.length - 1];
+    const mes = st.periodo || (datos.gasto && datos.gasto.periodo) || ult;
+    await Promise.all(sects.map(async (sid) => { const d = datos[sid]; if (d && !d.error && d.periodo !== mes) datos[sid] = await traer(sid, mes); }));
+    const filas = [], faltan = [];
+    sects.forEach((sid) => { const d = datos[sid];
+      if (!d || d.error) faltan.push(`${S[sid].t}${d && d.error ? `: ${d.error}` : ": sin datos cargados"}`); else filas.push(...indicadores(sid, d)); });
+    const a = +mes.slice(0, 4), nm = NOMBRE_MES[+mes.slice(5) - 1], m3 = nm.slice(0, 3) + ".";
+    const hechos = filas.filter((f) => f.vm != null || f.va != null).map((f) => {
+      const partes = [];
+      if (f.vm != null) partes.push(`en ${nm.toLowerCase()} ${verbo(f.vm)} respecto a igual mes de ${a - 1}`);
+      if (f.va != null) partes.push(`en el acumulado de enero a ${nm.toLowerCase()} ${verbo(f.va)}`);
+      return `${f.nombre}: ${partes.join(" y ")}${f.extra ? ` (${f.extra})` : ""}.`;
+    });
+    const items = filas.length ? [{ clave: "c1", tipo: "CUADRO", num: 1, nombre: `${R}: OTROS INDICADORES DE ACTIVIDAD ECONÓMICA`, svg: (n) => B.cuadro({ numero: n,
+      titulo: `${R}: OTROS INDICADORES DE ACTIVIDAD ECONÓMICA`, unidad: `(Variación % respecto a similar periodo de ${a - 1})`, minCol: 100,
+      cab: [[{ t: "Indicador" }, { t: `${m3} ${a}` }, { t: `Ene.-${m3} ${a}` }]],
+      filas: filas.map((f) => ({ c: [f.nombre, v1(f.vm), v1(f.va)] })),
+      notas: ["Gasto corriente e inversión pública: variación real (IPC de Lima).", "Fuente: DIREPRO, PERUPETRO, MTPE, SUNAT y MEF."] }) }] : [];
+    const meses = MESES.filter((m) => m >= "2025-01" && m <= ult).reverse();
+    caja.innerHTML = `<div class="caja"><div class="fila" style="justify-content:space-between;align-items:center"><h3>Principales hechos de importancia · ${esc(nm)} ${a}</h3>
+        ${hechos.length ? '<button class="btn" type="button" id="res-copiar">Copiar texto</button>' : ""}</div>
+        ${hechos.length ? `<ul class="hechos" id="res-texto">${hechos.map((h) => `<li>${esc(h)}</li>`).join("")}</ul><p class="nota">Borrador armado con los datos de la página: revísalo y complétalo con el contexto antes de pasarlo al informe.</p>`
+          : `<p class="nota">Todavía no hay datos de ${esc(nm)} ${a} en los sectores de ${esc(r.nombre)}.</p>`}
+        ${faltan.length ? `<p class="nota">Sin ${esc(nm.toLowerCase())} ${a}: ${esc(faltan.join(" · "))}.</p>` : ""}<div class="bcrp-msj" id="res-msj" aria-live="polite"></div></div>
+      <div id="res-cuadro"></div>`;
+    if ($("res-copiar")) $("res-copiar").addEventListener("click", async () => {
+      const m = $("res-msj");
+      try { await navigator.clipboard.writeText(hechos.map((h) => `• ${h}`).join("\n")); m.textContent = "Copiado: pégalo en Word con Ctrl+V."; m.className = "bcrp-msj ok"; }
+      catch (e) { m.textContent = "No se pudo copiar: selecciona el texto y usa Ctrl+C."; m.className = "bcrp-msj mal"; }
+      setTimeout(() => { m.textContent = ""; }, 3500);
+    });
+    galeriaBCRP($("res-cuadro"), clave, items, selectorMes(clave, meses.length ? meses : [mes], mes));
+    $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; resumenEjecutivo(r, caja); });
   }
 
   // ── Contraste: lo que tiene la página contra lo publicado por el MEF (vista anual de Consulta Amigable, de los CSV de CONTROL del scraper) ──
@@ -1285,9 +1330,9 @@
     const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
     // primero lo del informe (cuadros, gráficos, mapa, revisiones); al final, los datos y la actualización
     const DE_DATOS = ["Archivos", "Base mensual"], extra = s.extra || [];
-    const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
+    const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : s.cuadros === "resumen" ? [RESUMEN_TAB] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
       ...extra.filter((x) => !DE_DATOS.includes(x)), "Datos", ...extra.filter((x) => DE_DATOS.includes(x)), ...(s.sinActualizar ? [] : ["Actualizar"])];
-    const t = s.cuadros === "anexos" ? ANEXOS_TAB : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
+    const t = s.cuadros === "anexos" ? ANEXOS_TAB : s.cuadros === "resumen" ? RESUMEN_TAB : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
@@ -1306,6 +1351,7 @@
     else if (t === "Archivos") panel = '<div id="archivos-fiscal"></div>';
     else if (t === BCRP_TAB) panel = `<div id="bcrp" data-sector="${id}"></div>`;
     else if (t === ANEXOS_TAB) panel = '<div id="anexos-bcrp"></div>';
+    else if (t === RESUMEN_TAB) panel = '<div id="resumen-ejec"></div>';
     else if (t === "Base mensual" && id === "impo") panel = `${cajaSubida("sub-impo", "La base mensual de importaciones tal como llega (M_AAAAMM.xlsx: aduana, ruc, partida, fob, flete, seguro, kilos, pais_adqui, cuode, periodo, …) o el ANUAL_PRO - IMPORTACIONES (.xlsm: sus diccionarios PARTIDAS, CUODE y UNICOS y su hoja ORIGEN). Entran las filas de la aduana de Iquitos (226).")}<div id="base-impo"></div>`;
     else if (t === "Base mensual") panel = `${cajaSubida("sub-sunat", "La base mensual de exportaciones (X_AAAAMM.xlsx, tal como llega: aduana, ubigeo, ruc11, ano_mes, …, ubigeo_dep) o un ANUAL_PRO_AAAA.xlsx (sus diccionarios UNICOS y PARTIDA y su hoja ORIGEN). Sirve para las tres regiones: cada fila va a su departamento.")}<div id="sunat-expo"></div>`;
     else if (t === "Resumen Export") panel = '<div id="resumen-sunat"></div>';
@@ -1331,7 +1377,7 @@
   function seccionComun() {
     let cuerpo = "";
     if (id === "panorama") {
-      const sects = ["agro", "pesca", "hidro", "manu", "cemento", "empleo", "expo", "impo", "credito", "depositos", "gasto", "inversion"];
+      const sects = ["resumen", "pesca", "hidro", "empleo", "expo", "impo", "gasto", "inversion"];
       cuerpo = `<p class="lead">Qué sectores van en la síntesis de cada región y en qué estado está cada uno.</p><div class="caja"><div class="scroll"><table><tr><th>Sector</th><th>Loreto</th><th>San Martín</th><th>Ucayali</th></tr>
         ${sects.map((k) => `<tr><td><b>${esc(S[k].t)}</b></td>${["lor", "smn", "uca"].map((g) => planos(g).includes(k) ? `<td><a data-ir="${g}-${k}"><span class="chip ${estadoDe(k, REG[g])}">${ETIQ[estadoDe(k, REG[g])]}</span></a></td>` : '<td><span class="nota">no va en su síntesis</span></td>').join("")}</tr>`).join("")}</table></div></div>`;
     } else if (id === "mef-archivos") {
@@ -1415,6 +1461,7 @@
     if ($("archivos-fiscal")) archivosFiscales(REG[grupo], $("archivos-fiscal"));
     if ($("bcrp")) cuadrosBCRP($("bcrp").dataset.sector, REG[grupo], $("bcrp"));
     if ($("anexos-bcrp")) anexosBCRP(REG[grupo], $("anexos-bcrp"));
+    if ($("resumen-ejec")) resumenEjecutivo(REG[grupo], $("resumen-ejec"));
     if ($("contraste")) contrasteMEF($("contraste").dataset.sector, REG[grupo], $("contraste"));
     window.scrollTo(0, 0);
   }
