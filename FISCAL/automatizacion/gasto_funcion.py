@@ -14,6 +14,7 @@ import requests
 from bs4 import BeautifulSoup
 
 NOTEBOOK = Path(__file__).resolve().parents[1] / "Fiscal_Scraper.ipynb"
+SECTORES = {"22", "20", "15", "16", "12", "18", "19", "17"}   # educación, salud, transporte, comunicaciones, energía, saneamiento, vivienda, ambiente
 NIVELES = {"E": "GOBIERNO NACIONAL", "R": "GOBIERNO REGIONAL", "M": "GOBIERNOS LOCALES"}
 
 
@@ -34,6 +35,8 @@ def main():
     ap.add_argument("--departamento", default="16")
     ap.add_argument("--desde", type=int, default=2016)
     ap.add_argument("--hasta", type=int, default=2025)
+    ap.add_argument("--genericas", choices=["todas", "sectores", "ninguna"], default="todas",
+                    help="desglose por genérica: todas las funciones, solo educación/salud/transporte/saneamiento… o ninguno (rápido)")
     a = ap.parse_args()
     g = navegacion()
     dep, anios = a.departamento, list(range(a.desde, a.hasta + 1))
@@ -57,6 +60,9 @@ def main():
         for valor, et, dev, pim in fs:
             m = re.match(r"^(\d+)", et)
             cod = m.group(1).zfill(2) if m else valor
+            if a.genericas == "ninguna" or (a.genericas == "sectores" and cod not in SECTORES):
+                salida.append(dict(AÑO=anio, NIVEL=NIVELES[nivel], COD_FUNCION=cod, FUNCION=et, GENERICA="(SIN DESGLOSE)", PIM=pim, DEVENGADO=dev))
+                continue
             gen, e2, _ = g["filas_de"](anio, "", nivel, dep, [("8", cod)], "24", f"{anio} {nivel} {et[:30]} genéricas",
                                        candidatos=g["candidatos_de"](valor, et))
             if e2:
@@ -80,7 +86,7 @@ def main():
     print("\nTotales (millones de soles):\n" + tot.round(1).to_string())
     if errores:
         print(f"\n⚠️ {len(errores)} error(es):\n  " + "\n  ".join(errores[:40]))
-    destino = Path(os.environ.get("FISCAL_TRABAJO", ".")) / f"gasto_funcion_{dep}_{a.desde}_{a.hasta}.csv"
+    destino = Path(os.environ.get("FISCAL_TRABAJO", ".")) / f"gasto_funcion_{dep}_{a.desde}_{a.hasta}_{a.genericas}.csv"
     destino.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(destino, index=False, encoding="utf-8")
     b64 = base64.b64encode(gzip.compress(df.to_csv(index=False).encode())).decode()
