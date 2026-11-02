@@ -253,7 +253,8 @@ qué lote operaba ese año.
 - **Exportadores sin lote:** Petroperú y Perupetro exportan crudo sin operar lotes con producción. Quedan fuera por
   defecto, con una casilla para incluirlos, y la nota dice cuánto se excluyó. Por eso, sin ellos, las barras no suman el
   total exportado por la región.
-- **Selector «Lote»:** muestra solo las empresas que operaban ese lote cada año.
+- **Selector «Lote»:** muestra solo las empresas que operaban ese lote cada año. El gráfico va del primer al último año
+  con exportaciones de ese lote; por ejemplo, el 1-AB llega a 2015.
 - **Descargas:** Copiar, SVG, PNG y los datos en Excel (`/v1/cuadros/hidrocarburos/exportaciones`).
 
 Falta el precio del crudo (Reuters), que no está en DATA. La pestaña **Mapa** muestra el mapa de lotes del flujo de

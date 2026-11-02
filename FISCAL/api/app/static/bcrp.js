@@ -235,7 +235,7 @@
   function apiladas(spec) {
     api.ultimo = { tipo: "apiladas", spec };
     const cat = spec.categorias, n = Math.max(cat.length, 1), series = spec.series.map((s, i) => ({ ...s, color: s.color || PALETA_APILADAS[i % PALETA_APILADAS.length] }));
-    const W = Math.max(720, 90 + n * 40), izq = 66, der = 16, arr = 52, alto = 300;
+    const W = Math.ceil(Math.max(720, 90 + n * 40, ancho(spec.titulo, 15, true) + 40)), izq = 66, der = 16, arr = 52, alto = 300;
     const rot = cat.some((c) => ancho(c, 10.5) > (W - izq - der) / n - 4);   // años inclinados si no caben
     const totales = cat.map((_, i) => series.reduce((a, s) => a + (s.valores[i] || 0), 0));
     let hi = Math.max(...totales, 0); const paso = pasoBonito(hi || 1, 7); hi = Math.ceil((hi || 1) / paso) * paso;
