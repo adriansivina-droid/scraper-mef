@@ -241,8 +241,12 @@ millones de pies cúbicos.
 - **Colores:** la empresa con más producción del periodo va abajo, con el primer color.
 - **Descargas:** se copia o descarga en SVG o PNG, y los datos en Excel (`/v1/cuadros/hidrocarburos/empresas`).
 
-**Exportaciones de petróleo crudo por empresa y lote** (debajo, en la misma pestaña): cuánto exportó cada empresa y
-qué lote operaba ese año.
+**Exportaciones de petróleo crudo por lote** (debajo, en la misma pestaña): cuánto crudo se exportó desde cada lote.
+Cada exportación se asigna al lote que operaba la empresa exportadora ese año.
+- **«Ver por: Lote»** (por defecto): barras apiladas por lote.
+- **«Lotes 1-AB y 8»:** Pluspetrol Norte operaba los dos a la vez hasta 2015 y sus exportaciones no se separan, así que van en un solo tramo.
+- **«Ver por: Empresa»:** muestra cuánto exportó cada empresa, con su lote dentro del tramo.
+- **Excel:** trae las hojas «Exportaciones por lote» (con la empresa de cada año) y «Exportaciones por empresa».
 - **Datos:** salen del Excel «Petróleo crudo - Loreto.xlsx» (hoja Consolidado: una columna por empresa con su RUC, en
   millones de US$), que se sube en «Actualizar». Va a la base `hidro-expo-empresa` y se copia a
   `DATA/PP_exportaciones_crudo_empresa.csv` para que el mapa lo use en la pestaña «Empresas» de cada lote.
