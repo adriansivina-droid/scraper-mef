@@ -284,6 +284,16 @@ def mef_actualizar(desde: str = "", hasta: str = "", prueba: bool = False):
 ARCHIVOS_MEF = {"dev-municipalidad": "inv-dev-municipalidad", "pim-funcion": "inv-pim-funcion", "pim-municipalidad": "inv-pim-municipalidad"}
 
 
+@app.get("/v1/mef/archivos/control", dependencies=[Depends(acceso)])
+def mef_archivos_control(archivo: str = Query(..., pattern="^(dev-municipalidad|pim-funcion|pim-municipalidad)$")):
+    """Control de un archivo de los 25 departamentos: lo publicado por el MEF (vista anual, de los CSV de CONTROL que deja
+    cada corrida) contra lo que tiene la página, por departamento y año, con las funciones que no cuadran."""
+    filas = controles.control_archivo(archivo)
+    for f in filas:
+        f["nombre"] = DEPARTAMENTOS.get(f["depto"], f["depto"]).title().replace(" De ", " de ")
+    return {"control": filas}
+
+
 @app.get("/v1/mef/archivos", dependencies=[Depends(acceso)])
 def mef_archivos():
     """Los tres archivos de los 25 departamentos con scraper propio: qué hay cargado y las últimas corridas."""

@@ -1232,7 +1232,8 @@
         <div class="fila">${periodo}<button class="btn" type="button" data-arch-bajar="${a.id}" ${x.filas ? "" : "disabled"}>Descargar Excel</button></div>
         <div class="fila">${nuevo}<button class="btn sec" type="button" data-arch-act="${a.id}" ${j.configurado ? "" : "disabled"}>Actualizar desde el MEF</button></div>
         <p class="nota">${a.anual ? "Vacío = el año en curso; «hasta» vacío = solo el año «desde». Cada año toma unos minutos." : "Vacío = año en curso hasta el último mes cerrado (en dos tramos seguidos). Con los 25 departamentos, un año completo puede tardar varias horas: para un mes, pon el mismo mes en desde y hasta."}</p>
-        <div id="ares-${a.id}" aria-live="polite"></div></div>`;
+        <div id="ares-${a.id}" aria-live="polite"></div>
+        <details class="ctl-mef" data-ctl="${a.id}"><summary><b>Control con el MEF</b> · lo que tiene la página contra lo publicado por el MEF, por departamento y año</summary><div class="loading"><span class="spin"></span>Comparando…</div></details></div>`;
     };
     caja.innerHTML = `<div class="caja"><h3>Departamentos</h3><div class="fila"><button class="btn sec" type="button" data-adeps="todos">Los 25</button><button class="btn sec" type="button" data-adeps="lsu">Loreto · San Martín · Ucayali</button><button class="btn sec" type="button" data-adeps="ninguno">Ninguno</button></div>
         <div class="deptos">${CAT.departamentos.filter((d) => +d.codigo <= 25).map((d) => `<label for="adep-${d.codigo}"><input type="checkbox" class="adep" id="adep-${d.codigo}" value="${d.codigo}" ${sel.includes(d.codigo) ? "checked" : ""}>${esc(titulo(d.nombre))}</label>`).join("")}</div>
@@ -1251,6 +1252,23 @@
         + (lista.length ? `<div class="scroll"><table><tr><th>Inicio</th><th>Corrida</th><th>Estado</th><th></th></tr>${lista.map((r) => `<tr><td>${esc(fecha(r.inicio))}</td><td>${esc(r.titulo)}</td><td>${ESTADO_CORRIDA(r)}${barraAvance(r)}</td><td><a href="${esc(r.enlace)}" target="_blank" rel="noopener">ver en GitHub</a></td></tr>`).join("")}</table></div>` : j.configurado ? '<p class="nota">Todavía no hay corridas.</p>' : "");
     };
     corridas(j.corridas);
+    // control con el MEF: la vista anual que el scraper consulta en cada corrida (CSV de CONTROL) contra la base de la página
+    const CHIP_CTL = { coincide: '<span class="chip ok">coincide</span>', "mes en curso": '<span class="chip vacio">mes en curso</span>', revisar: '<span class="chip error">revisar</span>', "sin datos": '<span class="chip vacio">sin datos en la página</span>' };
+    caja.querySelectorAll("[data-ctl]").forEach((det) => det.addEventListener("toggle", async () => {
+      if (!det.open || det.dataset.listo) return;
+      det.dataset.listo = "1";
+      const zona = det.querySelector(".loading"), sol = (v) => v == null ? "" : Math.round(v).toLocaleString("es-PE");
+      try {
+        const x = (await api(`/v1/mef/archivos/control?archivo=${det.dataset.ctl}`)).control;
+        if (!x.length) { zona.outerHTML = '<p class="nota">Todavía no hay controles guardados de este archivo: se guardan en cada corrida del scraper (la de este archivo o la completa de los días 2 y 21).</p>'; return; }
+        const n = (e) => x.filter((f) => f.estado === e).length;
+        zona.outerHTML = `<p class="nota"><b>${n("coincide")}</b> coinciden · <b>${n("revisar")}</b> por revisar · <b>${n("mes en curso")}</b> con el mes en curso · <b>${n("sin datos")}</b> sin datos en la página.
+            Coincide = la diferencia no pasa de S/ 5 por mes. «Mes en curso»: del año actual, el MEF ya suma lo devengado en el mes abierto.</p>
+          <div class="scroll"><table><tr><th>Departamento</th><th>Año</th><th>Meses en la página</th><th class="n">MEF (S/)</th><th class="n">Página (S/)</th><th class="n">Diferencia</th><th>Estado</th><th>Funciones que no cuadran</th><th>Control del</th></tr>
+          ${x.map((f) => `<tr class="${f.estado === "revisar" ? "alerta" : ""}"><td>${esc(f.nombre)}</td><td>${f.anio}</td><td>${esc(f.meses)}</td><td class="n">${sol(f.mef)}</td><td class="n">${sol(f.pagina)}</td><td class="n">${sol(f.dif)}</td><td>${CHIP_CTL[f.estado] || esc(f.estado)}</td>
+            <td>${f.funciones.length ? f.funciones.slice(0, 6).map((g) => `${esc(g.funcion)}: ${sol(g.dif)}`).join(" · ") + (f.funciones.length > 6 ? ` · y ${f.funciones.length - 6} más` : "") : ""}</td><td>${f.fecha ? esc(fecha(f.fecha)) : ""}</td></tr>`).join("")}</table></div>`;
+      } catch (e) { zona.outerHTML = `<div class="err-box"><b>No se pudo armar el control</b><span>${esc(e.message)}</span></div>`; }
+    }));
     const vigilar = () => {
       clearInterval(sondeoArch); let vueltas = 0;
       sondeoArch = setInterval(async () => {
