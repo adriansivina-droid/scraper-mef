@@ -154,3 +154,22 @@ def test_control_de_los_tres_archivos(cliente):
     muni = cliente.get("/v1/mef/archivos/control?archivo=pim-municipalidad").json()["control"]
     assert [(f["depto"], f["estado"]) for f in muni] == [("03", "coincide")]
     assert cliente.get("/v1/mef/archivos/control?archivo=otro").status_code == 422
+
+
+def test_cancelar_corrida(cliente, monkeypatch):
+    """Solo se cancelan corridas en curso de los flujos de la página."""
+    monkeypatch.setenv("GITHUB_ACCIONES_TOKEN", "tok")
+    corridas = {7: {"path": ".github/workflows/fiscal_archivos.yml", "status": "in_progress", "display_title": "dev-municipalidad · 2025-01 a 2026-10"},
+                8: {"path": ".github/workflows/fiscal_scraper.yml", "status": "completed", "display_title": "Scraper del MEF"},
+                9: {"path": ".github/workflows/otro.yml", "status": "in_progress", "display_title": "otro"}}
+    canceladas = []
+    monkeypatch.setattr(mef.requests, "get", lambda url, headers=None, timeout=None, **k: Respuesta(200, corridas[int(url.rsplit("/", 1)[1])]))
+    monkeypatch.setattr(mef.requests, "post", lambda url, headers=None, timeout=None, **k: canceladas.append(url) or Respuesta(202))
+    r = cliente.post("/v1/corridas/cancelar?id=7")
+    assert r.status_code == 200 and r.json()["estado"] == "cancelando"
+    assert canceladas == ["https://api.github.com/repos/adriansivina-droid/scraper-mef/actions/runs/7/cancel"]
+    assert cliente.post("/v1/corridas/cancelar?id=8").status_code == 422      # ya terminó
+    assert cliente.post("/v1/corridas/cancelar?id=9").status_code == 422      # no es de la página
+    assert len(canceladas) == 1
+    monkeypatch.delenv("GITHUB_ACCIONES_TOKEN")
+    assert cliente.post("/v1/corridas/cancelar?id=7").status_code == 503

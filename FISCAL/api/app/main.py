@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import pandas as pd
+import requests
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -282,6 +283,20 @@ def mef_actualizar(desde: str = "", hasta: str = "", prueba: bool = False):
 
 
 ARCHIVOS_MEF = {"dev-municipalidad": "inv-dev-municipalidad", "pim-funcion": "inv-pim-funcion", "pim-municipalidad": "inv-pim-municipalidad"}
+
+
+@app.post("/v1/corridas/cancelar", dependencies=[Depends(acceso)])
+def corridas_cancelar(id: int = Query(..., ge=1)):
+    """Cancela una corrida en curso de un scraper de la página (MEF, 3 archivos, empleo, hidrocarburos, …) en GitHub Actions.
+    La carga en la base se hace al final de cada corrida: lo cancelado no deja nada a medias."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta GITHUB_ACCIONES_TOKEN en Render para hablar con GitHub.")
+    try:
+        return mef.cancelar(id)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except (mef.ErrorGitHub, requests.RequestException) as e:
+        raise HTTPException(502, str(e))
 
 
 @app.get("/v1/mef/archivos/control", dependencies=[Depends(acceso)])
