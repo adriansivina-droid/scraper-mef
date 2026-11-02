@@ -377,7 +377,20 @@ def exportaciones_crudo(expo, prod, sin_lote=False, lote=None):
         return None
     vacios = [etiqueta_anio(a) for i, a in enumerate(anios) if not any(e["valores"][i] for e in empresas) and expo[expo["ANIO"] == a]["FOB_MM_USD"].sum()]
     compartidos = sorted({f"{e['nombre']} ({' y '.join(l.rstrip('*') for l in ls)})" for e in empresas for ls in e["lotes_anio"] if len(ls) > 1})
-    return {"unidad": "millones de US$", "region": str(expo["DEPARTAMENTO"].iloc[0]), "lote": lote, "compartidos": compartidos,
+    # por lote: lo de cada empresa va al lote que operaba ese año; si operaba dos a la vez, a «Lotes A y B» (no se separa)
+    por_lote = {}
+    for e in empresas:
+        for i, (v, ls) in enumerate(zip(e["valores"], e["lotes_anio"])):
+            if not v:
+                continue
+            base = [l.rstrip("*") for l in ls]
+            clave = "Sin lote" if not base else ("Lote " if len(base) == 1 else "Lotes ") + " y ".join(base)
+            x = por_lote.setdefault(clave, {"nombre": clave, "lotes": base, "valores": [0.0] * len(anios), "empresas": [[] for _ in anios], "asterisco": [False] * len(anios)})
+            x["valores"][i] = round(x["valores"][i] + v, 4)
+            x["empresas"][i].append(e["nombre"])
+            x["asterisco"][i] = x["asterisco"][i] or any(l.endswith("*") for l in ls)
+    lotes_series = sorted(por_lote.values(), key=lambda x: (x["nombre"] == "Sin lote", -sum(x["valores"]), x["nombre"]))
+    return {"unidad": "millones de US$", "region": str(expo["DEPARTAMENTO"].iloc[0]), "lote": lote, "compartidos": compartidos, "por_lote": lotes_series,
             "con_asterisco": any(l.endswith("*") for e in empresas for ls in e["lotes_anio"] for l in ls),
             "lotes_disponibles": sorted({l.rstrip("*") for ls in [lotes(r_, n_, a) for (r_, n_), g in t.groupby(level=[0, 1]) for a in anios if g.get((r_, n_, a), 0)] for l in ls}, key=orden_lote),
             "anios": [{"anio": a, "etiqueta": etiqueta_anio(a), "parcial": etiqueta_anio(a) != str(a)} for a in anios],
@@ -387,8 +400,25 @@ def exportaciones_crudo(expo, prod, sin_lote=False, lote=None):
 
 def excel_exportaciones(region, e):
     wb = Workbook()
-    ws = wb.active
-    ws.title = "Exportaciones por empresa"
+    neg = Font(bold=True)
+    wl = wb.active
+    wl.title = "Exportaciones por lote"
+    wl.append([f"{region}: exportaciones de petróleo crudo por lote (millones de US$)"]); wl["A1"].font = neg
+    wl.append([])
+    wl.append(["Lote", *[x["etiqueta"] for x in e["anios"]]])
+    for celda in wl[3]:
+        celda.font = neg
+    for x in e["por_lote"]:
+        wl.append([x["nombre"], *x["valores"]])
+        wl.append(["   empresa(s)", *[" / ".join(n) for n in x["empresas"]]])
+    wl.append(["Total", *e["total"]])
+    for fila in wl.iter_rows(min_row=4, min_col=2):
+        for celda in fila:
+            if isinstance(celda.value, float):
+                celda.number_format = "#,##0.00"
+    wl.append([]); wl.append(["«Lotes 1-AB y 8»: Pluspetrol Norte operaba los dos lotes a la vez; sus exportaciones no se separan por lote."])
+    wl.column_dimensions["A"].width = 24
+    ws = wb.create_sheet("Exportaciones por empresa")
     neg = Font(bold=True)
     ws.append([f"{region}: exportaciones de petróleo crudo por empresa y lote que operaba (millones de US$)"]); ws["A1"].font = neg
     ws.append([])

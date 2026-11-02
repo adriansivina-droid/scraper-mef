@@ -354,3 +354,18 @@ def test_operadores_pegados_en_la_cabecera_del_reporte_diario(cliente):
     nombres = [x["nombre"] for x in emp["empresas"]]
     assert not any("Vigo" in n or "Petrotal Pluspetrol" in n for n in nombres)
     assert {"Petrotal", "Pluspetrol Norte", "Upland Oil and Gas"} <= set(nombres)
+
+
+def test_exportaciones_por_lote(cliente):
+    subir(cliente, csvs())
+    subir(cliente, {"PP_produccion_diaria.csv": diaria()})
+    cliente.post("/v1/cargas", files=[("archivos", ("Petróleo crudo - Loreto.xlsx", expo_crudo(), "application/octet-stream"))])
+    e = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16").json()["exportaciones"]
+    lotes = {x["nombre"]: x for x in e["por_lote"]}
+    assert set(lotes) == {"Lote 95", "Lote 8"}
+    assert lotes["Lote 8"]["valores"] == [0.0, 0.0, 11.293] and lotes["Lote 8"]["empresas"][2] == ["Upland Oil and Gas"]
+    assert [round(sum(x["valores"][i] for x in e["por_lote"]), 4) for i in range(3)] == e["total"]
+    con = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16&sin_lote=true").json()["exportaciones"]
+    assert "Sin lote" in [x["nombre"] for x in con["por_lote"]]
+    x = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16&formato=xlsx")
+    assert load_workbook(io.BytesIO(x.content)).sheetnames == ["Exportaciones por lote", "Exportaciones por empresa"]
