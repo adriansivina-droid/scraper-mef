@@ -4,29 +4,37 @@ import io
 import zipfile
 
 from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Alignment
 
 from .catalogo import BASES
 
 
 def excel(tablas):
-    """tablas: {base_id: DataFrame} en el orden del catálogo -> bytes del .xlsx."""
-    wb = Workbook(write_only=False)
-    wb.remove(wb.active)
+    """tablas: {base_id: DataFrame} en el orden del catálogo -> bytes del .xlsx. En modo de solo escritura (va directo a
+    un archivo temporal): con el modo normal, 180 mil filas (DEV Función·Municipalidad, 25 departamentos, dos años)
+    pasaban de 450 MB y Render reiniciaba el servicio (502)."""
+    wb = Workbook(write_only=True)
     centro = Alignment(horizontal="center")
     for base_id, df in tablas.items():
         b = BASES[base_id]
         ws = wb.create_sheet(b.hoja)
-        ws.append(b.columnas)
-        for celda in ws[1]:
-            celda.alignment = centro
-        for fila in df.itertuples(index=False):
-            ws.append(list(fila))
-        col_valor = b.columnas.index(b.valor) + 1
-        for (celda,) in ws.iter_rows(min_row=1, min_col=col_valor, max_col=col_valor):
-            celda.number_format = b.formato_valor
-        for i, ancho in enumerate(b.anchos):
+        for i, ancho in enumerate(b.anchos):                  # los anchos van antes de la primera fila
             ws.column_dimensions[chr(65 + i)].width = ancho
+        cab = []
+        for c in b.columnas:
+            celda = WriteOnlyCell(ws, value=c)
+            celda.alignment = centro
+            cab.append(celda)
+        ws.append(cab)
+        j = b.columnas.index(b.valor)
+        for fila in df.itertuples(index=False):
+            fila = list(fila)
+            v = fila[j]
+            celda = WriteOnlyCell(ws, value=None if v is None or (isinstance(v, float) and v != v) else v)
+            celda.number_format = b.formato_valor
+            fila[j] = celda
+            ws.append([None if (isinstance(x, float) and x != x) else x for x in fila[:j]] + [celda] + fila[j + 1:])
     salida = io.BytesIO()
     wb.save(salida)
     return salida.getvalue()
