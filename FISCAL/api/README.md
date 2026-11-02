@@ -141,6 +141,11 @@ en el notebook, el servidor usa el cambio.
 
 ### Los tres archivos de los 25 departamentos, cada uno con su scraper
 
+Cada archivo tiene además su **Control con el MEF** (desplegable al final de su tarjeta): por departamento y año, lo que
+publica el MEF en la vista anual de Consulta Amigable (los CSV de CONTROL que deja cada corrida: `CONTROL Municipalidad …`,
+`CONTROL PIM Funcion …` y `CONTROL PIM Funcion.Municipalidad …`, guardados en la tabla `mef_controles`) contra lo que tiene
+la página, con las funciones que no cuadran (`/v1/mef/archivos/control?archivo=`).
+
 En **Las tres regiones → Datos → MEF · 3 archivos**: DEV Función · Municipalidad, PIM Función y PIM Función ·
 Municipalidad tienen cada uno su botón **Descargar Excel** (departamentos y periodo a elegir) y su botón **Actualizar
 desde el MEF**, que lanza `.github/workflows/fiscal_archivos.yml`: el mismo notebook, pero solo con el bloque de ese

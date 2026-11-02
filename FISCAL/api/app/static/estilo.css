@@ -236,3 +236,6 @@ tr.alerta td { background: var(--gold-soft); }
 .avance .barra.indet span { width: 30%; animation: avance-indet 1.4s ease-in-out infinite; }
 @keyframes avance-indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
 @media (prefers-reduced-motion: reduce) { .avance .barra.indet span { animation: none; width: 100%; opacity: .35; } }
+details.ctl-mef { border-top: 1px solid var(--hair); margin-top: 14px; padding-top: 10px; }
+details.ctl-mef summary { cursor: pointer; }
+details.ctl-mef[open] summary { margin-bottom: 8px; }

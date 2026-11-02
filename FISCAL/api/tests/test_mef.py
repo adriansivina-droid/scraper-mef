@@ -118,3 +118,39 @@ def test_barra_de_avance(cliente, github, monkeypatch):
     e = cliente.get("/v1/mef/archivos").json()        # la corrida simulada (id 1) sigue en curso
     p = e["corridas"][0]["progreso"]
     assert p == [{"tramo": 1, "fraccion": 0.5, "texto": "Control Funcion.M 2026", "fecha": p[0]["fecha"]}]
+
+
+def test_control_de_los_tres_archivos(cliente):
+    """Los CSV de CONTROL de los tres archivos (25 departamentos) se guardan y se comparan con la base de la página."""
+    from tests.test_api import _csv, zip_de
+    import pandas as pd
+    suf = "TODOS LOS DEPARTAMENTOS"
+    s = {
+        # devengado municipal (2.6) de Amazonas en dos meses de 2025 y su control (vista anual del MEF)
+        f"output/DEVENGADO/Gobierno Municipal/DEV Funcion.Municipalidad 2025 - Meses 01-02 - {suf}.csv": _csv(pd.DataFrame([
+            dict(AÑO=2025, MES=f"{m}: Mes", DEPARTAMENTO="01: AMAZONAS", FUNCION="15: TRANSPORTE", MUNICIPALIDAD="010101-300001: MUNICIPALIDAD X", DEVENGADO=1000.0)
+            for m in (1, 2)])),
+        f"output/DEVENGADO/CARPETA DE CONTROL/CONTROL Municipalidad 2025 - Meses 01-02 - {suf}.csv": _csv(pd.DataFrame([
+            dict(AÑO=2025, DEPARTAMENTO="01: AMAZONAS", COD_FUNCION="15", DEV_SUMA_MESES=2000.0, DEV_REF_ANUAL=2000.0)])),
+        # PIM por función de Áncash: el MEF dice 5000 y la página tiene 4000 (revisar)
+        f"output/PIM/PIM X FUNCIÓN/DATA/PIM Funcion 2025 - {suf}.csv": _csv(pd.DataFrame([
+            {"AÑO": 2025, "DEPARTAMENTO": "02: ÁNCASH", "NIVEL DE GOBIERNO": "GOBIERNOS REGIONALES", "FUNCION": "22: EDUCACION", "PIM": 4000.0}])),
+        f"output/PIM/PIM X FUNCIÓN/CONTROL/CONTROL PIM Funcion 2025 - {suf}.csv": _csv(pd.DataFrame([
+            dict(AÑO=2025, DEPARTAMENTO="02: ÁNCASH", COD_FUNCION="22", PIM_SUMA_NIVELES=4000.0, PIM_REF_TOTAL=5000.0)])),
+        # PIM municipal de Apurímac y su control (PIM de gobiernos locales en el MEF)
+        f"output/PIM/PIM X FUNCIÓN X MUNICIPALIDAD/DATA/PIM Funcion.Municipalidad 2025 - {suf}.csv": _csv(pd.DataFrame([
+            dict(AÑO=2025, DEPARTAMENTO="03: APURÍMAC", FUNCION="18: SANEAMIENTO", MUNICIPALIDAD="030101-300100: MUNICIPALIDAD Y", PIM=700.0)])),
+        f"output/PIM/PIM X FUNCIÓN X MUNICIPALIDAD/CONTROL/CONTROL PIM Funcion.Municipalidad 2025 - {suf}.csv": _csv(pd.DataFrame([
+            dict(AÑO=2025, DEPARTAMENTO="03: APURÍMAC", COD_FUNCION="18", FUNCION="18: SANEAMIENTO", PIM_SUMA_MUNICIPIOS=700.0, PIM_REF_GL=700.0, DIF=0.0, ESTADO="OK")])),
+    }
+    r = cliente.post("/v1/cargas", files=[("archivos", ("output.zip", zip_de(s), "application/zip"))])
+    assert r.status_code == 200, r.text
+    dev = cliente.get("/v1/mef/archivos/control?archivo=dev-municipalidad").json()["control"]
+    assert [(f["depto"], f["anio"], f["estado"], f["meses"]) for f in dev] == [("01", 2025, "coincide", "01 a 02")]
+    assert dev[0]["nombre"] == "Amazonas"
+    pim = cliente.get("/v1/mef/archivos/control?archivo=pim-funcion").json()["control"]
+    assert [(f["depto"], f["estado"], f["dif"]) for f in pim] == [("02", "revisar", -1000.0)]
+    assert pim[0]["funciones"] == [{"funcion": "22 Educación", "mef": 5000.0, "pagina": 4000.0, "dif": -1000.0}]
+    muni = cliente.get("/v1/mef/archivos/control?archivo=pim-municipalidad").json()["control"]
+    assert [(f["depto"], f["estado"]) for f in muni] == [("03", "coincide")]
+    assert cliente.get("/v1/mef/archivos/control?archivo=otro").status_code == 422
