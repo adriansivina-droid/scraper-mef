@@ -1,7 +1,7 @@
 // Cuadros y gráficos con el formato de la Síntesis de Actividad Económica (BCRP, Sucursal Iquitos), en SVG para
 // pegarlos en el informe: Arial, filetes horizontales, miles con espacio y decimales con coma; los gráficos, barras
 // celestes con borde azul (el mismo mes de cada año, en blanco), meses «J.24 J A S … J.25», notas de fuente y elaboración.
-// window.BCRP.cuadro(spec) / .anexo(spec) / .barras(spec) / .circulares(spec) / .hbarras(spec) devuelven el SVG (texto); .descargar, .copiar, .png lo exportan.
+// window.BCRP.cuadro(spec) / .anexo(spec) / .barras(spec) / .circulares(spec) / .hbarras(spec) / .apiladas(spec) devuelven el SVG (texto); .descargar, .copiar, .png lo exportan.
 (function () {
   "use strict";
   const FUENTE = "Arial, Helvetica, sans-serif", TINTA = "#000", AZUL = "#4F81BD", RELLENO = "#C6D9F1", GRIS = "#C0C0C0";
@@ -229,6 +229,47 @@
     return envolver(W, n.y + 4, out.join(""));
   }
 
+  // ── Barras apiladas por año (estilo de los gráficos de Excel: título arriba, eje con su unidad, años inclinados y
+  // leyenda abajo): spec = {titulo, ejeY, categorias: [..], series: [{nombre, valores: [..], color?}], notas}
+  const PALETA_APILADAS = ["#111149", "#72D2D5", "#CCD3DF", "#FFC41D", "#2A9DA1", "#5A5A9E", "#8C96AD", "#181818", "#B9E9EB", "#4F81BD", "#9BBB59", "#DD6140"];
+  function apiladas(spec) {
+    api.ultimo = { tipo: "apiladas", spec };
+    const cat = spec.categorias, n = Math.max(cat.length, 1), series = spec.series.map((s, i) => ({ ...s, color: s.color || PALETA_APILADAS[i % PALETA_APILADAS.length] }));
+    const W = Math.max(720, 90 + n * 34), izq = 66, der = 16, arr = 52, alto = 300;
+    const rot = cat.some((c) => ancho(c, 10.5) > (W - izq - der) / n - 4);   // años inclinados si no caben
+    const totales = cat.map((_, i) => series.reduce((a, s) => a + (s.valores[i] || 0), 0));
+    let hi = Math.max(...totales, 0); const paso = pasoBonito(hi || 1, 7); hi = Math.ceil((hi || 1) / paso) * paso;
+    const Y = (v) => arr + (hi - v) / hi * alto, bw = (W - izq - der) / n, out = [];
+    out.push(`<text x="${W / 2}" y="26" text-anchor="middle" font-weight="bold" font-size="15">${esc(spec.titulo)}</text>`);
+    for (let v = 0; v <= hi + 1e-9; v += paso) {
+      out.push(`<line x1="${izq}" x2="${W - der}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="${v ? "#D9D9D9" : "#808080"}" stroke-width="0.8"/>`);
+      out.push(`<text x="${izq - 6}" y="${(Y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="10">${esc(num(v, paso < 1 ? 1 : 0))}</text>`);
+    }
+    if (spec.ejeY) out.push(`<text transform="translate(16 ${arr + alto / 2}) rotate(-90)" text-anchor="middle" font-weight="bold" font-size="10.5">${esc(spec.ejeY)}</text>`);
+    cat.forEach((c, i) => {
+      const x0 = izq + i * bw + bw * 0.2, wv = bw * 0.6;
+      let base = 0;
+      series.forEach((s) => { const v = s.valores[i] || 0; if (v <= 0) return;
+        const y1 = Y(base + v), y0 = Y(base); base += v;
+        out.push(`<rect x="${x0.toFixed(1)}" y="${y1.toFixed(1)}" width="${wv.toFixed(1)}" height="${Math.max(y0 - y1, 0.4).toFixed(1)}" fill="${s.color}"><title>${esc(c)} · ${esc(s.nombre)}: ${esc(num(v, 2))}</title></rect>`); });
+      const cx = x0 + wv / 2, cy = Y(0) + 12;
+      out.push(rot ? `<text transform="translate(${cx.toFixed(1)} ${cy}) rotate(-45)" text-anchor="end" font-size="10.5">${esc(c)}</text>`
+                   : `<text x="${cx.toFixed(1)}" y="${cy + 2}" text-anchor="middle" font-size="10.5">${esc(c)}</text>`);
+    });
+    // leyenda abajo, centrada, en filas
+    const baseEje = Y(0) + (rot ? Math.max(...cat.map((c) => ancho(c, 10.5))) * 0.71 + 16 : 24) + 10;
+    const items = series.map((s) => ({ ...s, w: 14 + ancho(s.nombre, 10.5) + 18 })), filas = [[]];
+    let fw = 0;
+    items.forEach((it) => { if (fw + it.w > W - 40 && filas[filas.length - 1].length) { filas.push([]); fw = 0; } filas[filas.length - 1].push(it); fw += it.w; });
+    let y = baseEje + 8;
+    filas.forEach((f) => { let x = (W - f.reduce((a, it) => a + it.w, 0)) / 2;
+      f.forEach((it) => { out.push(`<rect x="${x.toFixed(1)}" y="${y - 8.5}" width="10" height="10" fill="${it.color}"/><text x="${(x + 14).toFixed(1)}" y="${y}" font-size="10.5">${esc(it.nombre)}</text>`); x += it.w; });
+      y += 16; });
+    const nt = notas([...(spec.notas || []), ELABORACION], 16, y + 8);
+    out.push(nt.svg);
+    return envolver(W, nt.y + 4, out.join(""));
+  }
+
   // ── Exportar ──
   const nombreArchivo = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 90) || "grafico";
   function bajar(blob, nombre) {
@@ -265,5 +306,5 @@
     bajar(await r.blob(), nombreArchivo(nombre) + ".xlsx");
   }
 
-  window.BCRP = Object.assign(api, { cuadro, anexo, barras, circulares, hbarras, descargar, descargarPng, copiar, excel, num, var1, ELABORACION });
+  window.BCRP = Object.assign(api, { cuadro, anexo, barras, circulares, hbarras, apiladas, descargar, descargarPng, copiar, excel, num, var1, ELABORACION });
 })();

@@ -346,10 +346,56 @@
         ${gr ? `<div class="caja"><h3>Gráfico · Producción de ${esc(gr.producto.toLowerCase())}</h3><p>(${esc(gr.unidad.charAt(0).toUpperCase() + gr.unidad.slice(1))})</p>
           <div class="scroll"><svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Producción diaria promedio por mes"><line class="eje" x1="0" x2="${W}" y1="${base0}" y2="${base0}"></line>${barras}</svg></div>
           ${gr.serie.some((x) => x.parcial) ? `<p class="nota">* ${esc(c.parcial.periodo)}: promedio de los ${c.parcial.dias} días reportados en la producción diaria de PERUPETRO.</p>` : ""}</div>` : ""}
-        ${anexos}${canon}`;
+        ${anexos}${canon}<div class="caja" id="hid-emp"></div>`;
+      empresasHidro(r, $("hid-emp"));
       $("hid-p").addEventListener("change", (ev) => cuadrosHidro(r, caja, ev.target.value));
       $("hid-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/hidrocarburos?departamento=${r.cod}&periodo=${c.periodo}&formato=xlsx`; });
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
+  }
+
+  // ── Producción anual por empresa operadora: barras apiladas por año, de cualquier departamento o de todo el Perú ──
+  const hidEmp = {};                                     // por región: departamento, producto y año inicial elegidos
+  async function empresasHidro(r, caja) {
+    const B = window.BCRP, st = hidEmp[r.cod] || (hidEmp[r.cod] = { dep: r.cod, prod: "PETROLEO", desde: null });
+    const deps = (ESTADO.bases["hidro-produccion"].departamentos || []).filter((d) => d !== "99" && d !== "98");
+    const nomDep = (c) => titulo((CAT.departamentos.find((d) => d.codigo === c) || { nombre: c }).nombre);
+    const PROD = { PETROLEO: "Petróleo", LIQUIDOS: "Líquidos totales (petróleo, LGN y condensado)", "GAS NATURAL": "Gas natural" };
+    caja.innerHTML = '<h3>Producción anual por empresa operadora</h3><div class="loading"><span class="spin"></span>Armando el gráfico…</div>';
+    try {
+      const j = await api(`/v1/cuadros/hidrocarburos/empresas?departamento=${st.dep}&producto=${encodeURIComponent(st.prod)}`), e = j.empresas;
+      const anios = e ? e.anios.map((x) => x.anio) : [];
+      if (st.desde == null || !anios.includes(st.desde)) st.desde = anios.length ? anios[0] : null;
+      const sel = (id, lbl, ops, val) => `<label class="campo" for="${id}">${lbl}<select id="${id}">${ops.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(val) ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`;
+      const controles = `<div class="fila">${sel("emp-dep", "Región", [["todos", "Todo el Perú"], ...deps.map((d) => [d, nomDep(d)])], st.dep)}
+          ${sel("emp-prod", "Producto", Object.entries(PROD), st.prod)}${anios.length ? sel("emp-desde", "Desde", anios.map((a) => [a, a]), st.desde) : ""}</div>`;
+      let cuerpo = `<div class="vacio-caja"><b>Sin producción de ${esc(PROD[st.prod].toLowerCase())} en ${esc(j.region)}.</b></div>`, svg = null, nombre = "";
+      if (e) {
+        const k0 = e.anios.findIndex((x) => x.anio === st.desde), corte = (v) => v.slice(k0);
+        const series = e.empresas.map((x) => ({ nombre: x.nombre, valores: corte(x.valores), ...(x.nombre === "Sin operador identificado" ? { color: "#E7E6E6" } : {}) }))
+          .filter((x) => x.valores.some((v) => v > 0));
+        const notasG = [];
+        if (e.de_diaria.length) notasG.push(`${e.de_diaria.length > 1 ? `${e.de_diaria[0]} a ${e.de_diaria[e.de_diaria.length - 1]}` : e.de_diaria[0]}: suma de los reportes diarios de PERUPETRO (meses cerrados); la estadística mensual aún no los publica.`);
+        if (e.parcial) notasG.push(`${e.parcial.periodo} no se incluye: el mes está en curso (${e.parcial.dias} de ${e.parcial.de} días).`);
+        notasG.push("Fuente: PERUPETRO, producción fiscalizada por lote y operador.");
+        nombre = `${j.region}: producción anual de ${PROD[st.prod].split(" (")[0].toLowerCase()} por empresa (${e.unidad})`;
+        svg = B.apiladas({ titulo: nombre, ejeY: e.unidad.charAt(0).toUpperCase() + e.unidad.slice(1), categorias: corte(e.anios.map((x) => x.etiqueta)), series, notas: notasG });
+        cuerpo = `<div class="scroll">${svg}</div>
+          <div class="fila"><button class="btn" type="button" id="emp-copiar">Copiar</button><button class="btn sec" type="button" id="emp-svg">SVG</button>
+            <button class="btn sec" type="button" id="emp-png">PNG</button><button class="btn sec" type="button" id="emp-xlsx">Datos en Excel</button><span class="bcrp-msj" id="emp-msj"></span></div>`;
+      }
+      caja.innerHTML = `<h3>Producción anual por empresa operadora</h3><p>Qué empresas operaron cada año y cuánto produjeron, en ${esc(st.dep === "todos" ? "todo el Perú" : "cualquier región con producción")}. El año en curso suma la estadística mensual y los meses cerrados del reporte diario.</p>${controles}${cuerpo}`;
+      const re = () => empresasHidro(r, caja);
+      $("emp-dep").addEventListener("change", (ev) => { st.dep = ev.target.value; st.desde = null; re(); });
+      $("emp-prod").addEventListener("change", (ev) => { st.prod = ev.target.value; re(); });
+      if ($("emp-desde")) $("emp-desde").addEventListener("change", (ev) => { st.desde = +ev.target.value; re(); });
+      if (svg) {
+        const msj = (t, ok) => { const m = $("emp-msj"); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
+        $("emp-copiar").addEventListener("click", async () => { try { await B.copiar(svg); msj("Copiado: pégalo en Word o PowerPoint con Ctrl+V.", true); } catch (er) { msj(er.message, false); } });
+        $("emp-svg").addEventListener("click", () => B.descargar(svg, nombre));
+        $("emp-png").addEventListener("click", async () => { try { await B.descargarPng(svg, nombre); } catch (er) { msj(er.message, false); } });
+        $("emp-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/hidrocarburos/empresas?departamento=${st.dep}&producto=${encodeURIComponent(st.prod)}&formato=xlsx`; });
+      }
+    } catch (er) { caja.innerHTML = `<h3>Producción anual por empresa operadora</h3><div class="err-box"><b>No se pudo armar el gráfico</b><span>${esc(er.message)}</span></div>`; }
   }
 
   // ── Ejecución del presupuesto: gasto corriente no financiero e inversión pública ──
