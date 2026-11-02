@@ -409,7 +409,9 @@
       if (!e) { caja.innerHTML = `<h3>${T}</h3><div class="vacio-caja"><b>Todavía no hay exportaciones de crudo de ${esc(r.nombre)}.</b><span>Sube el Excel «Petróleo crudo - ${esc(r.nombre)}» (hoja Consolidado) en la pestaña «Actualizar».</span></div>`; return; }
       const anios = e.anios.map((x) => x.anio);
       if (st.desde == null || !anios.includes(st.desde)) st.desde = anios[Math.max(0, e.total.findIndex((v) => v > 0))];   // desde el primer año con exportaciones
-      const k0 = anios.indexOf(st.desde), corte = (v) => v.slice(k0);
+      // por lote, el gráfico termina en el último año con exportaciones de ese lote
+      const ult = e.total.reduce((u, v, i) => v > 0 ? i : u, anios.length - 1), k1 = st.lote ? ult : anios.length - 1;
+      const k0 = Math.min(anios.indexOf(st.desde), k1), corte = (v) => v.slice(k0, k1 + 1);
       const series = e.empresas.map((x) => ({ nombre: `${x.nombre} (${x.lotes.length ? (x.lotes.length > 1 ? "lotes " : "lote ") + x.lotes.join(" y ") : "no opera lotes"})`,
         valores: corte(x.valores), etiquetas: corte(x.lotes_anio) })).filter((x) => x.valores.some((v) => v > 0));
       const fmt1 = (v) => v.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -422,7 +424,7 @@
       const nombre = st.lote ? `${j.region}: exportaciones de petróleo crudo de las empresas que operaban el Lote ${st.lote} (millones de US$)` : `${j.region}: exportaciones de petróleo crudo por empresa y lote (millones de US$)`;
       const svg = B.apiladas({ titulo: nombre, ejeY: "Millones de US$", categorias: corte(e.anios.map((x) => x.etiqueta)), series, notas: notasG });
       caja.innerHTML = `<h3>${T}</h3><p>Cuánto exportó cada empresa y qué lote operaba ese año. Los datos de exportación vienen del Excel que se sube en «Actualizar».</p>
-        <div class="fila"><label class="campo" for="ex-desde">Desde<select id="ex-desde">${anios.map((a) => `<option value="${a}"${a === st.desde ? " selected" : ""}>${a}</option>`).join("")}</select></label>
+        <div class="fila"><label class="campo" for="ex-desde">Desde<select id="ex-desde">${anios.slice(0, k1 + 1).map((a) => `<option value="${a}"${a === st.desde ? " selected" : ""}>${a}</option>`).join("")}</select></label>
           <label class="campo" for="ex-lote">Lote<select id="ex-lote"><option value="">Todos los lotes</option>${e.lotes_disponibles.map((l) => `<option value="${esc(l)}"${l === st.lote ? " selected" : ""}>Lote ${esc(l)}</option>`).join("")}</select></label>
           <label class="campo" for="ex-sin"${st.lote ? " hidden" : ""}><span><input type="checkbox" id="ex-sin" ${st.sinLote ? "checked" : ""}> Incluir exportadores sin lote (Petroperú, Perupetro)</span></label></div>
         <div class="scroll">${svg}</div>
