@@ -230,12 +230,12 @@
   }
 
   // ── Barras apiladas por año (estilo de los gráficos de Excel: título arriba, eje con su unidad, años inclinados y
-  // leyenda abajo): spec = {titulo, ejeY, categorias: [..], series: [{nombre, valores: [..], color?}], notas}
+  // leyenda abajo): spec = {titulo, ejeY, categorias: [..], series: [{nombre, valores: [..], color?, etiquetas?: [[texto, …] por categoría]}], notas}
   const PALETA_APILADAS = ["#111149", "#72D2D5", "#CCD3DF", "#FFC41D", "#2A9DA1", "#5A5A9E", "#8C96AD", "#181818", "#B9E9EB", "#4F81BD", "#9BBB59", "#DD6140"];
   function apiladas(spec) {
     api.ultimo = { tipo: "apiladas", spec };
     const cat = spec.categorias, n = Math.max(cat.length, 1), series = spec.series.map((s, i) => ({ ...s, color: s.color || PALETA_APILADAS[i % PALETA_APILADAS.length] }));
-    const W = Math.max(720, 90 + n * 34), izq = 66, der = 16, arr = 52, alto = 300;
+    const W = Math.max(720, 90 + n * 40), izq = 66, der = 16, arr = 52, alto = 300;
     const rot = cat.some((c) => ancho(c, 10.5) > (W - izq - der) / n - 4);   // años inclinados si no caben
     const totales = cat.map((_, i) => series.reduce((a, s) => a + (s.valores[i] || 0), 0));
     let hi = Math.max(...totales, 0); const paso = pasoBonito(hi || 1, 7); hi = Math.ceil((hi || 1) / paso) * paso;
@@ -251,7 +251,13 @@
       let base = 0;
       series.forEach((s) => { const v = s.valores[i] || 0; if (v <= 0) return;
         const y1 = Y(base + v), y0 = Y(base); base += v;
-        out.push(`<rect x="${x0.toFixed(1)}" y="${y1.toFixed(1)}" width="${wv.toFixed(1)}" height="${Math.max(y0 - y1, 0.4).toFixed(1)}" fill="${s.color}"><title>${esc(c)} · ${esc(s.nombre)}: ${esc(num(v, 2))}</title></rect>`); });
+        out.push(`<rect x="${x0.toFixed(1)}" y="${y1.toFixed(1)}" width="${wv.toFixed(1)}" height="${Math.max(y0 - y1, 0.4).toFixed(1)}" fill="${s.color}"><title>${esc(c)} · ${esc(s.nombre)}: ${esc(num(v, 2))}${s.etiquetas && s.etiquetas[i] ? ` (${esc(s.etiquetas[i].join(" y "))})` : ""}</title></rect>`);
+        // texto dentro del tramo (p. ej. el lote): una línea por elemento, si cabe
+        const et = s.etiquetas && s.etiquetas[i];
+        if (et && et.length && y0 - y1 >= et.length * 10 + 3) {
+          const claro = ((c) => { const n = parseInt(c.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.55; })(s.color);
+          et.forEach((t, k) => out.push(`<text x="${(x0 + wv / 2).toFixed(1)}" y="${((y0 + y1) / 2 - (et.length - 1) * 5 + k * 10 + 3).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="bold" fill="${claro ? "#111149" : "#fff"}">${esc(t)}</text>`));
+        } });
       const cx = x0 + wv / 2, cy = Y(0) + 12;
       out.push(rot ? `<text transform="translate(${cx.toFixed(1)} ${cy}) rotate(-45)" text-anchor="end" font-size="10.5">${esc(c)}</text>`
                    : `<text x="${cx.toFixed(1)}" y="${cy + 2}" text-anchor="middle" font-size="10.5">${esc(c)}</text>`);
@@ -265,7 +271,9 @@
     filas.forEach((f) => { let x = (W - f.reduce((a, it) => a + it.w, 0)) / 2;
       f.forEach((it) => { out.push(`<rect x="${x.toFixed(1)}" y="${y - 8.5}" width="10" height="10" fill="${it.color}"/><text x="${(x + 14).toFixed(1)}" y="${y}" font-size="10.5">${esc(it.nombre)}</text>`); x += it.w; });
       y += 16; });
-    const nt = notas([...(spec.notas || []), ELABORACION], 16, y + 8);
+    // notas partidas en líneas que caben en el ancho del gráfico
+    const partir = (t) => { const ls = []; let l = ""; String(t).split(/\s+/).forEach((p) => { const q = l ? l + " " + p : p; if (ancho(q, 9) > W - 32 && l) { ls.push(l); l = p; } else l = q; }); if (l) ls.push(l); return ls; };
+    const nt = notas([...(spec.notas || []), ELABORACION].flatMap(partir), 16, y + 8);
     out.push(nt.svg);
     return envolver(W, nt.y + 4, out.join(""));
   }

@@ -116,8 +116,14 @@ def _produccion(df, gas, n, nivel):
 
 def leer(archivos):
     """archivos: [(n_archivo, ruta, tipo)] -> ({base_id: DataFrame con columnas internas}, avisos)."""
-    produccion, canon, avisos = [], [], []
+    produccion, canon, expo, avisos = [], [], [], []
     for n, ruta, t in archivos:
+        if t == "expo":
+            try:
+                expo.append(leer_expo_crudo(ruta).assign(_archivo=n))
+            except ValueError as e:
+                avisos.append(f"{ruta.name}: {e}; no se cargó.")
+            continue
         df = pd.read_csv(ruta, encoding="utf-8-sig", dtype={"LOTE": str, "LOTE_HISTORICO": str})
         if t == "canon":
             df = df[_texto(df["DEPARTAMENTO"]).str.upper() != "TOTAL"].copy()
@@ -143,7 +149,7 @@ def leer(archivos):
             continue
         produccion.append(_produccion(df.assign(FUENTE=MENSUAL), gas, n, "GAS" if gas else "LIQUIDOS"))
     bases = {}
-    for base_id, partes in (("hidro-produccion", produccion), ("hidro-canon", canon)):
+    for base_id, partes in (("hidro-produccion", produccion), ("hidro-canon", canon), ("hidro-expo-empresa", expo)):
         if partes:
             df = pd.concat(partes, ignore_index=True)
             df["AÑO"], df["MES"] = df["AÑO"].astype(int), df["MES"].astype(int)
@@ -261,6 +267,150 @@ def _canon(canon):
             "acum_anterior": round(acum(a - 1), 2), "acum": round(acum(a), 2), "var_acum": _var(acum(a - 1), acum(a)),
             "meses": [{"periodo": etiqueta(x, True), "valor": round(float(t[x]), 2),
                        "var": _var(float(t[x - 100]) if x - 100 in t.index else None, float(t[x]))} for x in list(t.index)[-13:]]}
+
+
+# ── Exportaciones de petróleo crudo por empresa (Excel «Petróleo crudo - <región>», hoja Consolidado) ──
+def es_expo_crudo(ruta):
+    """El consolidado de exportaciones de crudo: hoja «Consolidado» cuyo título empieza «Exportaciones de petróleo crudo»."""
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(ruta, read_only=True, data_only=True)
+        ok = "Consolidado" in wb.sheetnames and str(next(wb["Consolidado"].iter_rows(max_row=1, values_only=True))[0] or "").lower().startswith("exportaciones de petróleo crudo")
+        wb.close()
+        return ok
+    except Exception:
+        return False
+
+
+def leer_expo_crudo(ruta):
+    """Filas AÑO, MES, DEPARTAMENTO, RUC, EMPRESA, FOB_MM_USD de la tabla mensual (Fecha, Año, Mes, una columna por empresa
+    con su RUC en la fila siguiente, Total). «sin dato» y las celdas vacías no se guardan. El departamento sale del título."""
+    from openpyxl import load_workbook
+    wb = load_workbook(ruta, read_only=True, data_only=True)
+    filas = list(wb["Consolidado"].iter_rows(values_only=True))
+    wb.close()
+    titulo = str(filas[0][0] or "")
+    region = re.search(r"petróleo crudo de ([A-Za-zÁÉÍÓÚÑáéíóúñ ]+?)\s*(?:—|-|–|$)", titulo)
+    codigo = _CODIGO.get(_clave(region.group(1))) if region else None
+    if not codigo:
+        raise ValueError("el título no dice de qué región son las exportaciones")
+    i = next((k for k, f in enumerate(filas) if f and str(f[0]).strip() == "Fecha"), None)
+    if i is None:
+        raise ValueError("no tiene la fila «Fecha, Año, Mes, …» de la tabla mensual")
+    cab, rucs = filas[i], filas[i + 1]
+    cols = [j for j in range(3, len(cab)) if cab[j] and str(cab[j]).strip() != "Total" and j < next((k for k in range(3, len(cab)) if str(cab[k]).strip() == "Total"), len(cab))]
+    salida = []
+    for f in filas[i + 2:]:
+        if not f or not isinstance(f[1], (int, float)) or f[0] is None or str(f[0]).strip() == "Total":
+            continue
+        a, m = int(f[1]), (f[0].month if hasattr(f[0], "month") else None)
+        if not m:
+            continue
+        for j in cols:
+            v = f[j] if j < len(f) else None
+            if isinstance(v, (int, float)):              # los ceros también: dicen qué meses cubre el archivo
+                salida.append({"AÑO": a, "MES": m, "DEPARTAMENTO": DEPARTAMENTOS[codigo], "RUC": str(int(rucs[j])) if isinstance(rucs[j], (int, float)) else str(rucs[j] or ""),
+                               "EMPRESA": str(cab[j]).strip(), "FOB_MM_USD": float(v), "_depto": codigo, "_nivel": "EXPO"})
+    if not salida:
+        raise ValueError("la tabla mensual no trae montos")
+    return pd.DataFrame(salida)
+
+
+# exportador (RUC) → palabras del operador en la producción de PERUPETRO (mismo grupo o socio del contrato)
+OPERADOR_DE_RUC = {"20504311342": ["PLUSPETROL NORTE"], "20517553914": ["FRONTERA", "PACIFIC"], "20332473388": ["PERENCO"],
+                   "20523183941": ["PERENCO"], "20513842377": ["PETROTAL", "GRAN TIERRA"], "20516244161": ["UPLAND"]}
+# exportan crudo sin operar lotes con producción (lo compran o lo reciben de otros)
+SIN_LOTE_RUC = {"20100128218": "Petroperú", "20196785044": "Perupetro"}
+
+
+def exportaciones_crudo(expo, prod, sin_lote=False, lote=None):
+    """Exportaciones anuales por empresa (millones de US$) y el lote que cada una operaba ese año según la producción
+    fiscalizada. Petroperú y Perupetro (sin lote) se excluyen salvo sin_lote=True; la nota dice cuánto se dejó fuera.
+    Si la empresa no tuvo producción ese año, se toma el último lote que operó (hasta dos años antes) y se marca con «*».
+    lote: solo las exportaciones de las empresas que operaban ese lote cada año."""
+    if expo is None or expo.empty:
+        return None
+    expo = expo.assign(RUC=expo["RUC"].astype(str).str.replace(r"\.0$", "", regex=True))
+    unida = _unir(prod)[0] if not prod.empty else pd.DataFrame(columns=["P", "OPERADOR", "LOTE", "VOLUMEN", "PRODUCTO"])
+    unida = unida[(unida["VOLUMEN"] > 0) & (unida["PRODUCTO"] != "GAS NATURAL")].assign(EMP=lambda d: d["OPERADOR"].map(lambda o: _clave_esp(_empresa(o))))
+    unida["ANIO"] = unida["P"] // 100
+    orden_lote = lambda l: (re.sub(r"\D", "", l).zfill(4) if re.search(r"\d", l) else "9999", l)
+    def claves(ruc, nombre):
+        if ruc in OPERADOR_DE_RUC:
+            return OPERADOR_DE_RUC[ruc]
+        return [] if ruc in SIN_LOTE_RUC else [_clave_esp(nombre).split(" ")[0]]
+    def lotes(ruc, nombre, a):
+        ks = claves(ruc, nombre)
+        if not ks:
+            return []
+        d = unida[unida["EMP"].map(lambda e: any(k in e for k in ks))]
+        for atras in (0, 1, 2):
+            x = sorted(set(d.loc[d["ANIO"] == a - atras, "LOTE"].astype(str)), key=orden_lote)
+            if x:
+                return x if not atras else [l + "*" for l in x]
+        return []
+    expo = expo.assign(ANIO=expo["AÑO"].astype(int))
+    meses = expo.groupby("ANIO")["MES"].agg(lambda x: sorted(set(int(m) for m in x)))
+    anios = list(range(int(expo["ANIO"].min()), int(expo["ANIO"].max()) + 1))
+    def etiqueta_anio(a):
+        m = meses.get(a, [])
+        return str(a) if not m or (m[0] == 1 and m[-1] == 12) else f"{a} ({MESES_MIN[m[0] - 1]}-{MESES_MIN[m[-1] - 1]})"
+    t = expo.groupby(["RUC", "EMPRESA", "ANIO"])["FOB_MM_USD"].sum()
+    empresas, excluido = [], {}
+    for (ruc, nombre), g in t.groupby(level=[0, 1]):
+        valores = [round(float(g.get((ruc, nombre, a), 0)), 4) for a in anios]
+        sin = not claves(ruc, nombre)
+        if sin and not sin_lote:
+            excluido[nombre] = round(sum(valores), 2)
+            continue
+        por_anio = [lotes(ruc, nombre, a) if v else [] for a, v in zip(anios, valores)]
+        if lote:
+            valores = [v if lote in [l.rstrip("*") for l in ls] else 0.0 for v, ls in zip(valores, por_anio)]
+            por_anio = [ls if v else [] for v, ls in zip(valores, por_anio)]
+            if not any(valores):
+                continue
+        todos = sorted({l.rstrip("*") for x in por_anio for l in x}, key=orden_lote)
+        empresas.append({"nombre": nombre, "ruc": ruc, "sin_lote": sin, "lotes": todos, "lotes_anio": por_anio, "valores": valores})
+    empresas.sort(key=lambda e: (e["sin_lote"], -sum(e["valores"]), e["nombre"]))
+    if lote and not empresas:
+        return None
+    vacios = [etiqueta_anio(a) for i, a in enumerate(anios) if not any(e["valores"][i] for e in empresas) and expo[expo["ANIO"] == a]["FOB_MM_USD"].sum()]
+    compartidos = sorted({f"{e['nombre']} ({' y '.join(l.rstrip('*') for l in ls)})" for e in empresas for ls in e["lotes_anio"] if len(ls) > 1})
+    return {"unidad": "millones de US$", "region": str(expo["DEPARTAMENTO"].iloc[0]), "lote": lote, "compartidos": compartidos,
+            "con_asterisco": any(l.endswith("*") for e in empresas for ls in e["lotes_anio"] for l in ls),
+            "lotes_disponibles": sorted({l.rstrip("*") for ls in [lotes(r_, n_, a) for (r_, n_), g in t.groupby(level=[0, 1]) for a in anios if g.get((r_, n_, a), 0)] for l in ls}, key=orden_lote),
+            "anios": [{"anio": a, "etiqueta": etiqueta_anio(a), "parcial": etiqueta_anio(a) != str(a)} for a in anios],
+            "empresas": empresas, "excluido": excluido, "solo_excluidos": vacios,
+            "total": [round(sum(e["valores"][i] for e in empresas), 4) for i in range(len(anios))]}
+
+
+def excel_exportaciones(region, e):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Exportaciones por empresa"
+    neg = Font(bold=True)
+    ws.append([f"{region}: exportaciones de petróleo crudo por empresa y lote que operaba (millones de US$)"]); ws["A1"].font = neg
+    ws.append([])
+    ws.append(["Empresa", "Lotes que operaba", *[x["etiqueta"] for x in e["anios"]]])
+    for celda in ws[3]:
+        celda.font = neg
+    for x in e["empresas"]:
+        ws.append([x["nombre"], " y ".join(x["lotes"]) or "no opera lotes", *x["valores"]])
+        ws.append(["   lote ese año", "", *[" y ".join(l) for l in x["lotes_anio"]]])
+    ws.append(["Total", "", *e["total"]])
+    for fila in ws.iter_rows(min_row=4, min_col=3):
+        for celda in fila:
+            if isinstance(celda.value, float):
+                celda.number_format = "#,##0.00"
+    ws.append([])
+    if e["excluido"]:
+        ws.append(["Excluye a " + ", ".join(f"{k} ({v:,.1f})" for k, v in e["excluido"].items()) + ": no operan lotes con producción."])
+    ws.append(["Fuente: SUNAT (exportaciones por empresa) y PERUPETRO (producción fiscalizada por operador y lote)."])
+    ws.column_dimensions["A"].width = 30
+    ws.column_dimensions["B"].width = 20
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 
 # ── Producción anual por empresa operadora (gráfico de barras apiladas, cualquier departamento o todo el Perú) ──

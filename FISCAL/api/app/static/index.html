@@ -65,7 +65,7 @@
     pesca: { t: "Sector pesca", fuente: "DIREPRO de la región", entra: "Subiendo en la página el Excel que envía DIREPRO", bases: (r) => [r.pesca], actualizar: "subir",
       lead: "Desembarque por estado y especie, peces ornamentales y VBP a precios de 2007.", cuadros: "pesca" },
     hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Flujo diario de PERUPETRO en GitHub (7:00 a. m.), o con el botón",
-      bases: () => ["hidro-produccion", "hidro-canon"], actualizar: "hidro", cuadros: "hidrocarburos", mapa: true,
+      bases: () => ["hidro-produccion", "hidro-canon", "hidro-expo-empresa"], actualizar: "hidro", cuadros: "hidrocarburos", mapa: true,
       lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
       lead: "Trabajadores asalariados privados formales por rama de actividad económica.", cuadros: "empleo" },
@@ -346,8 +346,8 @@
         ${gr ? `<div class="caja"><h3>Gráfico · Producción de ${esc(gr.producto.toLowerCase())}</h3><p>(${esc(gr.unidad.charAt(0).toUpperCase() + gr.unidad.slice(1))})</p>
           <div class="scroll"><svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Producción diaria promedio por mes"><line class="eje" x1="0" x2="${W}" y1="${base0}" y2="${base0}"></line>${barras}</svg></div>
           ${gr.serie.some((x) => x.parcial) ? `<p class="nota">* ${esc(c.parcial.periodo)}: promedio de los ${c.parcial.dias} días reportados en la producción diaria de PERUPETRO.</p>` : ""}</div>` : ""}
-        ${anexos}${canon}<div class="caja" id="hid-emp"></div>`;
-      empresasHidro(r, $("hid-emp"));
+        ${anexos}${canon}<div class="caja" id="hid-emp"></div><div class="caja" id="hid-expo"></div>`;
+      empresasHidro(r, $("hid-emp")); exportacionesHidro(r, $("hid-expo"));
       $("hid-p").addEventListener("change", (ev) => cuadrosHidro(r, caja, ev.target.value));
       $("hid-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/hidrocarburos?departamento=${r.cod}&periodo=${c.periodo}&formato=xlsx`; });
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
@@ -396,6 +396,48 @@
         $("emp-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/hidrocarburos/empresas?departamento=${st.dep}&producto=${encodeURIComponent(st.prod)}&formato=xlsx`; });
       }
     } catch (er) { caja.innerHTML = `<h3>Producción anual por empresa operadora</h3><div class="err-box"><b>No se pudo armar el gráfico</b><span>${esc(er.message)}</span></div>`; }
+  }
+
+  // ── Exportaciones de crudo por empresa y el lote que operaba cada una (Excel de SUNAT cruzado con la producción) ──
+  const hidExpo = {};
+  async function exportacionesHidro(r, caja) {
+    const B = window.BCRP, st = hidExpo[r.cod] || (hidExpo[r.cod] = { sinLote: false, desde: null, lote: "" }), T = "Exportaciones de petróleo crudo por empresa y lote";
+    caja.innerHTML = `<h3>${T}</h3><div class="loading"><span class="spin"></span>Cruzando las exportaciones con los lotes…</div>`;
+    try {
+      const j = await api(`/v1/cuadros/hidrocarburos/exportaciones?departamento=${r.cod}&sin_lote=${st.sinLote}&lote=${encodeURIComponent(st.lote)}`), e = j.exportaciones;
+      if (!e && st.lote) { st.lote = ""; return exportacionesHidro(r, caja); }
+      if (!e) { caja.innerHTML = `<h3>${T}</h3><div class="vacio-caja"><b>Todavía no hay exportaciones de crudo de ${esc(r.nombre)}.</b><span>Sube el Excel «Petróleo crudo - ${esc(r.nombre)}» (hoja Consolidado) en la pestaña «Actualizar».</span></div>`; return; }
+      const anios = e.anios.map((x) => x.anio);
+      if (st.desde == null || !anios.includes(st.desde)) st.desde = anios[Math.max(0, e.total.findIndex((v) => v > 0))];   // desde el primer año con exportaciones
+      const k0 = anios.indexOf(st.desde), corte = (v) => v.slice(k0);
+      const series = e.empresas.map((x) => ({ nombre: `${x.nombre} (${x.lotes.length ? (x.lotes.length > 1 ? "lotes " : "lote ") + x.lotes.join(" y ") : "no opera lotes"})`,
+        valores: corte(x.valores), etiquetas: corte(x.lotes_anio) })).filter((x) => x.valores.some((v) => v > 0));
+      const fmt1 = (v) => v.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      const notasG = [st.lote ? `Exportaciones de las empresas que operaban el Lote ${st.lote} cada año (según la producción fiscalizada de PERUPETRO).` : "Dentro de cada tramo, el lote que la empresa operaba ese año según la producción fiscalizada de PERUPETRO."];
+      if (e.compartidos.length) notasG.push(`${e.compartidos.join("; ")}: la empresa operaba esos lotes a la vez y sus exportaciones no se separan por lote${st.lote ? ", así que incluyen también el otro lote" : ""}.`);
+      if (e.con_asterisco) notasG.push("* La empresa no tuvo producción ese año en el lote: se indica el último lote que operó (hasta dos años antes).");
+      const exc = Object.entries(e.excluido);
+      if (exc.length && !st.lote) notasG.push(`No incluye a ${exc.map(([n, v]) => `${n} (US$ ${fmt1(v)} millones)`).join(" ni a ")}: exportan crudo sin operar lotes con producción.${e.solo_excluidos.length ? ` ${e.solo_excluidos.join(", ")}: solo hay exportaciones de esas empresas.` : ""}`);
+      notasG.push("Fuente: SUNAT (exportaciones por empresa) y PERUPETRO (producción fiscalizada por operador y lote).");
+      const nombre = st.lote ? `${j.region}: exportaciones de petróleo crudo de las empresas que operaban el Lote ${st.lote} (millones de US$)` : `${j.region}: exportaciones de petróleo crudo por empresa y lote (millones de US$)`;
+      const svg = B.apiladas({ titulo: nombre, ejeY: "Millones de US$", categorias: corte(e.anios.map((x) => x.etiqueta)), series, notas: notasG });
+      caja.innerHTML = `<h3>${T}</h3><p>Cuánto exportó cada empresa y qué lote operaba ese año. Los datos de exportación vienen del Excel que se sube en «Actualizar».</p>
+        <div class="fila"><label class="campo" for="ex-desde">Desde<select id="ex-desde">${anios.map((a) => `<option value="${a}"${a === st.desde ? " selected" : ""}>${a}</option>`).join("")}</select></label>
+          <label class="campo" for="ex-lote">Lote<select id="ex-lote"><option value="">Todos los lotes</option>${e.lotes_disponibles.map((l) => `<option value="${esc(l)}"${l === st.lote ? " selected" : ""}>Lote ${esc(l)}</option>`).join("")}</select></label>
+          <label class="campo" for="ex-sin"${st.lote ? " hidden" : ""}><span><input type="checkbox" id="ex-sin" ${st.sinLote ? "checked" : ""}> Incluir exportadores sin lote (Petroperú, Perupetro)</span></label></div>
+        <div class="scroll">${svg}</div>
+        <div class="fila"><button class="btn" type="button" id="ex-copiar">Copiar</button><button class="btn sec" type="button" id="ex-svg">SVG</button>
+          <button class="btn sec" type="button" id="ex-png">PNG</button><button class="btn sec" type="button" id="ex-xlsx">Datos en Excel</button><span class="bcrp-msj" id="ex-msj"></span></div>`;
+      const re = () => exportacionesHidro(r, caja);
+      $("ex-desde").addEventListener("change", (ev) => { st.desde = +ev.target.value; re(); });
+      $("ex-sin").addEventListener("change", (ev) => { st.sinLote = ev.target.checked; re(); });
+      $("ex-lote").addEventListener("change", (ev) => { st.lote = ev.target.value; st.desde = null; re(); });
+      const msj = (t, ok) => { const m = $("ex-msj"); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
+      $("ex-copiar").addEventListener("click", async () => { try { await B.copiar(svg); msj("Copiado: pégalo en Word o PowerPoint con Ctrl+V.", true); } catch (er) { msj(er.message, false); } });
+      $("ex-svg").addEventListener("click", () => B.descargar(svg, nombre));
+      $("ex-png").addEventListener("click", async () => { try { await B.descargarPng(svg, nombre); } catch (er) { msj(er.message, false); } });
+      $("ex-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/hidrocarburos/exportaciones?departamento=${r.cod}&sin_lote=${st.sinLote}&lote=${encodeURIComponent(st.lote)}&formato=xlsx`; });
+    } catch (er) { caja.innerHTML = `<h3>${T}</h3><div class="err-box"><b>No se pudo armar el gráfico</b><span>${esc(er.message)}</span></div>`; }
   }
 
   // ── Ejecución del presupuesto: gasto corriente no financiero e inversión pública ──
@@ -1434,7 +1476,7 @@
     else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
-      : s.actualizar === "hidro" ? `<div><div class="caja"><h3>PERUPETRO → página</h3><div id="hidro-caja"></div></div>${cajaSubida("sub-hidro", "Los CSV de producción o canon (PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv). Traen la serie completa y reemplazan lo cargado.")}</div>`
+      : s.actualizar === "hidro" ? `<div><div class="caja"><h3>PERUPETRO → página</h3><div id="hidro-caja"></div></div>${cajaSubida("sub-hidro", "Los CSV de producción o canon (PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv), o el Excel de exportaciones de crudo por empresa («Petróleo crudo - Loreto.xlsx», hoja Consolidado). Traen la serie completa y reemplazan lo cargado.")}</div>`
       : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página.`)
       : s.actualizar === "estad" ? cajaSubida("sub-estad", `El libro ESTAD de ${esc(r.nombre)} tal como está (${{ lor: "ESTADLO.xlsx: hojas 15.Export e 16.Import", smn: "ESTADSMN.xlsx: hoja 14.XLS", uca: "ESTADUCA.xlsx: hoja 15.XLS" }[grupo]}). La página lee solo las columnas de cada mes (no las de Var.% ni los acumulados del final) y reemplaza los meses que trae.`)
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`

@@ -291,3 +291,48 @@ def test_produccion_por_empresa(cliente):
     assert cliente.get("/v1/cuadros/hidrocarburos/empresas?departamento=22").json()["empresas"] is None
     r = cliente.get("/v1/cuadros/hidrocarburos/empresas?departamento=16&formato=xlsx")
     assert load_workbook(io.BytesIO(r.content))["Por empresa"]["A3"].value == "Empresa"
+
+
+def expo_crudo():
+    """Excel «Petróleo crudo - Loreto» (hoja Consolidado) con las cifras reales de 2024 y 2025 (millones de US$) y un mes de
+    Upland de 2026; Petroperú no opera lotes con producción."""
+    from datetime import datetime
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Consolidado"
+    ws.append(["Exportaciones de petróleo crudo de Loreto — consolidado mensual y anual (millones de USD)"])
+    ws.append(["Fuentes: …"]); ws.append(["Sin datos: …"]); ws.append([])
+    ws.append(["Fecha", "Año", "Mes", "Petroperú", "Petrotal", "Upland Oil and Gas", "Total"])
+    ws.append(["RUC →", None, None, 20100128218, 20513842377, 20516244161, None])
+    ws.append([datetime(2024, 9, 1), 2024, "setiembre", 19.535, 10.718, 0, 30.253])
+    ws.append([datetime(2025, 1, 1), 2025, "enero", 0, 28.07, 0, 28.07])
+    ws.append([datetime(2026, 2, 1), 2026, "febrero", 0, 12.848, 11.293, 24.141])
+    ws.append(["Total", None, None, 19.535, 51.636, 11.293, 82.464])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_exportaciones_de_crudo_por_empresa_y_lote(cliente):
+    subir(cliente, csvs())
+    subir(cliente, {"PP_produccion_diaria.csv": diaria()})
+    r = cliente.post("/v1/cargas", files=[("archivos", ("Petróleo crudo - Loreto.xlsx", expo_crudo(), "application/octet-stream"))])
+    assert r.json()["bases"]["hidro-expo-empresa"]["filas"] == 9          # los ceros también: dicen qué meses cubre
+    assert any("DATA/PP_exportaciones_crudo_empresa.csv" in a for a in r.json()["avisos"])
+    from app import almacen
+    assert any(x["name"] == "PP_exportaciones_crudo_empresa.csv" for x in almacen.hijos(almacen.CARPETA_DATA))
+    e = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16").json()["exportaciones"]
+    assert [x["etiqueta"] for x in e["anios"]] == ["2024 (set-set)", "2025 (ene-ene)", "2026 (feb-feb)"]
+    emp = {x["nombre"]: x for x in e["empresas"]}
+    assert set(emp) == {"Petrotal", "Upland Oil and Gas"} and e["excluido"] == {"Petroperú": 19.54}
+    assert emp["Petrotal"]["lotes"] == ["95"] and emp["Upland Oil and Gas"]["lotes_anio"] == [[], [], ["8"]]
+    assert e["total"] == [10.718, 28.07, round(12.848 + 11.293, 4)]
+    todos = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16&sin_lote=true").json()["exportaciones"]
+    assert todos["excluido"] == {} and next(x for x in todos["empresas"] if x["nombre"] == "Petroperú")["lotes"] == []
+    x = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16&formato=xlsx")
+    assert load_workbook(io.BytesIO(x.content))["Exportaciones por empresa"]["B3"].value == "Lotes que operaba"
+    assert cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=25").json()["exportaciones"] is None
+    l8 = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16&lote=8").json()["exportaciones"]
+    assert [x["nombre"] for x in l8["empresas"]] == ["Upland Oil and Gas"] and l8["total"] == [0, 0, 11.293]
+    assert e["lotes_disponibles"] == ["8", "95"]
