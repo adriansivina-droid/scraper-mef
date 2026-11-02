@@ -127,6 +127,9 @@ def leer_archivos(raiz):
             if sunat_expo.es_sunat(ruta):                  # base mensual de SUNAT (X_AAAAMM.xlsx)
                 de_sunat.append((n_archivo, ruta, "sunat"))
                 continue
+            if hidrocarburos.es_expo_crudo(ruta):          # exportaciones de crudo por empresa (hoja Consolidado)
+                de_hidro.append((n_archivo, ruta, "expo"))
+                continue
             try:
                 es_pesca = pesca.reconocer(ruta)
             except Exception:                         # no es un Excel legible
@@ -244,6 +247,23 @@ def leer_archivos(raiz):
     return {k: v for k, v in bases.items() if v is not None}, avisos
 
 
+def _expo_al_almacen():
+    """Las exportaciones de crudo por empresa también van a DATA del almacén (PP_exportaciones_crudo_empresa.csv): el
+    notebook del mapa las lee de ahí para la pestaña «Empresas» de cada lote."""
+    from . import almacen
+    nombre = "PP_exportaciones_crudo_empresa.csv"
+    try:
+        datos = db.leer_todo("hidro-expo-empresa").to_csv(index=False).encode("utf-8-sig")
+        previo = next((x["id"] for x in almacen.hijos(almacen.CARPETA_DATA) if x["name"] == nombre), None)
+        if previo:
+            almacen.reemplazar(previo, datos)
+        else:
+            almacen.crear(nombre, almacen.CARPETA_DATA, datos, "text/csv")
+        return f"Exportaciones de crudo: copiadas a DATA/{nombre} para el mapa (se ven en la próxima corrida del mapa)."
+    except Exception as e:
+        return f"Exportaciones de crudo: no se pudieron copiar a DATA para el mapa ({e})."
+
+
 def cargar(origen, archivos):
     """archivos: lista de (nombre, bytes). Un .zip se descomprime. Guarda en la base de datos y devuelve el resumen."""
     avisos_ipc = []
@@ -277,6 +297,8 @@ def cargar(origen, archivos):
         filas = db.guardar(base_id, df)
         resumen["bases"][base_id] = {"filas": filas, "departamentos": sorted(df["_depto"].unique().tolist()),
                                      "periodos": sorted({f"{a}" if m == 0 else f"{a}-{m:02d}" for a, m in zip(df["_anio"], df["_mes"])})}
+    if "hidro-expo-empresa" in bases:
+        resumen["avisos"].append(_expo_al_almacen())
     if not bases and not avisos_ipc and not n_ctl:
         resumen["avisos"].append("No se encontró ningún archivo de los scrapers, de pesca, de empleo ni de hidrocarburos en lo que subiste.")
     db.registrar_carga(origen, resumen)

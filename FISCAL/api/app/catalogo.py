@@ -103,6 +103,11 @@ BASES = {b.id: b for b in [
          ["AÑO", "MES", "DEPARTAMENTO", "CANON_MM_SOLES"], [8, 6, 18, 16], valor="CANON_MM_SOLES", usa_niveles=False,
          reemplaza_periodo=True, formato_valor="#,##0.00",
          descripcion="PERUPETRO: canon y sobrecanon petrolero transferido a cada departamento por mes (millones de soles)."),
+    Base("hidro-expo-empresa", "hidrocarburos", "Exportaciones de petróleo crudo por empresa (SUNAT)", "Exportaciones de crudo por empresa",
+         "EXPO CRUDO", ["AÑO", "MES", "DEPARTAMENTO", "RUC", "EMPRESA", "FOB_MM_USD"], [8, 6, 14, 14, 30, 14], valor="FOB_MM_USD",
+         usa_niveles=False, reemplaza_periodo=True, formato_valor="#,##0.000",
+         descripcion="Exportaciones de petróleo crudo por empresa exportadora (RUC) y mes, en millones de US$ (Excel «Petróleo crudo - "
+                     "Loreto», hoja Consolidado). Se cruzan con el lote que operaba cada empresa según la producción de PERUPETRO."),
     # Exportaciones (EXPORT/info_export.md): el ESTAD de cada región, en largo; FOB en miles de US$
     Base("expo-estad", "comercio", "Exportaciones por grupo de productos (ESTAD)", "Exportaciones", "EXPORTACIONES",
          ["AÑO", "MES", "DEPARTAMENTO", "ORDEN", "NIVEL", "TIPO", "GRUPO", "RUBRO", "FOB"], [8, 6, 14, 8, 10, 30, 28, 32, 12],

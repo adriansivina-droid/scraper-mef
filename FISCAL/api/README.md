@@ -212,6 +212,7 @@ PERUPETRO y, al terminar, carga el más reciente de cada uno (también con «Vol
 | `PP_produccion_gas_lote_mes_<ini>-<fin>.csv` (gas natural; MPC) | `hidro-produccion` | HIDROCARBUROS |
 | `PP_canon_departamento_mes.csv` (canon y sobrecanon transferido; MM S/) | `hidro-canon` | CANON PETROLERO |
 | `PP_produccion_diaria.csv` (producción diaria por lote) | `hidro-produccion` (FUENTE «PRODUCCIÓN DIARIA · n de N días») | HIDROCARBUROS |
+| «Petróleo crudo - Loreto.xlsx» (hoja Consolidado; se sube en la página) | `hidro-expo-empresa` (y `DATA/PP_exportaciones_crudo_empresa.csv`) | EXPO CRUDO |
 | `MAPA/PP_mapa_lotes_plus.html` (o `PP_mapa_lotes.html`) | el mapa de la pestaña «Mapa» (tabla `documentos`) | — |
 
 La estadística mensual de PERUPETRO va con dos o tres meses de rezago; los meses que aún no trae se completan con la
@@ -239,6 +240,21 @@ millones de pies cúbicos.
   «UPLAND OIL AND GAS» son la misma empresa, y «PPN» es Pluspetrol Norte.
 - **Colores:** la empresa con más producción del periodo va abajo, con el primer color.
 - **Descargas:** se copia o descarga en SVG o PNG, y los datos en Excel (`/v1/cuadros/hidrocarburos/empresas`).
+
+**Exportaciones de petróleo crudo por empresa y lote** (debajo, en la misma pestaña): cuánto exportó cada empresa y
+qué lote operaba ese año.
+- **Datos:** salen del Excel «Petróleo crudo - Loreto.xlsx» (hoja Consolidado: una columna por empresa con su RUC, en
+  millones de US$), que se sube en «Actualizar». Va a la base `hidro-expo-empresa` y se copia a
+  `DATA/PP_exportaciones_crudo_empresa.csv` para que el mapa lo use en la pestaña «Empresas» de cada lote.
+- **Cruce con el lote:** sale de la producción fiscalizada. El exportador se reconoce por su RUC: Pluspetrol Norte;
+  Frontera (antes Pacific Stratus); PVEP-Perenco y Perenco Peru Petroleum, socios del Lote 67; Petrotal (antes Gran Tierra);
+  Upland. Si la empresa no produjo ese año, se toma su último lote, hasta dos años antes, marcado con «*».
+- **Lote compartido:** Pluspetrol Norte operó a la vez el 1-AB y el 8, y sus exportaciones no se separan por lote.
+- **Exportadores sin lote:** Petroperú y Perupetro exportan crudo sin operar lotes con producción. Quedan fuera por
+  defecto, con una casilla para incluirlos, y la nota dice cuánto se excluyó. Por eso, sin ellos, las barras no suman el
+  total exportado por la región.
+- **Selector «Lote»:** muestra solo las empresas que operaban ese lote cada año.
+- **Descargas:** Copiar, SVG, PNG y los datos en Excel (`/v1/cuadros/hidrocarburos/exportaciones`).
 
 Falta el precio del crudo (Reuters), que no está en DATA. La pestaña **Mapa** muestra el mapa de lotes del flujo de
 hidrocarburos (`/v1/hidrocarburos/mapa`, aislado en un iframe), con botones de pantalla completa y descarga.
@@ -430,6 +446,7 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET / POST | `/v1/ipc`, `/v1/ipc/actualizar` | IPC de Lima cargado / traerlo del BCRP |
 | GET | `/v1/cuadros/hidrocarburos` | Producción, gráfico, anexo por lote y canon de un departamento (`departamento=16`, `periodo` opcional, `formato=json` o `xlsx`) |
 | GET | `/v1/cuadros/hidrocarburos/empresas` | Producción anual por empresa operadora (`departamento=16` o `todos`, `producto=PETROLEO`, `LIQUIDOS` o `GAS NATURAL`, `formato=json` o `xlsx`) |
+| GET | `/v1/cuadros/hidrocarburos/exportaciones` | Exportaciones de crudo por empresa y lote que operaba (`departamento=16`, `lote` opcional, `sin_lote=true` para incluir a Petroperú y Perupetro, `formato=json` o `xlsx`) |
 | GET | `/v1/cuadros/empleo` | Cuadro, gráfico y anexo de empleo de un departamento (`departamento=16`, `periodo=2026-08` opcional, `formato=json` o `xlsx`) |
 | GET | `/docs` | Documentación interactiva |
 

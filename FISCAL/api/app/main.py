@@ -851,6 +851,23 @@ def hidrocarburos_empresas(departamento: str = Query(..., pattern=r"^(\d{2}|todo
     return {"region": region, "empresas": e}
 
 
+@app.get("/v1/cuadros/hidrocarburos/exportaciones", dependencies=[Depends(acceso)])
+def hidrocarburos_exportaciones(departamento: str = Query(..., pattern=r"^\d{2}$"), sin_lote: bool = False,
+                                lote: str = Query("", max_length=20), formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Exportaciones de petróleo crudo por empresa y el lote que operaba cada una (cruce con la producción de PERUPETRO).
+    sin_lote=true incluye a Petroperú y Perupetro, que exportan crudo sin operar lotes con producción."""
+    if departamento not in DEPARTAMENTOS:
+        raise HTTPException(422, f"departamento no válido: {departamento}.")
+    expo = db.leer("hidro-expo-empresa", [departamento], [], "1990-01", "2100-12")
+    prod = db.leer("hidro-produccion", [departamento], [], "1990-01", "2100-12")
+    e = hidrocarburos.exportaciones_crudo(expo, prod, sin_lote, lote or None)
+    region = DEPARTAMENTOS[departamento].title().replace(" De ", " de ")
+    if e is not None and formato == "xlsx":
+        return Response(hidrocarburos.excel_exportaciones(region, e), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"Exportaciones de crudo por empresa {region}.xlsx"))
+    return {"region": region, "exportaciones": e}
+
+
 @app.get("/v1/cuadros/empleo", dependencies=[Depends(acceso)])
 def cuadro_empleo(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "",
                   formato: str = Query("json", pattern="^(json|xlsx)$")):

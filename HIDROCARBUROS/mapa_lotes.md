@@ -588,3 +588,16 @@ El mapa (colores de los lotes) no cambia.
 - La estructura % es la participación de cada lote en la producción del año anterior del conjunto de lotes del cuadro.
 - «🖼 Imagen» y «⬇ SVG» guardan solo el cuadro. El título y las notas se copian aparte. El CSV lleva el mismo cuadro.
 - Con este formato se ocultan «Apilar por», «Desde/Hasta» y «Unidad», que no aplican.
+
+**Exportaciones de crudo en la pestaña «Empresas» (02/11/2026).** Debajo de la línea de tiempo de operadores de cada lote
+hay un gráfico: «Exportaciones de petróleo crudo de las empresas que operaban el lote», en barras apiladas por año y
+empresa, en millones de US$.
+- **Datos:** `DATA/PP_exportaciones_crudo_empresa.csv`, que la página web copia a DATA al subir el Excel «Petróleo
+  crudo - Loreto» de SUNAT.
+- **Cruce:** el notebook del mapa lo cruza con `PP_operadores_lote.csv`. El exportador se reconoce por su RUC: Frontera =
+  Pacific Stratus; PVEP-Perenco y Perenco Peru Petroleum = Perenco; Petrotal = Gran Tierra.
+- **Lotes a la vez:** si la empresa operaba más de un lote ese año, como Pluspetrol Norte con el 1-AB y el 8, sus
+  exportaciones no se separan, y la nota lo dice.
+- **Años sin producción:** si la empresa no produjo ese año, se toma su último lote (hasta dos años antes).
+- **Fuera del gráfico:** Petroperú y Perupetro, porque no operan lotes con producción.
+- **CSV de la pestaña:** trae las filas «EXPORTACIONES DE CRUDO (MM US$)».

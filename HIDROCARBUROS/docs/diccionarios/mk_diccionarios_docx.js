@@ -523,6 +523,20 @@ const ARCHIVOS = [
     refs: ["estad"],
   },
   {
+    archivo: "PP_exportaciones_crudo_empresa.csv", tema: "Empresas", util: "Útil",
+    para: "Cuánto petróleo crudo exportó cada empresa por mes (SUNAT), para cruzarlo con el lote que operaba.",
+    proposito: [
+      "Guarda las exportaciones de petróleo crudo por empresa exportadora (RUC) y mes, en millones de US$, tal como vienen en el Excel «Petróleo crudo - Loreto» (hoja Consolidado).",
+      "El mapa las cruza con el lote que operaba cada empresa ese año (PP_operadores_lote.csv) y las muestra en la pestaña Empresas de cada lote; la página web arma con ellas el gráfico «Exportaciones de petróleo crudo por empresa y lote».",
+    ],
+    origen: "No lo genera un notebook: la página web lo copia a DATA cuando se sube el Excel de exportaciones en el sector hidrocarburos (pestaña «Actualizar»). Cada carga reemplaza la serie. Petroperú y Perupetro exportan crudo sin operar lotes con producción.",
+    clave: "Una empresa y un mes. Clave: AÑO + MES + RUC.",
+    vars: [["AÑO", "Entero", "Año."], ["MES", "Entero", "Mes (1 a 12)."], V.DEPARTAMENTO,
+      ["RUC", "Texto", "RUC de la empresa exportadora."], ["EMPRESA", "Texto", "Empresa exportadora, como en el Excel."],
+      ["FOB_MM_USD", "Decimal, millones de US$", "Valor FOB exportado en el mes (0 = el archivo cubre el mes y la empresa no exportó)."]],
+    refs: [],
+  },
+  {
     archivo: "PP_operadores_lote.csv", tema: "Empresas", util: "Útil",
     para: "Quién operó cada lote y en qué años, con su producción y regalías en ese período.",
     proposito: [
