@@ -833,6 +833,24 @@ def cuadro_hidrocarburos(departamento: str = Query(..., pattern=r"^\d{2}$"), per
     return {"region": region, "cuadros": c}
 
 
+@app.get("/v1/cuadros/hidrocarburos/empresas", dependencies=[Depends(acceso)])
+def hidrocarburos_empresas(departamento: str = Query(..., pattern=r"^(\d{2}|todos)$"),
+                           producto: str = Query("PETROLEO", pattern="^(PETROLEO|LIQUIDOS|GAS NATURAL)$"),
+                           formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Producción anual por empresa operadora de un departamento o de todo el Perú (`departamento=todos`), para el
+    gráfico de barras apiladas del sector hidrocarburos."""
+    if departamento != "todos" and departamento not in DEPARTAMENTOS:
+        raise HTTPException(422, f"departamento no válido: {departamento}.")
+    deptos = list(DEPARTAMENTOS) if departamento == "todos" else [departamento]
+    prod = db.leer("hidro-produccion", deptos, [], "1990-01", "2100-12")
+    e = hidrocarburos.empresas(prod, producto)
+    region = "Perú" if departamento == "todos" else DEPARTAMENTOS[departamento].title().replace(" De ", " de ")
+    if e is not None and formato == "xlsx":
+        return Response(hidrocarburos.excel_empresas(region, e), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"Hidrocarburos por empresa {region}.xlsx"))
+    return {"region": region, "empresas": e}
+
+
 @app.get("/v1/cuadros/empleo", dependencies=[Depends(acceso)])
 def cuadro_empleo(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "",
                   formato: str = Query("json", pattern="^(json|xlsx)$")):

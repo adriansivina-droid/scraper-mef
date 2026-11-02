@@ -263,6 +263,123 @@ def _canon(canon):
                        "var": _var(float(t[x - 100]) if x - 100 in t.index else None, float(t[x]))} for x in list(t.index)[-13:]]}
 
 
+# ── Producción anual por empresa operadora (gráfico de barras apiladas, cualquier departamento o todo el Perú) ──
+GRUPOS_PRODUCTO = {"PETROLEO": (["PETROLEO"], "Petróleo", "millones de barriles"),
+                   "LIQUIDOS": (["PETROLEO", "LGN", "CONDENSADO"], "Líquidos totales (petróleo, LGN y condensado)", "millones de barriles"),
+                   "GAS NATURAL": (["GAS NATURAL"], "Gas natural", "miles de millones de pies cúbicos")}
+MESES_MIN = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"]
+SIN_OPERADOR = "SIN OPERADOR IDENTIFICADO"
+# el mismo operador escrito de varias formas (el PDF corta los nombres; la producción diaria usa nombres cortos)
+_EMPRESA = [(re.compile(r"^(PPN|PLUSPETROL NORTE)\b.*"), "PLUSPETROL NORTE"),
+            (re.compile(r"^UPLAND\b.*"), "UPLAND OIL AND GAS"),
+            (re.compile(r"^PETROPERU$"), "PETROPERÚ")]
+_SIGLAS = {"GMP", "ABC", "CNPC", "BPZ", "PVEP", "SK", "SRL", "SAC", "SA"}
+_MINUSCULAS = {"AND", "DE", "DEL", "Y", "EN", "LA", "LAS", "LOS", "OF"}
+
+
+def _empresa(nombre):
+    """Nombre homologado (en mayúsculas) de un operador; los consorcios «A / B» se homologan por partes."""
+    partes = []
+    for parte in str(nombre or "").split("/"):
+        x = re.sub(r"\s+", " ", parte).strip().upper()
+        if x in ("", "NAN", "NONE"):
+            continue
+        for patron, bueno in _EMPRESA:
+            if patron.match(_clave_esp(x)):
+                x = bueno
+                break
+        partes.append(x)
+    return " / ".join(partes)
+
+
+def _clave_esp(t):
+    return unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode().upper()
+
+
+def nombre_empresa(n):
+    """«PLUSPETROL NORTE» → «Pluspetrol Norte»; «UPLAND OIL AND GAS» → «Upland Oil and Gas»; las siglas quedan en mayúsculas."""
+    if n == SIN_OPERADOR:
+        return "Sin operador identificado"
+    def pal(w, i):
+        b = re.sub(r"[^A-ZÁÉÍÓÚÑ]", "", w)
+        if b in _SIGLAS or (b and not re.search(r"[AEIOUÁÉÍÓÚ]", b)):
+            return w
+        if i and b in _MINUSCULAS:
+            return w.lower()
+        return w[:1] + w[1:].lower()
+    return " ".join(pal(w, i) for i, w in enumerate(n.split(" ")))
+
+
+def empresas(prod, producto="PETROLEO"):
+    """Producción anual por empresa operadora: estadística mensual y, después, los meses cerrados de la producción diaria
+    (el mes en curso no entra). En esos meses el operador del reporte diario se lleva al nombre que tiene el lote en la
+    estadística mensual."""
+    if prod.empty:
+        return None
+    ks, nombre, unidad = GRUPOS_PRODUCTO[producto]
+    unida, parcial, de_diaria = _unir(prod)
+    d = unida[unida["PRODUCTO"].isin(ks)].copy()
+    if d.empty or not d["VOLUMEN"].abs().sum():
+        return None
+    d["EMPRESA"] = d["OPERADOR"].map(_empresa)
+    es_diaria = d["FUENTE"].fillna("").astype(str).str.startswith("PRODUCCIÓN DIARIA")
+    por_lote = d[~es_diaria & (d["EMPRESA"] != "")].groupby("LOTE_HISTORICO")["EMPRESA"].agg(lambda x: sorted(set(x)))
+    def del_mensual(lote, emp):
+        cands = por_lote.get(lote, [])
+        primera = lambda x: _clave_esp(x.split(" ")[0]) if x else ""
+        iguales = [c for c in cands if primera(c) == primera(emp)]
+        if len(iguales) == 1:
+            return iguales[0]
+        return emp or (cands[0] if len(cands) == 1 else "")
+    d.loc[es_diaria, "EMPRESA"] = [del_mensual(l, e) for l, e in zip(d.loc[es_diaria, "LOTE_HISTORICO"], d.loc[es_diaria, "EMPRESA"])]
+    d["EMPRESA"] = d["EMPRESA"].replace("", SIN_OPERADOR)
+    d["ANIO"] = d["P"] // 100
+    t = d.pivot_table(index="ANIO", columns="EMPRESA", values="VOLUMEN", aggfunc="sum").fillna(0) / 1e6
+    con = [int(a) for a in t.index if t.loc[a].sum() > 0]
+    if not con:
+        return None
+    anios = list(range(min(con), max(con) + 1))
+    t = t.reindex(anios, fill_value=0)
+    meses = d.groupby("ANIO")["P"].agg(lambda x: sorted({int(q) % 100 for q in x}))
+    def etiqueta_anio(a):
+        m = meses.get(a, [])
+        return str(a) if not m or (m[0] == 1 and m[-1] == 12) else f"{a} ({MESES_MIN[m[0] - 1]}-{MESES_MIN[m[-1] - 1]})"
+    # la empresa de mayor producción del periodo va abajo (y con el primer color); «sin operador», al final
+    orden = sorted([e for e in t.columns if t[e].sum() > 0], key=lambda e: (e == SIN_OPERADOR, -float(t[e].sum()), e))
+    return {"producto": nombre, "unidad": unidad,
+            "anios": [{"anio": a, "etiqueta": etiqueta_anio(a), "parcial": etiqueta_anio(a) != str(a)} for a in anios],
+            "empresas": [{"nombre": nombre_empresa(e), "valores": [round(float(t.at[a, e]), 4) for a in anios]} for e in orden],
+            "total": [round(float(t.loc[a].sum()), 4) for a in anios],
+            "de_diaria": [etiqueta(q, True) for q in de_diaria],
+            "parcial": None if not parcial else {"periodo": etiqueta(parcial["P"]), "dias": parcial["dias"], "de": parcial["de"]}}
+
+
+def excel_empresas(region, e):
+    """Los datos del gráfico por empresa: una fila por empresa y una columna por año, con el total."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Por empresa"
+    neg = Font(bold=True)
+    ws.append([f"{region}: producción anual de {e['producto'].lower()} por empresa operadora ({e['unidad']})"]); ws["A1"].font = neg
+    ws.append([])
+    ws.append(["Empresa", *[x["etiqueta"] for x in e["anios"]]])
+    for celda in ws[3]:
+        celda.font = neg
+    for x in e["empresas"]:
+        ws.append([x["nombre"], *x["valores"]])
+    ws.append(["Total", *e["total"]])
+    for fila in ws.iter_rows(min_row=4, min_col=2):
+        for celda in fila:
+            celda.number_format = "#,##0.00"
+    for celda in ws[ws.max_row]:
+        celda.font = neg
+    ws.append([]); ws.append(["Fuente: PERUPETRO, producción fiscalizada (estadística mensual y, en los meses que aún no publica, suma de los reportes diarios)."])
+    ws.column_dimensions["A"].width = 36
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def excel(region, c):
     """Cuadro de producción, gráfico, anexo por lote y canon en un Excel, con títulos y fuente como en la síntesis."""
     wb = Workbook()
