@@ -228,6 +228,18 @@ en miles de barriles, gas natural en millones de pies cúbicos) y lote, del mes 
 año anterior; el gráfico de producción diaria promedio (25 meses); el anexo mensual por lote (13 meses) y el canon
 transferido al departamento; todo se descarga en Excel. Comprobado con el texto de Loreto 2025
 (`HIDROCARBUROS/analisis`): 7,9 millones de barriles (+22,9 %), Lote 95 +5,9 % (`tests/test_hidrocarburos.py`).
+Al final de la misma pestaña, **«Producción anual por empresa operadora»** muestra qué empresas operaron cada año y
+cuánto produjeron. Son barras apiladas por año, con la leyenda abajo y el eje en millones de barriles; para el gas, miles de
+millones de pies cúbicos.
+- **Región:** cualquier departamento con producción o «Todo el Perú».
+- **Producto:** petróleo, líquidos totales o gas natural.
+- **Periodo:** el selector «Desde» elige el primer año.
+- **Año en curso:** suma la estadística mensual y los meses cerrados del reporte diario; por ejemplo, «2026 (ene-set)». El mes en curso no entra.
+- **Operador en los meses del reporte diario:** se lleva al nombre que tiene el lote en la estadística mensual. «UPLAND» y
+  «UPLAND OIL AND GAS» son la misma empresa, y «PPN» es Pluspetrol Norte.
+- **Colores:** la empresa con más producción del periodo va abajo, con el primer color.
+- **Descargas:** se copia o descarga en SVG o PNG, y los datos en Excel (`/v1/cuadros/hidrocarburos/empresas`).
+
 Falta el precio del crudo (Reuters), que no está en DATA. La pestaña **Mapa** muestra el mapa de lotes del flujo de
 hidrocarburos (`/v1/hidrocarburos/mapa`, aislado en un iframe), con botones de pantalla completa y descarga.
 
@@ -417,6 +429,7 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | POST | `/v1/fiscal/procesar` | Lanza `Fiscal_Procesamiento` en GitHub Actions |
 | GET / POST | `/v1/ipc`, `/v1/ipc/actualizar` | IPC de Lima cargado / traerlo del BCRP |
 | GET | `/v1/cuadros/hidrocarburos` | Producción, gráfico, anexo por lote y canon de un departamento (`departamento=16`, `periodo` opcional, `formato=json` o `xlsx`) |
+| GET | `/v1/cuadros/hidrocarburos/empresas` | Producción anual por empresa operadora (`departamento=16` o `todos`, `producto=PETROLEO`, `LIQUIDOS` o `GAS NATURAL`, `formato=json` o `xlsx`) |
 | GET | `/v1/cuadros/empleo` | Cuadro, gráfico y anexo de empleo de un departamento (`departamento=16`, `periodo=2026-08` opcional, `formato=json` o `xlsx`) |
 | GET | `/docs` | Documentación interactiva |
 

@@ -1,6 +1,6 @@
 # Scraper de Exportaciones · Infotrade (PROMPERÚ) · Contexto del proyecto
 
-Documento de traspaso de este proyecto, para retomarlo sin perder contexto, sea una persona o una sesión nueva de un asistente. Es **independiente** de los scrapers del MEF, que se describen en `FISCAL/CONTEXTO_PROYECTO.md`. Última actualización: **20/10/2026**.
+Documento de traspaso de este proyecto, para retomarlo sin perder contexto, sea una persona o una sesión nueva de un asistente. Es **independiente** de los scrapers del MEF, que se describen en `FISCAL/CONTEXTO_PROYECTO.md`. Última actualización: **02/11/2026**.
 
 ---
 
@@ -13,7 +13,7 @@ Descargar el detalle de **exportaciones del Perú** (datos de SUNAT) desde Infot
 - La tabla que muestra la web es **incompleta** (paginada); la información completa se obtiene con **"Exportar a Excel"**.
 - **Restricción de la web:** cada consulta abarca **6 meses como máximo**.
 
-**Repositorio:** `adriansivina-droid/scraper-mef` · **Notebooks:** `EXPORT/EXP_Infotrade_Exportaciones.ipynb` (descarga) y `EXPORT/EXP_Selector_Partidas.ipynb` (diccionario de partidas, §7)
+**Repositorio:** `adriansivina-droid/scraper-mef` · **Notebooks:** `EXPORT/EXP_Infotrade_Exportaciones.ipynb` (descarga), `EXPORT/EXP_Selector_Partidas.ipynb` (diccionario de partidas, §7) y `EXPORT/EXP_SUNAT_DUA.ipynb` (SUNAT por empresa y DUA, §9)
 
 Abrir en Colab:
 https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/EXPORT/EXP_Infotrade_Exportaciones.ipynb
@@ -308,6 +308,7 @@ Ejemplos (2005–2025 = las 5 versiones): hay 4 812 partidas habilitadas. `44123
 6. **Diccionario de partidas:** falta confirmar la fecha de vigencia del Arancel 2002 (se asume 01/01/2002). Cuando SUNAT publique un Arancel nuevo, agregar su correlación y volver a ejecutar `construir_diccionario.py`.
 7. **Idea:** unir los CSV por año o en un solo archivo para el BI. Power BI también puede leer la carpeta completa.
 8. **Infotrade solo tiene datos desde 2021** (PROMPERÚ, 20/10/2026). Para 2005–2020 hay que usar SUNAT «Detallado por subpartida nacional» (§9). Falta: capturar con F12 el envío del formulario y la página de Resultados, decidir cómo asignar la región (SUNAT no la trae) y revisar «Bases Regím. Definitivos». La descarga completa de Infotrade puede empezar en **enero de 2021**.
+9. **SUNAT por DUA** (`EXP_SUNAT_DUA.ipynb`, §9): primera corrida real en modo diagnóstico con 1–2 RUC y un año; revisar el ZIP de diagnóstico si la fase A no reconoce las filas.
 
 ---
 
@@ -357,6 +358,52 @@ Capturar con F12 → Network, desde el navegador:
 - la página «Resultados»: su URL y cómo se arma el enlace al ZIP.
 
 Con eso, un notebook nuevo (`EXP_SUNAT_Detallado.ipynb`) podría enviar las consultas por partida y año, esperar a que aparezcan en Resultados, bajar los ZIP, leer los DBF y dejar CSV con las mismas columnas que los de Infotrade (más aduana y puerto) en Drive.
+
+**Pruebas del 20/10/2026:**
+- El formulario **valida la partida contra el Arancel vigente**, no contra el del período. `4418999000` (vigente 2017–2021) dio «PARTIDA NO EXISTE, VERIFIQUE»; `4418990000` (solo desde 2022) fue aceptada para 2017 (pedido `00634307`). Si SUNAT guarda las DAM con el código de su época, las partidas que cambiaron no se pueden pedir por aquí.
+- Una consulta repetida devuelve «REQUERIMIENTO ANTERIORMENTE ENVIADO CON EL NOMBRE: …» (no se duplica).
+- `4415200000` (estable desde 2002), ene–jun 2017 → pedido `00634310`. Los pedidos de **todos los usuarios** van a una sola cola («Pendiente»); el formulario tardó 1,6 minutos en responder.
+- **La prueba de Infotrade del 10/10/2026 con `4418990000` en 2017 no era válida** (la partida no existía ese año). El vacío 2015–2020 sigue confirmado por las consultas sin partida y por PROMPERÚ.
+
+### Vía por DUA: notebook `EXP_SUNAT_DUA.ipynb` (02/11/2026)
+
+Es el proceso manual que el usuario seguía para «sincerar» las exportaciones por empresa, automatizado salvo el captcha.
+
+Abrir en Colab: https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/EXPORT/EXP_SUNAT_DUA.ipynb
+
+**Páginas de SUNAT (Aduanet, http):**
+
+| Paso | Página | Captcha |
+|---|---|---|
+| Consulta por exportador | `/cl-ad-itconsultadwh/ieITS01Alias`: tipo de documento (RUC), número o nombre, aduana, año, mes («Todo el Año»), régimen (EXPORTACION). Devuelve una fila por mes × agente × aduana × país con el FOB | No |
+| LISTAR (DUA del mes) | `ieITS01Alias?accion=buscarListadoDuas&CG_consulta=1&CG_regimen=40&CG_ruc=4<RUC>&CG_aduana=226&CG_agente=7814&CG_mes=12&CG_anio=2007&CG_pais=MX` (el `4` delante del RUC es el tipo de documento). Devuelve aduana, año, número de DUA, fecha de embarque y canal | No |
+| Una DUA | `/servlet/SgCDUI2?option=una&n=40&codaduana=226&anoprese=2007&numecorre=001778` → captcha → cabecera (formato A): exportador, RUC, dirección (con distrito, provincia y departamento), transporte, almacén, FOB (6.5), declarante, totales de peso, bultos y unidades | **Sí** |
+| Una serie | Desplegable «SERIE» → ventana `/servlet/SgDetSerie?codaduana=…&numecorre=…&anoprese=…&n=40&regimen=40&fini=…` (formato A1): partida (7.19), FOB (7.30), pesos (7.14/7.15), cantidad y unidad (7.16), bultos y clase, país, descripción comercial (7.35, con la especie de la madera) | Ya resuelto en la DUA |
+
+**El captcha no se resuelve automáticamente** (decisión del 02/11/2026): el notebook muestra la imagen y el usuario escribe el código. Todo lo demás es automático.
+
+**Cómo funciona:**
+- **Fase A (Bloque 3, sin captcha):** por cada RUC × año llena el formulario de la consulta por exportador (reconoce los desplegables por su contenido: RUC, año, «Todo el Año», EXPORTACION, «Todas las Aduanas»), lee cada fila con su enlace LISTAR y luego las DUA de cada LISTAR, siguiendo la paginación («1 a 6 de 6»).
+- **Fase B (Bloque 4, con captcha):** recorre las DUA pendientes del índice (hasta «DUA por corrida»), muestra el captcha, lee la cabecera y todas las series. Si SUNAT no vuelve a pedir el captcha en la misma sesión, sigue sin preguntar.
+- **Lector de fichas:** en cada tabla, el valor de un rótulo (`7.30 FOB US$`, `1.3 Dirección…`, `Total Peso Neto`…) es la celda de la fila de abajo en la misma columna, respetando `colspan` y `rowspan`. Toda la ficha se guarda además en `FICHA_JSON`.
+- **Series:** se abren con el formulario del desplegable «SERIE»; si no, con el enlace `SgDetSerie` del JavaScript; y si tampoco, con la URL de ejemplo que se pegue en el Bloque 2 (el notebook cambia aduana, año, número y serie).
+- **HTML original:** cada página se guarda y se sube comprimida a `SUNAT_DUA/SUNAT_DUA_HTML`. El **modo diagnóstico** guarda además las primeras páginas de la fase A (`DIAG …html`) y las que no se pudieron leer (`REVISAR …html`), para ajustar el lector.
+
+**Archivos** (carpeta `SUNAT_DUA` dentro de DATA, salvo el control):
+
+| Archivo | Una fila por | Columnas clave |
+|---|---|---|
+| `SUNAT_EXPORTADOR_MES.csv` | RUC × año × mes × agente × aduana × país | `FOB_USD`, códigos de aduana, agente y país, `DUAS_LISTADAS` |
+| `SUNAT_DUA_INDICE.csv` | DUA (`DUA_ID` = aduana-año-40-número) | `FECHA_EMBARQUE`, `CANAL`, `ESTADO_DETALLE` (PENDIENTE, OK, REVISAR, SALTADA, ERROR), `FOB_DUA` vs `FOB_SERIES` |
+| `SUNAT_DUA_CABECERA.csv` | DUA | RUC, exportador, dirección y `DEPARTAMENTO_DIR`/`PROVINCIA_DIR`/`DISTRITO_DIR`, FOB, pesos, agente, transporte, `FICHA_JSON` |
+| `SUNAT_DUA_SERIES.csv` | serie | `PARTIDA` (10 dígitos), `FOB_USD`, pesos, `CANT_FISICA` + `UNIDAD_FISICA`, `DESC_1…DESC_5` (especie), `FICHA_JSON` |
+| `CONTROL SUNAT_DUA exportador-año.csv` (CONTROL) | RUC × año | filas, FOB, DUA, `ESTADO` (OK, SIN_DATOS, REVISAR, ERROR) |
+
+**Control:** una DUA queda OK si la suma del FOB de sus series coincide con el FOB de la cabecera (6.5), con tolerancia de 1 US$. Un RUC-año queda OK si se listaron todas sus filas y DUA.
+
+**Región:** se toma del final de la dirección del exportador en la DUA (`…,MAINAS,LORETO`). Es la del domicilio fiscal, no la de producción que usa Infotrade.
+
+**Estado:** escrito y probado con páginas de prueba armadas a partir de las capturas del usuario. Desde el entorno de Claude no se puede abrir aduanet.gob.pe. **Falta la primera corrida real** con 1 o 2 RUC y 1 año, en modo diagnóstico. Si algo no se reconoce, el ZIP de diagnóstico en `SUNAT_DUA_HTML` trae el HTML para ajustar el lector.
 
 ---
 

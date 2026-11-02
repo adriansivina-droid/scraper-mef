@@ -271,3 +271,23 @@ def test_se_carga_el_csv_mas_reciente_segun_su_fecha_original(cliente):
     almacen.crear("PP_produccion_lote_mes_2026-2026.csv", almacen.CARPETA_DATA, b"x", modificado="2026-03-01T00:00:00Z")
     r = almacen.sincronizar(origen="migración desde Drive", todo=True)
     assert [x["nombre"] for x in r["archivos"]] == ["PP_produccion_lote_mes_1994-2026.csv"] and "hidro-produccion" in r["bases"]
+
+
+def test_produccion_por_empresa(cliente):
+    """Gráfico por empresa operadora: el total de Loreto 2025 es el del cuadro (7,9 millones de barriles); los meses de
+    la producción diaria (ene-feb 2026) van al operador que tiene el lote en la estadística mensual."""
+    subir(cliente, csvs())
+    subir(cliente, {"PP_produccion_diaria.csv": diaria()})
+    e = cliente.get("/v1/cuadros/hidrocarburos/empresas?departamento=16").json()["empresas"]
+    assert [x["etiqueta"] for x in e["anios"]] == ["2024", "2025", "2026 (ene-feb)"]
+    nombres = [x["nombre"] for x in e["empresas"]]
+    assert "Petrotal" in nombres and "Upland Oil and Gas" in nombres and "Pluspetrol Norte" in nombres
+    assert len(nombres) == len(set(nombres))                       # «UPLAND» (diaria) y «UPLAND OIL AND» (mensual) son la misma
+    assert round(e["total"][1], 1) == 7.9 and e["unidad"] == "millones de barriles"
+    petrotal = next(x for x in e["empresas"] if x["nombre"] == "Petrotal")
+    assert petrotal["valores"][2] == round(15000 * (31 + 28) / 1e6, 4)
+    peru = cliente.get("/v1/cuadros/hidrocarburos/empresas?departamento=todos&producto=LIQUIDOS").json()
+    assert peru["region"] == "Perú" and "Aguaytia" in [x["nombre"] for x in peru["empresas"]["empresas"]]
+    assert cliente.get("/v1/cuadros/hidrocarburos/empresas?departamento=22").json()["empresas"] is None
+    r = cliente.get("/v1/cuadros/hidrocarburos/empresas?departamento=16&formato=xlsx")
+    assert load_workbook(io.BytesIO(r.content))["Por empresa"]["A3"].value == "Empresa"
