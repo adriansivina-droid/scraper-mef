@@ -336,3 +336,21 @@ def test_exportaciones_de_crudo_por_empresa_y_lote(cliente):
     l8 = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16&lote=8").json()["exportaciones"]
     assert [x["nombre"] for x in l8["empresas"]] == ["Upland Oil and Gas"] and l8["total"] == [0, 0, 11.293]
     assert e["lotes_disponibles"] == ["8", "95"]
+
+
+def test_operadores_pegados_en_la_cabecera_del_reporte_diario(cliente):
+    """Julio 2026: la cabecera del reporte diario juntó operadores vecinos («PETROTAL PLUSPETROL NORTE» en la columna del
+    Lote 8 de Pluspetrol y «UPLAND OILVIGO ENERGY» en la de Upland). Se llevan al operador del lote en la estadística
+    mensual: Petrotal no queda operando el Lote 8."""
+    subir(cliente, csvs())
+    d = pd.read_csv(io.BytesIO(diaria()))
+    d.loc[d["LOTE"].astype(str) == "8", "OPERADOR"] = "UPLAND OILVIGO ENERGY"
+    ppn = d[d["LOTE"].astype(str) == "8"].assign(OPERADOR="PETROTAL PLUSPETROL NORTE", VALOR=500)
+    subir(cliente, {"PP_produccion_diaria.csv": pd.concat([d, ppn]).to_csv(index=False).encode("utf-8-sig")})
+    cliente.post("/v1/cargas", files=[("archivos", ("Petróleo crudo - Loreto.xlsx", expo_crudo(), "application/octet-stream"))])
+    e = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16").json()["exportaciones"]
+    assert next(x for x in e["empresas"] if x["nombre"] == "Petrotal")["lotes"] == ["95"]
+    emp = cliente.get("/v1/cuadros/hidrocarburos/empresas?departamento=16").json()["empresas"]
+    nombres = [x["nombre"] for x in emp["empresas"]]
+    assert not any("Vigo" in n or "Petrotal Pluspetrol" in n for n in nombres)
+    assert {"Petrotal", "Pluspetrol Norte", "Upland Oil and Gas"} <= set(nombres)

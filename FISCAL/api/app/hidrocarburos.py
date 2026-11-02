@@ -332,7 +332,8 @@ def exportaciones_crudo(expo, prod, sin_lote=False, lote=None):
         return None
     expo = expo.assign(RUC=expo["RUC"].astype(str).str.replace(r"\.0$", "", regex=True))
     unida = _unir(prod)[0] if not prod.empty else pd.DataFrame(columns=["P", "OPERADOR", "LOTE", "VOLUMEN", "PRODUCTO"])
-    unida = unida[(unida["VOLUMEN"] > 0) & (unida["PRODUCTO"] != "GAS NATURAL")].assign(EMP=lambda d: d["OPERADOR"].map(lambda o: _clave_esp(_empresa(o))))
+    unida = _con_empresa(unida[(unida["VOLUMEN"] > 0) & (unida["PRODUCTO"] != "GAS NATURAL")]) if len(unida) else unida.assign(EMPRESA="")
+    unida = unida.assign(EMP=unida["EMPRESA"].map(_clave_esp))
     unida["ANIO"] = unida["P"] // 100
     orden_lote = lambda l: (re.sub(r"\D", "", l).zfill(4) if re.search(r"\d", l) else "9999", l)
     def claves(ruc, nombre):
@@ -460,6 +461,31 @@ def nombre_empresa(n):
     return " ".join(pal(w, i) for i, w in enumerate(n.split(" ")))
 
 
+def _con_empresa(d):
+    """Columna EMPRESA (nombre homologado). En los meses de la producción diaria, el operador del reporte se lleva al nombre
+    que tiene el lote en la estadística mensual: por la primera palabra («UPLAND OIL» → UPLAND OIL AND GAS) o, si la
+    cabecera del PDF juntó dos operadores («PETROTAL PLUSPETROL NORTE», julio 2026), por el operador del lote que aparece en
+    el nombre leído."""
+    d = d.copy()
+    d["EMPRESA"] = d["OPERADOR"].map(_empresa)
+    es_diaria = d["FUENTE"].fillna("").astype(str).str.startswith("PRODUCCIÓN DIARIA")
+    por_lote = d[~es_diaria & (d["EMPRESA"] != "")].groupby("LOTE_HISTORICO")["EMPRESA"].agg(lambda x: sorted(set(x)))
+    primera = lambda x: _clave_esp(x.split(" ")[0]) if x else ""
+    def del_mensual(lote, emp):
+        cands = por_lote.get(lote, [])
+        iguales = [c for c in cands if primera(c) == primera(emp)]
+        if len(iguales) == 1:
+            return iguales[0]
+        palabras = set(_clave_esp(emp).replace("/", " ").split())
+        dentro = [c for c in cands if primera(c) in palabras]
+        if len(dentro) == 1:
+            return dentro[0]
+        return emp or (cands[0] if len(cands) == 1 else "")
+    d.loc[es_diaria, "EMPRESA"] = [del_mensual(l, e) for l, e in zip(d.loc[es_diaria, "LOTE_HISTORICO"], d.loc[es_diaria, "EMPRESA"])]
+    d["EMPRESA"] = d["EMPRESA"].replace("", SIN_OPERADOR)
+    return d
+
+
 def empresas(prod, producto="PETROLEO"):
     """Producción anual por empresa operadora: estadística mensual y, después, los meses cerrados de la producción diaria
     (el mes en curso no entra). En esos meses el operador del reporte diario se lleva al nombre que tiene el lote en la
@@ -471,18 +497,7 @@ def empresas(prod, producto="PETROLEO"):
     d = unida[unida["PRODUCTO"].isin(ks)].copy()
     if d.empty or not d["VOLUMEN"].abs().sum():
         return None
-    d["EMPRESA"] = d["OPERADOR"].map(_empresa)
-    es_diaria = d["FUENTE"].fillna("").astype(str).str.startswith("PRODUCCIÓN DIARIA")
-    por_lote = d[~es_diaria & (d["EMPRESA"] != "")].groupby("LOTE_HISTORICO")["EMPRESA"].agg(lambda x: sorted(set(x)))
-    def del_mensual(lote, emp):
-        cands = por_lote.get(lote, [])
-        primera = lambda x: _clave_esp(x.split(" ")[0]) if x else ""
-        iguales = [c for c in cands if primera(c) == primera(emp)]
-        if len(iguales) == 1:
-            return iguales[0]
-        return emp or (cands[0] if len(cands) == 1 else "")
-    d.loc[es_diaria, "EMPRESA"] = [del_mensual(l, e) for l, e in zip(d.loc[es_diaria, "LOTE_HISTORICO"], d.loc[es_diaria, "EMPRESA"])]
-    d["EMPRESA"] = d["EMPRESA"].replace("", SIN_OPERADOR)
+    d = _con_empresa(d)
     d["ANIO"] = d["P"] // 100
     t = d.pivot_table(index="ANIO", columns="EMPRESA", values="VOLUMEN", aggfunc="sum").fillna(0) / 1e6
     con = [int(a) for a in t.index if t.loc[a].sum() > 0]
