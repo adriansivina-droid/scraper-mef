@@ -44,6 +44,18 @@ def periodo_por_defecto(hoy=None):
     return f"{anio}-01", f"{anio}-{mes:02d}"
 
 
+def partir(desde, hasta, partes, tramo):
+    """Parte desde-hasta (AAAA-MM) en `partes` tramos seguidos de meses casi iguales y devuelve el tramo pedido (1..partes),
+    o None si ese tramo queda vacío. Cada tramo corre en su propio job de GitHub (6 horas cada uno): DEV Función·Municipalidad
+    de los 25 departamentos toma cerca de una hora por mes."""
+    a0, m0 = map(int, desde.split("-")); a1, m1 = map(int, hasta.split("-"))
+    meses = [f"{q // 12}-{q % 12 + 1:02d}" for q in range(a0 * 12 + m0 - 1, a1 * 12 + m1)]
+    base, extra = divmod(len(meses), partes)
+    ini = (tramo - 1) * base + min(tramo - 1, extra)
+    trozo = meses[ini:ini + base + (1 if tramo <= extra else 0)]
+    return (trozo[0], trozo[-1]) if trozo else None
+
+
 def tramo_por_defecto(tramo, hoy=None):
     """El año por defecto en dos tramos (enero-junio y julio-último mes cerrado), cada uno en su propio job de GitHub:
     con 3 consultas simultáneas un año completo no entra en las 6 horas que GitHub da a un job. None: no hay tramo."""
@@ -194,7 +206,9 @@ def main():
     ap.add_argument("--desde", default="", help=f"AAAA-MM (por defecto {d0})")
     ap.add_argument("--hasta", default="", help=f"AAAA-MM (por defecto {d1}, el último mes cerrado)")
     ap.add_argument("--prueba", action="store_true", help="PRUEBA_RAPIDA del notebook: solo el mes «desde» y Loreto")
-    ap.add_argument("--tramo", type=int, choices=[1, 2], help="sin --desde/--hasta: 1 = enero-junio, 2 = julio-último mes cerrado")
+    ap.add_argument("--tramo", type=int, choices=[1, 2, 3, 4], help="sin --desde/--hasta: 1 = enero-junio, 2 = julio-último mes cerrado; "
+                    "con --partes: el tramo del periodo que toca a este job")
+    ap.add_argument("--partes", type=int, choices=[2, 3, 4], help="con --desde/--hasta y --tramo: parte el periodo en tramos seguidos (un job cada uno)")
     ap.add_argument("--archivo", choices=list(ARCHIVOS), help="solo ese archivo de los 25 departamentos (sin el resto de la base fiscal)")
     ap.add_argument("--departamentos", default="", help="con --archivo: TODOS (por defecto) o códigos separados por comas, p. ej. 16,22,25")
     a = ap.parse_args()
@@ -216,6 +230,13 @@ def main():
     for p in (desde, hasta):
         if not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", p):
             sys.exit(f"Periodo no válido: {p!r} (formato AAAA-MM)")
+    if a.partes and a.tramo and not a.prueba and (a.desde or a.hasta):
+        t = partir(min(desde, hasta), max(desde, hasta), a.partes, a.tramo)
+        if t is None:
+            print(f"Tramo {a.tramo} de {a.partes}: el periodo {desde} a {hasta} no tiene meses para este tramo. Nada que hacer.")
+            return
+        print(f"Tramo {a.tramo} de {a.partes}: {t[0]} a {t[1]} (del periodo {desde} a {hasta})")
+        desde, hasta = t
     if a.prueba:
         hasta = desde
     titulo = f"{ARCHIVOS[a.archivo]['nombre']} · " if a.archivo else ""

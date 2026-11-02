@@ -173,3 +173,15 @@ def test_cancelar_corrida(cliente, monkeypatch):
     assert len(canceladas) == 1
     monkeypatch.delenv("GITHUB_ACCIONES_TOKEN")
     assert cliente.post("/v1/corridas/cancelar?id=7").status_code == 503
+
+
+def test_periodo_elegido_en_cuatro_tramos():
+    """DEV Función·Municipalidad de los 25 departamentos: un periodo elegido se parte en tramos seguidos (un job cada uno)."""
+    import importlib, sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "automatizacion"))
+    partir = importlib.import_module("scraper_servidor").partir
+    assert [partir("2025-01", "2025-12", 4, k) for k in range(1, 5)] == [("2025-01", "2025-03"), ("2025-04", "2025-06"), ("2025-07", "2025-09"), ("2025-10", "2025-12")]
+    assert [partir("2026-01", "2026-10", 4, k) for k in range(1, 5)] == [("2026-01", "2026-03"), ("2026-04", "2026-06"), ("2026-07", "2026-08"), ("2026-09", "2026-10")]
+    assert [partir("2026-09", "2026-09", 4, k) for k in range(1, 5)] == [("2026-09", "2026-09"), None, None, None]
+    assert partir("2025-11", "2026-02", 2, 2) == ("2026-01", "2026-02")

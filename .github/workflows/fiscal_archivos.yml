@@ -46,7 +46,7 @@ jobs:
       max-parallel: 1
       fail-fast: false
       matrix:
-        tramo: [1, 2]
+        tramo: [1, 2, 3, 4]
     name: raspar (tramo ${{ matrix.tramo }})
     runs-on: ubuntu-latest
     timeout-minutes: 355
@@ -59,9 +59,11 @@ jobs:
           PERIODO: ${{ inputs.desde }}${{ inputs.hasta }}
           PRUEBA: ${{ inputs.prueba }}
         run: |
-          # el tramo 2 solo sirve al devengado del año en curso; PIM (anual), un periodo elegido o la prueba van en el tramo 1
-          if [ "$TRAMO" = "2" ] && { [ "$ARCHIVO" != "dev-municipalidad" ] || [ -n "$PERIODO" ] || [ "$PRUEBA" = "true" ]; }; then
-            echo "correr=no" >> "$GITHUB_OUTPUT"; echo "Todo va en el tramo 1."
+          # devengado municipal: el año en curso va en dos tramos (enero-junio, julio-último mes); un periodo elegido se parte en
+          # cuatro tramos seguidos (cerca de una hora por mes con los 25 departamentos; cada job tiene 6 horas).
+          # PIM (anual) y la prueba van enteros en el tramo 1.
+          if [ "$TRAMO" != "1" ] && { [ "$ARCHIVO" != "dev-municipalidad" ] || [ "$PRUEBA" = "true" ] || { [ -z "$PERIODO" ] && [ "$TRAMO" -gt 2 ]; }; }; then
+            echo "correr=no" >> "$GITHUB_OUTPUT"; echo "Este tramo no hace falta."
           else
             echo "correr=si" >> "$GITHUB_OUTPUT"
           fi
@@ -95,7 +97,10 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           args=(--archivo "$ARCHIVO" --departamentos "${DEPARTAMENTOS:-TODOS}")
-          [ "$ARCHIVO" = "dev-municipalidad" ] && [ -z "$DESDE$HASTA" ] && [ "$PRUEBA" != "true" ] && args+=(--tramo "$TRAMO")
+          if [ "$ARCHIVO" = "dev-municipalidad" ] && [ "$PRUEBA" != "true" ]; then
+            args+=(--tramo "$TRAMO")
+            [ -n "$DESDE$HASTA" ] && args+=(--partes 4)
+          fi
           [ -n "$DESDE" ] && args+=(--desde "$DESDE")
           [ -n "$HASTA" ] && args+=(--hasta "$HASTA")
           [ "$PRUEBA" = "true" ] && args+=(--prueba)

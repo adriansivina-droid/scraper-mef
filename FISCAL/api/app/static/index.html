@@ -1329,7 +1329,7 @@
       return `<div class="caja"><h3>${esc(a.t)}</h3><p>${esc(a.d)} <span class="nota">Cargado: ${cargado}.</span></p>
         <div class="fila">${periodo}<button class="btn" type="button" data-arch-bajar="${a.id}" ${x.filas ? "" : "disabled"}>Descargar Excel</button></div>
         <div class="fila">${nuevo}<button class="btn sec" type="button" data-arch-act="${a.id}" ${j.configurado ? "" : "disabled"}>Actualizar desde el MEF</button></div>
-        <p class="nota">${a.anual ? "Vacío = el año en curso; «hasta» vacío = solo el año «desde». Cada año toma unos minutos." : "Vacío = año en curso hasta el último mes cerrado (en dos tramos seguidos). Con los 25 departamentos, un año completo puede tardar varias horas: para un mes, pon el mismo mes en desde y hasta."}</p>
+        <p class="nota">${a.anual ? "Vacío = el año en curso; «hasta» vacío = solo el año «desde». Cada año toma unos minutos." : "Vacío = año en curso hasta el último mes cerrado (en dos tramos seguidos). Un periodo elegido se parte solo en cuatro tramos seguidos, cada uno con su propio límite de 6 horas y su carga al terminar: con los 25 departamentos toma cerca de una hora por mes."}</p>
         <div id="ares-${a.id}" aria-live="polite"></div>
         <details class="ctl-mef" data-ctl="${a.id}"><summary><b>Control con el MEF</b> · lo que tiene la página contra lo publicado por el MEF, por departamento y año</summary><div class="loading"><span class="spin"></span>Comparando…</div></details></div>`;
     };
