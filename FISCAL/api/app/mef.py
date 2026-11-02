@@ -66,3 +66,22 @@ def corridas(cuantas=5, nombre="mef"):
     return [{"id": c["id"], "estado": c["status"], "resultado": c.get("conclusion"), "origen": c["event"], "inicio": c["created_at"],
              "actualizado": c["updated_at"], "enlace": c["html_url"], "titulo": c.get("display_title", "")}
             for c in r.json().get("workflow_runs", [])]
+
+
+def cancelar(corrida):
+    """Cancela una corrida en curso de uno de los flujos de la página (no cualquier corrida del repositorio)."""
+    url = f"https://api.github.com/repos/{REPO}/actions/runs/{int(corrida)}"
+    r = requests.get(url, headers=_encabezados(), timeout=30)
+    if r.status_code == 404:
+        raise ValueError("No existe esa corrida.")
+    if r.status_code != 200:
+        raise _fallo(r)
+    c = r.json()
+    if c.get("path", "").split("/")[-1].split("@")[0] not in FLUJOS.values():
+        raise ValueError("Esa corrida no es de un scraper de la página.")
+    if c.get("status") == "completed":
+        raise ValueError("Esa corrida ya terminó.")
+    r = requests.post(f"{url}/cancel", headers=_encabezados(), timeout=30)
+    if r.status_code not in (202, 409):          # 409: ya se estaba cancelando
+        raise _fallo(r)
+    return {"titulo": c.get("display_title", ""), "estado": "cancelando"}

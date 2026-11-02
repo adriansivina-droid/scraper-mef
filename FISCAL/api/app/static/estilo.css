@@ -239,3 +239,6 @@ tr.alerta td { background: var(--gold-soft); }
 details.ctl-mef { border-top: 1px solid var(--hair); margin-top: 14px; padding-top: 10px; }
 details.ctl-mef summary { cursor: pointer; }
 details.ctl-mef[open] summary { margin-bottom: 8px; }
+.btn.chico { padding: 4px 12px; font-size: 13px; min-height: 0; }
+td.acciones-corrida { white-space: nowrap; }
+td.acciones-corrida .btn { margin-right: 10px; }
