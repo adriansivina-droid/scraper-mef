@@ -381,8 +381,9 @@
         if (e.parcial) notasG.push(`${e.parcial.periodo} no se incluye: el mes está en curso (${e.parcial.dias} de ${e.parcial.de} días).`);
         notasG.push("Fuente: PERUPETRO, producción fiscalizada por lote y operador.");
         nombre = `${j.region}: producción anual de ${PROD[st.prod].split(" (")[0].toLowerCase()} por empresa (${e.unidad})`;
-        svg = B.apiladas({ titulo: nombre, ejeY: e.unidad.charAt(0).toUpperCase() + e.unidad.slice(1), categorias: corte(e.anios.map((x) => x.etiqueta)), series, notas: notasG });
-        cuerpo = `<div class="scroll">${svg}</div>
+        const specE = { titulo: nombre, ejeY: e.unidad.charAt(0).toUpperCase() + e.unidad.slice(1), categorias: corte(e.anios.map((x) => x.etiqueta)), series, notas: notasG };
+        svg = cuerpoSolo(() => B.apiladas(specE));
+        cuerpo = `${refSpec("emp", specE, "t")}<div class="scroll">${svg}</div>${refSpec("emp", specE, "n")}
           <div class="fila"><button class="btn" type="button" id="emp-copiar">Copiar</button><button class="btn sec" type="button" id="emp-svg">SVG</button>
             <button class="btn sec" type="button" id="emp-png">PNG</button><button class="btn sec" type="button" id="emp-xlsx">Datos en Excel</button><span class="bcrp-msj" id="emp-msj"></span></div>`;
       }
@@ -431,13 +432,14 @@
       if (exc.length && !st.lote) notasG.push(`No incluye a ${exc.map(([n, v]) => `${n} (US$ ${fmt1(v)} millones)`).join(" ni a ")}: exportan crudo sin operar lotes con producción.${e.solo_excluidos.length ? ` ${e.solo_excluidos.join(", ")}: solo hay exportaciones de esas empresas.` : ""}`);
       notasG.push("Fuente: SUNAT (exportaciones por empresa) y PERUPETRO (producción fiscalizada por operador y lote).");
       const nombre = st.lote ? `${j.region}: exportaciones de petróleo crudo del Lote ${st.lote}${porLote ? "" : " por empresa"} (millones de US$)` : `${j.region}: exportaciones de petróleo crudo por ${porLote ? "lote" : "empresa y lote"} (millones de US$)`;
-      const svg = B.apiladas({ titulo: nombre, ejeY: "Millones de US$", categorias: corte(e.anios.map((x) => x.etiqueta)), series, notas: notasG });
+      const specX = { titulo: nombre, ejeY: "Millones de US$", categorias: corte(e.anios.map((x) => x.etiqueta)), series, notas: notasG };
+      const svg = cuerpoSolo(() => B.apiladas(specX));
       caja.innerHTML = `<h3>${T}</h3><p>Cuánto crudo se exportó desde cada lote (asignado por la empresa que lo operaba ese año); con «Ver por: Empresa», cuánto exportó cada empresa. Los datos de exportación vienen del Excel que se sube en «Actualizar».</p>
         <div class="fila"><label class="campo" for="ex-desde">Desde<select id="ex-desde">${anios.slice(0, k1 + 1).map((a) => `<option value="${a}"${a === st.desde ? " selected" : ""}>${a}</option>`).join("")}</select></label>
           <label class="campo" for="ex-ver">Ver por<select id="ex-ver"><option value="lote"${porLote ? " selected" : ""}>Lote</option><option value="empresa"${porLote ? "" : " selected"}>Empresa</option></select></label>
           <label class="campo" for="ex-lote">Lote<select id="ex-lote"><option value="">Todos los lotes</option>${e.lotes_disponibles.map((l) => `<option value="${esc(l)}"${l === st.lote ? " selected" : ""}>Lote ${esc(l)}</option>`).join("")}</select></label>
           <label class="campo" for="ex-sin"${st.lote ? " hidden" : ""}><span><input type="checkbox" id="ex-sin" ${st.sinLote ? "checked" : ""}> Incluir exportadores sin lote (Petroperú, Perupetro)</span></label></div>
-        <div class="scroll">${svg}</div>
+        ${refSpec("ex", specX, "t")}<div class="scroll">${svg}</div>${refSpec("ex", specX, "n")}
         <div class="fila"><button class="btn" type="button" id="ex-copiar">Copiar</button><button class="btn sec" type="button" id="ex-svg">SVG</button>
           <button class="btn sec" type="button" id="ex-png">PNG</button><button class="btn sec" type="button" id="ex-xlsx">Datos en Excel</button><span class="bcrp-msj" id="ex-msj"></span></div>`;
       const re = () => exportacionesHidro(r, caja);
@@ -1079,19 +1081,42 @@
   const itemsBCRP = (sid, c, R, N) => sid === "expo" || sid === "impo" ? itemsExpo(c, R, N) : sid === "pesca" ? itemsPesca(c, R, N) : sid === "hidro" ? itemsHidro(c, R, N) : sid === "empleo" ? itemsEmpleo(c, R, N) : itemsEjecucion(sid, c, R, N, c.ultimo);
 
   // galería: cada cuadro con su número (editable), Copiar / SVG / PNG; un ítem sin svg es un pendiente (texto)
+  // «Referencia, no va en la imagen»: el título y las notas aparte, en Arial 10, cada uno con su botón Copiar
+  const cajaRef = (id, lineas, tipo) => lineas.length ? `<div class="ref-img ${tipo}"><div><small>Referencia (no va en la imagen)</small>
+      <div class="ref-txt">${lineas.map((l) => `<span>${esc(l)}</span>`).join("")}</div></div>
+      <button class="btn sec chico" type="button" data-ref="${id}">${tipo === "titulo" ? "Copiar título" : "Copiar notas"}</button></div>` : "";
+  const textosRef = {};
+  const cuerpoSolo = (f) => { window.BCRP.soloCuerpo = true; try { return f(); } finally { window.BCRP.soloCuerpo = false; } };
+  const refSpec = (id, spec, cual) => { const t = window.BCRP.textos(spec); textosRef[id + cual] = cual === "t" ? t.titulo : t.notas;
+    return cajaRef(id + cual, textosRef[id + cual], cual === "t" ? "titulo" : "notas"); };
+  document.addEventListener("click", async (ev) => {
+    const b = ev.target.closest("[data-ref]");
+    if (!b) return;
+    try { await navigator.clipboard.writeText((textosRef[b.dataset.ref] || []).join("\n")); const t = b.textContent; b.textContent = "Copiado"; setTimeout(() => { b.textContent = t; }, 1500); }
+    catch (e) { b.textContent = "No se pudo copiar"; }
+  });
+
   function galeriaBCRP(caja, clave, items, controles) {
     const etiqueta = (it, n) => n === "" || n == null ? (it.tipo === "ANEXO" ? "ANEXO" : `${it.tipo} N°`) : it.tipo === "ANEXO" ? `ANEXO ${n}` : `${it.tipo} N° ${n}`;
     const valorNum = (it) => numBcrp[`${clave}-${it.clave}`] ?? (it.num ?? "");
     const listos = items.map((it, k) => [it, k]).filter(([it]) => it.svg);
     caja.innerHTML = `<div class="fila controles">${controles}<button class="btn sec" type="button" id="${clave}-todo"${listos.length ? "" : " disabled"}>Descargar todos (SVG)</button></div>
-      <p class="lead">Con el formato de la síntesis. <b>Copiar</b> deja la imagen lista para pegar en Word (Ctrl+V); <b>SVG</b> es vectorial (en Word: Insertar → Imágenes) y no pierde nitidez al ampliarla; <b>Excel</b> lo baja con el mismo formato. Cambia el número si el informe lo pide.</p>
+      <p class="lead">Con el formato de la síntesis. La imagen lleva solo el cuadro o el gráfico: el título y las notas van aparte, como referencia, con su botón para copiarlos. <b>Copiar</b> deja la imagen lista para pegar en Word (Ctrl+V); <b>SVG</b> es vectorial (en Word: Insertar → Imágenes) y no pierde nitidez al ampliarla; <b>Excel</b> lo baja completo, con título y notas. Cambia el número si el informe lo pide.</p>
       ${items.map((it, k) => it.svg ? `<div class="caja bcrp-item"><div class="fila" style="justify-content:space-between;align-items:center">
           <label class="campo bcrp-num">${esc(it.tipo === "ANEXO" ? "Anexo" : it.tipo === "CUADRO" ? "Cuadro N°" : "Gráfico N°")}<input type="text" inputmode="numeric" data-k="${k}" value="${esc(valorNum(it))}" size="3"></label>
           <div class="fila"><button class="btn" type="button" data-copiar="${k}">Copiar</button><button class="btn sec" type="button" data-svg="${k}">SVG</button><button class="btn sec" type="button" data-png="${k}">PNG</button><button class="btn sec" type="button" data-xlsx="${k}">Excel</button></div></div>
-        <div class="bcrp-prev" id="${clave}-v${k}"></div><div class="bcrp-msj" id="${clave}-m${k}" aria-live="polite"></div></div>`
+        <div id="${clave}-t${k}"></div><div class="bcrp-prev" id="${clave}-v${k}"></div><div id="${clave}-n${k}"></div><div class="bcrp-msj" id="${clave}-m${k}" aria-live="polite"></div></div>`
         : `<div class="vacio-caja bcrp-pendiente"><b>${esc(etiqueta(it, it.num))} · ${esc(it.nombre)}</b><span>${esc(it.pendiente)}</span></div>`).join("")}`;
-    const svgDe = (k) => items[k].svg(etiqueta(items[k], valorNum(items[k])));
-    const pintar = (k) => { $(`${clave}-v${k}`).innerHTML = svgDe(k); };
+    // la imagen: solo el cuerpo (sin título ni notas); completo, solo para el Excel
+    const generar = (k, solo) => { B.soloCuerpo = solo; try { return items[k].svg(etiqueta(items[k], valorNum(items[k]))); } finally { B.soloCuerpo = false; } };
+    const svgDe = (k) => generar(k, true);
+    const pintar = (k) => {
+      const svg = generar(k, true), t = B.textos(B.ultimo.spec), id = `${clave}-${k}`;
+      textosRef[id + "t"] = t.titulo; textosRef[id + "n"] = t.notas;
+      $(`${clave}-t${k}`).innerHTML = cajaRef(id + "t", t.titulo, "titulo");
+      $(`${clave}-v${k}`).innerHTML = svg;
+      $(`${clave}-n${k}`).innerHTML = cajaRef(id + "n", t.notas, "notas");
+    };
     listos.forEach(([, k]) => pintar(k));
     const avisar = (k, t, ok) => { const m = $(`${clave}-m${k}`); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
     caja.querySelectorAll(".bcrp-num input").forEach((inp) => inp.addEventListener("input", () => { const k = +inp.dataset.k; numBcrp[`${clave}-${items[k].clave}`] = inp.value.trim(); pintar(k); }));
@@ -1101,7 +1126,7 @@
     caja.querySelectorAll("[data-svg]").forEach((bt) => bt.addEventListener("click", () => { const k = +bt.dataset.svg; B.descargar(svgDe(k), nombreDe(k)); }));
     caja.querySelectorAll("[data-png]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.png; try { await B.descargarPng(svgDe(k), nombreDe(k)); } catch (e) { avisar(k, e.message, false); } }));
     caja.querySelectorAll("[data-xlsx]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.xlsx;
-      try { svgDe(k); await B.excel(B.ultimo, nombreDe(k)); } catch (e) { avisar(k, e.message, false); } }));
+      try { generar(k, false); await B.excel(B.ultimo, nombreDe(k)); } catch (e) { avisar(k, e.message, false); } }));
     $(`${clave}-todo`).addEventListener("click", async () => { for (const [, k] of listos) { B.descargar(svgDe(k), nombreDe(k)); await new Promise((ok) => setTimeout(ok, 350)); } });
   }
   const selectorMes = (clave, meses, actual) => `<label class="campo" for="${clave}-p">Mes del informe<select id="${clave}-p">${meses.map((m) => `<option value="${m}"${m === actual ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>`;
@@ -1169,17 +1194,23 @@
     const nombreDe = (g) => `DRAE ${r.corto} ${String(g.orden).padStart(2, "0")} ${g.titulo || g.hoja}`;
     caja.innerHTML = `<div class="fila controles"><label class="campo" for="drae-hoja">Hoja de las SERIES<select id="drae-hoja"><option value="">Todas (${d.graficos.length})</option>${hojas.map((h) => `<option${h === sel ? " selected" : ""}>${esc(h)}</option>`).join("")}</select></label>
         <button class="btn sec" type="button" id="drae-todo">Descargar los ${lista.length} (SVG)</button><span class="nota">De ${esc(d.archivo)} · cargado el ${esc(fecha(d.fecha))}</span></div>
-      <p class="lead">Cada gráfico con los datos que guarda en las SERIES. <b>Copiar</b>, <b>SVG</b> y <b>PNG</b> llevan solo el gráfico (sin título, subtítulo ni fuente), para pegarlo en la lámina que ya tiene su título: Copiar lo deja listo para Ctrl+V en PowerPoint o Word y el SVG es vectorial. Si el título no es el correcto, corrígelo con <b>Título</b>.</p>
+      <p class="lead">Cada gráfico con los datos que guarda en las SERIES. La imagen lleva solo el gráfico: el título y la fuente van aparte, como referencia, con su botón para copiarlos. <b>Copiar</b>, <b>SVG</b> y <b>PNG</b> bajan solo el gráfico: Copiar lo deja listo para Ctrl+V en PowerPoint o Word y el SVG es vectorial. Si el título no es el correcto, corrígelo con <b>Título</b>.</p>
       ${tx ? `<details class="caja drae-textos" open><summary><b>Títulos para las láminas de exportaciones</b> · desde el sector Exportaciones (ESTAD de ${esc(r.nombre)}, hasta ${esc(etqMes(tx.periodo))})</summary>
         ${[["acumulado", "Enero-mes"], ["mes", "El mes"], ["no_tradicionales", "No tradicionales"]].filter(([k]) => tx[k]).map(([k, etq]) =>
           `<div class="fila drae-texto"><span class="nota">${etq}</span><p class="parrafo">${esc(tx[k])}</p><button class="btn sec chico" type="button" data-dtexto="${k}">Copiar</button></div>`).join("")}
         <p class="nota" id="drae-tmsj" aria-live="polite">Las cifras son las del cuadro de la síntesis; los productos, los que más explican la variación. Revísalo antes de pegarlo.</p></details>` : ""}
       <div class="drae-grid">${lista.map((g, k) => `<div class="caja drae-item"><div class="fila" style="justify-content:space-between;align-items:center"><span class="nota">${esc(g.hoja)} · N° ${g.orden}</span>
           <div class="fila"><button class="btn" type="button" data-dcopiar="${k}">Copiar</button><button class="btn sec" type="button" data-dsvg="${k}">SVG</button><button class="btn sec" type="button" data-dpng="${k}">PNG</button><button class="btn sec" type="button" data-dtit="${k}">Título</button><button class="btn sec" type="button" data-ddatos="${k}">Datos</button></div></div>
-        <div class="bcrp-prev drae-prev" id="drae-v${k}"></div><div class="drae-datos" id="drae-d${k}" hidden></div><div class="bcrp-msj" id="drae-m${k}" aria-live="polite"></div></div>`).join("")}</div>`;
+        <div id="drae-t${k}"></div><div class="bcrp-prev drae-prev" id="drae-v${k}"></div><div id="drae-n${k}"></div><div class="drae-datos" id="drae-d${k}" hidden></div><div class="bcrp-msj" id="drae-m${k}" aria-live="polite"></div></div>`).join("")}</div>`;
     const svgDe = (k) => D.svg(lista[k], r.nombre);                         // en la página: con su título
     const svgSolo = (k) => D.svg(lista[k], r.nombre, { soloGrafico: true });  // lo que se copia y descarga: solo el gráfico
-    lista.forEach((g, k) => { try { $(`drae-v${k}`).innerHTML = svgDe(k); } catch (e) { $(`drae-v${k}`).innerHTML = `<div class="err-box"><b>No se pudo dibujar</b><span>${esc(e.message)}</span></div>`; } });
+    const refDRAE = (k) => {
+      const g = lista[k], id = `drae-${grupo}-${g.orden}`, tit = [g.titulo || g.hoja, g.subtitulo].filter(Boolean), nts = g.notas || [];
+      textosRef[id + "t"] = tit; textosRef[id + "n"] = nts;
+      $(`drae-t${k}`).innerHTML = cajaRef(id + "t", tit, "titulo");
+      $(`drae-n${k}`).innerHTML = cajaRef(id + "n", nts, "notas");
+    };
+    lista.forEach((g, k) => { try { refDRAE(k); $(`drae-v${k}`).innerHTML = svgSolo(k); } catch (e) { $(`drae-v${k}`).innerHTML = `<div class="err-box"><b>No se pudo dibujar</b><span>${esc(e.message)}</span></div>`; } });
     const avisar = (k, t, ok) => { const m = $(`drae-m${k}`); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
     caja.querySelectorAll("[data-dtexto]").forEach((bt) => bt.addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(tx[bt.dataset.dtexto]); $("drae-tmsj").textContent = "Copiado: pégalo en el título de la lámina."; }
@@ -1202,7 +1233,7 @@
       const sub = prompt("Subtítulo (unidad), por ejemplo «(Variación % interanual)»:", g.subtitulo || "");
       if (sub === null) return;
       try { await api(`/v1/drae/titulo?departamento=${r.cod}&orden=${g.orden}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ titulo: t, subtitulo: sub }) });
-        g.titulo = t.trim(); g.subtitulo = sub.trim(); $(`drae-v${k}`).innerHTML = svgDe(k); avisar(k, "Título guardado.", true);
+        g.titulo = t.trim(); g.subtitulo = sub.trim(); refDRAE(k); avisar(k, "Título guardado.", true);
       } catch (e) { avisar(k, e.message, false); }
     }));
     $("drae-todo").addEventListener("click", async () => { for (let k = 0; k < lista.length; k++) { B.descargar(svgSolo(k), nombreDe(lista[k])); await new Promise((ok) => setTimeout(ok, 350)); } });
