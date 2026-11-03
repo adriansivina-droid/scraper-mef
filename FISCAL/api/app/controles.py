@@ -132,59 +132,96 @@ def _cod(funcion):
     return m.group(1).zfill(2) if m else str(funcion)
 
 
+DEPTOS_25 = [f"{i:02d}" for i in range(1, 26)]
+
+
+def _anios_pagina(base_id):
+    """{año: {departamentos con datos}} de una base de la página."""
+    b = db.BASES[base_id]
+    if not db.existe(b.tabla):
+        return {}
+    with db.motor().connect() as cx:
+        filas = cx.execute(text(f'SELECT DISTINCT _anio, _depto FROM "{b.tabla}"')).all()
+    salida = {}
+    for a, d in filas:
+        salida.setdefault(int(a), set()).add(str(d).zfill(2))
+    return salida
+
+
 def control_archivo(archivo, hoy=None):
     """Por departamento y año: lo publicado por el MEF (vista anual, guardado de los CSV de CONTROL de cada corrida) contra
-    lo que tiene la página en la base del archivo, con las funciones que no cuadran."""
+    lo que tiene la página en la base del archivo, con las funciones que no cuadran. Lista los 25 departamentos de cada año
+    con datos o con control: «sin control» = la página tiene datos pero ninguna corrida guardó lo publicado por el MEF."""
     hoy = hoy or date.today()
     bloque, nivel, base_id, valor, anual = ARCHIVOS[archivo]
     _tabla()
     with db.motor().connect() as cx:
         refs = pd.read_sql(text("SELECT depto, anio, codigo, SUM(ref) AS ref, MAX(fecha) AS fecha FROM mef_controles "
                                 "WHERE bloque = :b AND nivel = :n GROUP BY depto, anio, codigo"), cx, params={"b": bloque, "n": nivel})
-    if refs.empty:
-        return []
     refs["codigo"] = refs["codigo"].map(_cod)
-    b = db.BASES[base_id]
+    en_pagina = _anios_pagina(base_id)
+    anios = sorted({int(a) for a in refs["anio"]} | set(en_pagina), reverse=True)
+    grupos = {(d, int(a)): g for (d, a), g in refs.groupby(["depto", "anio"])}
     filas = []
-    for (dep, anio), g in sorted(refs.groupby(["depto", "anio"]), key=lambda x: (-x[0][1], x[0][0])):
-        df = db.leer(base_id, [dep], ["E", "R", "M"], f"{anio}-01", f"{anio}-12") if db.existe(b.tabla) else pd.DataFrame()
-        montos = pd.to_numeric(df[valor], errors="coerce").fillna(0) if not df.empty else pd.Series(dtype=float)
-        pagina = df.assign(_c=df["FUNCION"].map(_cod), _v=montos).groupby("_c")["_v"].sum() if not df.empty else pd.Series(dtype=float)
-        meses = [] if anual or df.empty else sorted({int(str(x).split(":")[0]) for x in df["MES"]})
-        ref = g.groupby("codigo")["ref"].sum()
-        mef, pag = float(ref.sum()), float(pagina.sum())
-        dif = pag - mef
-        tol = max(5.0, 5.0 * max(len(meses), 1))
-        en_curso = not anual and int(anio) == hoy.year
-        estado = "coincide" if abs(dif) <= tol else ("mes en curso" if en_curso and dif < 0 else "sin datos" if df.empty else "revisar")
-        funciones = []
-        if estado != "coincide":
-            for c in sorted(set(ref.index) | set(pagina.index)):
-                d = float(pagina.get(c, 0.0)) - float(ref.get(c, 0.0))
-                if abs(d) > max(3.0, 3.0 * max(len(meses), 1)):
-                    funciones.append({"funcion": f"{c} {FUNCIONES.get(int(c), '')}".strip() if c.isdigit() else c, "mef": round(float(ref.get(c, 0.0)), 2), "pagina": round(float(pagina.get(c, 0.0)), 2), "dif": round(d, 2)})
-        filas.append({"depto": dep, "anio": int(anio), "mef": round(mef, 2), "pagina": round(pag, 2), "dif": round(dif, 2), "estado": estado,
-                      "fecha": g["fecha"].max(), "meses": (f"{meses[0]:02d} a {meses[-1]:02d}" if meses else ("anual" if anual and not df.empty else "sin datos")),
-                      "funciones": funciones})
+    for anio in anios:
+        for dep in DEPTOS_25:
+            g = grupos.get((dep, anio))
+            hay = dep in en_pagina.get(anio, set())
+            df = db.leer(base_id, [dep], ["E", "R", "M"], f"{anio}-01", f"{anio}-12") if hay else pd.DataFrame()
+            montos = pd.to_numeric(df[valor], errors="coerce").fillna(0) if not df.empty else pd.Series(dtype=float)
+            pagina = df.assign(_c=df["FUNCION"].map(_cod), _v=montos).groupby("_c")["_v"].sum() if not df.empty else pd.Series(dtype=float)
+            meses = [] if anual or df.empty else sorted({int(str(x).split(":")[0]) for x in df["MES"]})
+            etq_meses = f"{meses[0]:02d} a {meses[-1]:02d}" if meses else ("anual" if anual and not df.empty else "sin datos")
+            pag = float(pagina.sum())
+            if g is None:
+                filas.append({"depto": dep, "anio": anio, "mef": None, "pagina": round(pag, 2) if not df.empty else None, "dif": None,
+                              "estado": "sin control" if not df.empty else "sin datos", "fecha": None, "meses": etq_meses, "funciones": []})
+                continue
+            ref = g.groupby("codigo")["ref"].sum()
+            mef = float(ref.sum())
+            dif = pag - mef
+            tol = max(5.0, 5.0 * max(len(meses), 1))
+            en_curso = not anual and anio == hoy.year
+            estado = "coincide" if abs(dif) <= tol else ("mes en curso" if en_curso and dif < 0 else "sin datos" if df.empty else "revisar")
+            funciones = []
+            if estado != "coincide":
+                for c in sorted(set(ref.index) | set(pagina.index)):
+                    d = float(pagina.get(c, 0.0)) - float(ref.get(c, 0.0))
+                    if abs(d) > max(3.0, 3.0 * max(len(meses), 1)):
+                        funciones.append({"funcion": f"{c} {FUNCIONES.get(int(c), '')}".strip() if c.isdigit() else c, "mef": round(float(ref.get(c, 0.0)), 2), "pagina": round(float(pagina.get(c, 0.0)), 2), "dif": round(d, 2)})
+            filas.append({"depto": dep, "anio": anio, "mef": round(mef, 2), "pagina": round(pag, 2), "dif": round(dif, 2), "estado": estado,
+                          "fecha": g["fecha"].max(), "meses": etq_meses, "funciones": funciones})
     return filas
 
 
+def _corregible(archivo, f, umbral):
+    """DEV Función·Municipalidad: «revisar» por más de `umbral` con funciones (se rehacen solo esas funciones).
+    Los PIM (anuales, unos minutos por departamento): además «sin control» y «sin datos» (se rehace el departamento)."""
+    grande = f["estado"] == "revisar" and abs(f["dif"]) > umbral
+    if archivo == "dev-municipalidad":
+        return grande and bool(f["funciones"])
+    return grande or f["estado"] in ("sin control", "sin datos")
+
+
 def remiendo(archivo, umbral=200.0, depto=None, anio=None, hoy=None):
-    """Qué volver a raspar de DEV Funcion.Municipalidad para corregir lo que no cuadra con el MEF: los departamentos y años en
-    «revisar» con una diferencia mayor que `umbral` soles, y solo sus funciones que no cuadran (el detalle del control).
+    """Qué volver a raspar para corregir lo que no cuadra con el MEF: los departamentos y años corregibles (`_corregible`).
+    En DEV Funcion.Municipalidad, solo sus funciones que no cuadran (el detalle del control); en los PIM, el departamento entero.
     -> {"desde", "hasta", "departamentos", "funciones", "casos"} o None si no hay nada que corregir."""
-    if archivo != "dev-municipalidad":
-        raise ValueError("Por ahora solo DEV Funcion.Municipalidad se corrige por función.")
+    if archivo not in ARCHIVOS:
+        raise ValueError(f"Archivo desconocido: {archivo}")
     hoy = hoy or date.today()
-    casos = [f for f in control_archivo(archivo, hoy) if f["estado"] == "revisar" and abs(f["dif"]) > umbral
-             and (depto is None or f["depto"] == depto) and (anio is None or f["anio"] == int(anio)) and f["funciones"]]
+    casos = [f for f in control_archivo(archivo, hoy) if _corregible(archivo, f, umbral)
+             and (depto is None or f["depto"] == depto) and (anio is None or f["anio"] == int(anio))]
     if not casos:
         return None
-    funciones = sorted({_cod(g["funcion"]) for f in casos for g in f["funciones"]})
     anios = sorted({f["anio"] for f in casos})
+    deps = ",".join(sorted({f["depto"] for f in casos}))
+    detalle = [{"depto": f["depto"], "anio": f["anio"], "dif": f["dif"], "estado": f["estado"],
+                "funciones": [g["funcion"] for g in f["funciones"]]} for f in casos]
+    if archivo != "dev-municipalidad":
+        return {"desde": f"{anios[0]}-01", "hasta": f"{anios[-1]}-12", "departamentos": deps, "funciones": "", "casos": detalle}
+    funciones = sorted({_cod(g["funcion"]) for f in casos for g in f["funciones"]})
     ultimo = (hoy.year, hoy.month - 1) if hoy.month > 1 else (hoy.year - 1, 12)
     a1 = anios[-1]
     hasta = f"{a1}-12" if a1 < ultimo[0] else f"{ultimo[0]}-{ultimo[1]:02d}"
-    return {"desde": f"{anios[0]}-01", "hasta": hasta, "departamentos": ",".join(sorted({f["depto"] for f in casos})),
-            "funciones": ",".join(funciones),
-            "casos": [{"depto": f["depto"], "anio": f["anio"], "dif": f["dif"], "funciones": [g["funcion"] for g in f["funciones"]]} for f in casos]}
+    return {"desde": f"{anios[0]}-01", "hasta": hasta, "departamentos": deps, "funciones": ",".join(funciones), "casos": detalle}

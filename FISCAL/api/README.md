@@ -145,6 +145,8 @@ Cada archivo tiene además su **Control con el MEF** (desplegable al final de su
 publica el MEF en la vista anual de Consulta Amigable (los CSV de CONTROL que deja cada corrida: `CONTROL Municipalidad …`,
 `CONTROL PIM Funcion …` y `CONTROL PIM Funcion.Municipalidad …`, guardados en la tabla `mef_controles`) contra lo que tiene
 la página, con las funciones que no cuadran (`/v1/mef/archivos/control?archivo=`).
+Lista los 25 departamentos de cada año: «sin control» = la página tiene datos de ese departamento y año pero ninguna
+corrida guardó lo publicado por el MEF (p. ej. datos de una corrida anterior al control); «sin datos» = no hay nada cargado.
 
 En DEV Función · Municipalidad, el botón **Corregir** (por fila, o «Corregir las diferencias mayores a S/ 200») lanza un
 **remiendo**: vuelve a raspar solo esos departamentos y solo sus funciones que no cuadran (`POST /v1/mef/archivos/corregir`
@@ -153,6 +155,10 @@ las demás como estaban; el control del remiendo solo pisa sus códigos. Además
 reintentar, el notebook la anota en `HUECOS Funcion.Municipalidad …csv` y la carga conserva lo que la página ya tenía de esa
 función y mes (antes el mes se reemplazaba entero y se perdía). La referencia anual del control ya no baja a municipalidad
 (solo el total por función), así que el control es mucho más rápido.
+
+En **PIM Función** y **PIM Función · Municipalidad** el botón **Corregir** vuelve a raspar el departamento y año enteros
+(son anuales: unos minutos por departamento) de los casos en «revisar» por más de S/ 200, «sin control» o «sin datos»;
+la carga reemplaza solo esos departamentos y años y guarda su control.
 
 En **Las tres regiones → Datos → MEF · 3 archivos**: DEV Función · Municipalidad, PIM Función y PIM Función ·
 Municipalidad tienen cada uno su botón **Descargar Excel** (departamentos y periodo a elegir) y su botón **Actualizar

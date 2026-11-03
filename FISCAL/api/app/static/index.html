@@ -1361,7 +1361,7 @@
     };
     corridas(j.corridas);
     // control con el MEF: la vista anual que el scraper consulta en cada corrida (CSV de CONTROL) contra la base de la página
-    const CHIP_CTL = { coincide: '<span class="chip ok">coincide</span>', "mes en curso": '<span class="chip vacio">mes en curso</span>', revisar: '<span class="chip error">revisar</span>', "sin datos": '<span class="chip vacio">sin datos en la página</span>' };
+    const CHIP_CTL = { coincide: '<span class="chip ok">coincide</span>', "mes en curso": '<span class="chip vacio">mes en curso</span>', revisar: '<span class="chip error">revisar</span>', "sin datos": '<span class="chip vacio">sin datos en la página</span>', "sin control": '<span class="chip vacio">sin control del MEF</span>' };
     caja.querySelectorAll("[data-ctl]").forEach((det) => det.addEventListener("toggle", async () => {
       if (!det.open || det.dataset.listo) return;
       det.dataset.listo = "1";
@@ -1370,26 +1370,31 @@
         const x = (await api(`/v1/mef/archivos/control?archivo=${det.dataset.ctl}`)).control;
         if (!x.length) { zona.outerHTML = '<p class="nota">Todavía no hay controles guardados de este archivo: se guardan en cada corrida del scraper (la de este archivo o la completa de los días 2 y 21).</p>'; return; }
         const n = (e) => x.filter((f) => f.estado === e).length;
-        // remiendo por función (solo DEV Función·Municipalidad): vuelve a raspar solo lo que no cuadra por más de S/ 200
-        const UMBRAL = 200, corregible = (f) => det.dataset.ctl === "dev-municipalidad" && f.estado === "revisar" && Math.abs(f.dif) > UMBRAL && f.funciones.length;
+        // corrección: DEV Función·Municipalidad vuelve a raspar solo las funciones que no cuadran por más de S/ 200;
+        // los PIM, el departamento y año enteros (también los que no tienen control guardado o no tienen datos)
+        const UMBRAL = 200, esDev = det.dataset.ctl === "dev-municipalidad";
+        const corregible = (f) => esDev ? (f.estado === "revisar" && Math.abs(f.dif) > UMBRAL && f.funciones.length)
+          : ((f.estado === "revisar" && Math.abs(f.dif) > UMBRAL) || f.estado === "sin control" || f.estado === "sin datos");
         const nCorr = x.filter(corregible).length;
-        zona.outerHTML = `<p class="nota"><b>${n("coincide")}</b> coinciden · <b>${n("revisar")}</b> por revisar · <b>${n("mes en curso")}</b> con el mes en curso · <b>${n("sin datos")}</b> sin datos en la página.
+        zona.outerHTML = `<p class="nota"><b>${n("coincide")}</b> coinciden · <b>${n("revisar")}</b> por revisar · <b>${n("mes en curso")}</b> con el mes en curso · <b>${n("sin datos")}</b> sin datos en la página${n("sin control") ? ` · <b>${n("sin control")}</b> sin control del MEF` : ""}.
             Coincide = la diferencia no pasa de S/ 5 por mes. «Mes en curso»: del año actual, el MEF ya suma lo devengado en el mes abierto.</p>
-          ${nCorr ? `<p class="nota"><button type="button" class="btn" data-corregir="">Corregir las ${nCorr} diferencias mayores a S/ ${UMBRAL}</button>
-            Vuelve a raspar solo esos departamentos y solo sus funciones que no cuadran (una corrida corta); las demás funciones quedan como están.</p><div data-corr-res></div>` : ""}
+          ${nCorr ? `<p class="nota"><button type="button" class="btn" data-corregir="">${esDev ? `Corregir las ${nCorr} diferencias mayores a S/ ${UMBRAL}` : `Corregir ${nCorr} ${nCorr === 1 ? "caso" : "casos"} (diferencia mayor a S/ ${UMBRAL}, sin control o sin datos)`}</button>
+            ${esDev ? "Vuelve a raspar solo esos departamentos y solo sus funciones que no cuadran (una corrida corta); las demás funciones quedan como están."
+              : "Vuelve a raspar del MEF solo esos departamentos y años (unos minutos por departamento) y guarda su control; los demás quedan como están."}</p><div data-corr-res></div>` : ""}
           <div class="scroll"><table><tr><th>Departamento</th><th>Año</th><th>Meses en la página</th><th class="n">MEF (S/)</th><th class="n">Página (S/)</th><th class="n">Diferencia</th><th>Estado</th><th>Funciones que no cuadran</th><th>Control del</th></tr>
           ${x.map((f) => `<tr class="${f.estado === "revisar" ? "alerta" : ""}"><td>${esc(f.nombre)}</td><td>${f.anio}</td><td>${esc(f.meses)}</td><td class="n">${sol(f.mef)}</td><td class="n">${sol(f.pagina)}</td><td class="n">${sol(f.dif)}</td><td>${CHIP_CTL[f.estado] || esc(f.estado)}</td>
             <td>${f.funciones.length ? f.funciones.slice(0, 6).map((g) => `${esc(g.funcion)}: ${sol(g.dif)}`).join(" · ") + (f.funciones.length > 6 ? ` · y ${f.funciones.length - 6} más` : "") : ""}${corregible(f) ? ` <button type="button" class="btn sec" data-corregir="${f.depto}" data-anio="${f.anio}">Corregir</button>` : ""}</td><td>${f.fecha ? esc(fecha(f.fecha)) : ""}</td></tr>`).join("")}</table></div>`;
         det.querySelectorAll("[data-corregir]").forEach((b) => b.addEventListener("click", async () => {
           const res = det.querySelector("[data-corr-res]") || b.parentElement, dep = b.dataset.corregir;
-          if (!confirm(dep ? "¿Volver a raspar solo las funciones que no cuadran de este departamento y año?" : `¿Volver a raspar las funciones que no cuadran de los departamentos con diferencia mayor a S/ ${UMBRAL}?`)) return;
+          if (!confirm(esDev ? (dep ? "¿Volver a raspar solo las funciones que no cuadran de este departamento y año?" : `¿Volver a raspar las funciones que no cuadran de los departamentos con diferencia mayor a S/ ${UMBRAL}?`)
+            : (dep ? "¿Volver a raspar este departamento y año del MEF?" : `¿Volver a raspar del MEF los ${nCorr} casos por corregir?`))) return;
           const q = new URLSearchParams({ archivo: det.dataset.ctl, umbral: UMBRAL });
           if (dep) { q.set("departamento", dep); q.set("anio", b.dataset.anio); }
           b.disabled = true;
           try {
             const r = await api(`/v1/mef/archivos/corregir?${q}`, { method: "POST" });
             res.insertAdjacentHTML("beforeend", r.lanzado
-              ? `<div class="ok-box"><b>Corrección lanzada: ${esc(r.desde)} a ${esc(r.hasta)}</b><span>${r.casos.map((c) => `${esc(c.nombre)} ${c.anio}: ${c.funciones.map(esc).join(", ")}`).join(" · ")}. Solo se reemplazan esas funciones; la tabla de corridas se actualiza sola.</span></div>`
+              ? `<div class="ok-box"><b>Corrección lanzada: ${esc(r.desde)} a ${esc(r.hasta)}</b><span>${r.casos.map((c) => `${esc(c.nombre)} ${c.anio}${c.funciones.length && esDev ? ": " + c.funciones.map(esc).join(", ") : ""}`).join(" · ")}. ${esDev ? "Solo se reemplazan esas funciones" : "Solo se reemplazan esos departamentos y años"}; la tabla de corridas se actualiza sola.</span></div>`
               : `<div class="err-box"><b>Nada que corregir</b><span>${esc(r.motivo)}</span></div>`);
             if (r.lanzado) vigilar();
           } catch (e) { b.disabled = false; res.insertAdjacentHTML("beforeend", `<div class="err-box"><b>No se pudo lanzar la corrección</b><span>${esc(e.message)}</span></div>`); }
