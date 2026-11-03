@@ -401,7 +401,7 @@
   // ── Exportaciones de crudo por empresa y el lote que operaba cada una (Excel de SUNAT cruzado con la producción) ──
   const hidExpo = {};
   async function exportacionesHidro(r, caja) {
-    const B = window.BCRP, st = hidExpo[r.cod] || (hidExpo[r.cod] = { sinLote: false, desde: null, lote: "" }), T = "Exportaciones de petróleo crudo por empresa y lote";
+    const B = window.BCRP, st = hidExpo[r.cod] || (hidExpo[r.cod] = { sinLote: false, desde: null, lote: "", ver: "lote" }), T = "Exportaciones de petróleo crudo por lote";
     caja.innerHTML = `<h3>${T}</h3><div class="loading"><span class="spin"></span>Cruzando las exportaciones con los lotes…</div>`;
     try {
       const j = await api(`/v1/cuadros/hidrocarburos/exportaciones?departamento=${r.cod}&sin_lote=${st.sinLote}&lote=${encodeURIComponent(st.lote)}`), e = j.exportaciones;
@@ -409,20 +409,29 @@
       if (!e) { caja.innerHTML = `<h3>${T}</h3><div class="vacio-caja"><b>Todavía no hay exportaciones de crudo de ${esc(r.nombre)}.</b><span>Sube el Excel «Petróleo crudo - ${esc(r.nombre)}» (hoja Consolidado) en la pestaña «Actualizar».</span></div>`; return; }
       const anios = e.anios.map((x) => x.anio);
       if (st.desde == null || !anios.includes(st.desde)) st.desde = anios[Math.max(0, e.total.findIndex((v) => v > 0))];   // desde el primer año con exportaciones
-      const k0 = anios.indexOf(st.desde), corte = (v) => v.slice(k0);
-      const series = e.empresas.map((x) => ({ nombre: `${x.nombre} (${x.lotes.length ? (x.lotes.length > 1 ? "lotes " : "lote ") + x.lotes.join(" y ") : "no opera lotes"})`,
-        valores: corte(x.valores), etiquetas: corte(x.lotes_anio) })).filter((x) => x.valores.some((v) => v > 0));
+      // por lote, el gráfico termina en el último año con exportaciones de ese lote
+      const ult = e.total.reduce((u, v, i) => v > 0 ? i : u, anios.length - 1), k1 = st.lote ? ult : anios.length - 1;
+      const k0 = Math.min(anios.indexOf(st.desde), k1), corte = (v) => v.slice(k0, k1 + 1);
+      const porLote = st.ver === "lote";
+      const series = (porLote
+        ? e.por_lote.map((x) => ({ nombre: x.nombre === "Sin lote" ? "Sin lote (Petroperú, Perupetro)" : x.nombre, valores: corte(x.valores),
+            etiquetas: corte(x.asterisco.map((a) => a ? ["*"] : [])), ...(x.nombre === "Sin lote" ? { color: "#E7E6E6" } : {}) }))
+        : e.empresas.map((x) => ({ nombre: `${x.nombre} (${x.lotes.length ? (x.lotes.length > 1 ? "lotes " : "lote ") + x.lotes.join(" y ") : "no opera lotes"})`,
+            valores: corte(x.valores), etiquetas: corte(x.lotes_anio) }))).filter((x) => x.valores.some((v) => v > 0));
       const fmt1 = (v) => v.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-      const notasG = [st.lote ? `Exportaciones de las empresas que operaban el Lote ${st.lote} cada año (según la producción fiscalizada de PERUPETRO).` : "Dentro de cada tramo, el lote que la empresa operaba ese año según la producción fiscalizada de PERUPETRO."];
-      if (e.compartidos.length) notasG.push(`${e.compartidos.join("; ")}: la empresa operaba esos lotes a la vez y sus exportaciones no se separan por lote${st.lote ? ", así que incluyen también el otro lote" : ""}.`);
-      if (e.con_asterisco) notasG.push("* La empresa no tuvo producción ese año en el lote: se indica el último lote que operó (hasta dos años antes).");
+      const notasG = [porLote ? "Cada exportación se asigna al lote que operaba la empresa exportadora ese año, según la producción fiscalizada de PERUPETRO."
+        : st.lote ? `Exportaciones de las empresas que operaban el Lote ${st.lote} cada año (según la producción fiscalizada de PERUPETRO).` : "Dentro de cada tramo, el lote que la empresa operaba ese año según la producción fiscalizada de PERUPETRO."];
+      if (e.compartidos.length) notasG.push(porLote ? `${e.por_lote.filter((x) => x.lotes.length > 1).map((x) => `«${x.nombre}»`).join(", ")}: la empresa exportadora (${e.compartidos.map((c) => c.split(" (")[0]).join(", ")}) operaba esos lotes a la vez y sus exportaciones no se separan por lote.`
+        : `${e.compartidos.join("; ")}: la empresa operaba esos lotes a la vez y sus exportaciones no se separan por lote${st.lote ? ", así que incluyen también el otro lote" : ""}.`);
+      if (e.con_asterisco) notasG.push(porLote ? "* La empresa exportadora no tuvo producción ese año: se asigna al último lote que operó (hasta dos años antes)." : "* La empresa no tuvo producción ese año en el lote: se indica el último lote que operó (hasta dos años antes).");
       const exc = Object.entries(e.excluido);
       if (exc.length && !st.lote) notasG.push(`No incluye a ${exc.map(([n, v]) => `${n} (US$ ${fmt1(v)} millones)`).join(" ni a ")}: exportan crudo sin operar lotes con producción.${e.solo_excluidos.length ? ` ${e.solo_excluidos.join(", ")}: solo hay exportaciones de esas empresas.` : ""}`);
       notasG.push("Fuente: SUNAT (exportaciones por empresa) y PERUPETRO (producción fiscalizada por operador y lote).");
-      const nombre = st.lote ? `${j.region}: exportaciones de petróleo crudo de las empresas que operaban el Lote ${st.lote} (millones de US$)` : `${j.region}: exportaciones de petróleo crudo por empresa y lote (millones de US$)`;
+      const nombre = st.lote ? `${j.region}: exportaciones de petróleo crudo del Lote ${st.lote}${porLote ? "" : " por empresa"} (millones de US$)` : `${j.region}: exportaciones de petróleo crudo por ${porLote ? "lote" : "empresa y lote"} (millones de US$)`;
       const svg = B.apiladas({ titulo: nombre, ejeY: "Millones de US$", categorias: corte(e.anios.map((x) => x.etiqueta)), series, notas: notasG });
-      caja.innerHTML = `<h3>${T}</h3><p>Cuánto exportó cada empresa y qué lote operaba ese año. Los datos de exportación vienen del Excel que se sube en «Actualizar».</p>
-        <div class="fila"><label class="campo" for="ex-desde">Desde<select id="ex-desde">${anios.map((a) => `<option value="${a}"${a === st.desde ? " selected" : ""}>${a}</option>`).join("")}</select></label>
+      caja.innerHTML = `<h3>${T}</h3><p>Cuánto crudo se exportó desde cada lote (asignado por la empresa que lo operaba ese año); con «Ver por: Empresa», cuánto exportó cada empresa. Los datos de exportación vienen del Excel que se sube en «Actualizar».</p>
+        <div class="fila"><label class="campo" for="ex-desde">Desde<select id="ex-desde">${anios.slice(0, k1 + 1).map((a) => `<option value="${a}"${a === st.desde ? " selected" : ""}>${a}</option>`).join("")}</select></label>
+          <label class="campo" for="ex-ver">Ver por<select id="ex-ver"><option value="lote"${porLote ? " selected" : ""}>Lote</option><option value="empresa"${porLote ? "" : " selected"}>Empresa</option></select></label>
           <label class="campo" for="ex-lote">Lote<select id="ex-lote"><option value="">Todos los lotes</option>${e.lotes_disponibles.map((l) => `<option value="${esc(l)}"${l === st.lote ? " selected" : ""}>Lote ${esc(l)}</option>`).join("")}</select></label>
           <label class="campo" for="ex-sin"${st.lote ? " hidden" : ""}><span><input type="checkbox" id="ex-sin" ${st.sinLote ? "checked" : ""}> Incluir exportadores sin lote (Petroperú, Perupetro)</span></label></div>
         <div class="scroll">${svg}</div>
@@ -431,6 +440,7 @@
       const re = () => exportacionesHidro(r, caja);
       $("ex-desde").addEventListener("change", (ev) => { st.desde = +ev.target.value; re(); });
       $("ex-sin").addEventListener("change", (ev) => { st.sinLote = ev.target.checked; re(); });
+      $("ex-ver").addEventListener("change", (ev) => { st.ver = ev.target.value; re(); });
       $("ex-lote").addEventListener("change", (ev) => { st.lote = ev.target.value; st.desde = null; re(); });
       const msj = (t, ok) => { const m = $("ex-msj"); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
       $("ex-copiar").addEventListener("click", async () => { try { await B.copiar(svg); msj("Copiado: pégalo en Word o PowerPoint con Ctrl+V.", true); } catch (er) { msj(er.message, false); } });

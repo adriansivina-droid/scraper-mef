@@ -443,3 +443,20 @@ Desde esta versión, la serie de canon y sobrecanon por departamento se arma en 
 ## Corrección: choque de nombres entre el lector de canon y el de producción diaria (20/10/2026)
 
 En la corrida del 20/10/2026 la sección 8 (producción diaria) falló con «TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'» en `a_filas`. Causa: el lector de los Excel de canon (punto 2) definía una función auxiliar `_num(v)` que devuelve vacío para el texto. Como ese lector se carga en el Bloque 1 después del de producción diaria, reemplazaba su `_num` y los números del PDF diario quedaban vacíos. Ahora las funciones auxiliares del lector de canon llevan el prefijo `_cx_` (`_cx_num`, `_cx_txt`…), así que ya no pisan las de otros lectores. Prueba: los PDF diarios de setiembre de 2026 (líquidos, gas en Mcf y gas en m³) dan 810, 780 y 390 filas, sin días a revisar; los lectores de canon dan los mismos resultados que antes.
+
+## Producción diaria: operadores pegados en la cabecera (02/11/2026)
+
+En el reporte diario de líquidos de **julio de 2026**, la cabecera traía los nombres de operadores vecinos casi pegados.
+El lector los juntó en una sola frase:
+- «PETROTAL PLUSPETROL NORTE» quedó en la columna «8» de Pluspetrol Norte;
+- «UPLAND OILVIGO ENERGY» quedó en la columna «8.» de Upland, incluso con «OIL» y «VIGO» en una misma palabra.
+
+Por eso el cruce de exportaciones mostraba a Petrotal operando el Lote 8 en 2026.
+
+**Corrección en el lector** (`_partir_fusionados` e `INICIO_OPERADOR` en el notebook):
+- Una palabra que empieza con el nombre de un operador conocido (PETROTAL, PLUSPETROL, UPLAND, VIGO, UNNA…) abre una frase nueva, aunque esté pegada a la anterior.
+- Una palabra que trae pegado el inicio de otro operador («OILVIGO») se parte en dos.
+
+**Corrección en la página** (`_con_empresa` en `FISCAL/api/app/hidrocarburos.py`): en los meses de la producción diaria, el
+operador leído se lleva al operador que tiene el lote en la estadística mensual. Así se corrigen también los meses ya
+cargados (`tests/test_hidrocarburos.py::test_operadores_pegados_en_la_cabecera_del_reporte_diario`).
