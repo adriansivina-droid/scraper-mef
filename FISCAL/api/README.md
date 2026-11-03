@@ -419,6 +419,23 @@ numeración viene de la síntesis de junio 2026 y se puede cambiar en cada uno. 
 anexos de ejecución salen de `/v1/cuadros/ejecucion?anexos=true` (13 meses por nivel de gobierno: gasto no financiero
 por genérica, inversión por función).
 
+## Gráficos DRAE (por departamento)
+
+En el índice de Loreto, San Martín y Ucayali, **Gráficos DRAE** dibuja todos los gráficos de las SERIES del departamento
+(`SERIES LORETO (OFICIAL).xlsx`, `SERIES SMN … .xlsx`, `SERIES UCAYALI.xlsx`), con la paleta del Seminario de Periodistas.
+Se suben en su pestaña **Actualizar** (o en «Subir archivos»): el nombre debe empezar con «SERIES» y el departamento.
+`app/drae.py` lee el XML de cada gráfico (la copia de datos que guarda Excel: `c:strCache`/`c:numCache`, sin recalcular
+ni abrir vínculos), su tipo (barras, líneas, área, combinado, circular, anillo; apilado, horizontal, eje secundario), el
+título y subtítulo de las celdas de arriba y las notas de fuente de abajo, y los guarda en la tabla `drae_graficos`
+(reemplaza los del departamento). Cada gráfico se copia, se baja en SVG o PNG, muestra sus datos y su título se corrige
+a mano (`POST /v1/drae/titulo`; se pierde si se vuelven a subir las SERIES). `static/drae.js` los dibuja: Barlow, sin
+cuadrícula ni eje vertical, la región en turquesa y el Perú en azul marino (línea con círculos blancos), en barras por
+departamento la región en naranja, «Otros» en gris.
+
+**Paleta del Seminario de Periodistas** (también en Cuadros y gráficos BCRP, el Excel de esos gráficos y los gráficos de
+la página): azul marino `#111149`, turquesa `#72D2D5`, naranja `#DD6140`, amarillo `#FFC41D`, dorado `#D59D00`,
+gris azulado `#CCD3DF`, morado `#7030A0`, turquesa claro `#CFF0F1`.
+
 ## Anexos y contraste con la síntesis
 
 - **Anexos** (último ítem del índice de cada región): todos los anexos de la síntesis en su orden y numeración (junio

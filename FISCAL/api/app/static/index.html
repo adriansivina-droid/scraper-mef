@@ -33,6 +33,7 @@
 </div>
 
 <script src="/static/bcrp.js"></script>
+<script src="/static/drae.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -78,6 +79,8 @@
       lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion", extra: ["Contraste", "Archivos"] },
     inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => INV, actualizar: "mef",
       lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos", "Contraste", "Archivos"] },
+    drae: { t: "Gráficos DRAE", fuente: "Las SERIES del departamento (Excel con los gráficos)", entra: "Subiendo las SERIES en «Actualizar»", estado: "ok", cuadros: "drae", actualizar: "series",
+      lead: "Los gráficos de las SERIES del departamento (los del DRAE), con sus datos y la paleta del Seminario de Periodistas: listos para copiar o descargar en SVG o PNG." },
     anexos: { t: "Anexos", fuente: "Todos los sectores", entra: "Se generan solos con los datos de cada sector", bases: (r) => ["gasto-dev-generica", "inv-dev-funcion", "empleo", "hidro-produccion", "expo-estad", r.pesca],
       lead: "Cuadros estadísticos del final del informe, uno por sector, con el formato de la síntesis: listos para copiar o descargar.", cuadros: "anexos" },
   };
@@ -85,9 +88,9 @@
   const V = "IV. Ejecución del presupuesto de gastos del Gobierno General";
   const comunes = [cap("II. Aspectos laborales", ["empleo"]), cap(V, ["gasto", "inversion"])];
   const GRUPOS = {
-    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }] },
-    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }] },
-    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }] },
+    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
+    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
+    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
     tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["mef-archivos", "bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
   const C = { panorama: "Panorama de las tres regiones", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
@@ -1146,6 +1149,53 @@
     $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; anexosBCRP(r, caja); });
   }
 
+  // ── Gráficos DRAE: los de las SERIES del departamento, con la paleta del Seminario de Periodistas (drae.js) ──
+  const DRAE_TAB = "Gráficos DRAE";
+  const draeFiltro = {};
+  async function graficosDRAE(r, caja) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Trayendo los gráficos…</div>';
+    let d;
+    try { d = await api(`/v1/drae?departamento=${r.cod}`); } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron traer los gráficos</b><span>${esc(e.message)}</span></div>`; return; }
+    if (!d.graficos.length) {
+      caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay gráficos DRAE de ${esc(r.nombre)}.</b><span>Sube las SERIES de ${esc(r.nombre)} en la pestaña «Actualizar»: la página toma los gráficos con sus datos y los dibuja aquí.</span></div>`;
+      return;
+    }
+    const D = window.DRAE, B = window.BCRP, hojas = [...new Set(d.graficos.map((g) => g.hoja))];
+    const sel = draeFiltro[grupo] && hojas.includes(draeFiltro[grupo]) ? draeFiltro[grupo] : "";
+    const lista = d.graficos.filter((g) => !sel || g.hoja === sel);
+    const nombreDe = (g) => `DRAE ${r.corto} ${String(g.orden).padStart(2, "0")} ${g.titulo || g.hoja}`;
+    caja.innerHTML = `<div class="fila controles"><label class="campo" for="drae-hoja">Hoja de las SERIES<select id="drae-hoja"><option value="">Todas (${d.graficos.length})</option>${hojas.map((h) => `<option${h === sel ? " selected" : ""}>${esc(h)}</option>`).join("")}</select></label>
+        <button class="btn sec" type="button" id="drae-todo">Descargar los ${lista.length} (SVG)</button><span class="nota">De ${esc(d.archivo)} · cargado el ${esc(fecha(d.fecha))}</span></div>
+      <p class="lead">Cada gráfico con los datos que guarda en las SERIES. <b>Copiar</b> lo deja listo para pegar en PowerPoint o Word (Ctrl+V); <b>SVG</b> es vectorial y no pierde nitidez. Si el título no es el correcto, corrígelo con <b>Título</b>.</p>
+      <div class="drae-grid">${lista.map((g, k) => `<div class="caja drae-item"><div class="fila" style="justify-content:space-between;align-items:center"><span class="nota">${esc(g.hoja)} · N° ${g.orden}</span>
+          <div class="fila"><button class="btn" type="button" data-dcopiar="${k}">Copiar</button><button class="btn sec" type="button" data-dsvg="${k}">SVG</button><button class="btn sec" type="button" data-dpng="${k}">PNG</button><button class="btn sec" type="button" data-dtit="${k}">Título</button><button class="btn sec" type="button" data-ddatos="${k}">Datos</button></div></div>
+        <div class="bcrp-prev drae-prev" id="drae-v${k}"></div><div class="drae-datos" id="drae-d${k}" hidden></div><div class="bcrp-msj" id="drae-m${k}" aria-live="polite"></div></div>`).join("")}</div>`;
+    const svgDe = (k) => D.svg(lista[k], r.nombre);
+    lista.forEach((g, k) => { try { $(`drae-v${k}`).innerHTML = svgDe(k); } catch (e) { $(`drae-v${k}`).innerHTML = `<div class="err-box"><b>No se pudo dibujar</b><span>${esc(e.message)}</span></div>`; } });
+    const avisar = (k, t, ok) => { const m = $(`drae-m${k}`); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
+    $("drae-hoja").addEventListener("change", (ev) => { draeFiltro[grupo] = ev.target.value; graficosDRAE(r, caja); });
+    caja.querySelectorAll("[data-dcopiar]").forEach((b) => b.addEventListener("click", async () => { const k = +b.dataset.dcopiar;
+      try { await B.copiar(svgDe(k)); avisar(k, "Copiado: pégalo con Ctrl+V.", true); } catch (e) { avisar(k, e.message, false); } }));
+    caja.querySelectorAll("[data-dsvg]").forEach((b) => b.addEventListener("click", () => { const k = +b.dataset.dsvg; B.descargar(svgDe(k), nombreDe(lista[k])); }));
+    caja.querySelectorAll("[data-dpng]").forEach((b) => b.addEventListener("click", async () => { const k = +b.dataset.dpng; try { await B.descargarPng(svgDe(k), nombreDe(lista[k])); } catch (e) { avisar(k, e.message, false); } }));
+    caja.querySelectorAll("[data-ddatos]").forEach((b) => b.addEventListener("click", () => {
+      const k = +b.dataset.ddatos, g = lista[k], z = $(`drae-d${k}`);
+      if (z.hidden) z.innerHTML = `<div class="scroll"><table><tr><th></th>${g.series.map((s) => `<th class="n">${esc(s.nombre || "Valor")}</th>`).join("")}</tr>${g.categorias.map((c, i) =>
+        `<tr><td>${esc(c)}</td>${g.series.map((s) => `<td class="n">${s.valores[i] == null ? "" : esc(B.num(s.valores[i], Math.abs(s.valores[i]) >= 1000 ? 0 : 2))}</td>`).join("")}</tr>`).join("")}</table></div>`;
+      z.hidden = !z.hidden;
+    }));
+    caja.querySelectorAll("[data-dtit]").forEach((b) => b.addEventListener("click", async () => {
+      const k = +b.dataset.dtit, g = lista[k], t = prompt("Título del gráfico:", g.titulo || "");
+      if (t === null) return;
+      const sub = prompt("Subtítulo (unidad), por ejemplo «(Variación % interanual)»:", g.subtitulo || "");
+      if (sub === null) return;
+      try { await api(`/v1/drae/titulo?departamento=${r.cod}&orden=${g.orden}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ titulo: t, subtitulo: sub }) });
+        g.titulo = t.trim(); g.subtitulo = sub.trim(); $(`drae-v${k}`).innerHTML = svgDe(k); avisar(k, "Título guardado.", true);
+      } catch (e) { avisar(k, e.message, false); }
+    }));
+    $("drae-todo").addEventListener("click", async () => { for (let k = 0; k < lista.length; k++) { B.descargar(svgDe(k), nombreDe(lista[k])); await new Promise((ok) => setTimeout(ok, 350)); } });
+  }
+
   // ── Resumen ejecutivo: principales hechos de importancia y Cuadro 1 (otros indicadores), con los datos de cada sector de la región ──
   const RESUMEN_TAB = "Resumen";
   // indicadores de cada sector: [nombre, var. % del mes, var. % acumulada, texto del hecho] (var. respecto al mismo periodo del año anterior)
@@ -1242,7 +1292,7 @@
       const datos = new FormData(); [...archivos].forEach((a) => datos.append("archivos", a));
       const btn = $(`${clave}-subir`); btn.disabled = true; btn.textContent = "Cargando…";
       res.innerHTML = '<div class="loading"><span class="spin"></span>Leyendo los archivos y guardando en la base de datos…</div>';
-      try { const r = await api("/v1/cargas", { method: "POST", body: datos }); const ok = Object.keys(r.bases).length > 0;
+      try { const r = await api("/v1/cargas", { method: "POST", body: datos }); const ok = Object.keys(r.bases).length > 0 || (r.avisos || []).some((a) => a.includes("gráficos DRAE guardados"));
         ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); res.innerHTML = resultado(r, ok ? "Carga terminada" : "No se cargó nada", ok);
       } catch (e) { res.innerHTML = `<div class="err-box"><b>No se pudo cargar</b><span>${esc(e.message)}</span></div>`; }
       finally { btn.disabled = false; btn.textContent = "Cargar a la base de datos"; }
@@ -1480,9 +1530,9 @@
     const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
     // primero lo del informe (cuadros, gráficos, mapa, revisiones); al final, los datos y la actualización
     const DE_DATOS = ["Archivos", "Base mensual"], extra = s.extra || [];
-    const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : s.cuadros === "resumen" ? [RESUMEN_TAB] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
+    const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : s.cuadros === "resumen" ? [RESUMEN_TAB] : s.cuadros === "drae" ? [DRAE_TAB, "Actualizar"] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
       ...extra.filter((x) => !DE_DATOS.includes(x)), "Datos", ...extra.filter((x) => DE_DATOS.includes(x)), ...(s.sinActualizar ? [] : ["Actualizar"])];
-    const t = s.cuadros === "anexos" ? ANEXOS_TAB : s.cuadros === "resumen" ? RESUMEN_TAB : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
+    const t = s.cuadros === "anexos" ? ANEXOS_TAB : s.cuadros === "resumen" ? RESUMEN_TAB : s.cuadros === "drae" ? (pestana[grupo + id] || DRAE_TAB) : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
@@ -1502,6 +1552,7 @@
     else if (t === BCRP_TAB) panel = `<div id="bcrp" data-sector="${id}"></div>`;
     else if (t === ANEXOS_TAB) panel = '<div id="anexos-bcrp"></div>';
     else if (t === RESUMEN_TAB) panel = '<div id="resumen-ejec"></div>';
+    else if (t === DRAE_TAB) panel = '<div id="drae-graf"></div>';
     else if (t === "Base mensual" && id === "impo") panel = `${cajaSubida("sub-impo", "La base mensual de importaciones tal como llega (M_AAAAMM.xlsx: aduana, ruc, partida, fob, flete, seguro, kilos, pais_adqui, cuode, periodo, …) o el ANUAL_PRO - IMPORTACIONES (.xlsm: sus diccionarios PARTIDAS, CUODE y UNICOS y su hoja ORIGEN). Entran las filas de la aduana de Iquitos (226).")}<div id="base-impo"></div>`;
     else if (t === "Base mensual") panel = `${cajaSubida("sub-sunat", "La base mensual de exportaciones (X_AAAAMM.xlsx, tal como llega: aduana, ubigeo, ruc11, ano_mes, …, ubigeo_dep) o un ANUAL_PRO_AAAA.xlsx (sus diccionarios UNICOS y PARTIDA y su hoja ORIGEN). Sirve para las tres regiones: cada fila va a su departamento.")}<div id="sunat-expo"></div>`;
     else if (t === "Resumen Export") panel = '<div id="resumen-sunat"></div>';
@@ -1511,6 +1562,7 @@
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
       : s.actualizar === "hidro" ? `<div><div class="caja"><h3>PERUPETRO → página</h3><div id="hidro-caja"></div></div>${cajaSubida("sub-hidro", "Los CSV de producción o canon (PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv), o el Excel de exportaciones de crudo por empresa («Petróleo crudo - Loreto.xlsx», hoja Consolidado). Traen la serie completa y reemplazan lo cargado.")}</div>`
+      : s.actualizar === "series" ? cajaSubida("sub-series", `Las SERIES de ${esc(r.nombre)} tal como están (${{ lor: "SERIES LORETO (OFICIAL).xlsx", smn: "SERIES SMN … .xlsx", uca: "SERIES UCAYALI.xlsx" }[grupo]}; el nombre debe empezar con «SERIES» y el departamento). La página lee los datos que guarda cada gráfico, su tipo y sus series, y reemplaza los gráficos DRAE de ${esc(r.nombre)}.`)
       : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página.`)
       : s.actualizar === "estad" ? cajaSubida("sub-estad", `El libro ESTAD de ${esc(r.nombre)} tal como está (${{ lor: "ESTADLO.xlsx: hojas 15.Export e 16.Import", smn: "ESTADSMN.xlsx: hoja 14.XLS", uca: "ESTADUCA.xlsx: hoja 15.XLS" }[grupo]}). La página lee solo las columnas de cada mes (no las de Var.% ni los acumulados del final) y reemplaza los meses que trae.`)
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
@@ -1594,7 +1646,7 @@
     document.querySelectorAll("#sector .dep").forEach((c) => c.addEventListener("change", () => { paneles.mefDeps = [...document.querySelectorAll(".dep")].filter((x) => x.checked).map((x) => x.value); vistaPrevia("p-mef"); }));
     if ($("el-vista")) atarEmpleoLong();
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
-    ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo"].forEach(atarSubida);
+    ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo", "sub-series"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
     if ($("hidro-caja")) cajaHidro($("hidro-caja"));
     if ($("arch-mef")) cajaArchivosMef($("arch-mef"));
@@ -1612,6 +1664,7 @@
     if ($("bcrp")) cuadrosBCRP($("bcrp").dataset.sector, REG[grupo], $("bcrp"));
     if ($("anexos-bcrp")) anexosBCRP(REG[grupo], $("anexos-bcrp"));
     if ($("resumen-ejec")) resumenEjecutivo(REG[grupo], $("resumen-ejec"));
+    if ($("drae-graf")) graficosDRAE(REG[grupo], $("drae-graf"));
     if ($("contraste")) contrasteMEF($("contraste").dataset.sector, REG[grupo], $("contraste"));
     window.scrollTo(0, 0);
   }

@@ -169,8 +169,8 @@ def _barras(ws, s):
     ch.add_data(Reference(ws, min_col=2, min_row=r, max_row=r + len(puntos)), titles_from_data=True)
     ch.set_categories(Reference(ws, min_col=1, min_row=r + 1, max_row=r + len(puntos)))
     serie = ch.series[0]
-    serie.graphicalProperties.solidFill = "C6D9F1"
-    serie.graphicalProperties.line.solidFill = "4F81BD"
+    serie.graphicalProperties.solidFill = "72D2D5"
+    serie.graphicalProperties.line.solidFill = "111149"
     serie.invertIfNegative = False
     ch.dataLabels = DataLabelList()
     ch.dataLabels.showVal = True
@@ -228,7 +228,7 @@ def _hbarras(ws, s):
     ch.y_axis.majorGridlines = None
     ch.x_axis.scaling.orientation = "maxMin"               # el mayor arriba, como en el cuadro
     serie = ch.series[0]
-    serie.graphicalProperties.solidFill, serie.graphicalProperties.line.solidFill = "C6D9F1", "4F81BD"
+    serie.graphicalProperties.solidFill, serie.graphicalProperties.line.solidFill = "72D2D5", "111149"
     ch.dataLabels = DataLabelList()
     ch.dataLabels.showVal = True
     ch.dataLabels.showSerName = ch.dataLabels.showCatName = ch.dataLabels.showLegendKey = ch.dataLabels.showPercent = False

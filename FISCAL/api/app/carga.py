@@ -15,10 +15,11 @@ import tempfile
 import unicodedata
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pandas as pd
 
-from . import controles, db, empleo, exportaciones, hidrocarburos, ipc, pesca, sunat_expo, sunat_impo
+from . import controles, db, drae, empleo, exportaciones, hidrocarburos, ipc, pesca, sunat_expo, sunat_impo
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -160,6 +161,13 @@ def leer_archivos(raiz):
             continue
         if ruta.suffix.lower() == ".xlsm" and sunat_impo.es_anual_pro(ruta):   # ANUAL_PRO - IMPORTACIONES (con macros)
             de_impo.append((n_archivo, ruta, "anual"))
+            continue
+        if ruta.suffix.lower() == ".xlsx" and drae.depto_de(ruta.name):   # SERIES de un departamento: Gráficos DRAE
+            try:
+                graficos = drae.leer_series(ruta.read_bytes())
+                avisos.append(f"{ruta.name}: {drae.guardar(drae.depto_de(ruta.name), ruta.name, graficos)} gráficos DRAE guardados.")
+            except (zipfile.BadZipFile, KeyError, ET.ParseError) as e:
+                avisos.append(f"{ruta.name}: no se pudieron leer los gráficos ({e}); se ignoró.")
             continue
         if ruta.suffix.lower() == ".xlsx":
             estad = exportaciones.reconocer(ruta)          # ESTADLO / ESTADSMN / ESTADUCA (exportaciones e importaciones)
@@ -363,7 +371,7 @@ def cargar(origen, archivos):
                                      "periodos": sorted({f"{a}" if m == 0 else f"{a}-{m:02d}" for a, m in zip(df["_anio"], df["_mes"])})}
     if "hidro-expo-empresa" in bases:
         resumen["avisos"].append(_expo_al_almacen())
-    if not bases and not avisos_ipc and not n_ctl:
+    if not bases and not avisos_ipc and not n_ctl and not any("gráficos DRAE guardados" in x for x in resumen["avisos"]):
         resumen["avisos"].append("No se encontró ningún archivo de los scrapers, de pesca, de empleo ni de hidrocarburos en lo que subiste.")
     db.registrar_carga(origen, resumen)
     return resumen
