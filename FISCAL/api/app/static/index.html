@@ -1166,18 +1166,19 @@
     const nombreDe = (g) => `DRAE ${r.corto} ${String(g.orden).padStart(2, "0")} ${g.titulo || g.hoja}`;
     caja.innerHTML = `<div class="fila controles"><label class="campo" for="drae-hoja">Hoja de las SERIES<select id="drae-hoja"><option value="">Todas (${d.graficos.length})</option>${hojas.map((h) => `<option${h === sel ? " selected" : ""}>${esc(h)}</option>`).join("")}</select></label>
         <button class="btn sec" type="button" id="drae-todo">Descargar los ${lista.length} (SVG)</button><span class="nota">De ${esc(d.archivo)} · cargado el ${esc(fecha(d.fecha))}</span></div>
-      <p class="lead">Cada gráfico con los datos que guarda en las SERIES. <b>Copiar</b> lo deja listo para pegar en PowerPoint o Word (Ctrl+V); <b>SVG</b> es vectorial y no pierde nitidez. Si el título no es el correcto, corrígelo con <b>Título</b>.</p>
+      <p class="lead">Cada gráfico con los datos que guarda en las SERIES. <b>Copiar</b>, <b>SVG</b> y <b>PNG</b> llevan solo el gráfico (sin título, subtítulo ni fuente), para pegarlo en la lámina que ya tiene su título: Copiar lo deja listo para Ctrl+V en PowerPoint o Word y el SVG es vectorial. Si el título no es el correcto, corrígelo con <b>Título</b>.</p>
       <div class="drae-grid">${lista.map((g, k) => `<div class="caja drae-item"><div class="fila" style="justify-content:space-between;align-items:center"><span class="nota">${esc(g.hoja)} · N° ${g.orden}</span>
           <div class="fila"><button class="btn" type="button" data-dcopiar="${k}">Copiar</button><button class="btn sec" type="button" data-dsvg="${k}">SVG</button><button class="btn sec" type="button" data-dpng="${k}">PNG</button><button class="btn sec" type="button" data-dtit="${k}">Título</button><button class="btn sec" type="button" data-ddatos="${k}">Datos</button></div></div>
         <div class="bcrp-prev drae-prev" id="drae-v${k}"></div><div class="drae-datos" id="drae-d${k}" hidden></div><div class="bcrp-msj" id="drae-m${k}" aria-live="polite"></div></div>`).join("")}</div>`;
-    const svgDe = (k) => D.svg(lista[k], r.nombre);
+    const svgDe = (k) => D.svg(lista[k], r.nombre);                         // en la página: con su título
+    const svgSolo = (k) => D.svg(lista[k], r.nombre, { soloGrafico: true });  // lo que se copia y descarga: solo el gráfico
     lista.forEach((g, k) => { try { $(`drae-v${k}`).innerHTML = svgDe(k); } catch (e) { $(`drae-v${k}`).innerHTML = `<div class="err-box"><b>No se pudo dibujar</b><span>${esc(e.message)}</span></div>`; } });
     const avisar = (k, t, ok) => { const m = $(`drae-m${k}`); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
     $("drae-hoja").addEventListener("change", (ev) => { draeFiltro[grupo] = ev.target.value; graficosDRAE(r, caja); });
     caja.querySelectorAll("[data-dcopiar]").forEach((b) => b.addEventListener("click", async () => { const k = +b.dataset.dcopiar;
-      try { await B.copiar(svgDe(k)); avisar(k, "Copiado: pégalo con Ctrl+V.", true); } catch (e) { avisar(k, e.message, false); } }));
-    caja.querySelectorAll("[data-dsvg]").forEach((b) => b.addEventListener("click", () => { const k = +b.dataset.dsvg; B.descargar(svgDe(k), nombreDe(lista[k])); }));
-    caja.querySelectorAll("[data-dpng]").forEach((b) => b.addEventListener("click", async () => { const k = +b.dataset.dpng; try { await B.descargarPng(svgDe(k), nombreDe(lista[k])); } catch (e) { avisar(k, e.message, false); } }));
+      try { await B.copiar(svgSolo(k)); avisar(k, "Copiado (sin título): pégalo con Ctrl+V.", true); } catch (e) { avisar(k, e.message, false); } }));
+    caja.querySelectorAll("[data-dsvg]").forEach((b) => b.addEventListener("click", () => { const k = +b.dataset.dsvg; B.descargar(svgSolo(k), nombreDe(lista[k])); }));
+    caja.querySelectorAll("[data-dpng]").forEach((b) => b.addEventListener("click", async () => { const k = +b.dataset.dpng; try { await B.descargarPng(svgSolo(k), nombreDe(lista[k])); } catch (e) { avisar(k, e.message, false); } }));
     caja.querySelectorAll("[data-ddatos]").forEach((b) => b.addEventListener("click", () => {
       const k = +b.dataset.ddatos, g = lista[k], z = $(`drae-d${k}`);
       if (z.hidden) z.innerHTML = `<div class="scroll"><table><tr><th></th>${g.series.map((s) => `<th class="n">${esc(s.nombre || "Valor")}</th>`).join("")}</tr>${g.categorias.map((c, i) =>
@@ -1193,7 +1194,7 @@
         g.titulo = t.trim(); g.subtitulo = sub.trim(); $(`drae-v${k}`).innerHTML = svgDe(k); avisar(k, "Título guardado.", true);
       } catch (e) { avisar(k, e.message, false); }
     }));
-    $("drae-todo").addEventListener("click", async () => { for (let k = 0; k < lista.length; k++) { B.descargar(svgDe(k), nombreDe(lista[k])); await new Promise((ok) => setTimeout(ok, 350)); } });
+    $("drae-todo").addEventListener("click", async () => { for (let k = 0; k < lista.length; k++) { B.descargar(svgSolo(k), nombreDe(lista[k])); await new Promise((ok) => setTimeout(ok, 350)); } });
   }
 
   // ── Resumen ejecutivo: principales hechos de importancia y Cuadro 1 (otros indicadores), con los datos de cada sector de la región ──
