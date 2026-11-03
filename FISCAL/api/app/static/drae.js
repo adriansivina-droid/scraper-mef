@@ -1,7 +1,7 @@
 // Gráficos DRAE: dibuja en SVG los gráficos de las SERIES de cada departamento con la paleta y el estilo del
 // Seminario de Periodistas (BCRP, Sucursal Iquitos): Barlow, azul marino y turquesa, etiquetas de datos, sin cuadrícula
 // ni eje vertical, la región en turquesa y el Perú en azul marino (línea con círculos blancos), «Otros» en gris.
-// window.DRAE.svg(spec, region) devuelve el SVG (texto).
+// window.DRAE.svg(spec, region, {soloGrafico}) devuelve el SVG (texto); soloGrafico quita título, subtítulo y notas.
 (function () {
   "use strict";
   const NAVY = "#111149", TURQ = "#72D2D5", NARANJA = "#DD6140", AMARILLO = "#FFC41D", ORO = "#D59D00", GRIS = "#CCD3DF",
@@ -63,6 +63,7 @@
     return cats.map((c) => String(c).replace(/\.0$/, ""));
   }
   function cabecera(g, W) {
+    if (g._solo) return { svg: "", y: 14 };              // solo el gráfico: sin título ni subtítulo
     const out = [];
     let y = 22;
     const lineas = partir(g.titulo || g.hoja || "", W - 40, 14, true);
@@ -281,7 +282,9 @@
     return envolver(W, nt.y + 6, out.join("") + nt.svg);
   }
 
-  function svg(g, region) {
+  // opc.soloGrafico: sin título, subtítulo ni notas (para pegar en la lámina, que ya lleva su título)
+  function svg(g, region, opc) {
+    if (opc && opc.soloGrafico) g = { ...g, _solo: true, notas: [] };
     if (g.tipo === "circular" || g.tipo === "anillo") return circular(g, region);
     return cartesiano(g, region);
   }
