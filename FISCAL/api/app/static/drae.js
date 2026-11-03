@@ -78,21 +78,27 @@
     if (l) lineas.push(l);
     return lineas.slice(0, 3);
   }
-  function leyenda(items, W, y) {
-    const out = [], gap = 18, w = items.map((it) => 16 + ancho(it.nombre, 11) + gap);
+  function leyenda(items, W, y, px = 11, borde = false, negrita = false) {
+    const out = [], gap = px * 1.6, w = items.map((it) => px * 1.5 + ancho(it.nombre, px, negrita) + gap), y0 = y;
+    y += px * 0.35;
     const filas = [[]]; let acc = 0;
     items.forEach((it, i) => { if (acc + w[i] > W - 40 && filas[filas.length - 1].length) { filas.push([]); acc = 0; } filas[filas.length - 1].push(i); acc += w[i]; });
     filas.forEach((f) => {
       let x = (W - f.reduce((a, i) => a + w[i], 0) + gap) / 2;
       f.forEach((i) => {
         const it = items[i];
-        out.push(it.linea ? `<line x1="${x}" x2="${x + 12}" y1="${y - 4}" y2="${y - 4}" stroke="${it.color}" stroke-width="2"/><circle cx="${x + 6}" cy="${y - 4}" r="3" fill="${BLANCO}" stroke="${it.color}" stroke-width="1.5"/>`
-          : `<rect x="${x}" y="${y - 9}" width="11" height="10" fill="${it.color}"/>`);
-        out.push(`<text x="${x + 16}" y="${y}" font-size="11" fill="${TINTA}">${esc(it.nombre)}</text>`);
+        const m = px * 0.38;
+        out.push(it.linea ? `<line x1="${x}" x2="${x + px * 1.1}" y1="${y - m}" y2="${y - m}" stroke="${it.color}" stroke-width="2"/><circle cx="${x + px * 0.55}" cy="${y - m}" r="${px * 0.28}" fill="${BLANCO}" stroke="${it.color}" stroke-width="1.5"/>`
+          : `<rect x="${x}" y="${y - px * 0.82}" width="${px}" height="${px * 0.9}" fill="${it.color}"/>`);
+        out.push(`<text x="${x + px * 1.5}" y="${y}" font-size="${px}"${negrita ? ' font-weight="600"' : ""} fill="${TINTA}">${esc(it.nombre)}</text>`);
         x += w[i];
       });
-      y += 16;
+      y += px * 1.45;
     });
+    if (borde && filas[0].length) {                       // el recuadro de la leyenda, como en Excel
+      const ancho1 = Math.max(...filas.map((f) => f.reduce((a, i) => a + w[i], 0))) - gap + px;
+      out.unshift(`<rect x="${((W - ancho1) / 2).toFixed(1)}" y="${(y0 - px * 0.9).toFixed(1)}" width="${ancho1.toFixed(1)}" height="${(y - y0 + px * 0.25).toFixed(1)}" fill="none" stroke="#A1A1A5" stroke-width="1"/>`);
+    }
     return { svg: out.join(""), y };
   }
   const envolver = (W, H, cuerpo) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Math.ceil(H)}" viewBox="0 0 ${W} ${Math.ceil(H)}" font-family="${FUENTE}" fill="${TINTA}"><rect width="100%" height="100%" fill="#fff"/>${cuerpo}</svg>`;
@@ -155,15 +161,28 @@
     if (horiz) return horizontal(g, region);
     const cols = colores(series, region);
     const soloLineas = series.every((s) => s.tipo !== "barras");
-    const W = Math.max(620, Math.min(soloLineas ? 860 : 1100, 70 + n * (series.filter((s) => s.tipo === "barras").length > 1 ? 46 : 30)));
+    // con la medida y el estilo de Excel (ancho y alto del gráfico en la hoja, letras en puntos), se dibuja a esa escala
+    const E = g.estilo || {}, conMedida = g.ancho_px > 200 && g.alto_px > 120;
+    const pt = (f, d) => (f && f.tam ? f.tam * 4 / 3 : d);
+    const fEje = pt(E.eje || E.base, 10.5), fLey = pt(E.leyenda_fuente || E.base, 11);
+    const fEtq = (s) => pt(s.etq || E.base, n > 20 ? 8.5 : 9.5);
+    const pesoEtq = (s) => (s.etq || E.base) && !(s.etq || E.base).negrita ? "500" : "600";
+    const W = conMedida ? Math.max(420, Math.min(1400, g.ancho_px))
+      : Math.max(620, Math.min(soloLineas ? 860 : 1100, 70 + n * (series.filter((s) => s.tipo === "barras").length > 1 ? 46 : 30)));
     const cab = cabecera(g, W);
     const cats = etiquetasCat(g.categorias);
-    const largoCat = Math.max(...cats.map((c) => ancho(c, 10.5)), 0), paso = (W - 60) / Math.max(n, 1);
+    const largoCat = Math.max(...cats.map((c) => ancho(c, fEje)), 0), paso = (W - 60) / Math.max(n, 1);
     const rotar = largoCat > paso - 4;
-    const altoCat = rotar ? Math.min(110, largoCat * 0.98 + 8) : 18;
+    const altoCat = rotar ? Math.min(110, largoCat * 0.98 + 8) : fEje + 8;
     const items = series.map((s, i) => ({ nombre: s.nombre, color: cols[i], linea: s.tipo === "lineas" }));
-    const conLeyenda = series.length > 1 && series.some((s) => s.nombre);
-    const top = cab.y + 10, altoPlot = 240, base = top + altoPlot;
+    const conLeyenda = series.length > 1 && series.some((s) => s.nombre) && !(conMedida && E.leyenda === null);
+    const leyArriba = conLeyenda && ["t", "tr", "r", "l"].includes(E.leyenda);
+    const out = [cab.svg];
+    let yLey = cab.y;
+    if (leyArriba) { const l = leyenda(items.filter((it) => it.nombre), W, cab.y + fLey, fLey, E.leyenda_borde, E.base && E.base.negrita); out.push(l.svg); yLey = l.y; }
+    const top = yLey + 10 + (conMedida ? fEtq(series[0]) : 0);
+    const altoPlot = conMedida ? Math.max(120, g.alto_px - (yLey - cab.y) - altoCat - (conLeyenda && !leyArriba ? fLey * 1.6 : 0) - 34) : 240;
+    const base = top + altoPlot;
     const izq = 30, der = W - 30;
     // escalas por eje (el secundario es independiente)
     const bs = series.filter((s) => s.tipo === "barras");
@@ -185,12 +204,12 @@
     const r1 = rango(1), r2 = rango(2);
     const Y = (v, eje) => { const [lo, hi] = (eje === 2 && r2) ? r2 : r1; return base - (v - lo) / (hi - lo) * altoPlot; };
     const X = (i) => izq + paso * (i + 0.5);
-    const out = [cab.svg];
     const y0 = Y(Math.max(0, r1[0]), 1);
     out.push(`<line x1="${izq}" x2="${der}" y1="${y0.toFixed(1)}" y2="${y0.toFixed(1)}" stroke="#A1A1A5" stroke-width="0.8"/>`);
     // barras
     const barras = series.map((s, i) => [s, i]).filter(([s]) => s.tipo === "barras");
-    const nb = apil ? 1 : barras.length, anchoGrupo = paso * (nb > 1 ? 0.78 : 0.62), wb = anchoGrupo / Math.max(nb, 1);
+    const solapa = (E.overlap || 0) >= 100, nb = apil || solapa ? 1 : barras.length;
+    const anchoGrupo = E.gap != null ? paso * nb / (nb + E.gap / 100) : paso * (nb > 1 ? 0.78 : 0.62), wb = anchoGrupo / Math.max(nb, 1);
     const pila = Array.from({ length: n }, () => ({ p: 0, q: 0 }));
     const etiquetas = [], deBarras = [], circulos = [];   // etiquetas de barras y círculos del Perú: se separan al final
     barras.forEach(([s, si], j) => {
@@ -201,14 +220,14 @@
         if (apil) {
           const b0 = v >= 0 ? pila[i].p : pila[i].q; const b1 = b0 + v; if (v >= 0) pila[i].p = b1; else pila[i].q = b1;
           x0 = X(i) - anchoGrupo / 2; ya = Y(b1, s.eje); yb = Y(b0, s.eje);
-        } else { x0 = X(i) - anchoGrupo / 2 + j * wb; ya = Y(v, s.eje); yb = Y(0 > r1[0] ? 0 : r1[0], s.eje); }
+        } else { x0 = X(i) - anchoGrupo / 2 + (solapa ? 0 : j) * wb; ya = Y(v, s.eje); yb = Y(0 > r1[0] ? 0 : r1[0], s.eje); }
         const top_ = Math.min(ya, yb), h = Math.max(Math.abs(yb - ya), 0.5), w = (apil ? anchoGrupo : wb) - (nb > 1 ? 1.5 : 0);
         const fill = unaDepto ? colorCategoria(cats[i], region, cols[si]) : cols[si];
         out.push(`<rect x="${x0.toFixed(1)}" y="${top_.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${fill}"/>`);
         if (s.etiquetas || series.length <= 2) {
           const txt = num(v, dec, ep);
           if (apil) { if (h > 12) etiquetas.push(`<text x="${(x0 + w / 2).toFixed(1)}" y="${(top_ + h / 2 + 3.5).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${[TURQ, AMARILLO, GRIS, TURQ_CLARO].includes(fill) ? NAVY : "#fff"}">${txt}</text>`); }
-          else deBarras.push({ x: x0 + w / 2, y: v >= 0 ? top_ - 4 : top_ + h + 11, neg: v < 0, txt, px: n > 20 ? 8.5 : 9.5 });
+          else deBarras.push({ x: x0 + w / 2, y: v >= 0 ? top_ - 4 : top_ + h + fEtq(s) + 2, neg: v < 0, txt, px: fEtq(s), peso: pesoEtq(s) });
         }
       });
     });
@@ -221,16 +240,19 @@
       if (t.length) tramos.push(t);
       tramos.forEach((tr) => {
         if (s.tipo === "area") out.push(`<path d="M${tr[0][0].toFixed(1)} ${Y(Math.max(0, r1[0]), s.eje).toFixed(1)} ${tr.map((p) => `L${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ")} L${tr[tr.length - 1][0].toFixed(1)} ${Y(Math.max(0, r1[0]), s.eje).toFixed(1)} Z" fill="${cols[si]}" fill-opacity="0.35" stroke="${cols[si]}" stroke-width="1.5"/>`);
-        else out.push(`<polyline points="${tr.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}" fill="none" stroke="${cols[si]}" stroke-width="2" stroke-linejoin="round"/>`);
+        else out.push(`<polyline points="${tr.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}" fill="none" stroke="${cols[si]}" stroke-width="${s.grosor ? (s.grosor * 4 / 3).toFixed(2) : 2}" stroke-linejoin="round"/>`);
       });
-      const pocos = n <= 16, circulo = pocos && g.tipo === "combinado" && s.valores.every((v) => v == null || ancho(num(v, dec, ep), 9, true) < 30);
+      const pocos = n <= 16, mk = s.marcador, px = fEtq(s);
+      const circulo = pocos && (mk && mk.simbolo === "circle" && mk.tam >= 15 ? true
+        : g.tipo === "combinado" && !mk && s.valores.every((v) => v == null || ancho(num(v, dec, ep), 9, true) < 30));
       s.valores.forEach((v, i) => {
         if (v == null) return;
         const x = X(i), y = Y(v, s.eje), txt = num(v, dec, ep);
         if (circulo) {
-          const r = Math.max(11, ancho(txt, 9, true) / 2 + 4);
+          const tp = mk && mk.tam ? px : 9;
+          const r = Math.max(mk && mk.tam ? mk.tam * 2 / 3 : 11, ancho(txt, tp, true) / 2 + 4);
           circulos.push({ x, y, r });
-          out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${BLANCO}" stroke="${cols[si]}" stroke-width="1.6"/><text x="${x.toFixed(1)}" y="${(y + 3.2).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${TINTA}">${txt}</text>`);
+          out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${BLANCO}" stroke="${cols[si]}" stroke-width="${s.grosor ? Math.max(1.6, s.grosor).toFixed(2) : 1.6}"/><text x="${x.toFixed(1)}" y="${(y + tp * 0.36).toFixed(1)}" text-anchor="middle" font-size="${tp}" font-weight="${pesoEtq(s)}" fill="${TINTA}">${txt}</text>`);
         } else if (pocos && s.tipo === "lineas") {
           out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${BLANCO}" stroke="${cols[si]}" stroke-width="1.5"/>`);
           if (s.etiquetas || series.length <= 3) etiquetas.push(`<text x="${x.toFixed(1)}" y="${(y - 7).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${TINTA}" paint-order="stroke" stroke="#fff" stroke-width="3">${txt}</text>`);
@@ -247,7 +269,7 @@
         if (!c) break;
         e.y = e.neg ? Math.max(e.y, c.y + c.r + e.px + 3) : Math.min(e.y, c.y - c.r - 4);
       }
-      etiquetas.push(`<text x="${e.x.toFixed(1)}" y="${e.y.toFixed(1)}" text-anchor="middle" font-size="${e.px}" font-weight="600" fill="${TINTA}">${e.txt}</text>`);
+      etiquetas.push(`<text x="${e.x.toFixed(1)}" y="${e.y.toFixed(1)}" text-anchor="middle" font-size="${e.px}" font-weight="${e.peso}" fill="${TINTA}">${e.txt}</text>`);
     });
     out.push(...etiquetas);
     // categorías (salteadas si son demasiadas)
@@ -255,11 +277,11 @@
     cats.forEach((c, i) => {
       if (i % cada) return;
       const x = X(i);
-      out.push(rotar ? `<text transform="translate(${(x + 3).toFixed(1)},${base + 8}) rotate(-90)" text-anchor="end" font-size="10" fill="${TINTA}">${esc(c)}</text>`
-        : `<text x="${x.toFixed(1)}" y="${base + 15}" text-anchor="middle" font-size="10.5" fill="${TINTA}">${esc(c)}</text>`);
+      out.push(rotar ? `<text transform="translate(${(x + 3).toFixed(1)},${base + 8}) rotate(-90)" text-anchor="end" font-size="${Math.min(fEje, 11)}" fill="${TINTA}">${esc(c)}</text>`
+        : `<text x="${x.toFixed(1)}" y="${base + fEje + 6}" text-anchor="middle" font-size="${fEje}"${E.eje && E.eje.negrita ? ' font-weight="600"' : ""} fill="${TINTA}">${esc(c)}</text>`);
     });
     let y = base + altoCat + 14;
-    if (conLeyenda) { const l = leyenda(items.filter((it) => it.nombre), W, y); out.push(l.svg); y = l.y; }
+    if (conLeyenda && !leyArriba) { const l = leyenda(items.filter((it) => it.nombre), W, y, fLey, E.leyenda_borde, E.base && E.base.negrita); out.push(l.svg); y = l.y; }
     const nt = notas(g, W, y + 2);
     return envolver(W, nt.y + 6, out.join("") + nt.svg);
   }

@@ -140,9 +140,15 @@ def leer_grafico(xml):
             if len(c) > len(cat):
                 cat = [str(x) if x is not None else "" for x in c]
             dl = ser.find("c:dLbls/c:showVal", NS)
+            mk = ser.find("c:marker", NS)
+            ln = ser.find("c:spPr/a:ln", NS)
             series.append({"nombre": nombre_s, "tipo": tipo, "valores": v, "eje": 2 if secundario else 1,
                            "etiquetas": dl is not None and dl.get("val") == "1", "formato": _formato(ser.find("c:val", NS)),
-                           "color_original": _color_serie(ser)})
+                           "color_original": _color_serie(ser),
+                           "marcador": (None if mk is None or mk.find("c:symbol", NS) is None else
+                                        {"simbolo": mk.find("c:symbol", NS).get("val"), "tam": _int(mk.find("c:size", NS))}),
+                           "grosor": round(int(ln.get("w")) / 12700, 2) if ln is not None and ln.get("w") else None,
+                           "etq": _fuente(ser.find("c:dLbls", NS))})
     series = [s for s in series if any(x is not None for x in s["valores"])]
     if not series:
         return None
@@ -150,7 +156,33 @@ def leer_grafico(xml):
     cat = (cat + [""] * n)[:n]
     if len({s["tipo"] for s in series}) > 1:
         tipo_base = "combinado"
-    return {"tipo": tipo_base, "apilado": apilado, "horizontal": horizontal, "categorias": cat, "series": series}
+    # estilo del gráfico en Excel (para dibujarlo igual): leyenda, separación de barras y tamaños de letra
+    ley = xml.find(".//c:chart/c:legend", NS)
+    bar = plot.find("c:barChart", NS)
+    estilo = {"leyenda": (None if ley is None else (ley.find("c:legendPos", NS).get("val") if ley.find("c:legendPos", NS) is not None else "r")),
+              "leyenda_borde": ley is not None and ley.find("c:spPr/a:ln/a:solidFill", NS) is not None,
+              "leyenda_fuente": _fuente(ley), "base": _fuente(xml.find("c:txPr", NS)),
+              "eje": _fuente(plot.find("c:catAx", NS)) or _fuente(plot.find("c:dateAx", NS)),
+              "gap": _int(bar.find("c:gapWidth", NS)) if bar is not None else None,
+              "overlap": _int(bar.find("c:overlap", NS)) if bar is not None else None}
+    return {"tipo": tipo_base, "apilado": apilado, "horizontal": horizontal, "categorias": cat, "series": series, "estilo": estilo}
+
+
+def _int(nodo):
+    try:
+        return int(nodo.get("val"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _fuente(nodo):
+    """{tam (pt), negrita} del primer a:defRPr con tamaño de un nodo (txPr de etiquetas, leyenda, ejes) o None."""
+    if nodo is None:
+        return None
+    for r in nodo.iter("{%s}defRPr" % NS["a"]):
+        if r.get("sz"):
+            return {"tam": int(r.get("sz")) / 100, "negrita": r.get("b") == "1"}
+    return None
 
 
 def _celdas(z, ruta_hoja, compartidas):
@@ -179,6 +211,34 @@ def _celdas(z, ruta_hoja, compartidas):
         if val and val.strip():
             salida[(int(m.group(2)) - 1, col - 1)] = val.strip()
     return salida
+
+
+EMU_PX = 9525
+
+
+def _medidas(hoja):
+    """Función ancla -> (ancho, alto) del gráfico en píxeles a 100 % de zoom, con los anchos de columna y altos de fila
+    de la hoja (columnas: caracteres × 7 + 5 px; filas: puntos × 4/3)."""
+    fmt = hoja.find("m:sheetFormatPr", NS)
+    ancho_def = float(fmt.get("defaultColWidth") or (float(fmt.get("baseColWidth") or 8) + 0.71)) if fmt is not None else 8.71
+    alto_def = float(fmt.get("defaultRowHeight") or 15) if fmt is not None else 15.0
+    cols = {}
+    for c in hoja.iter("{%s}col" % NS["m"]):
+        for i in range(int(c.get("min")), min(int(c.get("max")), 400) + 1):
+            cols[i - 1] = float(c.get("width") or ancho_def)
+    filas = {int(r.get("r")) - 1: float(r.get("ht")) for r in hoja.iter("{%s}row" % NS["m"]) if r.get("ht") and r.get("r")}
+    px_col = lambda i: round(cols.get(i, ancho_def) * 7 + 5)
+    px_fila = lambda i: filas.get(i, alto_def) * 4 / 3
+
+    def medir(a):
+        if a.get("ext"):
+            return round(a["ext"][0] / EMU_PX), round(a["ext"][1] / EMU_PX)
+        r0, c0, r1, c1 = a["pos"]
+        o = a["off"]
+        ancho = sum(px_col(i) for i in range(c0, c1)) - o[0] / EMU_PX + o[2] / EMU_PX
+        alto = sum(px_fila(i) for i in range(r0, r1)) - o[1] / EMU_PX + o[3] / EMU_PX
+        return round(ancho), round(alto)
+    return medir
 
 
 def _textos_cajas(anclas):
@@ -267,10 +327,15 @@ def leer_series(contenido):
             pos = (int(f.findtext("xdr:row", "0", NS)), int(f.findtext("xdr:col", "0", NS)),
                    int(t.findtext("xdr:row", "0", NS)) if t is not None else int(f.findtext("xdr:row", "0", NS)) + 20,
                    int(t.findtext("xdr:col", "0", NS)) if t is not None else int(f.findtext("xdr:col", "0", NS)) + 8)
+            off = (int(f.findtext("xdr:colOff", "0", NS)), int(f.findtext("xdr:rowOff", "0", NS)),
+                   int(t.findtext("xdr:colOff", "0", NS)) if t is not None else 0, int(t.findtext("xdr:rowOff", "0", NS)) if t is not None else 0)
+            ext = anc.find("xdr:ext", NS)
             ch = anc.find(".//c:chart", NS)
             texto = " ".join((x.text or "") for x in anc.iter("{%s}t" % NS["a"])).strip() if ch is None else ""
-            anclas.append({"pos": pos, "chart": rel_dib.get(ch.get("{%s}id" % NS["r"])) if ch is not None else None, "texto": texto})
+            anclas.append({"pos": pos, "off": off, "ext": (int(ext.get("cx")), int(ext.get("cy"))) if ext is not None else None,
+                           "chart": rel_dib.get(ch.get("{%s}id" % NS["r"])) if ch is not None else None, "texto": texto})
         celdas = None
+        medida = _medidas(raiz)
         for a in sorted((x for x in anclas if x["chart"]), key=lambda x: (x["pos"][0], x["pos"][1])):
             x = _xml(z, a["chart"])
             g = leer_grafico(x) if x is not None else None
@@ -287,8 +352,9 @@ def leer_series(contenido):
                 g["series"][0]["nombre"] = ""
             debajo = [celdas[k] for k in sorted(k for k in celdas if r1 - 2 <= k[0] <= r1 + 5 and c0 - 2 <= k[1] <= c1 + 2)]
             notas = [s for s in debajo if re.match(r"^\s*(\*|\d/|fuente|nota|elaboraci|\(\*\))", s, re.I)]
+            ancho, alto = medida(a)
             graficos.append({"hoja": hoja.get("name").strip(), "orden_hoja": nh, "titulo": titulo, "subtitulo": subtitulo,
-                             "notas": notas[:4], **g})
+                             "notas": notas[:4], "ancho_px": ancho, "alto_px": alto, **g})
     for i, g in enumerate(graficos):
         g["orden"] = i + 1
     return graficos
