@@ -344,6 +344,29 @@ def mef_archivos_actualizar(archivo: str = Query(..., pattern="^(dev-municipalid
     return {"lanzado": True, "archivo": archivo, "desde": desde or None, "hasta": hasta or None, "departamentos": deps}
 
 
+@app.post("/v1/mef/archivos/corregir", dependencies=[Depends(acceso)])
+def mef_archivos_corregir(archivo: str = Query("dev-municipalidad", pattern="^dev-municipalidad$"), umbral: float = Query(200, ge=0),
+                          departamento: str = Query(None, pattern=r"^\d{2}$"), anio: int = Query(None, ge=2000, le=2100)):
+    """Remiendo desde el control: vuelve a raspar solo los departamentos con diferencia mayor que `umbral` soles y solo sus
+    funciones que no cuadran (una corrida corta); la carga reemplaza solo esas funciones y deja las demás como estaban."""
+    if not mef.configurado():
+        raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
+    plan = controles.remiendo(archivo, umbral, departamento, anio)
+    if plan is None:
+        return {"lanzado": False, "motivo": f"No hay departamentos con una diferencia mayor que S/ {umbral:,.0f} y funciones por corregir."}
+    try:
+        mef.lanzar(plan["desde"], plan["hasta"], nombre="archivos",
+                   inputs={"archivo": archivo, "desde": plan["desde"], "hasta": plan["hasta"], "departamentos": plan["departamentos"],
+                           "funciones": plan["funciones"], "prueba": False})
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except (mef.ErrorGitHub, OSError) as e:
+        raise HTTPException(502, str(e))
+    for c in plan["casos"]:
+        c["nombre"] = DEPARTAMENTOS.get(c["depto"], c["depto"]).title().replace(" De ", " de ")
+    return {"lanzado": True, **plan}
+
+
 @app.get("/v1/empleo", dependencies=[Depends(acceso)])
 def empleo_estado():
     """Si el botón «Actualizar empleo» está configurado y las últimas corridas del scraper de empleo en GitHub."""

@@ -100,6 +100,18 @@ def leer(base_id, deptos, niveles, desde, hasta):
     return df[b.columnas].reset_index(drop=True)
 
 
+def filas_guardadas(base_id, depto, anio, meses):
+    """Filas tal como están en la tabla (con sus columnas internas) de un departamento, año y meses."""
+    b = BASES[base_id]
+    if not meses or not existe(b.tabla):
+        return pd.DataFrame(columns=b.columnas + INTERNAS)
+    params = {"d": depto, "a": int(anio), **{f"m{i}": int(m) for i, m in enumerate(meses)}}
+    with motor().connect() as cx:
+        df = pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE _depto = :d AND _anio = :a AND _mes IN '
+                              f'({", ".join(":m" + str(i) for i in range(len(meses)))})'), cx, params=params)
+    return df[[c for c in b.columnas + INTERNAS if c in df.columns]]
+
+
 def leer_todo(base_id):
     """Todas las filas de una base, sin columnas internas (None si está vacía)."""
     b = BASES[base_id]

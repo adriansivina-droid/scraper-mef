@@ -1370,11 +1370,30 @@
         const x = (await api(`/v1/mef/archivos/control?archivo=${det.dataset.ctl}`)).control;
         if (!x.length) { zona.outerHTML = '<p class="nota">Todavía no hay controles guardados de este archivo: se guardan en cada corrida del scraper (la de este archivo o la completa de los días 2 y 21).</p>'; return; }
         const n = (e) => x.filter((f) => f.estado === e).length;
+        // remiendo por función (solo DEV Función·Municipalidad): vuelve a raspar solo lo que no cuadra por más de S/ 200
+        const UMBRAL = 200, corregible = (f) => det.dataset.ctl === "dev-municipalidad" && f.estado === "revisar" && Math.abs(f.dif) > UMBRAL && f.funciones.length;
+        const nCorr = x.filter(corregible).length;
         zona.outerHTML = `<p class="nota"><b>${n("coincide")}</b> coinciden · <b>${n("revisar")}</b> por revisar · <b>${n("mes en curso")}</b> con el mes en curso · <b>${n("sin datos")}</b> sin datos en la página.
             Coincide = la diferencia no pasa de S/ 5 por mes. «Mes en curso»: del año actual, el MEF ya suma lo devengado en el mes abierto.</p>
+          ${nCorr ? `<p class="nota"><button type="button" class="btn" data-corregir="">Corregir las ${nCorr} diferencias mayores a S/ ${UMBRAL}</button>
+            Vuelve a raspar solo esos departamentos y solo sus funciones que no cuadran (una corrida corta); las demás funciones quedan como están.</p><div data-corr-res></div>` : ""}
           <div class="scroll"><table><tr><th>Departamento</th><th>Año</th><th>Meses en la página</th><th class="n">MEF (S/)</th><th class="n">Página (S/)</th><th class="n">Diferencia</th><th>Estado</th><th>Funciones que no cuadran</th><th>Control del</th></tr>
           ${x.map((f) => `<tr class="${f.estado === "revisar" ? "alerta" : ""}"><td>${esc(f.nombre)}</td><td>${f.anio}</td><td>${esc(f.meses)}</td><td class="n">${sol(f.mef)}</td><td class="n">${sol(f.pagina)}</td><td class="n">${sol(f.dif)}</td><td>${CHIP_CTL[f.estado] || esc(f.estado)}</td>
-            <td>${f.funciones.length ? f.funciones.slice(0, 6).map((g) => `${esc(g.funcion)}: ${sol(g.dif)}`).join(" · ") + (f.funciones.length > 6 ? ` · y ${f.funciones.length - 6} más` : "") : ""}</td><td>${f.fecha ? esc(fecha(f.fecha)) : ""}</td></tr>`).join("")}</table></div>`;
+            <td>${f.funciones.length ? f.funciones.slice(0, 6).map((g) => `${esc(g.funcion)}: ${sol(g.dif)}`).join(" · ") + (f.funciones.length > 6 ? ` · y ${f.funciones.length - 6} más` : "") : ""}${corregible(f) ? ` <button type="button" class="btn sec" data-corregir="${f.depto}" data-anio="${f.anio}">Corregir</button>` : ""}</td><td>${f.fecha ? esc(fecha(f.fecha)) : ""}</td></tr>`).join("")}</table></div>`;
+        det.querySelectorAll("[data-corregir]").forEach((b) => b.addEventListener("click", async () => {
+          const res = det.querySelector("[data-corr-res]") || b.parentElement, dep = b.dataset.corregir;
+          if (!confirm(dep ? "¿Volver a raspar solo las funciones que no cuadran de este departamento y año?" : `¿Volver a raspar las funciones que no cuadran de los departamentos con diferencia mayor a S/ ${UMBRAL}?`)) return;
+          const q = new URLSearchParams({ archivo: det.dataset.ctl, umbral: UMBRAL });
+          if (dep) { q.set("departamento", dep); q.set("anio", b.dataset.anio); }
+          b.disabled = true;
+          try {
+            const r = await api(`/v1/mef/archivos/corregir?${q}`, { method: "POST" });
+            res.insertAdjacentHTML("beforeend", r.lanzado
+              ? `<div class="ok-box"><b>Corrección lanzada: ${esc(r.desde)} a ${esc(r.hasta)}</b><span>${r.casos.map((c) => `${esc(c.nombre)} ${c.anio}: ${c.funciones.map(esc).join(", ")}`).join(" · ")}. Solo se reemplazan esas funciones; la tabla de corridas se actualiza sola.</span></div>`
+              : `<div class="err-box"><b>Nada que corregir</b><span>${esc(r.motivo)}</span></div>`);
+            if (r.lanzado) vigilar();
+          } catch (e) { b.disabled = false; res.insertAdjacentHTML("beforeend", `<div class="err-box"><b>No se pudo lanzar la corrección</b><span>${esc(e.message)}</span></div>`); }
+        }));
       } catch (e) { zona.outerHTML = `<div class="err-box"><b>No se pudo armar el control</b><span>${esc(e.message)}</span></div>`; }
     }));
     const vigilar = () => {

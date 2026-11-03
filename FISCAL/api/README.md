@@ -146,6 +146,14 @@ publica el MEF en la vista anual de Consulta Amigable (los CSV de CONTROL que de
 `CONTROL PIM Funcion …` y `CONTROL PIM Funcion.Municipalidad …`, guardados en la tabla `mef_controles`) contra lo que tiene
 la página, con las funciones que no cuadran (`/v1/mef/archivos/control?archivo=`).
 
+En DEV Función · Municipalidad, el botón **Corregir** (por fila, o «Corregir las diferencias mayores a S/ 200») lanza un
+**remiendo**: vuelve a raspar solo esos departamentos y solo sus funciones que no cuadran (`POST /v1/mef/archivos/corregir`
+→ `scraper_servidor.py --funciones 13,15`, `SOLO_FUNCIONES` en el notebook). La carga reemplaza solo esas funciones y deja
+las demás como estaban; el control del remiendo solo pisa sus códigos. Además, si una consulta municipal falla tras
+reintentar, el notebook la anota en `HUECOS Funcion.Municipalidad …csv` y la carga conserva lo que la página ya tenía de esa
+función y mes (antes el mes se reemplazaba entero y se perdía). La referencia anual del control ya no baja a municipalidad
+(solo el total por función), así que el control es mucho más rápido.
+
 En **Las tres regiones → Datos → MEF · 3 archivos**: DEV Función · Municipalidad, PIM Función y PIM Función ·
 Municipalidad tienen cada uno su botón **Descargar Excel** (departamentos y periodo a elegir) y su botón **Actualizar
 desde el MEF**, que lanza `.github/workflows/fiscal_archivos.yml`: el mismo notebook, pero solo con el bloque de ese

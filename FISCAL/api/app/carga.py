@@ -25,6 +25,7 @@ _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
 _RE_DEV = re.compile(r"^DEV (Funcion|InvFuente|Generica|Deuda|Fuente)\.(GobNacional|GobRegional|Municipalidad) ")
 _RE_PIM_MUNI = re.compile(r"^PIM Funcion\.Municipalidad (\d{4})")
 _RE_PIM = re.compile(r"^PIM Funcion (\d{4})")
+_RE_SOLO = re.compile(r" - FUNCIONES ([\d-]+)")            # remiendo del detalle municipal: solo esas funciones
 NIVEL_DE_TEXTO = {v: k for k, v in NIVEL_PIM.items()}
 
 
@@ -91,13 +92,71 @@ def unir_generica_y_deuda(gen, deu):
     return pd.concat(partes, ignore_index=True)
 
 
+def _cod_funcion(serie):
+    return serie.astype(str).str.extract(r"^\s*(\d+)")[0].str.zfill(2)
+
+
+def conservar_municipal(muni, huecos=None):
+    """DEV Funcion.Municipalidad se guarda reemplazando cada mes y departamento entero. Para no borrar lo bueno que ya está
+    en la página, a lo nuevo se le suman las filas guardadas de las funciones que esta carga NO trae bien:
+      · los huecos: funciones cuya consulta al MEF falló tras reintentar (CSV HUECOS del scraper);
+      · en un remiendo (archivo « - FUNCIONES 13-15»), todas las funciones que no se pidieron.
+    -> (muni completado, aviso o None)."""
+    if "_solo" not in muni.columns:
+        muni = muni.assign(_solo="")
+    huecos = huecos if huecos is not None and not huecos.empty else pd.DataFrame(columns=["AÑO", "MES", "COD_DEPTO", "COD_FUNCION"])
+    hueco = {(int(a), int(m), str(d).zfill(2), str(f).zfill(2)) for a, m, d, f in
+             zip(huecos["AÑO"], huecos["MES"], huecos["COD_DEPTO"], huecos["COD_FUNCION"])}
+    if not hueco and not muni["_solo"].astype(bool).any():
+        return muni.drop(columns="_solo"), None
+    muni = muni.assign(_cod=_cod_funcion(muni["FUNCION"]))
+    previas, n_hueco, n_solo = [], 0, 0
+    for (anio, depto), g in muni.groupby(["_anio", "_depto"]):
+        meses = sorted({int(x) for x in g["_mes"]} | {m for a, m, d, _ in hueco if a == anio and d == depto})
+        guardado = db.filas_guardadas("inv-dev-municipalidad", depto, int(anio), meses)
+        if guardado.empty:
+            continue
+        guardado = guardado.assign(_cod=_cod_funcion(guardado["FUNCION"]))
+        for mes in meses:
+            nuevo = g[g["_mes"] == mes]
+            if nuevo.empty:
+                continue                                  # el mes no viene: la carga no lo toca
+            solo = {c for s in nuevo["_solo"] for c in str(s).split("-") if c}
+            viejo = guardado[guardado["_mes"] == mes]
+            if solo:
+                quedan = viejo[~viejo["_cod"].isin(solo)]
+                n_solo += len(quedan)
+            else:
+                quedan = viejo.iloc[0:0]
+            faltan = {f for a, m, d, f in hueco if (a, m, d) == (anio, mes, depto)}
+            if faltan:
+                extra = viejo[viejo["_cod"].isin(faltan)]
+                n_hueco += len(extra)
+                quedan = pd.concat([quedan, extra]).drop_duplicates()
+            if not quedan.empty:
+                previas.append(quedan.assign(_archivo=int(nuevo["_archivo"].max()), _nivel=nuevo["_nivel"].iloc[0]))
+    if previas:
+        muni = pd.concat([muni] + previas, ignore_index=True)
+    partes = []
+    if n_hueco:
+        partes.append(f"{n_hueco} filas de funciones cuya consulta falló (se conservó lo que ya tenía la página)")
+    if n_solo:
+        partes.append(f"{n_solo} filas de las funciones que no se pidieron en el remiendo")
+    aviso = f"DEV Funcion.Municipalidad: se mantuvieron {' y '.join(partes)}." if partes else None
+    return muni.drop(columns=["_solo", "_cod"]), aviso
+
+
 def leer_archivos(raiz):
     """-> {base_id: DataFrame con las columnas de la base + columnas internas}, avisos."""
     raiz = Path(raiz)
     por_bloque, avisos = {}, []
+    huecos = []
     pim, pim_muni, de_pesca, de_empleo, de_hidro, de_estad, de_sunat, de_impo = [], [], [], [], [], [], [], []
     for n_archivo, ruta in enumerate(sorted(raiz.rglob("*"))):
         if not ruta.is_file() or ruta.name.startswith(("CONTROL", "LOG", ".")):
+            continue
+        if ruta.name.startswith("HUECOS") and ruta.suffix.lower() == ".csv":
+            huecos.append(pd.read_csv(ruta, encoding="utf-8-sig", dtype=str))
             continue
         if ruta.suffix.lower() == ".xlsm" and sunat_impo.es_anual_pro(ruta):   # ANUAL_PRO - IMPORTACIONES (con macros)
             de_impo.append((n_archivo, ruta, "anual"))
@@ -159,6 +218,8 @@ def leer_archivos(raiz):
         elif m:
             df = _leer_csv(ruta).assign(_archivo=n_archivo)
             df["_nivel"] = NIVEL_DE_CORTO[m.group(2)]
+            solo = _RE_SOLO.search(ruta.name)
+            df["_solo"] = solo.group(1) if solo else ""
             por_bloque.setdefault((m.group(1), NIVEL_DE_CORTO[m.group(2)]), []).append(df)
         elif _RE_PIM_MUNI.match(ruta.name):
             pim_muni.append(_leer_csv(ruta).assign(_archivo=n_archivo))
@@ -176,6 +237,9 @@ def leer_archivos(raiz):
     func = juntar("Funcion", ("E", "R"))
     muni = juntar("Funcion", ("M",))
     if not muni.empty:
+        muni, aviso = conservar_municipal(muni, pd.concat(huecos, ignore_index=True) if huecos else None)
+        if aviso:
+            avisos.append(aviso)
         bases["inv-dev-municipalidad"] = muni.assign(_nivel="")
         agg = muni.groupby(["_anio", "_mes", "_depto", "_archivo", "AÑO", "MES", "DEPARTAMENTO", "FUNCION"], as_index=False)["DEVENGADO"].sum()
         agg["NIVEL_GOBIERNO"], agg["ENTIDAD"], agg["_nivel"] = NIVEL_MEF["M"], "MUNICIPALIDADES (SUMA)", "M"

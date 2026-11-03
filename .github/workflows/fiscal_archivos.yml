@@ -6,7 +6,7 @@
 # Se lanza desde la página («MEF · 3 archivos» → Actualizar) o a mano: Actions → este flujo → Run workflow. No tiene
 # horario propio: el scraper completo (fiscal_scraper.yml) los sigue trayendo los días 2 y 21.
 name: Fiscal · archivo del MEF (25 departamentos)
-run-name: "${{ inputs.archivo }} · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.departamentos != 'TODOS' && format(' · {0}', inputs.departamentos) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
+run-name: "${{ inputs.archivo }} · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.departamentos != 'TODOS' && format(' · {0}', inputs.departamentos) || '' }}${{ inputs.funciones && format(' · funciones {0}', inputs.funciones) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
 
 on:
   workflow_dispatch:
@@ -28,6 +28,10 @@ on:
         description: "TODOS o códigos separados por comas (16,22,25)"
         type: string
         default: "TODOS"
+      funciones:
+        description: "Solo dev-municipalidad: remiendo de solo esas funciones (códigos separados por comas, p. ej. 13,15). Vacío: todas"
+        type: string
+        default: ""
       prueba:
         description: "Prueba rápida (un mes, solo Loreto; no carga en la base)"
         type: boolean
@@ -58,11 +62,13 @@ jobs:
           ARCHIVO: ${{ inputs.archivo }}
           PERIODO: ${{ inputs.desde }}${{ inputs.hasta }}
           PRUEBA: ${{ inputs.prueba }}
+          FUNCIONES: ${{ inputs.funciones }}
         run: |
+          # un remiendo de algunas funciones es corto (unas pocas consultas por mes): va entero en el tramo 1
           # devengado municipal: el año en curso va en dos tramos (enero-junio, julio-último mes); un periodo elegido se parte en
           # cuatro tramos seguidos (cerca de una hora por mes con los 25 departamentos; cada job tiene 6 horas).
           # PIM (anual) y la prueba van enteros en el tramo 1.
-          if [ "$TRAMO" != "1" ] && { [ "$ARCHIVO" != "dev-municipalidad" ] || [ "$PRUEBA" = "true" ] || { [ -z "$PERIODO" ] && [ "$TRAMO" -gt 2 ]; }; }; then
+          if [ "$TRAMO" != "1" ] && { [ "$ARCHIVO" != "dev-municipalidad" ] || [ "$PRUEBA" = "true" ] || [ -n "$FUNCIONES" ] || { [ -z "$PERIODO" ] && [ "$TRAMO" -gt 2 ]; }; }; then
             echo "correr=no" >> "$GITHUB_OUTPUT"; echo "Este tramo no hace falta."
           else
             echo "correr=si" >> "$GITHUB_OUTPUT"
@@ -91,13 +97,16 @@ jobs:
           HASTA: ${{ inputs.hasta }}
           DEPARTAMENTOS: ${{ inputs.departamentos }}
           PRUEBA: ${{ inputs.prueba }}
+          FUNCIONES: ${{ inputs.funciones }}
           FISCAL_WORKERS: "3"
           TRAMO: ${{ matrix.tramo }}
           FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
           PYTHONUNBUFFERED: "1"
         run: |
           args=(--archivo "$ARCHIVO" --departamentos "${DEPARTAMENTOS:-TODOS}")
-          if [ "$ARCHIVO" = "dev-municipalidad" ] && [ "$PRUEBA" != "true" ]; then
+          if [ "$ARCHIVO" = "dev-municipalidad" ] && [ -n "$FUNCIONES" ]; then
+            args+=(--funciones "$FUNCIONES")
+          elif [ "$ARCHIVO" = "dev-municipalidad" ] && [ "$PRUEBA" != "true" ]; then
             args+=(--tramo "$TRAMO")
             [ -n "$DESDE$HASTA" ] && args+=(--partes 4)
           fi
