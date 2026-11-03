@@ -192,7 +192,7 @@
     const barras = series.map((s, i) => [s, i]).filter(([s]) => s.tipo === "barras");
     const nb = apil ? 1 : barras.length, anchoGrupo = paso * (nb > 1 ? 0.78 : 0.62), wb = anchoGrupo / Math.max(nb, 1);
     const pila = Array.from({ length: n }, () => ({ p: 0, q: 0 }));
-    const etiquetas = [];
+    const etiquetas = [], deBarras = [], circulos = [];   // etiquetas de barras y círculos del Perú: se separan al final
     barras.forEach(([s, si], j) => {
       const dec = decimales(s, s.valores), ep = pct(s), unaDepto = barras.length === 1 && series.length === 1;
       s.valores.forEach((v, i) => {
@@ -208,7 +208,7 @@
         if (s.etiquetas || series.length <= 2) {
           const txt = num(v, dec, ep);
           if (apil) { if (h > 12) etiquetas.push(`<text x="${(x0 + w / 2).toFixed(1)}" y="${(top_ + h / 2 + 3.5).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${[TURQ, AMARILLO, GRIS, TURQ_CLARO].includes(fill) ? NAVY : "#fff"}">${txt}</text>`); }
-          else etiquetas.push(`<text x="${(x0 + w / 2).toFixed(1)}" y="${(v >= 0 ? top_ - 4 : top_ + h + 11).toFixed(1)}" text-anchor="middle" font-size="${n > 20 ? 8.5 : 9.5}" font-weight="600" fill="${TINTA}">${txt}</text>`);
+          else deBarras.push({ x: x0 + w / 2, y: v >= 0 ? top_ - 4 : top_ + h + 11, neg: v < 0, txt, px: n > 20 ? 8.5 : 9.5 });
         }
       });
     });
@@ -229,6 +229,7 @@
         const x = X(i), y = Y(v, s.eje), txt = num(v, dec, ep);
         if (circulo) {
           const r = Math.max(11, ancho(txt, 9, true) / 2 + 4);
+          circulos.push({ x, y, r });
           out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${BLANCO}" stroke="${cols[si]}" stroke-width="1.6"/><text x="${x.toFixed(1)}" y="${(y + 3.2).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${TINTA}">${txt}</text>`);
         } else if (pocos && s.tipo === "lineas") {
           out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${BLANCO}" stroke="${cols[si]}" stroke-width="1.5"/>`);
@@ -237,6 +238,16 @@
           etiquetas.push(`<text x="${(x + 4).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="${i === s.valores.length - 1 ? "end" : "middle"}" font-size="9" font-weight="600" fill="${TINTA}" paint-order="stroke" stroke="#fff" stroke-width="3">${txt}</text>`);
         }
       });
+    });
+    // como en Excel: si la cifra de una barra cae sobre un círculo, pasa encima del círculo (o debajo, si la barra es negativa)
+    deBarras.forEach((e) => {
+      const w = ancho(e.txt, e.px, true) / 2 + 2;
+      for (let vuelta = 0; vuelta < 3; vuelta++) {
+        const c = circulos.find((c) => Math.abs(c.x - e.x) < c.r + w && e.y - e.px < c.y + c.r + 1 && e.y + 2 > c.y - c.r - 1);
+        if (!c) break;
+        e.y = e.neg ? Math.max(e.y, c.y + c.r + e.px + 3) : Math.min(e.y, c.y - c.r - 4);
+      }
+      etiquetas.push(`<text x="${e.x.toFixed(1)}" y="${e.y.toFixed(1)}" text-anchor="middle" font-size="${e.px}" font-weight="600" fill="${TINTA}">${e.txt}</text>`);
     });
     out.push(...etiquetas);
     // categorías (salteadas si son demasiadas)
