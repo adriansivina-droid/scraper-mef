@@ -1,10 +1,10 @@
 // Cuadros y gráficos con el formato de la Síntesis de Actividad Económica (BCRP, Sucursal Iquitos), en SVG para
-// pegarlos en el informe: Arial, filetes horizontales, miles con espacio y decimales con coma; los gráficos, barras
-// celestes con borde azul (el mismo mes de cada año, en blanco), meses «J.24 J A S … J.25», notas de fuente y elaboración.
+// pegarlos en el informe: Arial, filetes horizontales, miles con espacio y decimales con coma; los gráficos, con la paleta
+// del Seminario de Periodistas: barras turquesa con borde azul marino (el mismo mes de cada año, en blanco), meses «J.24 J A S … J.25», notas de fuente y elaboración.
 // window.BCRP.cuadro(spec) / .anexo(spec) / .barras(spec) / .circulares(spec) / .hbarras(spec) / .apiladas(spec) devuelven el SVG (texto); .descargar, .copiar, .png lo exportan.
 (function () {
   "use strict";
-  const FUENTE = "Arial, Helvetica, sans-serif", TINTA = "#000", AZUL = "#4F81BD", RELLENO = "#C6D9F1", GRIS = "#C0C0C0";
+  const FUENTE = "Arial, Helvetica, sans-serif", TINTA = "#000", AZUL = "#111149", RELLENO = "#72D2D5", GRIS = "#C0C0C0";
   const ELABORACION = "Elaboración: BCRP, Sucursal Iquitos. Departamento de Estudios Económicos.";
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const lienzo = document.createElement("canvas").getContext("2d");
@@ -175,7 +175,7 @@
 
   // ── Circulares (uno o dos lado a lado): spec = {numero, titulo, unidad, circulos: [{subtitulo, partes: [{nombre, valor}]}], notas}
   // paleta de las SERIES (info_export §11); «Otros» siempre en gris
-  const PALETA = ["#111149", "#72D2D5", "#DD6140", "#FFC41D", "#4F81BD", "#8064A2", "#9BBB59"], OTROS = "#CCD3DF";
+  const PALETA = ["#111149", "#72D2D5", "#DD6140", "#FFC41D", "#D59D00", "#7030A0", "#CFF0F1"], OTROS = "#CCD3DF";   // paleta del Seminario de Periodistas
   function circulares(spec) {
     api.ultimo = { tipo: "circular", spec };
     const n = spec.circulos.length, cw = 440, W = Math.max(cw * n, 480), R = 74, arr = 92, out = [];
@@ -231,7 +231,7 @@
 
   // ── Barras apiladas por año (estilo de los gráficos de Excel: título arriba, eje con su unidad, años inclinados y
   // leyenda abajo): spec = {titulo, ejeY, categorias: [..], series: [{nombre, valores: [..], color?, etiquetas?: [[texto, …] por categoría]}], notas}
-  const PALETA_APILADAS = ["#111149", "#72D2D5", "#CCD3DF", "#FFC41D", "#2A9DA1", "#5A5A9E", "#8C96AD", "#181818", "#B9E9EB", "#4F81BD", "#9BBB59", "#DD6140"];
+  const PALETA_APILADAS = ["#111149", "#72D2D5", "#DD6140", "#FFC41D", "#D59D00", "#CCD3DF", "#7030A0", "#CFF0F1", "#5A5A9E", "#181818", "#2A9DA1", "#8C96AD"];   // Seminario de Periodistas
   function apiladas(spec) {
     api.ultimo = { tipo: "apiladas", spec };
     const cat = spec.categorias, n = Math.max(cat.length, 1), series = spec.series.map((s, i) => ({ ...s, color: s.color || PALETA_APILADAS[i % PALETA_APILADAS.length] }));

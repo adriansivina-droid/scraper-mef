@@ -6,6 +6,8 @@
   --paper: #FEFEFE; --canvas: #EEF1F6; --panel: #F6F8FB; --ink: #181818; --navy: #111149; --mid: #5A5A9E;
   --hair: #CCD3DF; --teal: #2A9DA1; --teal-soft: #E3F4F4; --orange: #DD6140; --error: #A8452B; --error-soft: #FCEAE5;
   --gold: #FFC41D; --gold-soft: #FFF4D2; --grey-soft: #EEF1F6; --link: #5A5A9E;
+  /* series de los gráficos: paleta del Seminario de Periodistas (BCRP Sucursal Iquitos) */
+  --s1: #111149; --s2: #72D2D5; --s3: #DD6140; --s4: #FFC41D; --s5: #D59D00; --s6: #CCD3DF;
   --display: 'Barlow Condensed', 'Barlow', 'Segoe UI', sans-serif;
   --font: 'Barlow', 'Segoe UI', ui-sans-serif, system-ui, -apple-system, Roboto, sans-serif;
   --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -133,7 +135,7 @@ tr.grupo td { background: var(--panel); padding-top: 14px; border-bottom: 1px so
 .barras { width: 100%; height: auto; display: block; }
 .barras text { fill: var(--mid); font-family: var(--font); font-size: 11px; }
 .barras .eje { stroke: var(--hair); }
-.barras .pos { fill: var(--navy); } .barras .neg { fill: var(--orange); }
+.barras .pos { fill: var(--s1); } .barras .neg { fill: var(--s3); }
 .barras .parcial { fill: var(--navy); opacity: .45; }
 iframe.mapa { width: 100%; height: 75vh; min-height: 480px; border: 1px solid var(--hair); border-radius: var(--r-s); background: var(--panel); }
 .barras .val { fill: var(--ink); font-size: 10px; }
@@ -141,9 +143,9 @@ iframe.mapa { width: 100%; height: 75vh; min-height: 480px; border: 1px solid va
 .linea-niveles { width: 100%; min-width: 640px; height: auto; display: block; }
 .linea-niveles text { fill: var(--mid); font-family: var(--font); font-size: 11px; }
 .linea-niveles .eje, .linea-niveles .sep { stroke: var(--hair); }
-.linea-niveles .trazo { fill: none; stroke: var(--teal); stroke-width: 2; stroke-linejoin: round; }
-.linea-niveles .area { fill: var(--teal); opacity: .08; }
-.linea-niveles .dot { fill: var(--teal); stroke: var(--paper); stroke-width: 1.5; opacity: 0; }
+.linea-niveles .trazo { fill: none; stroke: var(--s2); stroke-width: 2; stroke-linejoin: round; }
+.linea-niveles .area { fill: var(--s2); opacity: .18; }
+.linea-niveles .dot { fill: var(--s2); stroke: var(--paper); stroke-width: 1.5; opacity: 0; }
 .linea-niveles .dot.marcado { opacity: 1; }
 .linea-niveles .hit { fill: transparent; }
 .linea-niveles .pt:hover .dot { opacity: 1; r: 5; }
@@ -177,20 +179,20 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .ley-graf span { display: inline-flex; align-items: center; }
 .ley-graf i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .ley-graf i.anio-a, .barras .anio-a { background: var(--navy); fill: var(--navy); }
-.ley-graf i.anio-b, .barras .anio-b { background: var(--teal); fill: var(--teal); }
+.ley-graf i.anio-b, .barras .anio-b { background: var(--s2); fill: var(--s2); }
 .ley-graf i.parejo { background: none; border-top: 2px dashed var(--mid); height: 0; border-radius: 0; vertical-align: 3px; }
 .lineas { width: 100%; height: auto; display: block; min-width: 560px; }
 .lineas text { fill: var(--mid); font-family: var(--font); font-size: 11px; }
 .lineas .rejilla { stroke: var(--hair); stroke-dasharray: 2 4; }
 .lineas .trazo { fill: none; stroke-width: 2; stroke-linejoin: round; }
-.lineas .trazo.anio-a { stroke: var(--navy); } .lineas .trazo.anio-b { stroke: var(--teal); }
+.lineas .trazo.anio-a { stroke: var(--s1); } .lineas .trazo.anio-b { stroke: var(--s2); }
 .lineas .trazo.parejo { stroke: var(--mid); stroke-dasharray: 5 4; stroke-width: 1.5; }
-.lineas .pto { stroke: var(--paper); stroke-width: 1.5; } .lineas .pto.anio-a { fill: var(--navy); } .lineas .pto.anio-b { fill: var(--teal); } .lineas .pto.parejo { display: none; }
+.lineas .pto { stroke: var(--paper); stroke-width: 1.5; } .lineas .pto.anio-a { fill: var(--s1); } .lineas .pto.anio-b { fill: var(--s2); } .lineas .pto.parejo { display: none; }
 .lineas .val { fill: var(--ink); font-weight: 600; paint-order: stroke; stroke: var(--paper); stroke-width: 4px; }
 .participa { display: flex; height: 54px; border-radius: var(--r-s); overflow: hidden; gap: 2px; margin: 8px 0 12px; }
 .participa div { display: flex; flex-direction: column; justify-content: center; padding: 0 10px; color: #FEFEFE; min-width: 0; overflow: hidden; white-space: nowrap; }
 .participa b { font-size: 12px; } .participa span { font-size: 12px; font-family: var(--mono); }
-.niv-0 { background: var(--navy); } .niv-1 { background: var(--teal); } .participa .niv-2, i.niv-2 { background: var(--gold); color: var(--ink); }
+.niv-0 { background: var(--s1); } .niv-1 { background: var(--s2); } .participa .niv-2, i.niv-2 { background: var(--gold); color: var(--ink); }
 table.mini td { padding: 6px 8px; } i.cuadro { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; }
 .segmento { display: inline-flex; border: 1px solid var(--hair); border-radius: 999px; padding: 3px; gap: 2px; }
 .segmento button { border: 0; background: none; padding: 6px 14px; border-radius: 999px; font: inherit; font-weight: 600; color: var(--mid); cursor: pointer; }
@@ -198,7 +200,7 @@ table.mini td { padding: 6px 8px; } i.cuadro { display: inline-block; width: 10p
 td.dif { min-width: 180px; }
 .difbar { position: relative; height: 18px; display: flex; align-items: center; }
 .difbar i { height: 12px; border-radius: 3px; min-width: 2px; }
-.difbar.sube i { background: var(--teal); } .difbar.baja i { background: var(--orange); }
+.difbar.sube i { background: var(--s2); } .difbar.baja i { background: var(--s3); }
 .difbar span { margin-left: 8px; font-family: var(--mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .difbar.sube span { color: var(--teal); } .difbar.baja span { color: var(--orange); }
 .var-total { display: flex; gap: 12px; align-items: baseline; font-size: 13px; color: var(--mid); flex-wrap: wrap; }
@@ -242,3 +244,9 @@ details.ctl-mef[open] summary { margin-bottom: 8px; }
 .btn.chico { padding: 4px 12px; font-size: 13px; min-height: 0; }
 td.acciones-corrida { white-space: nowrap; }
 td.acciones-corrida .btn { margin-right: 10px; }
+
+/* ── Gráficos DRAE ── */
+.drae-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 560px), 1fr)); gap: 16px; }
+.drae-item { margin: 0; }
+.drae-prev svg { width: 100%; height: auto; max-width: 100%; }
+.drae-datos { margin-top: 8px; }

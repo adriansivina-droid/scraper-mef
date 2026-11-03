@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import almacen, archivos, bcrp_excel, carga, controles, db, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, mef, pesca_cuadros, sunat_expo, sunat_impo
+from . import almacen, archivos, bcrp_excel, carga, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, mef, pesca_cuadros, sunat_expo, sunat_impo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -194,6 +194,21 @@ async def cargas(archivos_subidos: list[UploadFile] = File(..., alias="archivos"
             raise HTTPException(413, f"Lo subido pasa de {MAX_CARGA_MB} MB.")
         contenido.append((a.filename or "archivo", datos))
     return carga.cargar(f"subida del {date.today().isoformat()}: {', '.join(n for n, _ in contenido)[:200]}", contenido)
+
+
+@app.get("/v1/drae", dependencies=[Depends(acceso)])
+def drae_graficos(departamento: str = Query(..., pattern="^(16|22|25)$")):
+    """Gráficos DRAE del departamento: los de sus SERIES (.xlsx subido en Actualizar), con sus datos y su formato."""
+    return drae.leer(departamento)
+
+
+@app.post("/v1/drae/titulo", dependencies=[Depends(acceso)])
+def drae_titulo(departamento: str = Query(..., pattern="^(16|22|25)$"), orden: int = Query(..., ge=1), cuerpo: dict = Body(...)):
+    """Corrige el título (y subtítulo) de un gráfico DRAE."""
+    titulo, sub = str(cuerpo.get("titulo", ""))[:200], str(cuerpo.get("subtitulo", ""))[:120]
+    if not drae.cambiar_titulo(departamento, orden, titulo, sub):
+        raise HTTPException(404, "No existe ese gráfico.")
+    return {"ok": True}
 
 
 @app.get("/v1/hidrocarburos/almacen", dependencies=[Depends(acceso)])
