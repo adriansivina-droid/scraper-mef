@@ -4,6 +4,8 @@
     python FISCAL/automatizacion/scraper_servidor.py --desde 2025-01 --hasta 2026-09
     python FISCAL/automatizacion/scraper_servidor.py --prueba              # PRUEBA_RAPIDA del notebook: un mes, Loreto
     python FISCAL/automatizacion/scraper_servidor.py --archivo pim-funcion --desde 2026-01   # solo un archivo (ver ARCHIVOS)
+    python FISCAL/automatizacion/scraper_servidor.py --archivo dev-municipalidad --desde 2025-01 --hasta 2025-12 \
+        --departamentos 02 --funciones 15      # remiendo: solo esas funciones (la página deja las demás como estaban)
 
 Cómo lo hace: lee las celdas de código del notebook (el mismo que se usa en Colab: si cambia allá, cambia aquí), quita
 las líneas «!pip», reemplaza Drive por una carpeta de trabajo y fija el periodo en el BLOQUE 2. Luego carga la carpeta
@@ -171,7 +173,7 @@ def periodo_anual(desde, hasta, hoy=None):
 AVANCE = [None]
 
 
-def raspar(desde, hasta, prueba, archivo=None, departamentos=None):
+def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=None):
     a0, m0 = map(int, desde.split("-"))
     a1, m1 = map(int, hasta.split("-"))
     fijar = {"PRUEBA_RAPIDA": prueba, "AÑO_INICIO": a0, "MES_INICIO": m0, "AÑO_FIN": a1, "MES_FIN": m1,
@@ -180,6 +182,8 @@ def raspar(desde, hasta, prueba, archivo=None, departamentos=None):
         fijar.update(ARCHIVOS[archivo]["fijar"])
     if departamentos:
         fijar["DEPARTAMENTOS_NACIONAL"] = departamentos
+    if funciones:
+        fijar["SOLO_FUNCIONES"] = funciones
     (TRABAJO / "Fiscal").mkdir(parents=True, exist_ok=True)
     sustituir_colab()
     g = {"__name__": "__main__", "display": lambda *x, **k: print(*x)}
@@ -211,7 +215,12 @@ def main():
     ap.add_argument("--partes", type=int, choices=[2, 3, 4], help="con --desde/--hasta y --tramo: parte el periodo en tramos seguidos (un job cada uno)")
     ap.add_argument("--archivo", choices=list(ARCHIVOS), help="solo ese archivo de los 25 departamentos (sin el resto de la base fiscal)")
     ap.add_argument("--departamentos", default="", help="con --archivo: TODOS (por defecto) o códigos separados por comas, p. ej. 16,22,25")
+    ap.add_argument("--funciones", default="", help="con --archivo dev-municipalidad: remiendo de solo esas funciones, p. ej. 13,15 "
+                    "(la carga reemplaza solo esas funciones y deja las demás como estaban)")
     a = ap.parse_args()
+    funcs = sorted({c.strip().zfill(2) for c in a.funciones.split(",") if c.strip()}) if a.funciones.strip() else None
+    if funcs and (a.archivo != "dev-municipalidad" or any(not (c.isdigit() and 1 <= int(c) <= 25) for c in funcs)):
+        sys.exit(f"Funciones no válidas: {a.funciones!r} (códigos 01-25 separados por comas, solo con --archivo dev-municipalidad)")
     deps = None
     if a.departamentos and a.departamentos.strip().upper() != "TODOS":
         deps = [c.strip().zfill(2) for c in a.departamentos.split(",") if c.strip()]
@@ -241,10 +250,10 @@ def main():
         hasta = desde
     titulo = f"{ARCHIVOS[a.archivo]['nombre']} · " if a.archivo else ""
     rango = f"{desde[:4]} a {hasta[:4]}" if anual and desde[:4] != hasta[:4] else desde[:4] if anual else f"{desde} a {hasta}"
-    lineas = [f"## Scraper del MEF · {titulo}{rango}{' · ' + ', '.join(deps) if deps else ''}{' · PRUEBA' if a.prueba else ''} · {datetime.now():%d/%m/%Y %H:%M}", ""]
+    lineas = [f"## Scraper del MEF · {titulo}{rango}{' · ' + ', '.join(deps) if deps else ''}{' · funciones ' + ', '.join(funcs) if funcs else ''}{' · PRUEBA' if a.prueba else ''} · {datetime.now():%d/%m/%Y %H:%M}", ""]
     t0, ok = time.time(), True
     try:
-        carpeta = raspar(desde, hasta, a.prueba, a.archivo, deps)
+        carpeta = raspar(desde, hasta, a.prueba, a.archivo, deps, funcs)
         csvs = sorted(carpeta.rglob("*.csv"))
         logs = [p.name for p in csvs if p.name.startswith("LOG")]
         lineas.append(f"**Raspado: ✅** {len(csvs)} archivos en {(time.time() - t0) / 60:.1f} min.")

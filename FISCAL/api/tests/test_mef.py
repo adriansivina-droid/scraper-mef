@@ -185,3 +185,90 @@ def test_periodo_elegido_en_cuatro_tramos():
     assert [partir("2026-01", "2026-10", 4, k) for k in range(1, 5)] == [("2026-01", "2026-03"), ("2026-04", "2026-06"), ("2026-07", "2026-08"), ("2026-09", "2026-10")]
     assert [partir("2026-09", "2026-09", 4, k) for k in range(1, 5)] == [("2026-09", "2026-09"), None, None, None]
     assert partir("2025-11", "2026-02", 2, 2) == ("2026-01", "2026-02")
+
+
+def test_huecos_y_remiendo_conservan_lo_guardado(cliente, monkeypatch):
+    """Una función cuya consulta falló (CSV HUECOS) no borra lo que ya tenía la página, y un remiendo (« - FUNCIONES 15»)
+    reemplaza solo esa función; el control de un remiendo solo pisa sus códigos. El botón Corregir arma el remiendo."""
+    from tests.test_api import _csv, zip_de
+    import pandas as pd
+    suf = "02 - 08 - 21"
+    fila = lambda f, m, v, mes=11: dict(AÑO=2025, MES=f"{mes}: Noviembre", DEPARTAMENTO="02: ÁNCASH", FUNCION=f, MUNICIPALIDAD=m, DEVENGADO=v)
+    dev = f"output/DEVENGADO/Gobierno Municipal/DEV Funcion.Municipalidad 2025 - Mes 11 - {suf}"
+    ctl = f"output/DEVENGADO/CARPETA DE CONTROL/CONTROL Municipalidad 2025 - Mes 11 - {suf}"
+    # 1) carga buena: transporte y educación
+    r = cliente.post("/v1/cargas", files=[("archivos", ("a.zip", zip_de({f"{dev}.csv": _csv(pd.DataFrame([
+        fila("15: TRANSPORTE", "MUNI A", 5000.0), fila("22: EDUCACION", "MUNI A", 300.0)]))}), "application/zip"))])
+    assert r.status_code == 200, r.text
+    # 2) corrida con el transporte fallido: el hueco conserva los 5000
+    r = cliente.post("/v1/cargas", files=[("archivos", ("b.zip", zip_de({
+        f"{dev}.csv": _csv(pd.DataFrame([fila("22: EDUCACION", "MUNI A", 310.0)])),
+        f"output/DEVENGADO/CARPETA DE CONTROL/HUECOS Funcion.Municipalidad 2025 - Mes 11.csv": _csv(pd.DataFrame([
+            dict(AÑO=2025, MES=11, COD_DEPTO="02", COD_FUNCION="15", ERROR="ConnectionError")])),
+        f"{ctl}.csv": _csv(pd.DataFrame([dict(AÑO=2025, DEPARTAMENTO="02: ÁNCASH", COD_FUNCION="15", DEV_REF_ANUAL=5400.0),
+                                         dict(AÑO=2025, DEPARTAMENTO="02: ÁNCASH", COD_FUNCION="22", DEV_REF_ANUAL=310.0)]))}), "application/zip"))])
+    assert r.status_code == 200, r.text
+    assert any("se mantuvieron 1 filas de funciones cuya consulta falló" in a for a in r.json()["avisos"])
+    guardado = db.leer("inv-dev-municipalidad", ["02"], [], "2025-11", "2025-11")
+    assert dict(zip(guardado["FUNCION"], guardado["DEVENGADO"])) == {"15: TRANSPORTE": 5000.0, "22: EDUCACION": 310.0}
+    func = db.leer("inv-dev-funcion", ["02"], ["M"], "2025-11", "2025-11")
+    assert func["DEVENGADO"].sum() == 5310.0                  # la suma municipal también conserva el transporte
+    # 3) el control marca transporte (-400) y el botón Corregir arma un remiendo solo de esa función
+    control = cliente.get("/v1/mef/archivos/control?archivo=dev-municipalidad").json()["control"]
+    assert [(f["depto"], f["estado"], f["dif"]) for f in control] == [("02", "revisar", -400.0)]
+    lanzado = []
+    monkeypatch.setenv("GITHUB_ACCIONES_TOKEN", "tok")
+    monkeypatch.setattr(mef.requests, "post", lambda url, headers=None, json=None, timeout=None: lanzado.append(json) or Respuesta(204))
+    assert cliente.post("/v1/mef/archivos/corregir?umbral=500").json()["lanzado"] is False
+    r = cliente.post("/v1/mef/archivos/corregir?umbral=200").json()
+    assert r["lanzado"] and r["casos"][0]["nombre"] == "Áncash"
+    assert lanzado[-1]["inputs"] == {"archivo": "dev-municipalidad", "desde": "2025-01", "hasta": "2025-12", "departamentos": "02",
+                                     "funciones": "15", "prueba": False}
+    # 4) el remiendo trae solo transporte: educación queda como estaba y el control solo pisa el código 15
+    r = cliente.post("/v1/cargas", files=[("archivos", ("c.zip", zip_de({
+        f"{dev} - FUNCIONES 15.csv": _csv(pd.DataFrame([fila("15: TRANSPORTE", "MUNI A", 5100.0), fila("15: TRANSPORTE", "MUNI B", 300.0)])),
+        f"{ctl} - FUNCIONES 15.csv": _csv(pd.DataFrame([dict(AÑO=2025, DEPARTAMENTO="02: ÁNCASH", COD_FUNCION="15", DEV_REF_ANUAL=5400.0)]))}),
+        "application/zip"))])
+    assert r.status_code == 200, r.text
+    guardado = db.leer("inv-dev-municipalidad", ["02"], [], "2025-11", "2025-11")
+    assert sorted(zip(guardado["FUNCION"], guardado["MUNICIPALIDAD"], guardado["DEVENGADO"])) == [
+        ("15: TRANSPORTE", "MUNI A", 5100.0), ("15: TRANSPORTE", "MUNI B", 300.0), ("22: EDUCACION", "MUNI A", 310.0)]
+    control = cliente.get("/v1/mef/archivos/control?archivo=dev-municipalidad").json()["control"]
+    assert [(f["depto"], f["estado"], f["mef"], f["pagina"]) for f in control] == [("02", "coincide", 5710.0, 5710.0)]
+
+
+def test_extraer_funcion_reintenta_y_anota_huecos(monkeypatch):
+    """El notebook: una consulta municipal que falla dos veces queda en HUECOS; SOLO_FUNCIONES filtra; la referencia anual
+    no baja a municipalidad. (Se ejecuta la celda de extractores con el MEF simulado.)"""
+    import importlib, json, re, sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "automatizacion"))
+    servidor = importlib.import_module("scraper_servidor")
+    assert any("SOLO_FUNCIONES = ['15']" in c for c in servidor.celdas({"SOLO_FUNCIONES": ["15"]}))
+    nb = json.loads(servidor.NOTEBOOK.read_text(encoding="utf-8"))
+    extractores = next("".join(c["source"]) for c in nb["cells"] if "BLOQUE 4 · EXTRACTORES" in "".join(c["source"]))
+    consultas = []
+
+    def filas_de(anio, mes, nivel, depto, ruta, agrupar, ctx, candidatos=None):
+        consultas.append((mes, ruta[-1]))
+        if agrupar == "8":                                 # funciones
+            return [("15", "15: TRANSPORTE", 900.0, 0), ("22", "22: EDUCACION", 100.0, 0)], None, None
+        if ruta[-1] == ("8", "15"):
+            return [], "Función 02 > 15: ConnectionError", None
+        return [("x", "MUNI A", 100.0, 0)], None, None
+
+    g = {"filas_de": filas_de, "solo_muni": lambda n: [("37", "M")], "CLAVE_GENERICA": "24", "GENERICA_INVERSION": "6-2-6", "CLAVE_FUNCION": "8",
+         "CLAVE_MUNICIPALIDAD": "7", "SIN_MANCOMUNIDADES": True, "_RE_MANCOM": re.compile("mancomunidad", re.I), "_CODIGO": re.compile(r"^(\d+)"),
+         "FUNCIONES": {"15": "TRANSPORTE", "22": "EDUCACION"}, "meses_map": {"11": "11: Noviembre"}, "deptos_map": {"02": "02: ÁNCASH"},
+         "NIVELES_GOB": {"M": {"etiqueta": "M: GOBIERNOS LOCALES"}}, "candidatos_de": lambda v, et: [v], "SOLO_FUNCIONES": None,
+         "time": type("T", (), {"sleep": staticmethod(lambda s: None)}), "random": __import__("random")}
+    exec(compile(extractores, "extractores", "exec"), g)
+    regs, err, _ = g["extraer_funcion"](2025, "11", "M", "02")
+    assert [r["FUNCION"] for r in regs] == ["22: EDUCACION"] and "ConnectionError" in err
+    assert [(h["MES"], h["COD_DEPTO"], h["COD_FUNCION"]) for h in g["HUECOS"]] == [(11, "02", "15")]
+    assert consultas.count(("11", ("8", "15"))) == 2           # reintentó una vez
+    ref, err, _ = g["extraer_funcion"](2025, "", "M", "02", detalle=False)
+    assert err is None and [(r["COD_FUNCION"], r["DEVENGADO"]) for r in ref] == [("15", 900.0), ("22", 100.0)]
+    g["SOLO_FUNCIONES"] = ["22"]
+    regs, err, _ = g["extraer_funcion"](2025, "11", "M", "02")
+    assert err is None and [r["FUNCION"] for r in regs] == ["22: EDUCACION"]

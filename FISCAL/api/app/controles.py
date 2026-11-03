@@ -56,7 +56,8 @@ def leer(nombre, df):
 
 
 def guardar(partes):
-    """partes: [(nombre del archivo, DataFrame de leer)]. Reemplaza lo guardado del mismo bloque, nivel, año y departamento."""
+    """partes: [(nombre del archivo, DataFrame de leer)]. Reemplaza lo guardado del mismo bloque, nivel, año y departamento
+    (en un remiendo, « - FUNCIONES 13-15» en el nombre, solo los códigos que trae)."""
     partes = [(n, d) for n, d in partes if d is not None and not d.empty]
     if not partes:
         return 0
@@ -65,9 +66,15 @@ def guardar(partes):
     total = 0
     with db.motor().begin() as cx:
         for nombre, d in partes:
+            remiendo = " - FUNCIONES " in nombre           # control de un remiendo: trae solo algunas funciones
             for (b, n, a, dep), g in d.groupby(["bloque", "nivel", "anio", "depto"]):
-                cx.execute(text("DELETE FROM mef_controles WHERE bloque = :b AND nivel = :n AND anio = :a AND depto = :d"),
-                           {"b": b, "n": n, "a": int(a), "d": dep})
+                prm = {"b": b, "n": n, "a": int(a), "d": dep}
+                solo = ""
+                if remiendo:
+                    codigos = sorted(set(g["codigo"].astype(str)))
+                    prm.update({f"c{i}": c for i, c in enumerate(codigos)})
+                    solo = f" AND codigo IN ({', '.join(':c' + str(i) for i in range(len(codigos)))})"
+                cx.execute(text("DELETE FROM mef_controles WHERE bloque = :b AND nivel = :n AND anio = :a AND depto = :d" + solo), prm)
                 g.assign(fecha=ahora, archivo=nombre).to_sql("mef_controles", cx, if_exists="append", index=False)
                 total += len(g)
     return total
@@ -160,3 +167,24 @@ def control_archivo(archivo, hoy=None):
                       "fecha": g["fecha"].max(), "meses": (f"{meses[0]:02d} a {meses[-1]:02d}" if meses else ("anual" if anual and not df.empty else "sin datos")),
                       "funciones": funciones})
     return filas
+
+
+def remiendo(archivo, umbral=200.0, depto=None, anio=None, hoy=None):
+    """Qué volver a raspar de DEV Funcion.Municipalidad para corregir lo que no cuadra con el MEF: los departamentos y años en
+    «revisar» con una diferencia mayor que `umbral` soles, y solo sus funciones que no cuadran (el detalle del control).
+    -> {"desde", "hasta", "departamentos", "funciones", "casos"} o None si no hay nada que corregir."""
+    if archivo != "dev-municipalidad":
+        raise ValueError("Por ahora solo DEV Funcion.Municipalidad se corrige por función.")
+    hoy = hoy or date.today()
+    casos = [f for f in control_archivo(archivo, hoy) if f["estado"] == "revisar" and abs(f["dif"]) > umbral
+             and (depto is None or f["depto"] == depto) and (anio is None or f["anio"] == int(anio)) and f["funciones"]]
+    if not casos:
+        return None
+    funciones = sorted({_cod(g["funcion"]) for f in casos for g in f["funciones"]})
+    anios = sorted({f["anio"] for f in casos})
+    ultimo = (hoy.year, hoy.month - 1) if hoy.month > 1 else (hoy.year - 1, 12)
+    a1 = anios[-1]
+    hasta = f"{a1}-12" if a1 < ultimo[0] else f"{ultimo[0]}-{ultimo[1]:02d}"
+    return {"desde": f"{anios[0]}-01", "hasta": hasta, "departamentos": ",".join(sorted({f["depto"] for f in casos})),
+            "funciones": ",".join(funciones),
+            "casos": [{"depto": f["depto"], "anio": f["anio"], "dif": f["dif"], "funciones": [g["funcion"] for g in f["funciones"]]} for f in casos]}
