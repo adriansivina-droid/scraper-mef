@@ -28,14 +28,12 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 
 | Notebook | Dato | Nivel de gobierno | Regiones | Ruta de consulta |
 |---|---|---|---|---|
-| `MEF_DEV_Funcion_GobiernoRegional_LOR_SMN_UCA_(1).ipynb` | Devengado mensual | R: Gobiernos Regionales | Loreto, San Martín, Ucayali | Depto (Meta) → Función |
-| `DEV_Funcion_GobiernoNacional_LOR_SMN_UCA.ipynb` | Devengado mensual | E: Gobierno Nacional | LOR, SMN, UCA | Depto (Meta) → Función |
-| `DEV_Funcion_Municipalidad.ipynb` | Devengado mensual | M: Municipalidades | las 25 | Depto → Función → Municipalidad |
-| `DEV_Funcion_Municipalidad_LOR_SMN_UCA.ipynb` | Devengado mensual | M: Municipalidades | LOR, SMN, UCA | Depto → Función → Municipalidad |
-| `PIM_Funcion_LOR_SMN_UCA.ipynb` | PIM anual | E, M y R (los tres) | LOR, SMN, UCA | Depto (Meta) → Función, por nivel |
-| `PIM_Funcion_Municipalidad_LOR_SMN_UCA.ipynb` | PIM anual | M: Municipalidades | LOR, SMN, UCA | Depto → Función → Municipalidad |
-| `Fiscal_Scraper.ipynb` | Devengado mensual y PIM (unificado) | E, R y M | LOR, SMN, UCA | ver §12 |
+| `Fiscal_Scraper.ipynb` | Devengado mensual y PIM (unificado) | E, R y M | LOR, SMN, UCA (detalle municipal: `DEPARTAMENTOS_NACIONAL`, o los 25) | ver §12 |
+| `Fiscal_Procesamiento.ipynb` | Workbooks `Fiscal-<Depto>_AUTO.xlsx` y Variaciones alarmantes | E, R y M | LOR, SMN, UCA | lee los CSV del scraper |
 | `Fiscal_Proyectos.ipynb` | Top 5 proyectos por función (mensual) | E, R y M | LOR, SMN, UCA | Depto (Meta) → Nivel → Función → Proyecto |
+
+Los seis scrapers anteriores (`DEV_Funcion_*`, `MEF_DEV_Funcion_GobiernoRegional_*`, `PIM_Funcion_*`) se retiraron: `Fiscal_Scraper.ipynb`
+hace lo mismo con los mismos nombres y columnas de archivo. Siguen en el historial de git si hiciera falta consultarlos.
 
 Para abrir cualquiera en Colab:
 `https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/FISCAL/<NOMBRE>.ipynb`
@@ -94,7 +92,7 @@ Navegar_6.aspx?_tgt=frame&_uhc=yes&0=&24=6-2-6&23=1&1=R&21=16&8=&y=2025&ap=ActPr
 | `8` | Función | `03`, `15`, … |
 | `7` | Municipalidad | listada como `160101-301263: MUNICIPALIDAD …` |
 
-Departamentos: `16` Loreto · `22` San Martín · `25` Ucayali (los 25 están en `DEV_Funcion_Municipalidad.ipynb`).
+Departamentos: `16` Loreto · `22` San Martín · `25` Ucayali (los 25, con `DEPARTAMENTOS_NACIONAL = "TODOS"` en `Fiscal_Scraper.ipynb`).
 
 ### 4.3 Estructura del HTML
 - **Breadcrumb** (`table.History`): filas sin radio, con la etiqueta del filtro ("Departamento (Meta) 16: LORETO") y sus montos.
@@ -240,7 +238,7 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 ## 11. Pendientes / ideas
 
 - Confirmar en el MEF real los notebooks que solo se probaron con el simulador: Nacional, Municipalidad (25 regiones) y los dos de PIM.
-- Si se necesita el PIM municipal de las 25 regiones, se puede crear la variante copiando el catálogo de `DEV_Funcion_Municipalidad.ipynb`.
+- Si se necesita el PIM municipal de las 25 regiones, basta `DEPARTAMENTOS_NACIONAL = "TODOS"` en `Fiscal_Scraper.ipynb`.
 - La opción de meses sueltos ("1, 3, 5") se eliminó al unificar con `MES_INICIO`/`MES_FIN`. Se puede volver a agregar.
 
 ---

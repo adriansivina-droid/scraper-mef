@@ -180,8 +180,8 @@ def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=Non
              "WORKERS": int(os.environ.get("FISCAL_WORKERS", "3"))}   # consultas simultáneas: con 6, el MEF devolvió páginas cruzadas (2026)
     if archivo:
         fijar.update(ARCHIVOS[archivo]["fijar"])
-    if departamentos:
-        fijar["DEPARTAMENTOS_NACIONAL"] = departamentos
+    fijar["DEPARTAMENTOS_NACIONAL"] = departamentos or "TODOS"   # en el servidor, los 25 salvo que se pidan otros
+                                                                  # (en Colab el notebook trae Loreto, San Martín y Ucayali)
     if funciones:
         fijar["SOLO_FUNCIONES"] = funciones
     (TRABAJO / "Fiscal").mkdir(parents=True, exist_ok=True)
