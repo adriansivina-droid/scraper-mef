@@ -169,6 +169,57 @@ def cuadros(depto, df, periodo=None, flujo="expo"):
     todos = _productos(filas)
     salida["principales"] = {"acumulado": _ranking(todos, serie, total["orden"], a, 1, m, 5, otros=False),
                              "mes": _ranking(todos, serie, total["orden"], a, m, m, 5, otros=False)}
+    salida["textos"] = textos(salida, todos, serie, nt, a, b, m)
+    return salida
+
+
+def _num(v, dec=1):
+    return f"{abs(v):,.{dec}f}".replace(",", " ").replace(".", ",")
+
+
+def _lista(nombres):
+    import re
+    nombres = [re.sub(r"^.*\((.+)\)\s*$", r"\1", n).strip() for n in nombres]          # «Agrícolas (café)» -> «café»
+    nombres = [n[:1].lower() + n[1:] if not n[:2].isupper() else n for n in nombres]
+    return nombres[0] if len(nombres) == 1 else ", ".join(nombres[:-1]) + " y " + nombres[-1]
+
+
+def _motivos(todos, serie, a, b, m0, m1, sube, n=3):
+    """Los productos que más explican la variación del total (en la misma dirección), de mayor a menor."""
+    difs = [(f["rubro"], _suma(serie, f["orden"], a, m0, m1) - _suma(serie, f["orden"], b, m0, m1)) for f in todos]
+    difs = [(k, d) for k, d in difs if (d > 0 if sube else d < 0)]
+    difs.sort(key=lambda x: -abs(x[1]))
+    return [k for k, _ in difs[:n]]
+
+
+def textos(c, todos, serie, nt, a, b, m):
+    """Títulos para las láminas de exportaciones (DRAE), con las mismas cifras del cuadro de la síntesis:
+    enero-mes, el mes y la concentración de las no tradicionales."""
+    total = next(f for f in c["sintesis"] if f["total"])
+    mes, periodo = MESES[m - 1].lower(), ("enero" if m == 1 else f"enero-{MESES[m - 1].lower()}")
+    salida = {}
+    for clave, var, m0, cuando in (("acumulado", total["var_acum"], 1, f"En el periodo {periodo} {a}" if m > 1 else f"En enero de {a}"),
+                                    ("mes", total["var_mes"], m, f"En {mes} de {a}")):
+        if var is None:
+            continue
+        if abs(var) < 0.05:
+            salida[clave] = f"{cuando}, las exportaciones se mantuvieron en el mismo nivel que el año anterior."
+            continue
+        sube = var > 0
+        motivos = _motivos(todos, serie, a, b, m0, m, sube)
+        verbo = "aumentaron" if sube else "disminuyeron"
+        texto = f"{cuando}, las exportaciones {verbo} {_num(var)} por ciento interanual"
+        if motivos:
+            texto += f", explicado por las {'mayores' if sube else 'menores'} ventas de {_lista(motivos)}, principalmente"
+        salida[clave] = texto + "."
+    if nt and c.get("no_tradicionales"):
+        act = c["no_tradicionales"]["actual"]
+        partes = [p for p in act["partes"] if p["nombre"] != "Otros"]
+        if partes and act["total"]:
+            p0 = partes[0]
+            cuando = f"Entre enero y {mes} de {a}" if m > 1 else f"En enero de {a}"
+            salida["no_tradicionales"] = (f"{cuando}, las exportaciones no tradicionales se concentraron en {_lista([p0['nombre']])} "
+                                          f"({_num(p0['valor'] / act['total'] * 100)} por ciento del total).")
     return salida
 
 
