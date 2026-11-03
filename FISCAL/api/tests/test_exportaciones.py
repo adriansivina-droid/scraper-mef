@@ -110,6 +110,12 @@ def test_cuadro_de_la_sintesis_sigue_la_regla_del_cuadro_lor(cliente):
     assert c["no_tradicionales"]["actual"]["partes"][0]["nombre"] == "Cacao en grano"
     assert c["principales"]["mes"]["partes"][0]["nombre"] == "Petróleo crudo y derivados"
     assert c["notas_estad"][1].startswith("2/")
+    # títulos para las láminas (Gráficos DRAE): las cifras del cuadro y los productos que explican la variación
+    assert c["textos"] == {
+        "acumulado": "En el periodo enero-agosto 2026, las exportaciones disminuyeron 2,9 por ciento interanual, explicado por las menores ventas de petróleo crudo y derivados, principalmente.",
+        "mes": "En agosto de 2026, las exportaciones disminuyeron 28,2 por ciento interanual, explicado por las menores ventas de petróleo crudo y derivados, principalmente.",
+        "no_tradicionales": "Entre enero y agosto de 2026, las exportaciones no tradicionales se concentraron en cacao en grano (55,8 por ciento del total)."}
+    assert s["TOTAL EXPORTACIONES"]["var_mes"] == -28.2 and s["TOTAL EXPORTACIONES"]["var_acum"] == -2.9
     assert cliente.get("/v1/cuadros/exportaciones?departamento=16&periodo=2026-03").json()["cuadros"]["periodo"] == "2026-03"
 
 

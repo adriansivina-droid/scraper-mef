@@ -1160,6 +1160,9 @@
       caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay gráficos DRAE de ${esc(r.nombre)}.</b><span>Sube las SERIES de ${esc(r.nombre)} en la pestaña «Actualizar»: la página toma los gráficos con sus datos y los dibuja aquí.</span></div>`;
       return;
     }
+    // títulos para las láminas de exportaciones, con las cifras del sector Exportaciones (ESTAD cargado en la página)
+    let tx = null;
+    try { const ce = (await api(`/v1/cuadros/exportaciones?departamento=${r.cod}`)).cuadros; if (ce && ce.textos) tx = { ...ce.textos, periodo: ce.periodo }; } catch (e) { tx = null; }
     const D = window.DRAE, B = window.BCRP, hojas = [...new Set(d.graficos.map((g) => g.hoja))];
     const sel = draeFiltro[grupo] && hojas.includes(draeFiltro[grupo]) ? draeFiltro[grupo] : "";
     const lista = d.graficos.filter((g) => !sel || g.hoja === sel);
@@ -1167,6 +1170,10 @@
     caja.innerHTML = `<div class="fila controles"><label class="campo" for="drae-hoja">Hoja de las SERIES<select id="drae-hoja"><option value="">Todas (${d.graficos.length})</option>${hojas.map((h) => `<option${h === sel ? " selected" : ""}>${esc(h)}</option>`).join("")}</select></label>
         <button class="btn sec" type="button" id="drae-todo">Descargar los ${lista.length} (SVG)</button><span class="nota">De ${esc(d.archivo)} · cargado el ${esc(fecha(d.fecha))}</span></div>
       <p class="lead">Cada gráfico con los datos que guarda en las SERIES. <b>Copiar</b>, <b>SVG</b> y <b>PNG</b> llevan solo el gráfico (sin título, subtítulo ni fuente), para pegarlo en la lámina que ya tiene su título: Copiar lo deja listo para Ctrl+V en PowerPoint o Word y el SVG es vectorial. Si el título no es el correcto, corrígelo con <b>Título</b>.</p>
+      ${tx ? `<details class="caja drae-textos" open><summary><b>Títulos para las láminas de exportaciones</b> · desde el sector Exportaciones (ESTAD de ${esc(r.nombre)}, hasta ${esc(etqMes(tx.periodo))})</summary>
+        ${[["acumulado", "Enero-mes"], ["mes", "El mes"], ["no_tradicionales", "No tradicionales"]].filter(([k]) => tx[k]).map(([k, etq]) =>
+          `<div class="fila drae-texto"><span class="nota">${etq}</span><p class="parrafo">${esc(tx[k])}</p><button class="btn sec chico" type="button" data-dtexto="${k}">Copiar</button></div>`).join("")}
+        <p class="nota" id="drae-tmsj" aria-live="polite">Las cifras son las del cuadro de la síntesis; los productos, los que más explican la variación. Revísalo antes de pegarlo.</p></details>` : ""}
       <div class="drae-grid">${lista.map((g, k) => `<div class="caja drae-item"><div class="fila" style="justify-content:space-between;align-items:center"><span class="nota">${esc(g.hoja)} · N° ${g.orden}</span>
           <div class="fila"><button class="btn" type="button" data-dcopiar="${k}">Copiar</button><button class="btn sec" type="button" data-dsvg="${k}">SVG</button><button class="btn sec" type="button" data-dpng="${k}">PNG</button><button class="btn sec" type="button" data-dtit="${k}">Título</button><button class="btn sec" type="button" data-ddatos="${k}">Datos</button></div></div>
         <div class="bcrp-prev drae-prev" id="drae-v${k}"></div><div class="drae-datos" id="drae-d${k}" hidden></div><div class="bcrp-msj" id="drae-m${k}" aria-live="polite"></div></div>`).join("")}</div>`;
@@ -1174,6 +1181,10 @@
     const svgSolo = (k) => D.svg(lista[k], r.nombre, { soloGrafico: true });  // lo que se copia y descarga: solo el gráfico
     lista.forEach((g, k) => { try { $(`drae-v${k}`).innerHTML = svgDe(k); } catch (e) { $(`drae-v${k}`).innerHTML = `<div class="err-box"><b>No se pudo dibujar</b><span>${esc(e.message)}</span></div>`; } });
     const avisar = (k, t, ok) => { const m = $(`drae-m${k}`); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
+    caja.querySelectorAll("[data-dtexto]").forEach((bt) => bt.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(tx[bt.dataset.dtexto]); $("drae-tmsj").textContent = "Copiado: pégalo en el título de la lámina."; }
+      catch (e) { $("drae-tmsj").textContent = `No se pudo copiar: ${e.message}`; }
+    }));
     $("drae-hoja").addEventListener("change", (ev) => { draeFiltro[grupo] = ev.target.value; graficosDRAE(r, caja); });
     caja.querySelectorAll("[data-dcopiar]").forEach((b) => b.addEventListener("click", async () => { const k = +b.dataset.dcopiar;
       try { await B.copiar(svgSolo(k)); avisar(k, "Copiado (sin título): pégalo con Ctrl+V.", true); } catch (e) { avisar(k, e.message, false); } }));
