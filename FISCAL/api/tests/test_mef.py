@@ -146,14 +146,45 @@ def test_control_de_los_tres_archivos(cliente):
     r = cliente.post("/v1/cargas", files=[("archivos", ("output.zip", zip_de(s), "application/zip"))])
     assert r.status_code == 200, r.text
     dev = cliente.get("/v1/mef/archivos/control?archivo=dev-municipalidad").json()["control"]
-    assert [(f["depto"], f["anio"], f["estado"], f["meses"]) for f in dev] == [("01", 2025, "coincide", "01 a 02")]
-    assert dev[0]["nombre"] == "Amazonas"
+    assert len(dev) == 25 and [f["depto"] for f in dev] == [f"{i:02d}" for i in range(1, 26)]     # la lista completa del año
+    assert (dev[0]["depto"], dev[0]["anio"], dev[0]["estado"], dev[0]["meses"]) == ("01", 2025, "coincide", "01 a 02")
+    assert dev[0]["nombre"] == "Amazonas" and {f["estado"] for f in dev[1:]} == {"sin datos"}
     pim = cliente.get("/v1/mef/archivos/control?archivo=pim-funcion").json()["control"]
-    assert [(f["depto"], f["estado"], f["dif"]) for f in pim] == [("02", "revisar", -1000.0)]
-    assert pim[0]["funciones"] == [{"funcion": "22 Educación", "mef": 5000.0, "pagina": 4000.0, "dif": -1000.0}]
+    assert [(f["depto"], f["estado"], f["dif"]) for f in pim if f["estado"] != "sin datos"] == [("02", "revisar", -1000.0)]
+    assert pim[1]["funciones"] == [{"funcion": "22 Educación", "mef": 5000.0, "pagina": 4000.0, "dif": -1000.0}]
     muni = cliente.get("/v1/mef/archivos/control?archivo=pim-municipalidad").json()["control"]
-    assert [(f["depto"], f["estado"]) for f in muni] == [("03", "coincide")]
+    assert [(f["depto"], f["estado"]) for f in muni if f["estado"] != "sin datos"] == [("03", "coincide")]
     assert cliente.get("/v1/mef/archivos/control?archivo=otro").status_code == 422
+
+
+def test_corregir_pim_municipalidad(cliente, monkeypatch):
+    """PIM Función·Municipalidad: la lista trae los 25 departamentos; «sin control» (datos de una corrida que no guardó lo
+    publicado por el MEF) y «revisar» por más de S/ 200 se corrigen volviendo a raspar el departamento y año enteros."""
+    from tests.test_api import _csv, zip_de
+    import pandas as pd
+    suf = "TODOS LOS DEPARTAMENTOS"
+    fila = lambda d, v: dict(AÑO=2026, DEPARTAMENTO=d, FUNCION="18: SANEAMIENTO", MUNICIPALIDAD="M X", PIM=v)
+    r = cliente.post("/v1/cargas", files=[("archivos", ("o.zip", zip_de({
+        f"output/PIM/PIM X FUNCIÓN X MUNICIPALIDAD/DATA/PIM Funcion.Municipalidad 2026 - {suf}.csv": _csv(pd.DataFrame(
+            [fila("02: ÁNCASH", 1000.0), fila("16: LORETO", 900.0), fila("22: SAN MARTÍN", 500.0)])),
+        f"output/PIM/PIM X FUNCIÓN X MUNICIPALIDAD/CONTROL/CONTROL PIM Funcion.Municipalidad 2026 - {suf}.csv": _csv(pd.DataFrame([
+            dict(AÑO=2026, DEPARTAMENTO="02: ÁNCASH", COD_FUNCION="18", PIM_REF_GL=1000.0),
+            dict(AÑO=2026, DEPARTAMENTO="22: SAN MARTÍN", COD_FUNCION="18", PIM_REF_GL=420.0)]))}), "application/zip"))])
+    assert r.status_code == 200, r.text
+    muni = {f["depto"]: f for f in cliente.get("/v1/mef/archivos/control?archivo=pim-municipalidad").json()["control"]}
+    assert len(muni) == 25 and muni["16"]["nombre"] == "Loreto"
+    assert (muni["02"]["estado"], muni["16"]["estado"], muni["16"]["pagina"], muni["16"]["mef"], muni["22"]["estado"], muni["01"]["estado"]) == (
+        "coincide", "sin control", 900.0, None, "revisar", "sin datos")         # San Martín: +80, revisar pero bajo el umbral de S/ 200
+    lanzado = []
+    monkeypatch.setenv("GITHUB_ACCIONES_TOKEN", "tok")
+    monkeypatch.setattr(mef.requests, "post", lambda url, headers=None, json=None, timeout=None: lanzado.append(json) or Respuesta(204))
+    r = cliente.post("/v1/mef/archivos/corregir?archivo=pim-municipalidad&departamento=16&anio=2026").json()
+    assert r["lanzado"] and r["casos"] == [{"depto": "16", "anio": 2026, "dif": None, "estado": "sin control", "funciones": [], "nombre": "Loreto"}]
+    assert lanzado[-1]["inputs"] == {"archivo": "pim-municipalidad", "desde": "2026-01", "hasta": "2026-12", "departamentos": "16", "prueba": False}
+    r = cliente.post("/v1/mef/archivos/corregir?archivo=pim-municipalidad").json()      # todos: Loreto y los 22 sin datos
+    assert r["lanzado"] and "02" not in r["departamentos"].split(",") and "22" not in r["departamentos"].split(",")
+    assert len(r["departamentos"].split(",")) == 23 and lanzado[-1]["inputs"]["departamentos"] == r["departamentos"]
+    assert cliente.post("/v1/mef/archivos/corregir?archivo=otro").status_code == 422
 
 
 def test_cancelar_corrida(cliente, monkeypatch):
@@ -215,7 +246,7 @@ def test_huecos_y_remiendo_conservan_lo_guardado(cliente, monkeypatch):
     assert func["DEVENGADO"].sum() == 5310.0                  # la suma municipal también conserva el transporte
     # 3) el control marca transporte (-400) y el botón Corregir arma un remiendo solo de esa función
     control = cliente.get("/v1/mef/archivos/control?archivo=dev-municipalidad").json()["control"]
-    assert [(f["depto"], f["estado"], f["dif"]) for f in control] == [("02", "revisar", -400.0)]
+    assert [(f["depto"], f["estado"], f["dif"]) for f in control if f["estado"] != "sin datos"] == [("02", "revisar", -400.0)]
     lanzado = []
     monkeypatch.setenv("GITHUB_ACCIONES_TOKEN", "tok")
     monkeypatch.setattr(mef.requests, "post", lambda url, headers=None, json=None, timeout=None: lanzado.append(json) or Respuesta(204))
@@ -234,7 +265,7 @@ def test_huecos_y_remiendo_conservan_lo_guardado(cliente, monkeypatch):
     assert sorted(zip(guardado["FUNCION"], guardado["MUNICIPALIDAD"], guardado["DEVENGADO"])) == [
         ("15: TRANSPORTE", "MUNI A", 5100.0), ("15: TRANSPORTE", "MUNI B", 300.0), ("22: EDUCACION", "MUNI A", 310.0)]
     control = cliente.get("/v1/mef/archivos/control?archivo=dev-municipalidad").json()["control"]
-    assert [(f["depto"], f["estado"], f["mef"], f["pagina"]) for f in control] == [("02", "coincide", 5710.0, 5710.0)]
+    assert [(f["depto"], f["estado"], f["mef"], f["pagina"]) for f in control if f["estado"] != "sin datos"] == [("02", "coincide", 5710.0, 5710.0)]
 
 
 def test_extraer_funcion_reintenta_y_anota_huecos(monkeypatch):

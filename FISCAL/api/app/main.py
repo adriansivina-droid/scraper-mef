@@ -345,19 +345,24 @@ def mef_archivos_actualizar(archivo: str = Query(..., pattern="^(dev-municipalid
 
 
 @app.post("/v1/mef/archivos/corregir", dependencies=[Depends(acceso)])
-def mef_archivos_corregir(archivo: str = Query("dev-municipalidad", pattern="^dev-municipalidad$"), umbral: float = Query(200, ge=0),
+def mef_archivos_corregir(archivo: str = Query("dev-municipalidad", pattern="^(dev-municipalidad|pim-funcion|pim-municipalidad)$"),
+                          umbral: float = Query(200, ge=0),
                           departamento: str = Query(None, pattern=r"^\d{2}$"), anio: int = Query(None, ge=2000, le=2100)):
-    """Remiendo desde el control: vuelve a raspar solo los departamentos con diferencia mayor que `umbral` soles y solo sus
-    funciones que no cuadran (una corrida corta); la carga reemplaza solo esas funciones y deja las demás como estaban."""
+    """Remiendo desde el control: vuelve a raspar solo los departamentos con diferencia mayor que `umbral` soles. En DEV
+    Función·Municipalidad, solo sus funciones que no cuadran (la carga reemplaza solo esas y deja las demás); en los PIM,
+    el departamento y año enteros, también los que no tienen control guardado o no tienen datos."""
     if not mef.configurado():
         raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
     plan = controles.remiendo(archivo, umbral, departamento, anio)
     if plan is None:
-        return {"lanzado": False, "motivo": f"No hay departamentos con una diferencia mayor que S/ {umbral:,.0f} y funciones por corregir."}
+        return {"lanzado": False, "motivo": f"No hay departamentos con una diferencia mayor que S/ {umbral:,.0f} por corregir"
+                + (" con funciones que no cuadren." if archivo == "dev-municipalidad" else " ni sin control.")}
+    deps = "TODOS" if plan["departamentos"].count(",") == 24 else plan["departamentos"]
+    inputs = {"archivo": archivo, "desde": plan["desde"], "hasta": plan["hasta"], "departamentos": deps, "prueba": False}
+    if plan["funciones"]:
+        inputs["funciones"] = plan["funciones"]
     try:
-        mef.lanzar(plan["desde"], plan["hasta"], nombre="archivos",
-                   inputs={"archivo": archivo, "desde": plan["desde"], "hasta": plan["hasta"], "departamentos": plan["departamentos"],
-                           "funciones": plan["funciones"], "prueba": False})
+        mef.lanzar(plan["desde"], plan["hasta"], nombre="archivos", inputs=inputs)
     except ValueError as e:
         raise HTTPException(422, str(e))
     except (mef.ErrorGitHub, OSError) as e:
