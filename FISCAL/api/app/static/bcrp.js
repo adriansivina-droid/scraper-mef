@@ -22,6 +22,7 @@
 
   // título: «CUADRO N° 4» / «UCAYALI: PRODUCCIÓN PESQUERA» con llamada «1/» / «(Toneladas)»
   function cabecera(spec, W, y0) {
+    if (api.soloCuerpo) return { svg: "", y: Math.max(4, y0 - 12), tw: 0 };   // solo el cuadro o gráfico: el título va aparte
     const c = W / 2, out = [];
     let y = y0;
     if (spec.numero) { out.push(`<text x="${c}" y="${y}" text-anchor="middle" font-weight="bold" font-size="12">${esc(spec.numero)}</text>`); y += 15; }
@@ -32,6 +33,7 @@
     return { svg: out.join(""), y, tw };
   }
   function notas(lista, x, y) {
+    if (api.soloCuerpo) return { svg: "", y: y - 4 };                          // las notas van aparte
     const out = [];
     for (const n of lista) { out.push(`<text x="${x}" y="${y}" font-size="9">${esc(n)}</text>`); y += 11; }
     return { svg: out.join(""), y };
@@ -39,7 +41,10 @@
   const envolver = (W, H, cuerpo) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Math.ceil(H)}" viewBox="0 0 ${W} ${Math.ceil(H)}" font-family="${FUENTE}" fill="${TINTA}"><rect width="100%" height="100%" fill="#fff"/>${cuerpo}</svg>`;
 
   // ── Cuadro del texto: spec = {numero, titulo, llamada, unidad, cab: [[{t, span, linea}]], filas: [{c: [..], b, ind, sep, total}], notas, minCol}
-  const api = { ultimo: null };                          // el último cuadro dibujado (tipo y spec), para el Excel
+  const api = { ultimo: null, soloCuerpo: false };
+  // título y notas de un cuadro o gráfico, como texto (para mostrarlos aparte: «Referencia, no va en la imagen»)
+  api.textos = (spec) => ({ titulo: [spec.numero, `${spec.titulo || ""}${spec.llamada ? " " + spec.llamada : ""}`, spec.unidad].filter(Boolean),
+                            notas: [...(spec.notas || []), ELABORACION] });                          // el último cuadro dibujado (tipo y spec), para el Excel
   function cuadro(spec) {
     api.ultimo = { tipo: "cuadro", spec };
     const F = 11, filaH = 16, pad = 8, nCols = spec.filas.reduce((m, f) => Math.max(m, f.c.length), 0);

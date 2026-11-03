@@ -255,3 +255,16 @@ td.acciones-corrida .btn { margin-right: 10px; }
 .drae-texto .nota { min-width: 110px; }
 .drae-texto .parrafo { margin: 0; flex: 1; }
 @media (max-width: 640px) { .drae-texto { flex-wrap: wrap; } }
+
+/* «Referencia (no va en la imagen)»: título y notas de los cuadros y gráficos, aparte, en Arial 10 */
+.ref-img { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border: 1px dashed var(--hair); border-radius: var(--r-s);
+  background: var(--panel); padding: 8px 12px; margin: 8px 0; }
+.ref-img small { display: block; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--mid); font-weight: 600; }
+.ref-txt { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; display: flex; flex-direction: column; }
+.ref-img.titulo .ref-txt { text-align: center; align-items: center; flex: 1; }
+.ref-img.titulo > div { flex: 1; }
+.ref-img.titulo .ref-txt span:first-child { font-weight: bold; }
+.ref-img.titulo .ref-txt span:nth-child(2) { font-weight: bold; }
+.ref-img .btn { flex: none; }
+.drae-item .ref-img.titulo .ref-txt span:nth-child(2) { font-weight: normal; }
+.drae-texto .parrafo { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; text-align: left; }
