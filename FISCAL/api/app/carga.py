@@ -162,7 +162,7 @@ def leer_archivos(raiz):
         if ruta.suffix.lower() == ".xlsm" and sunat_impo.es_anual_pro(ruta):   # ANUAL_PRO - IMPORTACIONES (con macros)
             de_impo.append((n_archivo, ruta, "anual"))
             continue
-        if ruta.suffix.lower() == ".xlsx" and drae.depto_de(ruta.name):   # SERIES de un departamento: Gráficos DRAE
+        if ruta.suffix.lower() == ".xlsx" and drae.depto_de(ruta.name):   # SERIES o libro del DRAE de un departamento: Gráficos DRAE
             try:
                 graficos = drae.leer_series(ruta.read_bytes())
                 avisos.append(f"{ruta.name}: {drae.guardar(drae.depto_de(ruta.name), ruta.name, graficos)} gráficos DRAE guardados.")

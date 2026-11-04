@@ -1179,18 +1179,23 @@
   const draeFiltro = {};
   // capítulos y sectores del DRAE (como en la presentación): cada hoja de las SERIES va a su sector
   const DRAE_CAPS = [
-    { n: 1, t: "Actividad sectorial", sec: [["PBI y actividad productiva", /^(PBI|VAR PBI)(?!.*(CAP|PER|CORR))/], ["Agropecuario", /AGRI|SIEMBRA/], ["Pesca", /PESCA/],
-      ["Hidrocarburos y minería", /PETRO/], ["Manufactura", /MANUF/], ["Construcción", /CONSTRUC|CEMENT/], ["Turismo", /TURIS|ARRIBO|HOTEL/],
+    { n: 1, t: "Actividad sectorial", sec: [["PBI y actividad productiva", /^(PBI|VAR PBI)(?!.*(CAP|PER|CORR))|^ACT\.? ?ECON|EVOLUCION DEL PBI|ACTIVIDAD (ECONOMICA|PRODUCTIVA)/], ["Agropecuario", /AGRI|AGRO|SIEMBRA/], ["Pesca", /PESCA/],
+      ["Hidrocarburos y minería", /PETRO/], ["Manufactura", /MANUF/], ["Construcción", /CONSTRUC|CEMENT/], ["Transporte y comunicaciones", /TRANSPORTE/],
+      ["Administración pública y defensa", /DEFENSA/], ["Turismo", /TURIS|ARRIBO|HOTEL/],
       ["Electricidad", /ENERG/], ["Empleo formal", /EMPLEO\s+FORMAL/], ["Inflación", /INFLAC|IGPC/]] },
-    { n: 2, t: "Sector externo", sec: [["Evolución de las exportaciones", /^XS\b/], ["Productos"], ["Mercados de destino"], ["Aduanas"], ["Empresas exportadoras"]] },
+    { n: 2, t: "Sector externo", sec: [["Evolución de las exportaciones", /^XS\b|EXPORTAC/], ["Productos"], ["Mercados de destino"], ["Aduanas"], ["Empresas exportadoras"]] },
     { n: 3, t: "Sector fiscal", sec: [["Inversión pública", /INVER|^CUADROS (LOR|SM|UCA)|EJE\.? PIM|MUNICIPAL|PROYECTO/], ["Recaudación", /RECAUD/]] },
-    { n: 4, t: "Sector financiero", sec: [["Crédito", /CRED(?!.*DOLAR)/], ["Depósitos", /DEPOSIT|^DEP\./], ["Dolarización", /DOLAR/], ["Morosidad e indicadores", /MOROS|SSFF/]] },
+    { n: 4, t: "Sector financiero", sec: [["Crédito", /CRED(?!.*DOLAR)/], ["Depósitos", /DEPOSIT|^DEP\./], ["Dolarización", /DOLAR/], ["Morosidad e indicadores", /MORO|SSFF/],
+      ["Inclusión financiera", /TENENCIA|CTAS|CUENTA|INCLUSION/]] },
     { n: 5, t: "Situación social", sec: [["Empleo y desempleo", /PEA/], ["Informalidad", /INFORMAL/], ["Pobreza", /POBREZA/],
-      ["Otros indicadores sociales", /SITUACI|SIECYSC|INCORE|CAPITA|PERCAP|POBLA|CORR/]] },
+      ["Otros indicadores sociales", /SITUACI|SIECYSC|INCORE|CAPITA|PERCAP|POBLA|CORR|NBI|NECESIDADES/]] },
   ];
   const sinTilde = (x) => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
   function lugarDRAE(g) {
-    const h = sinTilde(g.hoja);
+    const l = lugarPor(g, sinTilde(g.hoja));
+    return l.cap < 6 ? l : lugarPor(g, sinTilde(g.titulo));   // hojas sin nombre claro («1.1.4»): por el título
+  }
+  function lugarPor(g, h) {
     if (/DOLAR/.test(h)) return { cap: 4, sec: "Dolarización" };
     for (const c of DRAE_CAPS) for (const [sec, re] of c.sec) if (re && re.test(h)) {
       if (c.n === 2) {                                   // en el sector externo, por lo que muestra el gráfico (su título)
@@ -1223,7 +1228,7 @@
     const lista = d.graficos.filter((g) => !sel || g.cap === sel)
       .sort((a, b) => a.cap - b.cap || caps[a.cap - 1].sec.findIndex((x) => x[0] === a.sec) - caps[b.cap - 1].sec.findIndex((x) => x[0] === b.sec) || a.orden - b.orden);
     const nombreDe = (g) => `DRAE ${r.corto} ${g.cap}. ${g.sec} ${String(g.orden).padStart(2, "0")} ${g.titulo || g.hoja}`;
-    const tarjeta = (g, k) => `<div class="caja drae-item"><div class="fila" style="justify-content:space-between;align-items:center"><span class="nota">${esc(g.hoja)} · N° ${g.orden}</span>
+    const tarjeta = (g, k) => `<div class="caja drae-item"><div class="fila" style="justify-content:space-between;align-items:center"><span class="nota"><span class="chip ${g.fuente === "DRAE" ? "ok" : "vacio"}">${g.fuente === "DRAE" ? "Libro del DRAE" : "SERIES"}</span> ${esc(g.hoja)} · N° ${g.orden > 1000 ? g.orden - 1000 : g.orden}</span>
           <div class="fila"><button class="btn" type="button" data-dcopiar="${k}">Copiar</button><button class="btn sec" type="button" data-dsvg="${k}">SVG</button><button class="btn sec" type="button" data-dpng="${k}">PNG</button><button class="btn sec" type="button" data-dtit="${k}">Título</button><button class="btn sec" type="button" data-ddatos="${k}">Datos</button></div></div>
         <div id="drae-t${k}"></div><div class="bcrp-prev drae-prev" id="drae-v${k}"></div><div id="drae-n${k}"></div><div class="drae-datos" id="drae-d${k}" hidden></div><div class="bcrp-msj" id="drae-m${k}" aria-live="polite"></div></div>`;
     const textosExpo = tx ? `<details class="caja drae-textos" open><summary><b>Títulos para las láminas de exportaciones</b> · desde el sector Exportaciones (ESTAD de ${esc(r.nombre)}, hasta ${esc(etqMes(tx.periodo))})</summary>
@@ -1241,7 +1246,7 @@
     }).join("");
     caja.innerHTML = `<div class="drae-caps" role="tablist">${[0, ...caps.map((c) => c.n)].filter((n) => !n || cuenta(n)).map((n) =>
         `<button type="button" class="drae-chip" data-dcap="${n}" aria-pressed="${n === sel}">${n ? `${n <= 5 ? `<i>${n}</i>` : ""}${esc(caps[n - 1].t)}` : "Todos"} <span>${n ? cuenta(n) : d.graficos.length}</span></button>`).join("")}</div>
-      <div class="fila controles"><button class="btn sec" type="button" id="drae-todo">Descargar los ${lista.length} (SVG)</button><span class="nota">De ${esc(d.archivo)} · cargado el ${esc(fecha(d.fecha))}</span></div>
+      <div class="fila controles"><button class="btn sec" type="button" id="drae-todo">Descargar los ${lista.length} (SVG)</button><span class="nota">${(d.archivos || [{ archivo: d.archivo, fecha: d.fecha }]).map((a) => `De ${esc(a.archivo)} · cargado el ${esc(fecha(a.fecha))}`).join(" · ")}</span></div>
       <p class="lead">Ordenados por capítulo y sector, como en el DRAE. Cada gráfico con los datos que guarda en las SERIES; la imagen lleva solo el gráfico y el título y la fuente van aparte, con su botón para copiarlos. Si el título no es el correcto, corrígelo con <b>Título</b>.</p>
       ${cuerpo}`;
     const svgSolo = (k) => D.svg(lista[k], r.nombre, { soloGrafico: true });  // lo que se ve, se copia y se descarga: solo el gráfico
@@ -1647,7 +1652,7 @@
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
       : s.actualizar === "hidro" ? `<div><div class="caja"><h3>PERUPETRO → página</h3><div id="hidro-caja"></div></div>${cajaSubida("sub-hidro", "Los CSV de producción o canon (PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv), o el Excel de exportaciones de crudo por empresa («Petróleo crudo - Loreto.xlsx», hoja Consolidado). Traen la serie completa y reemplazan lo cargado.")}</div>`
-      : s.actualizar === "series" ? cajaSubida("sub-series", `Las SERIES de ${esc(r.nombre)} tal como están (${{ lor: "SERIES LORETO (OFICIAL).xlsx", smn: "SERIES SMN … .xlsx", uca: "SERIES UCAYALI.xlsx" }[grupo]}; el nombre debe empezar con «SERIES» y el departamento). La página lee los datos que guarda cada gráfico, su tipo y sus series, y reemplaza los gráficos DRAE de ${esc(r.nombre)}.`)
+      : s.actualizar === "series" ? cajaSubida("sub-series", `Las SERIES de ${esc(r.nombre)} (${{ lor: "SERIES LORETO (OFICIAL).xlsx", smn: "SERIES SMN … .xlsx", uca: "SERIES UCAYALI.xlsx" }[grupo]}) y el libro de gráficos del DRAE (${{ lor: "DRAE_LOR_….xlsx", smn: "DRAE_SMT_Nov-26.xlsx", uca: "DRAE_Ucayali-….xlsx" }[grupo]}), tal como están: el nombre debe empezar con «SERIES» o «DRAE» y el departamento. La página lee los datos que guarda cada gráfico, su tipo y sus series; cada archivo reemplaza solo los gráficos de su fuente (las SERIES o el libro del DRAE) y se ordenan juntos por capítulo y sector.`)
       : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página.`)
       : s.actualizar === "estad" ? cajaSubida("sub-estad", `El libro ESTAD de ${esc(r.nombre)} tal como está (${{ lor: "ESTADLO.xlsx: hojas 15.Export e 16.Import", smn: "ESTADSMN.xlsx: hoja 14.XLS", uca: "ESTADUCA.xlsx: hoja 15.XLS" }[grupo]}). La página lee solo las columnas de cada mes (no las de Var.% ni los acumulados del final) y reemplaza los meses que trae.`)
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
