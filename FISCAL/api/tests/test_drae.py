@@ -69,6 +69,9 @@ def test_departamento_por_nombre():
     assert drae.depto_de("SERIES_SMN.xlsx") == "22" and drae.depto_de("SERIES SMN 04-2026.xlsx") == "22"
     assert drae.depto_de("SERIES UCAYALI.xlsx") == "25" and drae.depto_de("SERIES_UCA.xlsx") == "25"
     assert drae.depto_de("ESTADLO.xlsx") is None and drae.depto_de("SERIES_LIMA.xlsx") is None
+    # los libros de gráficos del DRAE
+    assert drae.depto_de("DRAE_SMT_Nov-26.xlsx") == "22" and drae.fuente_de("DRAE_SMT_Nov-26.xlsx") == "DRAE"
+    assert drae.depto_de("DRAE_Ucayali-Set26_Parte5.xlsx") == "25" and drae.fuente_de("SERIES_UCA.xlsx") == "SERIES"
 
 
 @pytest.fixture()
@@ -81,7 +84,7 @@ def cliente(tmp_path, monkeypatch):
 
 
 def test_subir_series_y_corregir_titulo(cliente):
-    assert cliente.get("/v1/drae?departamento=16").json() == {"archivo": None, "fecha": None, "graficos": []}
+    assert cliente.get("/v1/drae?departamento=16").json() == {"archivo": None, "fecha": None, "graficos": [], "archivos": []}
     r = cliente.post("/v1/cargas", files=[("archivos", ("SERIES LORETO (OFICIAL).xlsx", libro(), "application/octet-stream"))])
     assert r.status_code == 200, r.text
     assert r.json()["avisos"] == ["SERIES LORETO (OFICIAL).xlsx: 1 gráficos DRAE guardados."]
@@ -92,3 +95,15 @@ def test_subir_series_y_corregir_titulo(cliente):
     assert cliente.get("/v1/drae?departamento=16").json()["graficos"][0]["titulo"] == "Loreto: PBI"
     assert cliente.post("/v1/drae/titulo?departamento=16&orden=9", json={"titulo": "x"}).status_code == 404
     assert cliente.get("/v1/drae?departamento=15").status_code == 422
+
+
+def test_series_y_libro_del_drae_conviven(cliente):
+    """El libro del DRAE se guarda aparte de las SERIES (orden 1001…): subir uno no borra los del otro."""
+    subir = lambda nombre: cliente.post("/v1/cargas", files=[("archivos", (nombre, libro(), "application/octet-stream"))]).json()
+    assert subir("SERIES_SMN.xlsx")["avisos"] == ["SERIES_SMN.xlsx: 1 gráficos DRAE guardados."]
+    assert subir("DRAE_SMT_Nov-26.xlsx")["avisos"] == ["DRAE_SMT_Nov-26.xlsx: 1 gráficos DRAE guardados."]
+    d = cliente.get("/v1/drae?departamento=22").json()
+    assert [(g["orden"], g["fuente"]) for g in d["graficos"]] == [(1, "SERIES"), (1001, "DRAE")]
+    assert {a["archivo"] for a in d["archivos"]} == {"SERIES_SMN.xlsx", "DRAE_SMT_Nov-26.xlsx"}
+    subir("SERIES_SMN.xlsx")                                  # volver a subir las SERIES deja el libro del DRAE
+    assert [g["fuente"] for g in cliente.get("/v1/drae?departamento=22").json()["graficos"]] == ["SERIES", "DRAE"]

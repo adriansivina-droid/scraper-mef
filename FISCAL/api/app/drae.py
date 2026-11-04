@@ -26,15 +26,24 @@ NS = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
       "pr": "http://schemas.openxmlformats.org/package/2006/relationships"}
 TIPOS = {"barChart": "barras", "bar3DChart": "barras", "lineChart": "lineas", "line3DChart": "lineas", "areaChart": "area",
          "pieChart": "circular", "pie3DChart": "circular", "doughnutChart": "anillo", "scatterChart": "dispersion", "radarChart": "radar"}
-# departamento por el nombre del archivo: «SERIES LORETO (OFICIAL).xlsx», «SERIES_SMN.xlsx», «SERIES UCAYALI.xlsx»
-_RE_SERIES = re.compile(r"^SERIES[\s_\-]+(LORETO|LOR|SAN[\s_]*MART[IÍ]N|SMN|UCAYALI|UCA)\b", re.I)
-DEPTO = {"LOR": "16", "LORETO": "16", "SMN": "22", "SANMARTIN": "22", "SANMARTÍN": "22", "UCA": "25", "UCAYALI": "25"}
+# departamento y fuente por el nombre del archivo: las SERIES («SERIES LORETO (OFICIAL).xlsx», «SERIES_SMN.xlsx») o el
+# libro de gráficos del DRAE («DRAE_SMT_Nov-26.xlsx», «DRAE_Ucayali-Set26_Parte5.xlsx»)
+_RE_SERIES = re.compile(r"^(SERIES|DRAE)[\s_\-]+(LORETO|LOR|SAN[\s_]*MART[IÍ]N|SMN|SMT|UCAYALI|UCA)(?![A-Za-z])", re.I)
+DEPTO = {"LOR": "16", "LORETO": "16", "SMN": "22", "SMT": "22", "SANMARTIN": "22", "SANMARTÍN": "22", "UCA": "25", "UCAYALI": "25"}
+NOMBRE = {"16": "Loreto", "22": "San Martín", "25": "Ucayali"}
+BASE_DRAE = 1000            # los gráficos del libro del DRAE van con orden 1001, 1002… (los de las SERIES, 1, 2…)
 
 
 def depto_de(nombre):
-    """'16' / '22' / '25' si el nombre es el de unas SERIES, si no None."""
+    """'16' / '22' / '25' si el nombre es el de unas SERIES o un libro del DRAE, si no None."""
     m = _RE_SERIES.match(posixpath.basename(nombre).strip())
-    return DEPTO.get(re.sub(r"[\s_]", "", m.group(1)).upper()) if m else None
+    return DEPTO.get(re.sub(r"[\s_]", "", m.group(2)).upper()) if m else None
+
+
+def fuente_de(nombre):
+    """'SERIES' o 'DRAE' según el nombre del archivo."""
+    m = _RE_SERIES.match(posixpath.basename(nombre).strip())
+    return m.group(1).upper() if m else None
 
 
 def _xml(z, ruta):
@@ -367,11 +376,23 @@ def _tabla():
 
 
 def guardar(depto, archivo, graficos):
-    """Reemplaza los gráficos DRAE del departamento por los de este libro."""
+    """Reemplaza los gráficos del departamento que vienen de esa fuente (SERIES o libro del DRAE) por los de este libro.
+    Del libro del DRAE se dejan fuera los gráficos auxiliares (una sola categoría), las copias rotas (una serie con
+    #¡REF!) y las series auxiliares («Aux2018»)."""
     _tabla()
+    fuente = fuente_de(archivo) or "SERIES"
+    if fuente == "DRAE":
+        roto = lambda g: any("#" in x["nombre"] and "REF" in x["nombre"].upper() for x in g["series"])
+        graficos = [g for g in graficos if len([c for c in g["categorias"] if str(c).strip()]) >= 2 and not roto(g)]
+        for i, g in enumerate(graficos):
+            g["orden"] = BASE_DRAE + i + 1
+            g["series"] = [x for x in g["series"] if not re.match(r"^aux", x["nombre"].strip(), re.I)] or g["series"]
+    for g in graficos:
+        g["fuente"] = fuente
     ahora = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    rango = "orden > :b" if fuente == "DRAE" else "orden <= :b"
     with db.motor().begin() as cx:
-        cx.execute(text("DELETE FROM drae_graficos WHERE depto = :d"), {"d": depto})
+        cx.execute(text(f"DELETE FROM drae_graficos WHERE depto = :d AND {rango}"), {"d": depto, "b": BASE_DRAE})
         for g in graficos:
             cx.execute(text("INSERT INTO drae_graficos (depto, orden, hoja, spec, archivo, fecha) VALUES (:d, :o, :h, :s, :a, :f)"),
                        {"d": depto, "o": g["orden"], "h": g["hoja"], "s": json.dumps(g, ensure_ascii=False), "a": archivo, "f": ahora})
@@ -384,8 +405,12 @@ def leer(depto):
     with db.motor().connect() as cx:
         filas = cx.execute(text("SELECT spec, archivo, fecha FROM drae_graficos WHERE depto = :d ORDER BY orden"), {"d": depto}).all()
     if not filas:
-        return {"archivo": None, "fecha": None, "graficos": []}
-    return {"archivo": filas[0][1], "fecha": filas[0][2], "graficos": [json.loads(f[0]) for f in filas]}
+        return {"archivo": None, "fecha": None, "graficos": [], "archivos": []}
+    archivos = {}
+    for f in filas:
+        archivos.setdefault(f[1], f[2])
+    return {"archivo": filas[0][1], "fecha": filas[0][2], "graficos": [json.loads(f[0]) for f in filas],
+            "archivos": [{"archivo": a, "fecha": fe} for a, fe in archivos.items()]}
 
 
 def cambiar_titulo(depto, orden, titulo, subtitulo):
