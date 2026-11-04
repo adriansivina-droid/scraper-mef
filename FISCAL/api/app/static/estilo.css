@@ -268,3 +268,20 @@ td.acciones-corrida .btn { margin-right: 10px; }
 .ref-img .btn { flex: none; }
 .drae-item .ref-img.titulo .ref-txt span:nth-child(2) { font-weight: normal; }
 .drae-texto .parrafo { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; text-align: left; }
+
+/* Gráficos DRAE ordenados por capítulo y sector */
+.drae-caps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.drae-chip { border: 1px solid var(--hair); background: var(--paper); border-radius: 999px; padding: 7px 14px; cursor: pointer; font-weight: 600; color: var(--navy); display: flex; align-items: center; gap: 8px; }
+.drae-chip i { font-style: normal; background: var(--navy); color: #FEFEFE; border-radius: 4px; min-width: 20px; text-align: center; font-size: 12px; padding: 1px 4px; }
+.drae-chip span { color: var(--mid); font-weight: 500; font-size: 12px; }
+.drae-chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #FEFEFE; }
+.drae-chip[aria-pressed="true"] i { background: #FEFEFE; color: var(--navy); }
+.drae-chip[aria-pressed="true"] span { color: var(--gold); }
+.drae-cap { margin-top: 24px; }
+.drae-cap-t { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-size: 24px; color: var(--navy); margin: 0 0 8px; padding-bottom: 8px; border-bottom: 2px solid var(--navy); }
+.drae-cap-t i { font-style: normal; background: var(--navy); color: #FEFEFE; border-left: 6px solid var(--hair); min-width: 34px; text-align: center; padding: 2px 6px; }
+.drae-cap-t small { margin-left: auto; font-family: var(--font); font-size: 13px; color: var(--mid); font-weight: 500; }
+.drae-secs { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 12px; font-size: 13px; }
+.drae-secs a { color: var(--link); text-decoration: none; } .drae-secs a:hover { text-decoration: underline; }
+.drae-secs span, .drae-sec-t span { color: var(--mid); font-weight: 500; font-size: 12px; }
+.drae-sec-t { font-size: 16px; color: var(--navy); margin: 18px 0 10px; scroll-margin-top: 80px; }
