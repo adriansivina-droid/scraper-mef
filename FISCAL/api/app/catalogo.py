@@ -92,7 +92,11 @@ BASES = {b.id: b for b in [
     # Empleo (EMPLEO/empleo.md): trabajadores asalariados privados formales por región y actividad
     Base("empleo", "empleo", "Trabajadores asalariados privados formales", "Empleo", "EMPLEO",
          ["AÑO", "MES", "REGIÓN", "ACTIVIDAD_ECONOMICA", "EMPLEO"], [8, 6, 20, 24, 12], valor="EMPLEO", usa_niveles=False,
-         descripcion="MTPE (PLAME y T-Registro): trabajadores asalariados privados formales por mes, región y actividad económica."),
+         descripcion="MTPE (PLAME y T-Registro): trabajadores asalariados privados formales por mes y región (total de la región)."),
+    Base("empleo-sectores", "empleo", "Trabajadores por sectores (actividad económica)", "Empleo por sectores", "EMPLEO SECTORES",
+         ["AÑO", "MES", "REGIÓN", "ACTIVIDAD_ECONOMICA", "EMPLEO"], [8, 6, 20, 24, 12], valor="EMPLEO", usa_niveles=False,
+         descripcion="MTPE (PLAME y T-Registro): trabajadores por mes, región y actividad económica (Agrícola, Minería, Manufactura, "
+                     "Construcción, Comercio, Servicios y No precisa). Aparte del total, que vive en «empleo»."),
     # Hidrocarburos (HIDROCARBUROS/perupetro_produccion.md): los CSV que el flujo diario deja en Drive (DATA)
     Base("hidro-produccion", "hidrocarburos", "Producción fiscalizada por lote", "Producción de hidrocarburos", "HIDROCARBUROS",
          ["AÑO", "MES", "DEPARTAMENTO", "ZONA", "OPERADOR", "LOTE", "LOTE_HISTORICO", "PRODUCTO", "UNIDAD", "VOLUMEN", "PROMEDIO_DIARIO", "FUENTE"],

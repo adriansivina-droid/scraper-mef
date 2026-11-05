@@ -152,6 +152,25 @@ def totales(df, desde=2025):
 
 
 COLUMNAS_TOTAL = ["AÑO", "MES", "REGIÓN", "EMPLEO", "VAR_%"]
+ACTIVIDADES = ["Agrícola", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "No precisa"]
+
+
+def de_actividad(df, actividad):
+    """Las filas de una actividad, con la forma del total (para reusar totales(), excel_totales() y long_totales())."""
+    d = df[df["ACTIVIDAD_ECONOMICA"].map(_clave) == _clave(actividad)]
+    return d.assign(ACTIVIDAD_ECONOMICA="Total")
+
+
+def long_sectores(df, desde):
+    """Todas las actividades en formato LONG: AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO, VAR_%."""
+    partes = []
+    for a in ACTIVIDADES:
+        x = long_totales(totales(de_actividad(df, a), desde))
+        x.insert(3, "ACTIVIDAD_ECONOMICA", a)
+        partes.append(x)
+    out = pd.concat(partes, ignore_index=True)
+    orden = {a: i for i, a in enumerate(ACTIVIDADES)}
+    return out.sort_values(["REGIÓN", "ACTIVIDAD_ECONOMICA", "AÑO", "MES"], key=lambda c: c.map(orden) if c.name == "ACTIVIDAD_ECONOMICA" else c).reset_index(drop=True)
 
 
 def long_totales(x):
@@ -162,16 +181,17 @@ def long_totales(x):
     return pd.DataFrame(filas, columns=COLUMNAS_TOTAL)
 
 
-def excel_totales(x):
+def excel_totales(x, titulo="TRABAJADORES ASALARIADOS PRIVADOS FORMALES POR REGIÓN"):
     """Las regiones en filas y los meses en columnas: una hoja con el número de trabajadores y otra con la var. %."""
     wb = Workbook()
     neg = Font(bold=True)
     meses = [f"{a}-{m:02d}" for a in x["anios"] for m in range(1, 13) if f"{a}-{m:02d}" <= (x["ultimo"] or "")]
+    titulo_hoja = titulo
     for i, (hoja, clave, titulo, fmt) in enumerate((("Trabajadores", "valores", "(Número de trabajadores)", "#,##0"),
                                                     ("Var. %", "var", "(Variación % respecto a similar mes del año anterior)", "0.0"))):
         ws = wb.active if i == 0 else wb.create_sheet()
         ws.title = hoja
-        ws.append(["TRABAJADORES ASALARIADOS PRIVADOS FORMALES POR REGIÓN"]); ws.append([titulo]); ws.append([])
+        ws.append([titulo_hoja]); ws.append([titulo]); ws.append([])
         ws.append(["Región"] + [etiqueta(int(m.replace("-", "")), True) for m in meses])
         for r in x["regiones"]:
             ws.append([r["region"]] + [r[clave].get(m) for m in meses])
