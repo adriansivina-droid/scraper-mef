@@ -107,3 +107,29 @@ def test_long_grupos_y_todas(cliente):
     assert "filename*=UTF-8''Loreto_San_Mart%C3%ADn_Ucayali_empleo.csv" in r.headers["content-disposition"]
     cat = cliente.get("/v1/catalogo").json()["empleo"]
     assert len(cat["regiones"]) == 26 and all(set(g) <= set(cat["regiones"]) for g in cat["grupos"].values())
+
+
+def test_solo_el_total_desde_2025(cliente):
+    """El scraper nuevo trae solo «Total» por región: reemplaza los sectores de esos meses y da el total por mes."""
+    filas = [dict(AÑO=a, MES=m, REGIÓN=r, ACTIVIDAD_ECONOMICA="Total", EMPLEO=v)
+             for r, base in (("Loreto", 40000), ("Ucayali", 20000))
+             for (a, m), v in {(2025, 4): base, (2025, 5): base + 100, (2026, 4): base + 1000, (2026, 5): base + 2000}.items()]
+    buf = io.BytesIO()
+    pd.DataFrame(filas).to_excel(buf, index=False)
+    r = cliente.post("/v1/cargas", files=[("archivos", ("2_regiones_empleo.xlsx", buf.getvalue(), "application/octet-stream"))])
+    assert r.status_code == 200, r.text
+    c = cliente.get("/v1/cuadros/empleo?departamento=16&periodo=2026-05").json()["cuadros"]
+    assert not c["por_sectores"] and [f["rama"] for f in c["cuadro"]] == ["Total"] and c["anexo"] == []
+    assert c["cuadro"][0]["mes"] == 42000 and c["cuadro"][0]["var_mes"] == 4.7
+    assert c["mensual"][3] == {"mes": "Abril", "anterior": 40000.0, "actual": 41000.0, "var": 2.5}
+    assert c["mensual"][5] == {"mes": "Junio", "anterior": None, "actual": None, "var": None}
+    # diciembre 2025 conserva los sectores que ya estaban (no vino en el archivo nuevo)
+    assert c["cuadro"][0]["diciembre"] == 39637
+    t = cliente.get("/v1/empleo/totales?desde=2025").json()
+    assert t["anios"] == [2025, 2026] and t["ultimo"] == "2026-05"
+    lor = next(x for x in t["regiones"] if x["region"] == "Loreto")
+    assert lor["valores"]["2026-05"] == 42000 and lor["var"]["2026-04"] == 2.5 and lor["var"]["2025-04"] is None
+    assert {x["region"] for x in t["regiones"]} >= {"Loreto", "Ucayali", "Lima Metropolitana"}
+    x = cliente.get("/v1/empleo/totales?desde=2025&formato=xlsx")
+    ws = load_workbook(io.BytesIO(x.content))["Trabajadores"]
+    assert ws["A4"].value == "Región" and ws["B4"].value == "Ene. 2025"
