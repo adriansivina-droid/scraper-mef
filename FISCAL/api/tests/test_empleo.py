@@ -48,14 +48,14 @@ def cliente(tmp_path, monkeypatch):
 
 
 def test_carga(cliente):
-    e = cliente.get("/v1/estado").json()["bases"]["empleo"]
+    e = cliente.get("/v1/estado").json()["bases"]["empleo-sectores"]     # los sectores van a su base aparte
     assert e["departamentos"] == ["15", "16"] and e["desde"] == "2025-04" and e["hasta"] == "2026-04"
     avisos = cliente.get("/v1/estado").json()["ultima_carga"]["resumen"]["avisos"]
     assert any("Perú" in a for a in avisos)                      # el total nacional no se guarda
 
 
 def test_lima_metropolitana_y_provincias_no_se_pisan(cliente):
-    d = cliente.get("/v1/descargas?base=empleo&departamento=15&desde=2026-01&hasta=2026-12&formato=json").json()["empleo"]["datos"]
+    d = cliente.get("/v1/descargas?base=empleo-sectores&departamento=15&desde=2026-01&hasta=2026-12&formato=json").json()["empleo-sectores"]["datos"]
     assert sorted(f["REGIÓN"] for f in d) == ["Lima Metropolitana", "Lima Provincias"]
 
 
@@ -138,3 +138,20 @@ def test_solo_el_total_desde_2025(cliente):
     f = lg[(lg["REGIÓN"] == "Loreto") & (lg["AÑO"] == 2026) & (lg["MES"] == 4)].iloc[0]
     assert (f["EMPLEO"], f["VAR_%"]) == (41000, 2.5)
     assert cliente.get("/v1/empleo/totales?desde=2025&formato=csv").text.lstrip("\ufeff").startswith("AÑO,MES,REGIÓN,EMPLEO,VAR_%\n2026,4,Lima Metropolitana,100,")
+
+
+def test_sectores_aparte_del_total(cliente):
+    """Los sectores viven en «empleo-sectores»: subir el total no los borra y subir sectores no cambia el total."""
+    total = pd.DataFrame([dict(AÑO=2026, MES=4, REGIÓN="Loreto", ACTIVIDAD_ECONOMICA="Total", EMPLEO=40000)])
+    buf = io.BytesIO(); total.to_excel(buf, index=False)
+    cliente.post("/v1/cargas", files=[("archivos", ("Loreto_empleo.xlsx", buf.getvalue(), "application/octet-stream"))])
+    c = cliente.get("/v1/cuadros/empleo?departamento=16&periodo=2026-04").json()["cuadros"]
+    assert c["por_sectores"] and c["cuadro"][-1]["mes"] == 40000 and c["cuadro"][0]["mes"] == 3373   # Agrícola sigue ahí
+    s = cliente.get("/v1/empleo/sectores?desde=2025&actividad=Comercio").json()
+    lor = next(x for x in s["regiones"] if x["region"] == "Loreto")
+    assert lor["valores"]["2026-04"] == 10469 and lor["var"]["2026-04"] == 1.7
+    lg = pd.read_excel(io.BytesIO(cliente.get("/v1/empleo/sectores?desde=2025&formato=long").content))
+    assert list(lg.columns) == ["AÑO", "MES", "REGIÓN", "ACTIVIDAD_ECONOMICA", "EMPLEO", "VAR_%"]
+    assert set(lg["ACTIVIDAD_ECONOMICA"]) >= {"Agrícola", "Comercio", "No precisa"}
+    assert cliente.get("/v1/empleo/sectores?actividad=Pesca").status_code == 422
+    assert cliente.get("/v1/empleo/sectores?actividad=Minería&formato=xlsx").status_code == 200

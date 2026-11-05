@@ -62,7 +62,10 @@ def sustituir_colab():
     sys.modules["google.colab"], sys.modules["google.colab.files"] = colab, files
 
 
-def celdas(seleccion, desde=None):
+SECTORES = ["Agrícola", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "No precisa"]
+
+
+def celdas(seleccion, desde=None, sectores=False):
     """Las celdas de código del notebook, con la pregunta de regiones respondida y, si se pide, otro DESDE_ANIO."""
     nb = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
     salida, pregunta = [], False
@@ -76,6 +79,8 @@ def celdas(seleccion, desde=None):
                 continue
             if re.match(r"^entrada\s*=\s*input\(", linea):
                 linea, pregunta = f"entrada = {seleccion!r}", True
+            if sectores and re.match(r"^ACTIVIDADES\s*=", linea):
+                linea = f"ACTIVIDADES = {SECTORES!r}"
             if desde and re.match(r"^DESDE_ANIO\s*=", linea):
                 linea = f"DESDE_ANIO = {int(desde)}"
             lineas.append(linea)
@@ -119,7 +124,7 @@ class Avance:
         return getattr(self.salida, k)
 
 
-def raspar(seleccion, desde=None):
+def raspar(seleccion, desde=None, sectores=False):
     TRABAJO.mkdir(parents=True, exist_ok=True)
     for viejo in TRABAJO.glob("*_empleo.xlsx"):
         viejo.unlink()
@@ -129,7 +134,7 @@ def raspar(seleccion, desde=None):
     avance = Avance(sys.stdout)
     avance.marcar(0.0, "abriendo el tablero del MTPE")
     sys.stdout = avance
-    for i, codigo in enumerate(celdas(seleccion, desde), 1):
+    for i, codigo in enumerate(celdas(seleccion, desde, sectores), 1):
         print(f"\n── celda {i} ──", flush=True)
         obj = compile(codigo, f"empleo.ipynb#celda{i}", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
         resultado = eval(obj, g)                        # una celda con «await» devuelve una corrutina
@@ -149,21 +154,50 @@ def cargar(ruta):
     return carga.cargar(f"scraper de empleo en GitHub Actions ({datetime.now():%Y-%m-%d %H:%M})", [(ruta.name, ruta.read_bytes())])
 
 
+def control_sectores(df):
+    """Compara la suma de los 7 sectores con el total de la región guardado en la base (base «empleo»): una diferencia
+    grande delata un filtro de actividad que no tomó (la región entera contada como un sector)."""
+    sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
+    from app import db, empleo
+    tot = db.leer("empleo", sorted({empleo.depto_de(r) for r in df["REGIÓN"]}), [], "1990-01", "2100-12")
+    tot = tot[tot["ACTIVIDAD_ECONOMICA"].str.lower() == "total"].assign(K=lambda d: d["REGIÓN"].map(empleo._clave))
+    suma = df.assign(K=df["REGIÓN"].map(empleo._clave)).groupby(["K", "REGIÓN", "AÑO", "MES"], as_index=False)["EMPLEO"].sum()
+    m = suma.merge(tot[["K", "AÑO", "MES", "EMPLEO"]].rename(columns={"EMPLEO": "TOTAL"}), on=["K", "AÑO", "MES"], how="left")
+    m["DIF_%"] = (m["EMPLEO"] / m["TOTAL"] - 1) * 100
+    malos = m[m["TOTAL"].notna() & (m["DIF_%"].abs() > 1)]
+    faltan = df.groupby("REGIÓN")["ACTIVIDAD_ECONOMICA"].nunique()
+    faltan = faltan[faltan < len(SECTORES)]
+    salida = ["", f"**Control suma de sectores = total:** {len(m) - len(malos)} de {len(m)} región-mes cuadran (±1 %)."]
+    if len(malos):
+        salida.append("Regiones con diferencias (revisar y volver a correr con --regiones): "
+                      + ", ".join(f"{r} ({n} meses)" for r, n in malos.groupby("REGIÓN").size().items()))
+    if len(faltan):
+        salida.append("Regiones con actividades faltantes: " + ", ".join(f"{r} ({n} de 7)" for r, n in faltan.items()))
+    print("\n".join(salida))
+    return salida
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--regiones", default="TODAS", help="TODAS, LOR,SMN,UCA o nombres separados por comas («La Libertad,Piura»)")
+    ap.add_argument("--sectores", action="store_true", help="por actividad económica (7 sectores); se guarda en la base aparte «empleo-sectores»")
     ap.add_argument("--desde", type=int, default=None, help="primer año a guardar (por defecto, el DESDE_ANIO del notebook: 2025)")
     a = ap.parse_args()
     lineas = [f"## Scraper de empleo (MTPE) · {a.regiones} · {datetime.now():%d/%m/%Y %H:%M}", ""]
     t0, ok = time.time(), True
     try:
-        ruta = raspar(seleccion(a.regiones), a.desde)
+        ruta = raspar(seleccion(a.regiones), a.desde, a.sectores)
+        if a.sectores:                                  # otro nombre, para no confundirlo con el del total
+            ruta = ruta.rename(ruta.with_name(ruta.name.replace("_empleo.xlsx", "_empleo_sectores.xlsx")))
         import pandas as pd
         df = pd.read_excel(ruta)
         ultimo = df.assign(P=df["AÑO"] * 100 + df["MES"]).groupby("REGIÓN")["P"].max()
         lineas.append(f"**Raspado: ✅** {len(df):,} filas en {(time.time() - t0) / 60:.1f} min ({ruta.name}).")
-        lineas += ["", "| Región | Meses | Desde | Último mes |", "|---|---|---|---|"]
-        lineas += [f"| {r} | {len(df[df['REGIÓN'] == r])} | {df[df['REGIÓN'] == r]['AÑO'].min()}-{df[(df['REGIÓN'] == r)].sort_values(['AÑO', 'MES'])['MES'].iloc[0]:02d} | {p // 100}-{p % 100:02d} |" for r, p in ultimo.items()]
+        lineas += ["", "| Región | Actividades | Meses | Desde | Último mes |", "|---|---|---|---|---|"]
+        for r, p in ultimo.items():
+            d = df[df["REGIÓN"] == r].sort_values(["AÑO", "MES"])
+            lineas.append(f"| {r} | {d['ACTIVIDAD_ECONOMICA'].nunique()} | {len(d[['AÑO', 'MES']].drop_duplicates())} | "
+                          f"{d['AÑO'].iloc[0]}-{d['MES'].iloc[0]:02d} | {p // 100}-{p % 100:02d} |")
         if not os.environ.get("DATABASE_URL"):
             lineas.append("⚠ Falta DATABASE_URL: no se cargó en la base de datos.")
             ok = False
@@ -174,6 +208,12 @@ def main():
                        + (f" {x['filas']:,} filas · {x['periodos'][0]} a {x['periodos'][-1]}" if x else "")]
             lineas += [f"- {m}" for m in r["avisos"]]
             ok = bool(x)
+            if a.sectores:
+                x = r["bases"].get("empleo-sectores")
+                lineas[-1 - len(r["avisos"])] = (f"**Carga en la base de datos (empleo-sectores): {'✅' if x else '❌'}**"
+                                                 + (f" {x['filas']:,} filas · {x['periodos'][0]} a {x['periodos'][-1]}" if x else ""))
+                ok = bool(x)
+                lineas += control_sectores(df)
     except BaseException as e:
         traceback.print_exc()
         lineas.append(f"**❌ {type(e).__name__}: {str(e)[:500]}**")

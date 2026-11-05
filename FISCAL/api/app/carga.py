@@ -270,7 +270,12 @@ def leer_archivos(raiz):
     if de_empleo:
         df, avisos_empleo = empleo.leer(de_empleo)
         if not df.empty:
-            bases["empleo"] = df
+            # el total de cada región va a «empleo»; las actividades, a su base aparte (no se pisan)
+            es_total = df["ACTIVIDAD_ECONOMICA"].str.strip().str.lower() == "total"
+            if es_total.any():
+                bases["empleo"] = df[es_total].copy()
+            if (~es_total).any():
+                bases["empleo-sectores"] = df[~es_total].copy()
         avisos += avisos_empleo
     if de_hidro:
         de_hidrocarburos, avisos_hidro = hidrocarburos.leer(de_hidro)

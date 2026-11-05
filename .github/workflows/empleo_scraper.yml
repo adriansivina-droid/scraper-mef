@@ -4,7 +4,7 @@
 #   · a mano: Actions → «Empleo · scraper del MTPE» → Run workflow, o el botón «Actualizar empleo» de la página
 # Requiere el secreto DATABASE_URL. El Excel queda como artefacto de la corrida (30 días).
 name: Empleo · scraper del MTPE
-run-name: "Scraper de empleo · ${{ inputs.regiones || 'TODAS' }}"
+run-name: "Scraper de empleo · ${{ inputs.regiones || 'TODAS' }}${{ inputs.sectores && ' · sectores' || '' }}${{ inputs.desde && format(' · desde {0}', inputs.desde) || '' }}"
 
 on:
   schedule:
@@ -15,6 +15,10 @@ on:
         description: "Regiones: TODAS, LOR,SMN,UCA o nombres separados por comas (p. ej. La Libertad,Piura); solo se reemplazan esas"
         type: string
         default: "TODAS"
+      sectores:
+        description: "Por sectores (7 actividades; base aparte «empleo-sectores», no toca el total)"
+        type: boolean
+        default: false
       desde:
         description: "Primer año a guardar (vacío = 2025; 2016 = todos los años del tablero)"
         type: string
@@ -50,15 +54,16 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           REGIONES: ${{ inputs.regiones || 'TODAS' }}
           DESDE: ${{ inputs.desde }}
+          SECTORES: ${{ inputs.sectores && '--sectores' || '' }}
           EMPLEO_TRABAJO: ${{ runner.temp }}/empleo
           PYTHONUNBUFFERED: "1"
-        run: python EMPLEO/automatizacion/empleo_servidor.py --regiones "$REGIONES" ${DESDE:+--desde "$DESDE"}
+        run: python EMPLEO/automatizacion/empleo_servidor.py --regiones "$REGIONES" ${DESDE:+--desde "$DESDE"} $SECTORES
 
       - name: Guardar el Excel como artefacto
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: empleo
-          path: ${{ runner.temp }}/empleo/*_empleo.xlsx
+          path: ${{ runner.temp }}/empleo/*_empleo*.xlsx
           retention-days: 30
           if-no-files-found: ignore

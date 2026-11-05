@@ -399,15 +399,22 @@ def empleo_estado():
 
 
 @app.post("/v1/empleo/actualizar", dependencies=[Depends(acceso)])
-def empleo_actualizar(regiones: str = Query("TODAS", pattern=r"^[A-Za-zÁÉÍÓÚáéíóúÑñ ,]{3,300}$")):
+def empleo_actualizar(regiones: str = Query("TODAS", pattern=r"^[A-Za-zÁÉÍÓÚáéíóúÑñ ,]{3,300}$"),
+                      desde: str = Query("", pattern=r"^(|20\d\d)$"), sectores: bool = False):
     """Lanza el scraper de empleo (Power BI del MTPE) en GitHub Actions; al terminar carga los datos en la base."""
     if not mef.configurado():
         raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
     try:
-        mef.lanzar(nombre="empleo", inputs={"regiones": regiones})
+        mef.lanzar(nombre="empleo", inputs={"regiones": regiones, "desde": desde, "sectores": sectores})
     except (mef.ErrorGitHub, OSError) as e:
         raise HTTPException(502, str(e))
     return {"lanzado": True, "regiones": regiones}
+
+
+def _empleo_todo(deptos, desde, hasta):
+    """El total de cada región (base «empleo») y los sectores (base «empleo-sectores») juntos, como el Excel del scraper.
+    Donde hay fila «Total» manda esa; si una región solo tiene sectores, el total es su suma."""
+    return pd.concat([db.leer("empleo", deptos, [], desde, hasta), db.leer("empleo-sectores", deptos, [], desde, hasta)], ignore_index=True)
 
 
 @app.get("/v1/empleo/totales", dependencies=[Depends(acceso)])
@@ -416,7 +423,7 @@ def empleo_totales(desde: int = Query(2025, ge=2000, le=2100), formato: str = Qu
     variación % respecto al mismo mes del año anterior. xlsx: regiones en filas y meses en columnas; long (Excel) y csv:
     una fila por región y mes (AÑO, MES, REGIÓN, EMPLEO, VAR_%)."""
     deptos = sorted({empleo.depto_de(r) for r in empleo.REGIONES})
-    x = empleo.totales(db.leer("empleo", deptos, [], f"{desde - 1}-01", "2100-12"), desde)
+    x = empleo.totales(_empleo_todo(deptos, f"{desde - 1}-01", "2100-12"), desde)
     hasta = (x["ultimo"] or "")[:4]
     if formato in ("long", "csv"):
         df = empleo.long_totales(x)
@@ -431,6 +438,32 @@ def empleo_totales(desde: int = Query(2025, ge=2000, le=2100), formato: str = Qu
         return Response(empleo.excel_totales(x), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(f"Empleo total por región {desde}-{(x['ultimo'] or '')[:4]}.xlsx"))
     return x
+
+
+@app.get("/v1/empleo/sectores", dependencies=[Depends(acceso)])
+def empleo_sectores(desde: int = Query(2016, ge=2000, le=2100), actividad: str = "Agrícola",
+                    formato: str = Query("json", pattern="^(json|xlsx|long|csv)$")):
+    """Trabajadores de cada región por mes en una actividad económica (base aparte «empleo-sectores»), con la var. %
+    interanual. long/csv: todas las actividades, una fila por región, actividad y mes."""
+    if actividad not in empleo.ACTIVIDADES:
+        raise HTTPException(422, f"Actividad no válida: {actividad}. Usa una de: {', '.join(empleo.ACTIVIDADES)}.")
+    deptos = sorted({empleo.depto_de(r) for r in empleo.REGIONES})
+    df = db.leer("empleo-sectores", deptos, [], f"{desde - 1}-01", "2100-12")
+    if formato in ("long", "csv"):
+        out = empleo.long_sectores(df, desde)
+        nombre = f"Empleo por sectores LONG {desde}"
+        if formato == "csv":
+            return Response(archivos.csv(out), media_type="text/csv", headers=_adjunto(nombre + ".csv"))
+        buf = io.BytesIO()
+        out.to_excel(buf, index=False, sheet_name="Empleo sectores")
+        return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(nombre + ".xlsx"))
+    x = empleo.totales(empleo.de_actividad(df, actividad), desde)
+    if formato == "xlsx":
+        return Response(empleo.excel_totales(x, f"TRABAJADORES ASALARIADOS PRIVADOS FORMALES · {actividad.upper()} · POR REGIÓN"),
+                        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"Empleo {actividad} por región {desde}.xlsx"))
+    return {**x, "actividad": actividad, "actividades": empleo.ACTIVIDADES}
 
 
 @app.get("/v1/descargas/empleo", dependencies=[Depends(acceso)])
@@ -455,7 +488,7 @@ def descarga_empleo(regiones: str = "todas", desde: str = "", hasta: str = "",
     if desde and hasta and desde > hasta:
         raise HTTPException(422, f"El periodo está al revés: desde={desde} es posterior a hasta={hasta}.")
     deptos = sorted({empleo.depto_de(r) for r in pedidas})
-    df = empleo.long(db.leer("empleo", deptos, [], desde or "1990-01", hasta or "2100-12"), pedidas)
+    df = empleo.long(_empleo_todo(deptos, desde or "1990-01", hasta or "2100-12"), pedidas)
     nombre = empleo.nombre_long(pedidas)
     if formato == "json":
         con_datos, p = set(df["REGIÓN"].map(empleo.region_de)), df["AÑO"] * 100 + df["MES"]
@@ -942,7 +975,8 @@ def cuadro_empleo(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: s
         raise HTTPException(422, f"departamento no válido: {departamento}.")
     if periodo and not _RE_PERIODO.match(periodo):
         raise HTTPException(422, f"Periodo no válido: {periodo!r} (formato AAAA-MM).")
-    df = db.leer("empleo", [departamento], [], "1990-01", "2100-12")
+    # el total de la región (base «empleo») y, si los hay, los sectores (base aparte «empleo-sectores»)
+    df = _empleo_todo([departamento], "1990-01", "2100-12")
     try:
         c = empleo.cuadros(df, periodo or None)
     except ValueError as e:
