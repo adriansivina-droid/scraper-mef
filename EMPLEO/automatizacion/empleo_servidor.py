@@ -3,6 +3,7 @@
     python EMPLEO/automatizacion/empleo_servidor.py                         # los 26 ámbitos del tablero, sin el total Perú
     python EMPLEO/automatizacion/empleo_servidor.py --regiones LOR,SMN,UCA  # Loreto, San Martín y Ucayali
     python EMPLEO/automatizacion/empleo_servidor.py --regiones "La Libertad,Piura"  # solo esas (las demás no se tocan)
+    python EMPLEO/automatizacion/empleo_servidor.py --desde 2016            # todos los años del tablero
 
 El notebook trae el total de trabajadores de cada región (sin sectores) desde 2025 hasta el último mes publicado.
 
@@ -61,7 +62,8 @@ def sustituir_colab():
     sys.modules["google.colab"], sys.modules["google.colab.files"] = colab, files
 
 
-def celdas(seleccion):
+def celdas(seleccion, desde=None):
+    """Las celdas de código del notebook, con la pregunta de regiones respondida y, si se pide, otro DESDE_ANIO."""
     nb = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
     salida, pregunta = [], False
     for c in nb["cells"]:
@@ -74,6 +76,8 @@ def celdas(seleccion):
                 continue
             if re.match(r"^entrada\s*=\s*input\(", linea):
                 linea, pregunta = f"entrada = {seleccion!r}", True
+            if desde and re.match(r"^DESDE_ANIO\s*=", linea):
+                linea = f"DESDE_ANIO = {int(desde)}"
             lineas.append(linea)
         salida.append("\n".join(lineas))
     if not pregunta:
@@ -115,7 +119,7 @@ class Avance:
         return getattr(self.salida, k)
 
 
-def raspar(seleccion):
+def raspar(seleccion, desde=None):
     TRABAJO.mkdir(parents=True, exist_ok=True)
     for viejo in TRABAJO.glob("*_empleo.xlsx"):
         viejo.unlink()
@@ -125,7 +129,7 @@ def raspar(seleccion):
     avance = Avance(sys.stdout)
     avance.marcar(0.0, "abriendo el tablero del MTPE")
     sys.stdout = avance
-    for i, codigo in enumerate(celdas(seleccion), 1):
+    for i, codigo in enumerate(celdas(seleccion, desde), 1):
         print(f"\n── celda {i} ──", flush=True)
         obj = compile(codigo, f"empleo.ipynb#celda{i}", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
         resultado = eval(obj, g)                        # una celda con «await» devuelve una corrutina
@@ -148,11 +152,12 @@ def cargar(ruta):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--regiones", default="TODAS", help="TODAS, LOR,SMN,UCA o nombres separados por comas («La Libertad,Piura»)")
+    ap.add_argument("--desde", type=int, default=None, help="primer año a guardar (por defecto, el DESDE_ANIO del notebook: 2025)")
     a = ap.parse_args()
     lineas = [f"## Scraper de empleo (MTPE) · {a.regiones} · {datetime.now():%d/%m/%Y %H:%M}", ""]
     t0, ok = time.time(), True
     try:
-        ruta = raspar(seleccion(a.regiones))
+        ruta = raspar(seleccion(a.regiones), a.desde)
         import pandas as pd
         df = pd.read_excel(ruta)
         ultimo = df.assign(P=df["AÑO"] * 100 + df["MES"]).groupby("REGIÓN")["P"].max()
