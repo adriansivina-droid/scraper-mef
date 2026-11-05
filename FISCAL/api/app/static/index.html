@@ -293,6 +293,8 @@
     let x;
     try { x = await api("/v1/empleo/totales?desde=2025"); } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo leer el empleo</b><span>${esc(e.message)}</span></div>`; return; }
     $("et-xlsx").addEventListener("click", () => { window.location.href = "/v1/empleo/totales?desde=2025&formato=xlsx"; });
+    $("et-long").addEventListener("click", () => { window.location.href = "/v1/empleo/totales?desde=2025&formato=long"; });
+    $("et-csv").addEventListener("click", () => { window.location.href = "/v1/empleo/totales?desde=2025&formato=csv"; });
     if (!x.regiones.length) { caja.innerHTML = '<div class="vacio-caja"><b>Todavía no hay datos de empleo.</b><span>Lanza el scraper de empleo con «Todas las regiones».</span></div>'; return; }
     const meses = x.anios.flatMap((a) => Array.from({ length: 12 }, (_, i) => `${a}-${String(i + 1).padStart(2, "0")}`)).filter((m) => m <= x.ultimo);
     const pinta = () => {
@@ -1706,8 +1708,9 @@
     } else if (id === "empleo-total") {
       cuerpo = `<p class="lead">El total de trabajadores asalariados privados formales de cada región por mes (MTPE, Planilla Electrónica), desde enero 2025 hasta el último mes publicado.</p>
         <div class="caja"><div class="fila"><label class="campo" for="et-v">Ver<select id="et-v"><option value="valores">Número de trabajadores</option><option value="var">Var. % interanual</option></select></label>
-          <button class="btn" type="button" id="et-xlsx">Descargar en Excel</button></div><div id="emp-tot"><div class="loading"><span class="spin"></span>Cargando…</div></div>
-          <p class="nota">Fuente: MTPE, Planilla Electrónica – PLAME y T-Registro. La variación compara con el mismo mes del año anterior. Para actualizar, ${irComun("act-empleo", "Scraper de empleo")} con «Todas las regiones».</p></div>`;
+          <button class="btn" type="button" id="et-xlsx">Descargar en Excel</button>
+          <button class="btn sec" type="button" id="et-long">Descargar LONG (Excel)</button><button class="btn sec" type="button" id="et-csv">LONG en CSV</button></div><div id="emp-tot"><div class="loading"><span class="spin"></span>Cargando…</div></div>
+          <p class="nota">Fuente: MTPE, Planilla Electrónica – PLAME y T-Registro. La variación compara con el mismo mes del año anterior. El formato LONG trae una fila por región y mes: AÑO, MES, REGIÓN, EMPLEO, VAR_%. Para actualizar, ${irComun("act-empleo", "Scraper de empleo")} con «Todas las regiones».</p></div>`;
     } else if (id === "empleo-long") {
       const E = CAT.empleo, sel = paneles.empReg || (paneles.empReg = E.grupos[Object.keys(E.grupos)[0]].slice());
       cuerpo = `<p class="lead">El empleo del MTPE en el formato LONG que genera el scraper (AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO), de una región, de un grupo o de todas.</p>

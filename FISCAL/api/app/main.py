@@ -411,11 +411,22 @@ def empleo_actualizar(regiones: str = Query("TODAS", pattern="^(LOR,SMN,UCA|TODA
 
 
 @app.get("/v1/empleo/totales", dependencies=[Depends(acceso)])
-def empleo_totales(desde: int = Query(2025, ge=2000, le=2100), formato: str = Query("json", pattern="^(json|xlsx)$")):
+def empleo_totales(desde: int = Query(2025, ge=2000, le=2100), formato: str = Query("json", pattern="^(json|xlsx|long|csv)$")):
     """El total de trabajadores asalariados privados formales de cada región por mes (desde enero de «desde»), con la
-    variación % respecto al mismo mes del año anterior."""
+    variación % respecto al mismo mes del año anterior. xlsx: regiones en filas y meses en columnas; long (Excel) y csv:
+    una fila por región y mes (AÑO, MES, REGIÓN, EMPLEO, VAR_%)."""
     deptos = sorted({empleo.depto_de(r) for r in empleo.REGIONES})
     x = empleo.totales(db.leer("empleo", deptos, [], f"{desde - 1}-01", "2100-12"), desde)
+    hasta = (x["ultimo"] or "")[:4]
+    if formato in ("long", "csv"):
+        df = empleo.long_totales(x)
+        nombre = f"Empleo total por región LONG {desde}-{hasta}"
+        if formato == "csv":
+            return Response(archivos.csv(df), media_type="text/csv", headers=_adjunto(nombre + ".csv"))
+        buf = io.BytesIO()
+        df.to_excel(buf, index=False, sheet_name="Empleo")
+        return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(nombre + ".xlsx"))
     if formato == "xlsx":
         return Response(empleo.excel_totales(x), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(f"Empleo total por región {desde}-{(x['ultimo'] or '')[:4]}.xlsx"))

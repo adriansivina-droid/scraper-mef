@@ -133,3 +133,8 @@ def test_solo_el_total_desde_2025(cliente):
     x = cliente.get("/v1/empleo/totales?desde=2025&formato=xlsx")
     ws = load_workbook(io.BytesIO(x.content))["Trabajadores"]
     assert ws["A4"].value == "Región" and ws["B4"].value == "Ene. 2025"
+    lg = pd.read_excel(io.BytesIO(cliente.get("/v1/empleo/totales?desde=2025&formato=long").content))
+    assert list(lg.columns) == ["AÑO", "MES", "REGIÓN", "EMPLEO", "VAR_%"]
+    f = lg[(lg["REGIÓN"] == "Loreto") & (lg["AÑO"] == 2026) & (lg["MES"] == 4)].iloc[0]
+    assert (f["EMPLEO"], f["VAR_%"]) == (41000, 2.5)
+    assert cliente.get("/v1/empleo/totales?desde=2025&formato=csv").text.lstrip("\ufeff").startswith("AÑO,MES,REGIÓN,EMPLEO,VAR_%\n2026,4,Lima Metropolitana,100,")
