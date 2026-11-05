@@ -564,7 +564,6 @@
       const filas = c.sintesis.map((f) => `<tr class="${f.total ? "total" : f.nivel === 0 ? "fuerte" : ""}"><td style="padding-left:${10 + f.nivel * 16}px">${esc(f.nombre)}</td><td class="n">${f.estructura == null ? "" : pct(f.estructura)}</td>
         <td class="n">${nd(f.mes_b)}</td><td class="n">${nd(f.mes_a)}</td><td class="n ${cls(f.var_mes)}">${vs(f.var_mes)}</td><td class="n">${f.contrib_mes == null ? "" : pct(f.contrib_mes)}</td>
         <td class="n">${nd(f.acum_b)}</td><td class="n">${nd(f.acum_a)}</td><td class="n ${cls(f.var_acum)}">${vs(f.var_acum)}</td><td class="n">${f.contrib_acum == null ? "" : pct(f.contrib_acum)}</td></tr>`).join("");
-      const exactas = c.sintesis.filter((f) => f.var_exacta_mes !== f.var_mes || f.var_exacta_acum !== f.var_acum);
       const ax = c.anexo, grupos = [];
       ax.columnas.forEach((x) => { const k = x.total ? "Total" : x.anio; if (!grupos.length || grupos[grupos.length - 1][0] !== k) grupos.push([k, 1]); else grupos[grupos.length - 1][1]++; });
       const anexo = `<details class="caja"><summary><b>Anexo · ${esc(R)}: ${expo ? "exportaciones por grupo de productos" : "importaciones según uso o destino económico"}</b> (millones de US$, 13 meses)</summary>
@@ -582,8 +581,7 @@
         <div class="caja cuadro-sintesis"><h3 style="text-align:center">${esc(R)}: ${expo ? "EXPORTACIONES POR GRUPO DE PRODUCTOS" : "IMPORTACIONES FOB SEGÚN USO O DESTINO ECONÓMICO"}</h3><p style="text-align:center;margin:0 auto">(Valor FOB en millones de USD)</p>
           <div class="scroll"><table><tr><th rowspan="2">Tipo</th><th class="n">Estructura %</th><th colspan="2" class="n" style="text-align:center">${esc(mes)}</th><th rowspan="2" class="n">Var. %</th><th rowspan="2" class="n">Contrib.</th><th colspan="2" class="n" style="text-align:center">Enero - ${esc(mes)}</th><th rowspan="2" class="n">Var. %</th><th rowspan="2" class="n">Contrib.</th></tr>
             <tr><th class="n">${b}</th><th class="n">${b}</th><th class="n">${a}</th><th class="n">${b}</th><th class="n">${a}</th></tr>${filas}</table></div>
-          <p class="nota">${expo ? `Regla del cuadro de la síntesis: ${d} decimal${d > 1 ? "es" : ""}, total = suma de los tipos redondeados, variaciones con las cifras redondeadas. Contribución: puntos porcentuales de la variación del total.` : "Millones de US$ con 1 decimal."}</p>
-          ${exactas.length ? `<p class="nota">Para redactar (con los miles de US$ del ESTAD): ${exactas.map((f) => `${esc(f.nombre)} ${vs(f.var_exacta_mes)} % en el mes y ${vs(f.var_exacta_acum)} % en el acumulado`).join("; ")}.</p>` : ""}</div>
+          <p class="nota">${expo ? `Se muestran ${d} decimal${d > 1 ? "es" : ""}, pero el total, la estructura y las variaciones se calculan con las cifras reales del ESTAD, sin redondeos. Contribución: puntos porcentuales de la variación del total.` : "Millones de US$ con 1 decimal."}</p></div>
         ${graficos}
         ${anexo}`;
       $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; cuadrosExpo(r, caja, flujo); });

@@ -1,9 +1,10 @@
 """Cuadros, anexo y gráficos de exportaciones (e importaciones de Loreto) desde el ESTAD (EXPORT/info_export.md §5–§7).
 
   · síntesis (Cuadro N° 7 Loreto, N° 5 San Martín, N° 8 Ucayali): por tipo y grupo, estructura % del mes del año anterior,
-    mes y enero-mes de los dos años, var. % y contribución. Millones de US$ redondeados (Loreto 2 decimales, San Martín y
-    Ucayali 1); el total es la suma de los tipos ya redondeados y las variaciones salen de las cifras redondeadas (la
-    regla del Cuadro_LOR). Para redactar, «var_exacta» usa los miles de US$ del ESTAD.
+    mes y enero-mes de los dos años, var. % y contribución. Millones de US$ que se MUESTRAN redondeados (Loreto 2 decimales,
+    San Martín y Ucayali 1), pero el total, la estructura, la variación y la contribución se calculan con las cifras
+    reales del ESTAD, sin redondeos (24 215 -> 17 033 miles = -29,66 %, no 24,22 -> 17,03 = -29,69 %). «exacto» lleva
+    los millones sin redondear (el Excel guarda esos y el formato redondea a la vista).
   · anexo: los 13 meses (mismo mes del año anterior al mes del informe) y el total Ene.-Dic. del año anterior, con todas
     las filas del ESTAD, en millones de US$.
   · gráficos (hoja ENLACE ESTAD de las SERIES): variación % anual de 12 años (el año en curso, enero-mes; Ucayali compara
@@ -114,21 +115,18 @@ def cuadros(depto, df, periodo=None, flujo="expo"):
         valores[o] = {"mes_b": mill(_suma(serie, o, b, m, m)), "mes_a": mill(_suma(serie, o, a, m, m)),
                       "acum_b": mill(_suma(serie, o, b, 1, m)), "acum_a": mill(_suma(serie, o, a, 1, m)),
                       "miles": [_suma(serie, o, b, m, m), _suma(serie, o, a, m, m), _suma(serie, o, b, 1, m), _suma(serie, o, a, 1, m)]}
-    # el total: la suma de los tipos ya redondeados
-    tot = valores[total["orden"]]
-    for k in ("mes_b", "mes_a", "acum_b", "acum_a"):
-        tot[k] = _r(sum(valores[t["orden"]][k] for t in tipos), dec)
     sint = []
     for f, nivel in lineas + [(total, 0)]:
         v = valores[f["orden"]]
-        mi = v["miles"]
+        mb, ma, ab, aa = (x / 1000 for x in v["miles"])          # millones exactos
+        tb, tab = (x / 1000 for x in (valores[total["orden"]]["miles"][0], valores[total["orden"]]["miles"][2]))
         sint.append({"nombre": EN_SINTESIS.get(f["rubro"], f["rubro"]) if nivel else f["rubro"], "nivel": nivel, "total": f is total,
-                     "estructura": _r(v["mes_b"] / tot["mes_b"] * 100, 1) if tot["mes_b"] else None,
-                     "mes_b": v["mes_b"], "mes_a": v["mes_a"], "var_mes": _var(v["mes_a"], v["mes_b"]),
-                     "contrib_mes": _r((v["mes_a"] - v["mes_b"]) / tot["mes_b"] * 100, 1) if tot["mes_b"] else None,
-                     "acum_b": v["acum_b"], "acum_a": v["acum_a"], "var_acum": _var(v["acum_a"], v["acum_b"]),
-                     "contrib_acum": _r((v["acum_a"] - v["acum_b"]) / tot["acum_b"] * 100, 1) if tot["acum_b"] else None,
-                     "var_exacta_mes": _var(mi[1], mi[0]), "var_exacta_acum": _var(mi[3], mi[2])})
+                     "estructura": _r(mb / tb * 100, 1) if tb else None,
+                     "mes_b": v["mes_b"], "mes_a": v["mes_a"], "var_mes": _var(ma, mb),
+                     "contrib_mes": _r((ma - mb) / tb * 100, 1) if tb else None,
+                     "acum_b": v["acum_b"], "acum_a": v["acum_a"], "var_acum": _var(aa, ab),
+                     "contrib_acum": _r((aa - ab) / tab * 100, 1) if tab else None,
+                     "exacto": [mb, ma, ab, aa]})
     salida["sintesis"] = sint
 
     # ── anexo: 13 meses + total Ene.-Dic. del año anterior ──
@@ -235,8 +233,9 @@ def excel(region, c):
     ws.append(["TIPO", "Estructura %", mes, None, "Var. %", "Contribución", f"Enero-{mes}", None, "Var. %", "Contribución"])
     ws.append([None, b, b, a, None, None, b, a, None, None])
     for f in c["sintesis"]:
-        ws.append([("   " * f["nivel"]) + f["nombre"], f["estructura"], f["mes_b"], f["mes_a"], f["var_mes"], f["contrib_mes"],
-                   f["acum_b"], f["acum_a"], f["var_acum"], f["contrib_acum"]])
+        e = f["exacto"]          # las cifras reales; el formato de la celda las redondea a la vista
+        ws.append([("   " * f["nivel"]) + f["nombre"], f["estructura"], e[0], e[1], f["var_mes"], f["contrib_mes"],
+                   e[2], e[3], f["var_acum"], f["contrib_acum"]])
         if f["nivel"] == 0:
             ws.cell(ws.max_row, 1).font = neg
     fmt = "0." + "0" * c["dec"]

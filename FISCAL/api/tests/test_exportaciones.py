@@ -1,4 +1,5 @@
 """Pruebas de exportaciones: libros ESTAD que imitan ESTADLO (15.Export y 16.Import) y ESTADUCA (15.XLS)."""
+import pytest
 import io
 from datetime import datetime
 
@@ -87,19 +88,21 @@ def test_estad_se_reconoce_y_se_lee_solo_por_meses(cliente):
     assert fila.loc["Madera aserrada", "GRUPO"] == "Forestales" and fila.loc["Madera aserrada", "TIPO"] == "PRODUCTOS NO TRADICIONALES"
 
 
-def test_cuadro_de_la_sintesis_sigue_la_regla_del_cuadro_lor(cliente):
+def test_cuadro_de_la_sintesis_muestra_redondeado_y_calcula_con_cifras_reales(cliente):
     subir(cliente, **{"ESTADLO.xlsx": estadlo()})
     c = cliente.get("/v1/cuadros/exportaciones?departamento=16").json()["cuadros"]
     assert c["periodo"] == "2026-08" and c["dec"] == 2
     s = {f["nombre"]: f for f in c["sintesis"]}
     # 24 215 miles -> 24,22 (REDONDEAR de Excel, no 24,21 del redondeo bancario)
     assert s["Petróleo crudo y derivados"]["mes_b"] == 24.22
+    # la variación sale de las cifras reales: 24 215 -> 17 033 = -29,66 % (con 24,22 -> 17,03 saldría -29,69 %)
+    assert s["Petróleo crudo y derivados"]["var_mes"] == -29.7 and s["Petróleo crudo y derivados"]["exacto"][:2] == [24.215, 17.033]
     assert list(s)[:2] == ["PRODUCTOS TRADICIONALES", "Petróleo crudo y derivados"]
     nt = [f["nombre"] for f in c["sintesis"] if f["nivel"] == 1][1:]
     assert nt == ["Agropecuarios", "Animales vivos", "Maderas y sus manufacturas", "Pesqueros", "Resto"]
     tot = s["TOTAL EXPORTACIONES"]
     tipos = [f for f in c["sintesis"] if f["nivel"] == 0 and not f["total"]]
-    assert tot["mes_a"] == round(sum(f["mes_a"] for f in tipos), 2)
+    assert tot["exacto"][1] == pytest.approx(sum(f["exacto"][1] for f in tipos))     # el total suma las cifras reales
     assert tot["estructura"] == 100.0 and s["Agropecuarios"]["var_mes"] is None
     # anexo: 13 meses + el total del año anterior, con el TOTAL al final
     assert len(c["anexo"]["columnas"]) == 14 and c["anexo"]["columnas"][5]["total"]
