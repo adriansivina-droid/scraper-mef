@@ -1,7 +1,9 @@
 """Corre Scraping_MTPE_Empleo_x_Region_Actividad.ipynb sin Colab (GitHub Actions) y carga el Excel en la base del API.
 
-    python EMPLEO/automatizacion/empleo_servidor.py                 # Loreto, San Martín y Ucayali
-    python EMPLEO/automatizacion/empleo_servidor.py --regiones TODAS  # los 26 ámbitos del tablero, sin el total Perú
+    python EMPLEO/automatizacion/empleo_servidor.py                         # los 26 ámbitos del tablero, sin el total Perú
+    python EMPLEO/automatizacion/empleo_servidor.py --regiones LOR,SMN,UCA  # Loreto, San Martín y Ucayali
+
+El notebook trae el total de trabajadores de cada región (sin sectores) desde 2025 hasta el último mes publicado.
 
 Cómo lo hace: lee las celdas de código del notebook (el mismo de Colab: si cambia allá, cambia aquí), quita las líneas
 «!apt-get»/«!pip», responde la pregunta de regiones (el «input» del selector) y reemplaza la descarga de Colab por una
@@ -82,7 +84,7 @@ def cargar(ruta):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--regiones", choices=list(SELECCION), default="LOR,SMN,UCA")
+    ap.add_argument("--regiones", choices=list(SELECCION), default="TODAS")
     a = ap.parse_args()
     lineas = [f"## Scraper de empleo (MTPE) · {a.regiones} · {datetime.now():%d/%m/%Y %H:%M}", ""]
     t0, ok = time.time(), True
@@ -92,8 +94,8 @@ def main():
         df = pd.read_excel(ruta)
         ultimo = df.assign(P=df["AÑO"] * 100 + df["MES"]).groupby("REGIÓN")["P"].max()
         lineas.append(f"**Raspado: ✅** {len(df):,} filas en {(time.time() - t0) / 60:.1f} min ({ruta.name}).")
-        lineas += ["", "| Región | Actividades | Último mes |", "|---|---|---|"]
-        lineas += [f"| {r} | {df[df['REGIÓN'] == r]['ACTIVIDAD_ECONOMICA'].nunique()} de 7 | {p // 100}-{p % 100:02d} |" for r, p in ultimo.items()]
+        lineas += ["", "| Región | Meses | Desde | Último mes |", "|---|---|---|---|"]
+        lineas += [f"| {r} | {len(df[df['REGIÓN'] == r])} | {df[df['REGIÓN'] == r]['AÑO'].min()}-{df[(df['REGIÓN'] == r)].sort_values(['AÑO', 'MES'])['MES'].iloc[0]:02d} | {p // 100}-{p % 100:02d} |" for r, p in ultimo.items()]
         if not os.environ.get("DATABASE_URL"):
             lineas.append("⚠ Falta DATABASE_URL: no se cargó en la base de datos.")
             ok = False

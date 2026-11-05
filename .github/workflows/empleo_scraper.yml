@@ -1,10 +1,10 @@
 # Empleo · scraper del MTPE en el servidor: corre EMPLEO/Scraping_MTPE_Empleo_x_Region_Actividad.ipynb sin Colab (Power BI
 # del MTPE con Playwright) y carga el Excel en la base de datos del API (Neon), igual que subirlo en la página.
-#   · cada mes, los días 2 y 21 (07:30 hora de Lima): Loreto, San Martín y Ucayali
+#   · cada mes, los días 2 y 21 (07:30 hora de Lima): las 26 regiones, solo el total de trabajadores desde 2025
 #   · a mano: Actions → «Empleo · scraper del MTPE» → Run workflow, o el botón «Actualizar empleo» de la página
 # Requiere el secreto DATABASE_URL. El Excel queda como artefacto de la corrida (30 días).
 name: Empleo · scraper del MTPE
-run-name: "Scraper de empleo · ${{ inputs.regiones || 'LOR,SMN,UCA' }}"
+run-name: "Scraper de empleo · ${{ inputs.regiones || 'TODAS' }}"
 
 on:
   schedule:
@@ -14,8 +14,8 @@ on:
       regiones:
         description: "Regiones"
         type: choice
-        options: ["LOR,SMN,UCA", "TODAS"]
-        default: "LOR,SMN,UCA"
+        options: ["TODAS", "LOR,SMN,UCA"]
+        default: "TODAS"
 
 concurrency:
   group: empleo-scraper
@@ -45,7 +45,7 @@ jobs:
       - name: Raspar el MTPE y cargar en la base de datos
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          REGIONES: ${{ inputs.regiones || 'LOR,SMN,UCA' }}
+          REGIONES: ${{ inputs.regiones || 'TODAS' }}
           EMPLEO_TRABAJO: ${{ runner.temp }}/empleo
           PYTHONUNBUFFERED: "1"
         run: python EMPLEO/automatizacion/empleo_servidor.py --regiones "$REGIONES"

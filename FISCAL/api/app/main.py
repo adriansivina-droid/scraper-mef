@@ -399,7 +399,7 @@ def empleo_estado():
 
 
 @app.post("/v1/empleo/actualizar", dependencies=[Depends(acceso)])
-def empleo_actualizar(regiones: str = Query("LOR,SMN,UCA", pattern="^(LOR,SMN,UCA|TODAS)$")):
+def empleo_actualizar(regiones: str = Query("TODAS", pattern="^(LOR,SMN,UCA|TODAS)$")):
     """Lanza el scraper de empleo (Power BI del MTPE) en GitHub Actions; al terminar carga los datos en la base."""
     if not mef.configurado():
         raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
@@ -408,6 +408,18 @@ def empleo_actualizar(regiones: str = Query("LOR,SMN,UCA", pattern="^(LOR,SMN,UC
     except (mef.ErrorGitHub, OSError) as e:
         raise HTTPException(502, str(e))
     return {"lanzado": True, "regiones": regiones}
+
+
+@app.get("/v1/empleo/totales", dependencies=[Depends(acceso)])
+def empleo_totales(desde: int = Query(2025, ge=2000, le=2100), formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """El total de trabajadores asalariados privados formales de cada región por mes (desde enero de «desde»), con la
+    variación % respecto al mismo mes del año anterior."""
+    deptos = sorted({empleo.depto_de(r) for r in empleo.REGIONES})
+    x = empleo.totales(db.leer("empleo", deptos, [], f"{desde - 1}-01", "2100-12"), desde)
+    if formato == "xlsx":
+        return Response(empleo.excel_totales(x), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"Empleo total por región {desde}-{(x['ultimo'] or '')[:4]}.xlsx"))
+    return x
 
 
 @app.get("/v1/descargas/empleo", dependencies=[Depends(acceso)])

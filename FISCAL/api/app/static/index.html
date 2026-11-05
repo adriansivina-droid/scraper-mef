@@ -69,7 +69,7 @@
       bases: () => ["hidro-produccion", "hidro-canon", "hidro-expo-empresa"], actualizar: "hidro", cuadros: "hidrocarburos", mapa: true,
       lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
-      lead: "Trabajadores asalariados privados formales por rama de actividad económica.", cuadros: "empleo" },
+      lead: "Trabajadores asalariados privados formales: el total de la región por mes (desde 2025, sin sectores).", cuadros: "empleo" },
     expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["expo-estad"], sinActualizar: true,
       lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos. En «Base mensual», la base del mes se limpia, se revisa y arma el ESTAD; «Resumen Export» trae los datos destacados y el borrador de la síntesis.", cuadros: "exportaciones", extra: ["Base mensual", "Resumen Export"] },
     impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["impo-estad"], sinActualizar: true,
@@ -91,9 +91,9 @@
     lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
     smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
     uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
-    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["mef-archivos", "bases-mef", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
+    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["mef-archivos", "bases-mef", "empleo-total", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
-  const C = { panorama: "Panorama de las tres regiones", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
+  const C = { panorama: "Panorama de las tres regiones", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-total": "Empleo · total por región", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
               "act-empleo": "Scraper de empleo", "act-hidro": "Hidrocarburos (PERUPETRO)", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
   const CORTO = { [V]: "IV. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
@@ -287,6 +287,26 @@
         <line class="eje" x1="0" x2="${W}" y1="${H - aba}" y2="${H - aba}"></line><path class="area" d="${linea} L${X(n.length - 1)},${H - aba} L${X(0)},${H - aba} Z"></path><path class="trazo" d="${linea}"></path>${puntos}${meses}</svg></div></div>`;
   }
 
+  // ── Empleo: el total de cada región por mes (desde 2025) ──
+  async function empleoTotales() {
+    const caja = $("emp-tot");
+    let x;
+    try { x = await api("/v1/empleo/totales?desde=2025"); } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo leer el empleo</b><span>${esc(e.message)}</span></div>`; return; }
+    $("et-xlsx").addEventListener("click", () => { window.location.href = "/v1/empleo/totales?desde=2025&formato=xlsx"; });
+    if (!x.regiones.length) { caja.innerHTML = '<div class="vacio-caja"><b>Todavía no hay datos de empleo.</b><span>Lanza el scraper de empleo con «Todas las regiones».</span></div>'; return; }
+    const meses = x.anios.flatMap((a) => Array.from({ length: 12 }, (_, i) => `${a}-${String(i + 1).padStart(2, "0")}`)).filter((m) => m <= x.ultimo);
+    const pinta = () => {
+      const k = $("et-v").value, cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
+      const cab1 = x.anios.map((a) => `<th class="n" colspan="${meses.filter((m) => m.startsWith(a)).length}" style="text-align:center">${a}</th>`).join("");
+      const cab2 = meses.map((m) => `<th class="n">${esc(etqMes(m).slice(0, 3))}</th>`).join("");
+      const filas = x.regiones.map((r) => `<tr><td>${esc(r.region)}</td>${meses.map((m) => { const v = r[k][m];
+        return `<td class="n ${k === "var" ? cls(v) : ""}">${v == null ? "" : k === "var" ? pct(v) : fmt(v)}</td>`; }).join("")}</tr>`).join("");
+      caja.innerHTML = `<div class="scroll"><table><tr><th rowspan="2">Región</th>${cab1}</tr><tr>${cab2}</tr>${filas}</table></div>`;
+    };
+    $("et-v").addEventListener("change", pinta);
+    pinta();
+  }
+
   // ── Cuadros de empleo (los de la síntesis) ──
   async function cuadrosEmpleo(r, caja, periodo) {
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
@@ -303,17 +323,20 @@
         return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${y}" width="${bw * 0.64}" height="${Math.max(h, 1)}"></rect>
           <text class="val" x="${i * bw + bw / 2}" y="${x.var >= 0 ? y - 4 : y + h + 11}" text-anchor="middle">${pct(x.var)}</text>
           <title>${esc(x.periodo)}: ${pct(x.var)} %</title>`; }).join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
+      const mensual = c.mensual.filter((f) => f.anterior != null || f.actual != null).map((f) => `<tr><td>${esc(f.mes)}</td><td class="n">${fmt(f.anterior)}</td><td class="n">${fmt(f.actual)}</td><td class="n ${cls(f.var)}">${f.actual == null ? "" : pct(f.var)}</td></tr>`).join("");
       const anexo = c.anexo.map((f) => `<tr><td>${esc(f.periodo)}</td>${["Agricultura", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "Total"].map((k) => `<td class="n ${cls(f[k])}">${pct(f[k])}</td>`).join("")}</tr>`).join("");
       caja.innerHTML = `<div class="fila"><label class="campo" for="emp-p">Mes del informe<select id="emp-p">${meses.slice().reverse().map((m) => `<option value="${m}"${m === c.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
           <button class="btn" type="button" id="emp-xlsx">Descargar los cuadros en Excel</button></div>
         <div class="caja"><h3>Cuadro ${num} · ${esc(r.nombre.toUpperCase())}: TRABAJADORES ASALARIADOS PRIVADOS FORMALES</h3><p>(Número de trabajadores)</p>
           <div class="scroll"><table><tr><th>Rama de actividad</th><th class="n">${mes} ${a - 1}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Dic. ${a - 1}</th><th class="n">${mes.slice(0, 3)}. ${a}</th><th class="n">Var. %</th></tr>${cuadro}</table></div>
-          <p class="nota">Fuente: Planilla Electrónica – PLAME y T-Registro. «Otros» es la actividad «No precisa» del MTPE.</p></div>
+          <p class="nota">Fuente: Planilla Electrónica – PLAME y T-Registro.${c.por_sectores ? " «Otros» es la actividad «No precisa» del MTPE." : " Desde 2025 el scraper trae solo el total de la región (sin sectores)."}</p></div>
+        <div class="caja"><h3>${esc(r.nombre)}: trabajadores por mes · ${a - 1} y ${a}</h3><p>(Número de trabajadores; variación % respecto al mismo mes del año anterior)</p>
+          <div class="scroll"><table><tr><th>Mes</th><th class="n">${a - 1}</th><th class="n">${a}</th><th class="n">Var. %</th></tr>${mensual}</table></div></div>
         ${graficoNiveles(c.niveles)}
         <div class="caja"><h3>Gráfico · Variación % respecto a similar mes del año anterior</h3>
           ${g.length ? `<div class="scroll"><svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Variación porcentual interanual del total"><line class="eje" x1="0" x2="${W}" y1="${y0}" y2="${y0}"></line>${barras}</svg></div>` : '<p class="nota">Hace falta al menos un año de datos para la variación interanual.</p>'}</div>
-        <div class="caja"><h3>${grupo === "lor" ? "Anexo 5 · " : ""}Trabajadores por sectores económicos</h3><p>(Variación % con respecto al mismo mes del año anterior)</p>
-          <div class="scroll"><table><tr><th>Mes</th><th class="n">Agricultura</th><th class="n">Minería</th><th class="n">Manufactura</th><th class="n">Construcción</th><th class="n">Comercio</th><th class="n">Servicios</th><th class="n">Total</th></tr>${anexo}</table></div></div>`;
+        ${c.anexo.length ? `<div class="caja"><h3>${grupo === "lor" ? "Anexo 5 · " : ""}Trabajadores por sectores económicos</h3><p>(Variación % con respecto al mismo mes del año anterior)</p>
+          <div class="scroll"><table><tr><th>Mes</th><th class="n">Agricultura</th><th class="n">Minería</th><th class="n">Manufactura</th><th class="n">Construcción</th><th class="n">Comercio</th><th class="n">Servicios</th><th class="n">Total</th></tr>${anexo}</table></div></div>` : ""}`;
       $("emp-p").addEventListener("change", (ev) => cuadrosEmpleo(r, caja, ev.target.value));
       $("emp-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/empleo?departamento=${r.cod}&periodo=${c.periodo}&formato=xlsx`; });
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
@@ -1011,7 +1034,7 @@
       notas: ["Fuente: Planilla Electrónica – PLAME y T-Registro."] }) });
     const sect = ["Agricultura", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "Total"];
     let anio = null;
-    items.push({ clave: "a0", tipo: "ANEXO", num: (N.a || [])[0], nombre: `${R}: TRABAJADORES POR SECTORES ECONÓMICOS`, svg: (n) => { anio = null; return B.cuadro({ numero: n,
+    if (c.anexo.length) items.push({ clave: "a0", tipo: "ANEXO", num: (N.a || [])[0], nombre: `${R}: TRABAJADORES POR SECTORES ECONÓMICOS`, svg: (n) => { anio = null; return B.cuadro({ numero: n,
       titulo: `${R}: TRABAJADORES ASALARIADOS PRIVADOS FORMALES POR SECTORES ECONÓMICOS`, unidad: "(Variación % con respecto al mismo mes del año anterior)", minCol: 52,
       cab: [[{ t: "Año" }, { t: "Mes" }, ...sect.map((x) => ({ t: x }))]],
       filas: c.anexo.map((f) => { const [mm, yy] = f.periodo.split(" "); const nuevo = yy !== anio; anio = yy;
@@ -1412,10 +1435,10 @@
     const mef = cual === "mef";
     return `<div class="caja" id="scr-${cual}"><h3>${mef ? "Scraper del MEF" : "Scraper de empleo (MTPE)"}</h3>
       <p>${mef ? "Baja de Consulta Amigable las 7 bases del MEF (detalle municipal y PIM de los 25 departamentos; lo demás, Loreto, San Martín y Ucayali) y las carga aquí. Corre solo los días 2 y 21 de cada mes, a las 6:00 a. m."
-        : "Baja del tablero de Power BI del MTPE los trabajadores formales por actividad y los carga aquí. Corre solo los días 2 y 21 de cada mes, a las 7:30 a. m."} Tarda varios minutos: puedes cerrar la página.</p>
+        : "Baja del tablero de Power BI del MTPE el total de trabajadores formales de cada región (sin sectores), desde enero 2025 hasta el último mes publicado, y lo carga aquí. Las 26 regiones toman alrededor de media hora. Corre solo los días 2 y 21 de cada mes, a las 7:30 a. m."} Tarda varios minutos: puedes cerrar la página.</p>
       <div class="fila">${mef ? `<label class="campo" for="mef-d">Desde<input type="month" id="mef-d"></label><label class="campo" for="mef-h">Hasta<input type="month" id="mef-h"></label>
           <label class="chk"><input type="checkbox" id="mef-prueba"> Prueba rápida (un mes, solo Loreto, no carga)</label>`
-        : `<label class="campo" for="emp-reg">Regiones<select id="emp-reg"><option value="LOR,SMN,UCA">Loreto · San Martín · Ucayali</option><option value="TODAS">Todas las regiones</option></select></label>`}
+        : `<label class="campo" for="emp-reg">Regiones<select id="emp-reg"><option value="TODAS">Todas las regiones</option><option value="LOR,SMN,UCA">Loreto · San Martín · Ucayali</option></select></label>`}
         <button class="btn" type="button" id="${cual}-lanzar">${mef ? "Actualizar desde el MEF" : "Actualizar empleo"}</button></div>
       <p class="nota">${mef ? "Vacío = año en curso hasta el último mes cerrado, en dos tramos seguidos (enero-junio y julio en adelante). Con 25 departamentos toma unos 30 minutos por mes: con periodo elegido, hasta unos 10 meses por corrida." : ""}</p>
       <div id="${cual}-res" aria-live="polite"></div><div id="${cual}-corridas"><div class="loading"><span class="spin"></span>Consultando GitHub…</div></div></div>`;
@@ -1680,6 +1703,11 @@
           <div class="deptos">${deps.map((d) => `<label for="dep-${d.codigo}"><input type="checkbox" class="dep" id="dep-${d.codigo}" value="${d.codigo}" ${marcados.includes(d.codigo) ? "checked" : ""}>${esc(titulo(d.nombre))}</label>`).join("")}</div></div>
         <div class="caja"><h3>2. Bases y periodo</h3>${panelBases("p-mef", [...NACIONAL, "inv-dev-fuente", ...GASTO], { deptos: () => paneles.mefDeps, alcance: true, marcar: 3, desde: MESES.includes("2025-01") ? "2025-01" : MESES[0] })}
           <p class="nota">Las bases marcadas «LOR · SMN · UCA» solo tienen esas tres regiones: con otros departamentos, esas hojas salen vacías y la página lo avisa.</p></div>`;
+    } else if (id === "empleo-total") {
+      cuerpo = `<p class="lead">El total de trabajadores asalariados privados formales de cada región por mes (MTPE, Planilla Electrónica), desde enero 2025 hasta el último mes publicado.</p>
+        <div class="caja"><div class="fila"><label class="campo" for="et-v">Ver<select id="et-v"><option value="valores">Número de trabajadores</option><option value="var">Var. % interanual</option></select></label>
+          <button class="btn" type="button" id="et-xlsx">Descargar en Excel</button></div><div id="emp-tot"><div class="loading"><span class="spin"></span>Cargando…</div></div>
+          <p class="nota">Fuente: MTPE, Planilla Electrónica – PLAME y T-Registro. La variación compara con el mismo mes del año anterior. Para actualizar, ${irComun("act-empleo", "Scraper de empleo")} con «Todas las regiones».</p></div>`;
     } else if (id === "empleo-long") {
       const E = CAT.empleo, sel = paneles.empReg || (paneles.empReg = E.grupos[Object.keys(E.grupos)[0]].slice());
       cuerpo = `<p class="lead">El empleo del MTPE en el formato LONG que genera el scraper (AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO), de una región, de un grupo o de todas.</p>
@@ -1733,6 +1761,7 @@
     }));
     document.querySelectorAll("#sector .dep").forEach((c) => c.addEventListener("change", () => { paneles.mefDeps = [...document.querySelectorAll(".dep")].filter((x) => x.checked).map((x) => x.value); vistaPrevia("p-mef"); }));
     if ($("el-vista")) atarEmpleoLong();
+    if ($("emp-tot")) empleoTotales();
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
     ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo", "sub-series"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
