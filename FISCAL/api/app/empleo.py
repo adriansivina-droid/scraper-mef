@@ -151,6 +151,17 @@ def totales(df, desde=2025):
     return {"anios": anios, "ultimo": f"{ultimo // 100}-{ultimo % 100:02d}" if ultimo else None, "regiones": salida}
 
 
+COLUMNAS_TOTAL = ["AÑO", "MES", "REGIÓN", "EMPLEO", "VAR_%"]
+
+
+def long_totales(x):
+    """El total por región en formato LONG: una fila por región y mes (AÑO, MES, REGIÓN, EMPLEO, VAR_%), ordenado por
+    región, año y mes, como el Excel del scraper."""
+    filas = [{"AÑO": int(m[:4]), "MES": int(m[5:]), "REGIÓN": r["region"], "EMPLEO": int(round(v)), "VAR_%": r["var"].get(m)}
+             for r in x["regiones"] for m, v in sorted(r["valores"].items())]
+    return pd.DataFrame(filas, columns=COLUMNAS_TOTAL)
+
+
 def excel_totales(x):
     """Las regiones en filas y los meses en columnas: una hoja con el número de trabajadores y otra con la var. %."""
     wb = Workbook()
