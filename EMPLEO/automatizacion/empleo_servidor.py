@@ -2,6 +2,7 @@
 
     python EMPLEO/automatizacion/empleo_servidor.py                         # los 26 ámbitos del tablero, sin el total Perú
     python EMPLEO/automatizacion/empleo_servidor.py --regiones LOR,SMN,UCA  # Loreto, San Martín y Ucayali
+    python EMPLEO/automatizacion/empleo_servidor.py --regiones "La Libertad,Piura"  # solo esas (las demás no se tocan)
 
 El notebook trae el total de trabajadores de cada región (sin sectores) desde 2025 hasta el último mes publicado.
 
@@ -28,6 +29,29 @@ NOTEBOOK = AQUI.parent / "Scraping_MTPE_Empleo_x_Region_Actividad.ipynb"
 TRABAJO = Path(os.environ.get("EMPLEO_TRABAJO", Path.home() / "empleo_trabajo"))
 # números del selector del notebook (REGIONES): 18 Loreto, 24 San Martín, 27 Ucayali; 2-27 = todas menos «Perú»
 SELECCION = {"LOR,SMN,UCA": "18,24,27", "TODAS": "2-27"}
+# el selector del notebook: 1 Perú y luego los 26 ámbitos en este orden (app.empleo.REGIONES)
+AMBITOS = ["Amazonas", "Áncash", "Apurímac", "Arequipa", "Ayacucho", "Cajamarca", "Callao", "Cusco", "Huancavelica",
+           "Huánuco", "Ica", "Junín", "La Libertad", "Lambayeque", "Lima Metropolitana", "Lima Provincias", "Loreto",
+           "Madre de Dios", "Moquegua", "Pasco", "Piura", "Puno", "San Martín", "Tacna", "Tumbes", "Ucayali"]
+
+
+def _clave(t):
+    import unicodedata
+    return re.sub(r"[^a-z]", "", unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode().lower())
+
+
+def seleccion(texto):
+    """«TODAS», «LOR,SMN,UCA» o nombres de regiones separados por comas (con o sin tildes) -> números del notebook.
+    Solo se reemplazan en la base las regiones raspadas; las demás quedan como están."""
+    if texto.strip().upper() in SELECCION:
+        return SELECCION[texto.strip().upper()]
+    claves = {_clave(r): i for i, r in enumerate(AMBITOS, 2)}
+    nums, malas = [], []
+    for r in (x for x in texto.split(",") if x.strip()):
+        (nums.append(str(claves[_clave(r)])) if _clave(r) in claves else malas.append(r.strip()))
+    if malas or not nums:
+        raise SystemExit(f"Región no válida: {', '.join(malas) or '(ninguna)'}. Usa TODAS, LOR,SMN,UCA o nombres como «La Libertad,Piura».")
+    return ",".join(nums)
 
 
 def sustituir_colab():
@@ -123,12 +147,12 @@ def cargar(ruta):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--regiones", choices=list(SELECCION), default="TODAS")
+    ap.add_argument("--regiones", default="TODAS", help="TODAS, LOR,SMN,UCA o nombres separados por comas («La Libertad,Piura»)")
     a = ap.parse_args()
     lineas = [f"## Scraper de empleo (MTPE) · {a.regiones} · {datetime.now():%d/%m/%Y %H:%M}", ""]
     t0, ok = time.time(), True
     try:
-        ruta = raspar(SELECCION[a.regiones])
+        ruta = raspar(seleccion(a.regiones))
         import pandas as pd
         df = pd.read_excel(ruta)
         ultimo = df.assign(P=df["AÑO"] * 100 + df["MES"]).groupby("REGIÓN")["P"].max()
