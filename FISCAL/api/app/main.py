@@ -393,7 +393,7 @@ def empleo_estado():
     if not mef.configurado():
         return {"configurado": False, "corridas": []}
     try:
-        return {"configurado": True, "corridas": mef.corridas(nombre="empleo")}
+        return {"configurado": True, "corridas": _con_progreso(mef.corridas(nombre="empleo"))}
     except (mef.ErrorGitHub, OSError) as e:
         return {"configurado": True, "corridas": [], "error": str(e)}
 
