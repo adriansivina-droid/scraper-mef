@@ -12,9 +12,8 @@ on:
   workflow_dispatch:
     inputs:
       regiones:
-        description: "Regiones"
-        type: choice
-        options: ["TODAS", "LOR,SMN,UCA"]
+        description: "Regiones: TODAS, LOR,SMN,UCA o nombres separados por comas (p. ej. La Libertad,Piura); solo se reemplazan esas"
+        type: string
         default: "TODAS"
 
 concurrency:

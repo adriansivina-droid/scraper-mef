@@ -399,7 +399,7 @@ def empleo_estado():
 
 
 @app.post("/v1/empleo/actualizar", dependencies=[Depends(acceso)])
-def empleo_actualizar(regiones: str = Query("TODAS", pattern="^(LOR,SMN,UCA|TODAS)$")):
+def empleo_actualizar(regiones: str = Query("TODAS", pattern=r"^[A-Za-zÁÉÍÓÚáéíóúÑñ ,]{3,300}$")):
     """Lanza el scraper de empleo (Power BI del MTPE) en GitHub Actions; al terminar carga los datos en la base."""
     if not mef.configurado():
         raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
