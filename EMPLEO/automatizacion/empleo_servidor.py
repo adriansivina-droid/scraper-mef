@@ -57,6 +57,40 @@ def celdas(seleccion):
     return salida
 
 
+class Avance:
+    """Deja el avance en la tabla «progreso» de la base para la barra de la página: lee los «REGIÓN [i/n]: X» que imprime
+    el notebook. Solo en GitHub Actions (GITHUB_RUN_ID) y con base; si falla, el scraper sigue igual."""
+    PATRON = re.compile(r"REGIÓN \[(\d+)/(\d+)\]: (.+)")
+
+    def __init__(self, salida):
+        self.salida, self.corrida = salida, os.environ.get("GITHUB_RUN_ID")
+        self.activo = bool(self.corrida and os.environ.get("DATABASE_URL"))
+
+    def marcar(self, fraccion, texto):
+        if not self.activo:
+            return
+        try:
+            sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
+            from app import db
+            db.guardar_progreso(self.corrida, 1, fraccion, texto)
+        except Exception as e:                          # la barra no debe tumbar el scraper
+            self.salida.write(f"[avance] no se pudo guardar: {e}\n")
+            self.activo = False
+
+    def write(self, texto):
+        m = self.PATRON.search(texto)
+        if m:
+            i, n, region = int(m.group(1)), int(m.group(2)), m.group(3).strip()
+            self.marcar((i - 1) / n * 0.97, f"{region} ({i} de {n} regiones)")
+        return self.salida.write(texto)
+
+    def flush(self):
+        self.salida.flush()
+
+    def __getattr__(self, k):
+        return getattr(self.salida, k)
+
+
 def raspar(seleccion):
     TRABAJO.mkdir(parents=True, exist_ok=True)
     for viejo in TRABAJO.glob("*_empleo.xlsx"):
@@ -64,12 +98,17 @@ def raspar(seleccion):
     os.chdir(TRABAJO)                                   # el notebook guarda el Excel en la carpeta actual
     sustituir_colab()
     g = {"__name__": "__main__", "display": lambda *x, **k: print(*x)}
+    avance = Avance(sys.stdout)
+    avance.marcar(0.0, "abriendo el tablero del MTPE")
+    sys.stdout = avance
     for i, codigo in enumerate(celdas(seleccion), 1):
         print(f"\n── celda {i} ──", flush=True)
         obj = compile(codigo, f"empleo.ipynb#celda{i}", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
         resultado = eval(obj, g)                        # una celda con «await» devuelve una corrutina
         if asyncio.iscoroutine(resultado):
             asyncio.run(resultado)
+    sys.stdout = avance.salida
+    avance.marcar(0.97, "cargando en la base de datos")
     archivos = sorted(TRABAJO.glob("*_empleo.xlsx"))
     if not archivos:
         raise RuntimeError("El scraper no generó el Excel de empleo (ver los mensajes de arriba).")
