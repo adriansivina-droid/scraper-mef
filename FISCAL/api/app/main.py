@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import almacen, archivos, bcrp_excel, carga, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, mef, pesca_cuadros, sunat_expo, sunat_impo
+from . import almacen, archivos, bcrp_excel, carga, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -974,6 +974,26 @@ def hidrocarburos_exportaciones(departamento: str = Query(..., pattern=r"^\d{2}$
         return Response(hidrocarburos.excel_exportaciones(region, e), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(f"Exportaciones de crudo por empresa {region}.xlsx"))
     return {"region": region, "exportaciones": e}
+
+
+@app.get("/v1/cuadros/manufactura", dependencies=[Depends(acceso)])
+def cuadro_manufactura(departamento: str = Query(..., pattern="^(16|22|25)$"), periodo: str = "",
+                       formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Cuadro de la síntesis del IVF manufacturero (mes y enero-mes, var. %, contribución y estructura) y su serie."""
+    if periodo and not _RE_PERIODO.match(periodo):
+        raise HTTPException(422, f"Periodo no válido: {periodo!r} (formato AAAA-MM).")
+    df = db.leer("manu-ivf", [departamento], [], "1990-01", "2100-12")
+    try:
+        c = manufactura.cuadros(departamento, df, periodo or None)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    region = DEPARTAMENTOS[departamento].title().replace(" De ", " de ")
+    if c is None:
+        return {"region": region, "cuadros": None}
+    if formato == "xlsx":
+        return Response(manufactura.excel(region, c), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"Manufactura {region} {c['periodo']}.xlsx"))
+    return {"region": region, "cuadros": c}
 
 
 @app.get("/v1/cuadros/empleo", dependencies=[Depends(acceso)])

@@ -68,6 +68,9 @@
     hidro: { t: "Sector hidrocarburos", fuente: "PERUPETRO, producción fiscalizada y canon petrolero", entra: "Flujo diario de PERUPETRO en GitHub (7:00 a. m.), o con el botón",
       bases: () => ["hidro-produccion", "hidro-canon", "hidro-expo-empresa"], actualizar: "hidro", cuadros: "hidrocarburos", mapa: true,
       lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
+    manu: { t: "Sector manufactura", fuente: "IVFM de la región (DIREPRO y empresas)", entra: "Subiendo el IVFM de la región (IVFM-LO / SM / UCA … TOTAL.xlsx)",
+      bases: () => ["manu-ivf"], actualizar: "manu", cuadros: "manufactura",
+      lead: "Índice de volumen físico manufacturero por rama CIIU: cuadro de la síntesis (mes y enero-mes, var. %, contribución y estructura) y la variación de la manufactura no primaria, calculados del IVFM sin copias a mano." },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
       lead: "Trabajadores asalariados privados formales: el total de la región por mes y, desde la base por sectores, el detalle por rama de actividad.", cuadros: "empleo" },
     expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["expo-estad"], sinActualizar: true,
@@ -88,9 +91,9 @@
   const V = "IV. Ejecución del presupuesto de gastos del Gobierno General";
   const comunes = [cap("II. Aspectos laborales", ["empleo"]), cap(V, ["gasto", "inversion"])];
   const GRUPOS = {
-    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
-    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
-    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
+    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
+    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
+    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
     tres: { comun: true, indice: [{ id: "panorama" }, cap("Empleo", ["empleo-total", "empleo-sectores", "empleo-long"]), cap("MEF", ["mef-archivos", "bases-mef"]), cap("Comparar regiones", ["bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
   const C = { panorama: "Panorama de las tres regiones", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-total": "Empleo · total por región", "empleo-sectores": "Empleo · por sectores", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
@@ -315,6 +318,36 @@
     };
     $(`${pre}-v`).onchange = pinta;
     pinta();
+  }
+
+  // ── Cuadros de manufactura (los de la síntesis) ──
+  async function cuadrosManu(r, caja, periodo) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando el cuadro…</div>';
+    try {
+      const c = (await api(`/v1/cuadros/manufactura?departamento=${r.cod}${periodo ? `&periodo=${periodo}` : ""}`)).cuadros;
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay IVF manufacturero de ${esc(r.nombre)}.</b><span>Sube el IVFM de ${esc(r.nombre)} en la pestaña «Actualizar».</span></div>`; return; }
+      const B = window.BCRP, n1 = (v) => v == null ? "-" : B.num(v, 1), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
+      const g = (f, k) => f.vacia || f[k] == null ? "-" : n1(f[k]);
+      const filas = c.cuadro.map((f) => `<tr class="${f.total ? "total" : ""}${f.vacia ? " apagada" : ""}"><td${f.nivel ? ' style="padding-left:22px"' : ""}>${f.nivel ? esc(f.nombre) : `<b>${esc(f.nombre)}</b>`}</td>
+        <td class="n">${f.estructura == null ? "-" : n1(f.estructura)}</td><td class="n">${f.vacia ? "-" : n1(f.mes_b)}</td><td class="n">${f.vacia ? "-" : n1(f.mes_a)}</td>
+        <td class="n ${cls(f.var_mes)}">${g(f, "var_mes")}</td><td class="n">${g(f, "contrib_mes")}</td><td class="n">${f.vacia ? "-" : n1(f.acum_b)}</td><td class="n">${f.vacia ? "-" : n1(f.acum_a)}</td>
+        <td class="n ${cls(f.var_acum)}">${g(f, "var_acum")}</td><td class="n">${g(f, "contrib_acum")}</td></tr>`).join("");
+      const graf = (k, nom) => { const pts = c.serie_25.filter((x) => x[`var_${k}`] != null);
+        return pts.length ? `<div class="caja"><h3>${esc(r.nombre.toUpperCase())}: IVF ${nom}</h3><p>(Var. % real respecto a similar periodo del año anterior)</p>
+          <div class="bcrp-prev drae-prev">${B.barras({ titulo: "", unidad: "", puntos: pts.map((x) => ({ periodo: x.periodo, valor: x[`var_${k}`] })), notas: [] })}</div></div>` : ""; };
+      const t = c.cuadro[c.cuadro.length - 1];
+      caja.innerHTML = `<div class="fila"><label class="campo" for="manu-p">Mes del informe<select id="manu-p">${c.meses.slice().reverse().map((m) => `<option value="${m}"${m === c.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
+          <button class="btn" type="button" id="manu-xlsx">Descargar en Excel</button></div>
+        <div class="stats"><div class="stat"><small>${esc(c.titulo_mes)} ${c.anio}</small><b class="${cls(t.var_mes)}">${n1(t.var_mes)} %</b><span>frente a ${esc(c.titulo_mes.toLowerCase())} ${c.comparar}</span></div>
+          <div class="stat"><small>${esc(c.acumulado)} ${c.anio}</small><b class="${cls(t.var_acum)}">${n1(t.var_acum)} %</b><span>frente a igual periodo de ${c.comparar}</span></div></div>
+        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO 1/</h3><p>(Var. % real respecto a similar periodo del año anterior)</p>
+          <div class="scroll"><table><tr><th rowspan="2">Ramas de actividad</th><th class="n">Estructura %</th><th class="n" colspan="4" style="text-align:center">${esc(c.titulo_mes)}</th><th class="n" colspan="4" style="text-align:center">${esc(c.acumulado)}</th></tr>
+            <tr><th class="n">${c.estructura_de || c.comparar} 2/</th><th class="n">${c.comparar}</th><th class="n">${c.anio}</th><th class="n">Var. %</th><th class="n">Contrib. 3/</th><th class="n">${c.comparar}</th><th class="n">${c.anio}</th><th class="n">Var. %</th><th class="n">Contrib. 3/</th></tr>${filas}</table></div>
+          <p class="nota">1/ Cifras preliminares. 2/ Estimado a precios de 2007: participación de cada rama en el IVF ponderado de ${c.estructura_de || c.comparar}${c.meses_estructura && c.meses_estructura < 12 ? ` (${c.meses_estructura} meses)` : ""}. 3/ Puntos porcentuales: var. % de la rama por su peso (ponderación 2007 × índice del año anterior); suman la variación del sector. «-»: la rama no tuvo producción en ninguno de los dos años. Fuente: DIREPRO y Empresas.</p></div>
+        ${graf("no_primaria", "MANUFACTURA NO PRIMARIA")}${graf("total", "SECTOR MANUFACTURA")}`;
+      $("manu-p").addEventListener("change", (ev) => cuadrosManu(r, caja, ev.target.value));
+      $("manu-xlsx").addEventListener("click", () => { window.location.href = `/v1/cuadros/manufactura?departamento=${r.cod}&periodo=${c.periodo}&formato=xlsx`; });
+    } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar el cuadro</b><span>${esc(e.message)}</span></div>`; }
   }
 
   // ── Cuadros de empleo (los de la síntesis) ──
@@ -1032,6 +1065,25 @@
     return items;
   }
 
+  // Manufactura: el cuadro de la síntesis y los gráficos de var. % (no primaria y total, últimos 25 meses)
+  function itemsManu(c, R, N) {
+    const a = c.anio, b = c.comparar, mes = c.titulo_mes, items = [], tit = `${R}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO 1/`;
+    const g = (f, k) => f.vacia || f[k] == null ? "-" : v1(f[k]);
+    items.push({ clave: "c", tipo: "CUADRO", num: N.c, nombre: `${R}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO`, svg: (n) => B.cuadro({ numero: n, titulo: tit,
+      unidad: "(Var. % real respecto a similar periodo del año anterior)",
+      cab: [[{ t: "Ramas de actividad" }, { t: "Estructura" }, { t: mes, span: 4, linea: true }, { t: c.acumulado, span: 4, linea: true }],
+            [{ t: "" }, { t: `% ${c.estructura_de || b} 2/` }, { t: b }, { t: a }, { t: "Var. %" }, { t: "Contrib. 3/" }, { t: b }, { t: a }, { t: "Var. %" }, { t: "Contrib. 3/" }]],
+      filas: c.cuadro.map((f) => ({ c: [f.nombre, f.estructura == null ? "-" : n1(f.estructura), f.vacia ? "-" : n1(f.mes_b), f.vacia ? "-" : n1(f.mes_a), g(f, "var_mes"), g(f, "contrib_mes"),
+        f.vacia ? "-" : n1(f.acum_b), f.vacia ? "-" : n1(f.acum_a), g(f, "var_acum"), g(f, "contrib_acum")], b: f.nivel === 0, total: !!f.total, ind: f.nivel ? 1 : 0 })),
+      notas: ["1/ Cifras preliminares.", "2/ Estimado a precios de 2007.", "3/ Puntos porcentuales: var. % de la rama por su peso (ponderación 2007 × índice del año anterior).", "Fuente: DIREPRO y Empresas."] }) });
+    [["no_primaria", "MANUFACTURA NO PRIMARIA", "g"], ["total", "SECTOR MANUFACTURA", "g2"]].forEach(([k, nom, cl]) => {
+      const pts = c.serie_25.filter((x) => x[`var_${k}`] != null);
+      if (pts.length) items.push({ clave: cl, tipo: "GRÁFICO", num: N[cl], nombre: `${R}: IVF ${nom}`, svg: (n) => B.barras({ numero: n, titulo: `${R}: IVF ${nom}`,
+        unidad: "(Var. % real respecto a similar periodo del año anterior)", puntos: pts.map((x) => ({ periodo: x.periodo, valor: x[`var_${k}`] })), notas: ["Fuente: DIREPRO y Empresas."] }) });
+    });
+    return items;
+  }
+
   function itemsEmpleo(c, R, N) {
     const a = c.anio, mes = c.titulo_mes, items = [], m3 = mes.slice(0, 3) + ".";
     items.push({ clave: "c", tipo: "CUADRO", num: N.c, nombre: `${R}: TRABAJADORES ASALARIADOS PRIVADOS FORMALES`, svg: (n) => B.cuadro({ numero: n, titulo: `${R}: TRABAJADORES ASALARIADOS PRIVADOS FORMALES`,
@@ -1105,11 +1157,11 @@
 
   const URL_BCRP = (sid, r, periodo) => {
     const qp = periodo ? `&periodo=${periodo}` : "";
-    return { pesca: `/v1/cuadros/pesca?departamento=${r.cod}${qp}`, hidro: `/v1/cuadros/hidrocarburos?departamento=${r.cod}${qp}`, empleo: `/v1/cuadros/empleo?departamento=${r.cod}${qp}`,
+    return { manu: `/v1/cuadros/manufactura?departamento=${r.cod}${qp}`, pesca: `/v1/cuadros/pesca?departamento=${r.cod}${qp}`, hidro: `/v1/cuadros/hidrocarburos?departamento=${r.cod}${qp}`, empleo: `/v1/cuadros/empleo?departamento=${r.cod}${qp}`,
       gasto: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=gasto&anexos=true${qp}`, inversion: `/v1/cuadros/ejecucion?departamento=${r.cod}&sector=inversion&anexos=true${qp}`,
       expo: `/v1/cuadros/exportaciones?departamento=${r.cod}${qp}`, impo: `/v1/cuadros/exportaciones?departamento=${r.cod}&flujo=impo${qp}` }[sid];
   };
-  const itemsBCRP = (sid, c, R, N) => sid === "expo" || sid === "impo" ? itemsExpo(c, R, N) : sid === "pesca" ? itemsPesca(c, R, N) : sid === "hidro" ? itemsHidro(c, R, N) : sid === "empleo" ? itemsEmpleo(c, R, N) : itemsEjecucion(sid, c, R, N, c.ultimo);
+  const itemsBCRP = (sid, c, R, N) => sid === "manu" ? itemsManu(c, R, N) : sid === "expo" || sid === "impo" ? itemsExpo(c, R, N) : sid === "pesca" ? itemsPesca(c, R, N) : sid === "hidro" ? itemsHidro(c, R, N) : sid === "empleo" ? itemsEmpleo(c, R, N) : itemsEjecucion(sid, c, R, N, c.ultimo);
 
   // galería: cada cuadro con su número (editable), Copiar / SVG / PNG; un ítem sin svg es un pendiente (texto)
   // «Referencia, no va en la imagen»: el título y las notas aparte, en Arial 10, cada uno con su botón Copiar
@@ -1340,6 +1392,7 @@
     if (sid === "pesca") { const f = c.filas[0]; return [fila("Pesca (valor bruto de producción)", f.var_mes, f.var_acum)]; }
     if (sid === "hidro") return c.bloques.map((b) => { const t = b.filas.find((f) => f.lote === "Total") || {};
       return fila(`Producción de ${b.producto.toLowerCase()}`, t.var_mes, t.var_acum); });
+    if (sid === "manu") { const t = c.cuadro[c.cuadro.length - 1]; return [fila("Manufactura (índice de volumen físico)", t.var_mes, t.var_acum)]; }
     if (sid === "empleo") { const t = c.cuadro.find((f) => f.rama === "Total"); return [fila("Empleo formal privado", t.var_mes, null, `${fmt(t.mes)} trabajadores`)]; }
     if (sid === "expo" || sid === "impo") { const t = c.sintesis.find((f) => f.total) || {};
       return [fila(sid === "expo" ? "Exportaciones (valor FOB)" : "Importaciones (valor FOB)", t.var_mes, t.var_acum)]; }
@@ -1698,13 +1751,14 @@
     else if (t === "Resumen Export") panel = '<div id="resumen-sunat"></div>';
     else if (t === "Resumen Import") panel = '<div id="resumen-sunat" data-flujo="impo"></div>';
     else if (t === "Contraste") panel = `<div id="contraste" data-sector="${id}"></div>`;
-    else if (t === "Cuadros") panel = s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
+    else if (t === "Cuadros") panel = s.cuadros === "manufactura" ? '<div id="cuadros-manu"></div>' : s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
       : s.actualizar === "hidro" ? `<div><div class="caja"><h3>PERUPETRO → página</h3><div id="hidro-caja"></div></div>${cajaSubida("sub-hidro", "Los CSV de producción o canon (PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv), o el Excel de exportaciones de crudo por empresa («Petróleo crudo - Loreto.xlsx», hoja Consolidado). Traen la serie completa y reemplazan lo cargado.")}</div>`
       : s.actualizar === "series" ? cajaSubida("sub-series", `Las SERIES de ${esc(r.nombre)} (${{ lor: "SERIES LORETO (OFICIAL).xlsx", smn: "SERIES SMN … .xlsx", uca: "SERIES UCAYALI.xlsx" }[grupo]}) y el libro de gráficos del DRAE (${{ lor: "DRAE_LOR_….xlsx", smn: "DRAE_SMT_Nov-26.xlsx", uca: "DRAE_Ucayali-….xlsx" }[grupo]}), tal como están: el nombre debe empezar con «SERIES» o «DRAE» y el departamento. La página lee los datos que guarda cada gráfico, su tipo y sus series; cada archivo reemplaza solo los gráficos de su fuente (las SERIES o el libro del DRAE) y se ordenan juntos por capítulo y sector.`)
       : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página.`)
       : s.actualizar === "estad" ? cajaSubida("sub-estad", `El libro ESTAD de ${esc(r.nombre)} tal como está (${{ lor: "ESTADLO.xlsx: hojas 15.Export e 16.Import", smn: "ESTADSMN.xlsx: hoja 14.XLS", uca: "ESTADUCA.xlsx: hoja 15.XLS" }[grupo]}). La página lee solo las columnas de cada mes (no las de Var.% ni los acumulados del final) y reemplaza los meses que trae.`)
+      : s.actualizar === "manu" ? cajaSubida("sub-manu", `El IVFM de ${esc(r.nombre)} tal como está (${{ lor: "IVFM-LO 2026 TOTAL.xlsx", smn: "IVFM-SM-2026 TOTAL.xlsx", uca: "IVFM-UCA-2026 TOTAL.xlsx" }[grupo]}): la página lee los índices mensuales de cada rama CIIU y su ponderación (columna D) y calcula el resto. Reemplaza los meses que trae; los meses en 0 (aún sin datos) no se guardan.`)
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
       : `<div class="vacio-caja"><b>Cómo entrará: ${esc(s.entra.toLowerCase())}.</b><span>Cuando se construya, aquí estarán su actualización y la carga del archivo del mes de ${esc(r.nombre)}.</span></div>`;
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
@@ -1719,7 +1773,7 @@
   function seccionComun() {
     let cuerpo = "";
     if (id === "panorama") {
-      const sects = ["resumen", "pesca", "hidro", "empleo", "expo", "impo", "gasto", "inversion"];
+      const sects = ["resumen", "pesca", "hidro", "manu", "empleo", "expo", "impo", "gasto", "inversion"];
       const acceso = (ir, t, d) => `<a class="acceso" data-ir="${ir}"><b>${t}</b><span>${d}</span></a>`;
       cuerpo = `<p class="lead">Por dónde empezar y en qué estado está cada sector de las tres regiones.</p>
         <h2 class="sub-t">¿Qué quieres hacer?</h2>
@@ -1821,11 +1875,12 @@
     if ($("emp-tot")) empleoTotales("et");
     if ($("emp-sec")) empleoTotales("es");
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
-    ["sub-todo", "sub-emp", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo", "sub-series"].forEach(atarSubida);
+    ["sub-todo", "sub-emp", "sub-manu", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo", "sub-series"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
     if ($("hidro-caja")) cajaHidro($("hidro-caja"));
     if ($("arch-mef")) cajaArchivosMef($("arch-mef"));
     if ($("cuadros-empleo")) cuadrosEmpleo(REG[grupo], $("cuadros-empleo"));
+    if ($("cuadros-manu")) cuadrosManu(REG[grupo], $("cuadros-manu"));
     if ($("cuadros-hidro")) cuadrosHidro(REG[grupo], $("cuadros-hidro"));
     if ($("cuadros-pesca")) cuadrosPesca(REG[grupo], $("cuadros-pesca"));
     if ($("sunat-expo")) sunatExpo(REG[grupo], $("sunat-expo"));

@@ -19,7 +19,7 @@ from xml.etree import ElementTree as ET
 
 import pandas as pd
 
-from . import controles, db, drae, empleo, exportaciones, hidrocarburos, ipc, pesca, sunat_expo, sunat_impo
+from . import controles, db, drae, empleo, exportaciones, hidrocarburos, ipc, manufactura, pesca, sunat_expo, sunat_impo
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -153,6 +153,7 @@ def leer_archivos(raiz):
     por_bloque, avisos = {}, []
     huecos = []
     pim, pim_muni, de_pesca, de_empleo, de_hidro, de_estad, de_sunat, de_impo = [], [], [], [], [], [], [], []
+    de_manu = []
     for n_archivo, ruta in enumerate(sorted(raiz.rglob("*"))):
         if not ruta.is_file() or ruta.name.startswith(("CONTROL", "LOG", ".")):
             continue
@@ -193,6 +194,9 @@ def leer_archivos(raiz):
                 continue
             if sunat_expo.es_sunat(ruta):                  # base mensual de SUNAT (X_AAAAMM.xlsx)
                 de_sunat.append((n_archivo, ruta, "sunat"))
+                continue
+            if manufactura.reconocer(ruta):               # IVFM de una región (índice de volumen físico manufacturero)
+                de_manu.append((n_archivo, ruta))
                 continue
             if hidrocarburos.es_expo_crudo(ruta):          # exportaciones de crudo por empresa (hoja Consolidado)
                 de_hidro.append((n_archivo, ruta, "expo"))
@@ -277,6 +281,11 @@ def leer_archivos(raiz):
             if (~es_total).any():
                 bases["empleo-sectores"] = df[~es_total].copy()
         avisos += avisos_empleo
+    if de_manu:
+        df, avisos_manu = manufactura.leer(de_manu)
+        if not df.empty:
+            bases["manu-ivf"] = df
+        avisos += avisos_manu
     if de_hidro:
         de_hidrocarburos, avisos_hidro = hidrocarburos.leer(de_hidro)
         bases.update(de_hidrocarburos)

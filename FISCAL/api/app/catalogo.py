@@ -18,6 +18,7 @@ NIVEL_PIM = {"E": "GOBIERNO NACIONAL", "R": "GOBIERNOS REGIONALES", "M": "GOBIER
 GRUPOS = {"inversion": "Inversión · genérica 2.6", "gasto": "Gasto total · todas las genéricas",
           "pesca": "Pesca · DIREPRO, VBP a precios de 2007",
           "empleo": "Empleo · MTPE, Planilla Electrónica",
+          "manufactura": "Manufactura · IVF de DIREPRO y empresas",
           "hidrocarburos": "Hidrocarburos · PERUPETRO",
           "comercio": "Exportaciones e importaciones · ESTAD"}
 
@@ -89,6 +90,11 @@ BASES = {b.id: b for b in [
          ["AÑO", "MES", "TIPO", "ESPECIES", "ESPECIES_CORREGIDO", "ESPECIES_OK", "VOLUMEN", "VBP"],
          [8, 6, 14, 30, 30, 22, 12, 12], valor="VBP", usa_niveles=False, departamentos=("25",), formato_valor="#,##0.000",
          descripcion="DIREPRO Ucayali: desembarque fresco, seco salado y total (t) y peces ornamentales (unidades)."),
+    # Manufactura: índice de volumen físico manufacturero (IVFM) de cada región, por rama CIIU (FISCAL/api/app/manufactura.py)
+    Base("manu-ivf", "manufactura", "Índice de volumen físico manufacturero por rama", "Manufactura", "MANUFACTURA",
+         ["AÑO", "MES", "DEPARTAMENTO", "GRUPO", "CIIU", "RAMA", "PONDERACION", "INDICE"], [8, 6, 14, 26, 8, 44, 14, 12],
+         valor="INDICE", usa_niveles=False, departamentos=("16", "22", "25"), formato_valor="#,##0.000",
+         descripcion="IVFM de la región (DIREPRO y empresas): índice mensual de cada rama CIIU y su ponderación base 2007."),
     # Empleo (EMPLEO/empleo.md): trabajadores asalariados privados formales por región y actividad
     Base("empleo", "empleo", "Trabajadores asalariados privados formales", "Empleo", "EMPLEO",
          ["AÑO", "MES", "REGIÓN", "ACTIVIDAD_ECONOMICA", "EMPLEO"], [8, 6, 20, 24, 12], valor="EMPLEO", usa_niveles=False,
