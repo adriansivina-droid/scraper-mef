@@ -155,3 +155,8 @@ def test_sectores_aparte_del_total(cliente):
     assert set(lg["ACTIVIDAD_ECONOMICA"]) >= {"Agrícola", "Comercio", "No precisa"}
     assert cliente.get("/v1/empleo/sectores?actividad=Pesca").status_code == 422
     assert cliente.get("/v1/empleo/sectores?actividad=Minería&formato=xlsx").status_code == 200
+    t = cliente.get("/v1/empleo/sectores?desde=2025&actividad=Todos").json()
+    lor = [x for x in t["regiones"] if x["region"] == "Loreto"]
+    assert [x["sector"] for x in lor][:2] == ["Agrícola", "Minería"] and next(x for x in lor if x["sector"] == "Comercio")["valores"]["2026-04"] == 10469
+    ws = load_workbook(io.BytesIO(cliente.get("/v1/empleo/sectores?desde=2025&actividad=Todos&formato=xlsx").content))["Trabajadores"]
+    assert (ws["A4"].value, ws["B4"].value, ws["C4"].value) == ("Región", "Sector", "Ene. 2025")

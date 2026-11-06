@@ -320,3 +320,5 @@ tr.apagada td { color: var(--mid); opacity: .7; }
 .zona-subida:hover { border-color: var(--s2); background: var(--panel); }
 .zona-subida b { color: var(--navy); font-size: 15px; }
 .zona-subida input { margin-top: 6px; font-size: 13px; }
+
+tr.nueva-region td { border-top: 2px solid var(--hair); }
