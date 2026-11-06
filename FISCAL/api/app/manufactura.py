@@ -39,6 +39,8 @@ NOMBRES = {"1511": "Productos cárnicos", "1513": "Conservas de palmito", "1514"
            "2710": "Calaminas", "2899": "Mallas metálicas", "2911": "Motores para pozos", "2912": "Bombas para pozos",
            "3591": "Motocicletas y motokar"}
 NOMBRES_REGION = {"22": {"2320": "Biodiesel", "1520": "Queso y mantequilla"}, "25": {"2899": "Clavos para madera"}}
+# ramas que el cuadro de la síntesis presenta juntas: en Loreto, motores y bombas para pozos son la misma rama (bombas de agua)
+FUSIONES = {"16": {"2912": "2911"}}
 FUENTE = "Fuente: DIREPRO y Empresas. Elaboración: BCRP, Sucursal Iquitos. Departamento de Estudios Económicos."
 
 
@@ -155,6 +157,16 @@ def cuadros(depto, df, periodo=None):
     df["P"] = df["AÑO"] * 100 + df["MES"]
     df["W"], df["I"] = pd.to_numeric(df["PONDERACION"]), pd.to_numeric(df["INDICE"])
     df["CIIU"] = df["CIIU"].astype(str)
+    fus = FUSIONES.get(depto, {})
+    if fus and df["CIIU"].isin(list(fus)).any():
+        # la rama unida: ponderación = suma; índice = promedio ponderado de los índices (lo mismo que suma el IVF)
+        df["CIIU"] = df["CIIU"].replace(fus)
+        df["WI"] = df["W"] * df["I"]
+        claves = ["AÑO", "MES", "P", "CIIU"]
+        prim = df.drop_duplicates(claves)[claves + ["DEPARTAMENTO", "GRUPO", "RAMA"]]
+        sumas = df.groupby(claves, as_index=False)[["W", "WI"]].sum()
+        df = prim.merge(sumas, on=claves)
+        df["I"] = (df["WI"] / df["W"]).where(df["W"] > 0, 0.0)
     periodos = sorted(df["P"].unique())
     ultimo = int(periodos[-1])
     p = int(periodo.replace("-", "")) if periodo else ultimo
