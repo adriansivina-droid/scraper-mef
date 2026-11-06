@@ -20,6 +20,8 @@ import unicodedata
 import openpyxl
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.cell.rich_text import CellRichText, TextBlock
+from openpyxl.cell.text import InlineFont
 from openpyxl.styles import Alignment, Font
 
 from .catalogo import DEPARTAMENTOS
@@ -258,11 +260,15 @@ def excel(region, c):
     ws.title = "Cuadro"
     neg, centro = Font(bold=True), Alignment(horizontal="center")
     a, b, mes = c["anio"], c["comparar"], c["titulo_mes"]
-    ws.append([f"{region.upper()}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO 1/"])
+    ws.append([CellRichText(TextBlock(InlineFont(b=True), f"{region.upper()}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO"),
+                            TextBlock(InlineFont(b=True, vertAlign="superscript"), "1/"))])
     ws.append(["(Var. % real respecto a similar periodo del año anterior)"])
     ws.append([])
     ws.append(["Ramas de actividad", "Estructura porcentual", mes, None, c["acumulado"], None])
-    ws.append([None, f"{c['estructura_de'] or b} 2/", "Var. %", "Contribución 3/", "Var. %", "Contribución 3/"])
+    ws.append([None, None, "Var. %", None, "Var. %", None])
+    sup = InlineFont(vertAlign="superscript", b=True)
+    for ref, base in (("B5", str(c["estructura_de"] or b)), ("D5", "Contribución"), ("F5", "Contribución")):   # llamadas 2/ y 3/ en superíndice
+        ws[ref] = CellRichText(TextBlock(InlineFont(b=True), base), TextBlock(sup, "2/" if ref == "B5" else "3/"))
     for f in c["cuadro"]:
         guion = lambda v: "-" if f["vacia"] or v is None else v
         ws.append([("   " * (f["nivel"] // 2)) + f["nombre"], f["estructura"], guion(f["var_mes"]), guion(f["contrib_mes"]),

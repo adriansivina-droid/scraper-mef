@@ -339,9 +339,9 @@
           <button class="btn" type="button" id="manu-xlsx">Descargar en Excel</button></div>
         <div class="stats"><div class="stat"><small>${esc(c.titulo_mes)} ${c.anio}</small><b class="${cls(t.var_mes)}">${n1(t.var_mes)} %</b><span>frente a ${esc(c.titulo_mes.toLowerCase())} ${c.comparar}</span></div>
           <div class="stat"><small>${esc(c.acumulado)} ${c.anio}</small><b class="${cls(t.var_acum)}">${n1(t.var_acum)} %</b><span>frente a igual periodo de ${c.comparar}</span></div></div>
-        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO 1/</h3><p>(Var. % real respecto a similar periodo del año anterior)</p>
+        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO<sup>1/</sup></h3><p>(Var. % real respecto a similar periodo del año anterior)</p>
           <div class="scroll"><table><tr><th rowspan="2">Ramas de actividad</th><th class="n">Estructura porcentual</th><th class="n" colspan="2" style="text-align:center">${esc(c.titulo_mes)}</th><th class="n" colspan="2" style="text-align:center">${esc(c.acumulado)}</th></tr>
-            <tr><th class="n">${c.estructura_de || c.comparar} 2/</th><th class="n">Var. %</th><th class="n">Contribución 3/</th><th class="n">Var. %</th><th class="n">Contribución 3/</th></tr>${filas}</table></div>
+            <tr><th class="n">${c.estructura_de || c.comparar}<sup>2/</sup></th><th class="n">Var. %</th><th class="n">Contribución<sup>3/</sup></th><th class="n">Var. %</th><th class="n">Contribución<sup>3/</sup></th></tr>${filas}</table></div>
           <p class="nota">1/ Cifras preliminares. 2/ Estimado a precios de 2007: participación de cada rama en el IVF ponderado de ${c.estructura_de || c.comparar}${c.meses_estructura && c.meses_estructura < 12 ? ` (${c.meses_estructura} meses)` : ""}. 3/ Puntos porcentuales: var. % de la rama por su peso (ponderación 2007 × índice del año anterior); suman la variación del sector. «-»: la rama no tuvo producción en ninguno de los dos años. Fuente: DIREPRO y Empresas.</p></div>
         ${graf("no_primaria", "MANUFACTURA NO PRIMARIA")}${graf("total", "SECTOR MANUFACTURA")}`;
       $("manu-p").addEventListener("change", (ev) => cuadrosManu(r, caja, ev.target.value));
@@ -1066,13 +1066,13 @@
 
   // Manufactura: el cuadro de la síntesis y los gráficos de var. % (no primaria y total, últimos 25 meses)
   function itemsManu(c, R, N) {
-    const a = c.anio, b = c.comparar, mes = c.titulo_mes, items = [], tit = `${R}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO 1/`;
+    const a = c.anio, b = c.comparar, mes = c.titulo_mes, items = [], tit = `${R}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO`;
     const g = (f, k) => f.vacia || f[k] == null ? "-" : v1(f[k]);
-    items.push({ clave: "c", tipo: "CUADRO", num: N.c, nombre: `${R}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO`, svg: (n) => B.cuadro({ numero: n, titulo: tit,
+    items.push({ clave: "c", tipo: "CUADRO", num: N.c, nombre: `${R}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO`, svg: (n) => B.cuadro({ numero: n, titulo: tit, llamada: "1/",
       unidad: "(Var. % real respecto a similar periodo del año anterior)",
       cab: [[{ t: "Ramas de actividad" }, { t: "Estructura" }, { t: mes, span: 2, linea: true }, { t: c.acumulado, span: 2, linea: true }],
             [{ t: "" }, { t: "Porcentual" }, { t: "" }, { t: "" }, { t: "" }, { t: "" }],
-            [{ t: "" }, { t: `${c.estructura_de || b} 2/` }, { t: "Var. %" }, { t: "Contribución 3/" }, { t: "Var. %" }, { t: "Contribución 3/" }]],
+            [{ t: "" }, { t: `${c.estructura_de || b}`, sup: "2/" }, { t: "Var. %" }, { t: "Contribución", sup: "3/" }, { t: "Var. %" }, { t: "Contribución", sup: "3/" }]],
       filas: c.cuadro.map((f) => ({ c: [f.nombre, f.estructura == null ? "-" : n1(f.estructura), g(f, "var_mes"), g(f, "contrib_mes"), g(f, "var_acum"), g(f, "contrib_acum")],
         b: f.nivel === 0, total: !!f.total, ind: f.nivel ? 1 : 0 })),
       notas: ["1/ Cifras preliminares.", "2/ Estimado a precios de 2007.", "3/ Puntos porcentuales: var. % de la rama por su peso (ponderación 2007 × índice del año anterior).", "Fuente: DIREPRO y Empresas."] }) });
