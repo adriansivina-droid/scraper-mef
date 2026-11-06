@@ -41,6 +41,10 @@ NOMBRES = {"1511": "Productos cárnicos", "1513": "Conservas de palmito", "1514"
 NOMBRES_REGION = {"22": {"2320": "Biodiesel", "1520": "Queso y mantequilla"}, "25": {"2899": "Clavos para madera"}}
 # ramas que el cuadro de la síntesis presenta juntas: en Loreto, motores y bombas para pozos son la misma rama (bombas de agua)
 FUSIONES = {"16": {"2912": "2911"}}
+# orden de las ramas en Manufactura_Cuadro de cada región (las que no estén, al final en el orden del IVFM)
+ORDEN = {"16": ["2320", "1513", "1520", "1533", "1541", "1553", "1554", "2010", "2021", "2212", "2221", "2411", "2899", "2911", "3591"],
+         "22": ["2320", "1514", "1520", "1543", "1554", "2010", "2424", "2695", "2694"],
+         "25": ["2320", "1553", "1554", "2010", "2021", "2710", "2899"]}
 FUENTE = "Fuente: DIREPRO y Empresas. Elaboración: BCRP, Sucursal Iquitos. Departamento de Estudios Económicos."
 
 
@@ -177,7 +181,8 @@ def cuadros(depto, df, periodo=None):
     # ramas en el orden del libro (primaria primero), con la ponderación y el grupo de la carga más reciente
     orden = list(dict.fromkeys(df["CIIU"]))
     ramas = df.sort_values(["AÑO", "MES"]).drop_duplicates("CIIU", keep="last").set_index("CIIU")
-    pos = {c: i for i, c in enumerate(orden)}
+    pref = ORDEN.get(depto, [])
+    pos = {c: (pref.index(c) if c in pref else len(pref) + i) for i, c in enumerate(orden)}
     orden.sort(key=lambda c: (ramas.at[c, "GRUPO"] != PRIMARIA, pos[c]))
     ramas = ramas.loc[orden]
     w = ramas["W"]
