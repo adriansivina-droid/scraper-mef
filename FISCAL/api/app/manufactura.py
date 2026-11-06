@@ -160,12 +160,13 @@ def cuadros(depto, df, periodo=None):
     fus = FUSIONES.get(depto, {})
     if fus and df["CIIU"].isin(list(fus)).any():
         # la rama unida: ponderación = suma; índice = promedio ponderado de los índices (lo mismo que suma el IVF)
+        df["_o"] = range(len(df))                         # el orden del libro (la rama unida va donde la primera)
         df["CIIU"] = df["CIIU"].replace(fus)
         df["WI"] = df["W"] * df["I"]
         claves = ["AÑO", "MES", "P", "CIIU"]
-        prim = df.drop_duplicates(claves)[claves + ["DEPARTAMENTO", "GRUPO", "RAMA"]]
+        prim = df.drop_duplicates(claves)[claves + ["DEPARTAMENTO", "GRUPO", "RAMA", "_o"]]
         sumas = df.groupby(claves, as_index=False)[["W", "WI"]].sum()
-        df = prim.merge(sumas, on=claves)
+        df = prim.merge(sumas, on=claves).sort_values("_o").reset_index(drop=True)
         df["I"] = (df["WI"] / df["W"]).where(df["W"] > 0, 0.0)
     periodos = sorted(df["P"].unique())
     ultimo = int(periodos[-1])
