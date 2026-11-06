@@ -453,8 +453,8 @@ def empleo_sectores(desde: int = Query(2016, ge=2000, le=2100), actividad: str =
                     formato: str = Query("json", pattern="^(json|xlsx|long|csv)$")):
     """Trabajadores de cada región por mes en una actividad económica (base aparte «empleo-sectores»), con la var. %
     interanual. long/csv: todas las actividades, una fila por región, actividad y mes."""
-    if actividad not in empleo.ACTIVIDADES:
-        raise HTTPException(422, f"Actividad no válida: {actividad}. Usa una de: {', '.join(empleo.ACTIVIDADES)}.")
+    if actividad not in empleo.ACTIVIDADES and actividad != "Todos":
+        raise HTTPException(422, f"Actividad no válida: {actividad}. Usa «Todos» o una de: {', '.join(empleo.ACTIVIDADES)}.")
     deptos = sorted({empleo.depto_de(r) for r in empleo.REGIONES})
     df = db.leer("empleo-sectores", deptos, [], f"{desde - 1}-01", "2100-12")
     if formato in ("long", "csv"):
@@ -466,11 +466,12 @@ def empleo_sectores(desde: int = Query(2016, ge=2000, le=2100), actividad: str =
         out.to_excel(buf, index=False, sheet_name="Empleo sectores")
         return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(nombre + ".xlsx"))
-    x = empleo.totales(empleo.de_actividad(df, actividad), desde)
+    x = empleo.todos_sectores(df, desde) if actividad == "Todos" else empleo.totales(empleo.de_actividad(df, actividad), desde)
     if formato == "xlsx":
-        return Response(empleo.excel_totales(x, f"TRABAJADORES ASALARIADOS PRIVADOS FORMALES · {actividad.upper()} · POR REGIÓN"),
+        sector = "POR SECTORES" if actividad == "Todos" else actividad.upper()
+        return Response(empleo.excel_totales(x, f"TRABAJADORES ASALARIADOS PRIVADOS FORMALES · {sector} · POR REGIÓN"),
                         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers=_adjunto(f"Empleo {actividad} por región {desde}.xlsx"))
+                        headers=_adjunto(f"Empleo {'todos los sectores' if actividad == 'Todos' else actividad} por región {desde}.xlsx"))
     return {**x, "actividad": actividad, "actividades": empleo.ACTIVIDADES}
 
 

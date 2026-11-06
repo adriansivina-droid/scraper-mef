@@ -161,6 +161,15 @@ def de_actividad(df, actividad):
     return d.assign(ACTIVIDAD_ECONOMICA="Total")
 
 
+def todos_sectores(df, desde):
+    """Cada región con sus 7 actividades (filas región × sector), con la forma de totales()."""
+    por = {a: totales(de_actividad(df, a), desde) for a in ACTIVIDADES}
+    anios = sorted({y for x in por.values() for y in x["anios"]})
+    ultimo = max((x["ultimo"] for x in por.values() if x["ultimo"]), default=None)
+    filas = [{**r, "sector": a} for reg in REGIONES for a in ACTIVIDADES for r in por[a]["regiones"] if r["region"] == reg]
+    return {"anios": anios, "ultimo": ultimo, "regiones": filas}
+
+
 def long_sectores(df, desde):
     """Todas las actividades en formato LONG: AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO, VAR_%."""
     partes = []
@@ -192,16 +201,19 @@ def excel_totales(x, titulo="TRABAJADORES ASALARIADOS PRIVADOS FORMALES POR REGI
         ws = wb.active if i == 0 else wb.create_sheet()
         ws.title = hoja
         ws.append([titulo_hoja]); ws.append([titulo]); ws.append([])
-        ws.append(["Región"] + [etiqueta(int(m.replace("-", "")), True) for m in meses])
+        con_sector = any("sector" in r for r in x["regiones"])          # «Todos los sectores»: región y sector en filas
+        ws.append(["Región"] + (["Sector"] if con_sector else []) + [etiqueta(int(m.replace("-", "")), True) for m in meses])
         for r in x["regiones"]:
-            ws.append([r["region"]] + [r[clave].get(m) for m in meses])
-            for celda in ws[ws.max_row][1:]:
+            ws.append([r["region"]] + ([r.get("sector")] if con_sector else []) + [r[clave].get(m) for m in meses])
+            for celda in ws[ws.max_row][1 + con_sector:]:
                 celda.number_format = fmt
         ws.append([]); ws.append([FUENTE])
         ws["A1"].font = neg
         for celda in ws[4]:
             celda.font = neg
         ws.column_dimensions["A"].width = 20
+        if con_sector:
+            ws.column_dimensions["B"].width = 14
     salida = io.BytesIO()
     wb.save(salida)
     return salida.getvalue()

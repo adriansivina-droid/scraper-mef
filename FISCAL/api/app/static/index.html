@@ -308,9 +308,10 @@
       const k = $(`${pre}-v`).value, cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
       const cab1 = x.anios.map((a) => `<th class="n" colspan="${meses.filter((m) => m.startsWith(a)).length}" style="text-align:center">${a}</th>`).join("");
       const cab2 = meses.map((m) => `<th class="n">${esc(etqMes(m).slice(0, 3))}</th>`).join("");
-      const filas = x.regiones.map((r) => `<tr><td>${esc(r.region)}</td>${meses.map((m) => { const v = r[k][m];
+      const conSector = x.regiones.some((r) => r.sector);
+      const filas = x.regiones.map((r, i) => `<tr${conSector && i && x.regiones[i - 1].region !== r.region ? ' class="nueva-region"' : ""}><td>${conSector && i && x.regiones[i - 1].region === r.region ? "" : `<b>${esc(r.region)}</b>`}</td>${conSector ? `<td>${esc(r.sector)}</td>` : ""}${meses.map((m) => { const v = r[k][m];
         return `<td class="n ${k === "var" ? cls(v) : ""}">${v == null ? "" : k === "var" ? pct(v) : fmt(v)}</td>`; }).join("")}</tr>`).join("");
-      caja.innerHTML = `<div class="scroll"><table><tr><th rowspan="2">Región</th>${cab1}</tr><tr>${cab2}</tr>${filas}</table></div>`;
+      caja.innerHTML = `<div class="scroll"><table><tr><th rowspan="2">Región</th>${conSector ? '<th rowspan="2">Sector</th>' : ""}${cab1}</tr><tr>${cab2}</tr>${filas}</table></div>`;
     };
     $(`${pre}-v`).onchange = pinta;
     pinta();
@@ -1750,10 +1751,10 @@
     } else if (id === "empleo-sectores") {
       const anios = Array.from({ length: new Date().getFullYear() - 2015 }, (_, i) => 2016 + i).reverse();
       cuerpo = `<p class="lead">Los trabajadores asalariados privados formales de cada región por actividad económica y mes (MTPE, Planilla Electrónica), desde 2016. Es una base aparte: no cambia el total de cada región.</p>
-        <div class="caja"><div class="fila"><label class="campo" for="es-a">Sector<select id="es-a">${["Agrícola", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "No precisa"].map((a) => `<option>${a}</option>`).join("")}</select></label>
+        <div class="caja"><div class="fila"><label class="campo" for="es-a">Sector<select id="es-a"><option value="Todos">Todos los sectores</option>${["Agrícola", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "No precisa"].map((a) => `<option>${a}</option>`).join("")}</select></label>
           <label class="campo" for="es-d">Desde<select id="es-d">${anios.map((a) => `<option value="${a}"${a === 2025 ? " selected" : ""}>${a}</option>`).join("")}</select></label>
           <label class="campo" for="es-v">Ver<select id="es-v"><option value="valores">Número de trabajadores</option><option value="var">Var. % interanual</option></select></label>
-          <button class="btn" type="button" id="es-xlsx">Descargar el sector en Excel</button>
+          <button class="btn" type="button" id="es-xlsx">Descargar lo que se ve (Excel)</button>
           <button class="btn sec" type="button" id="es-long">LONG de todos los sectores (Excel)</button><button class="btn sec" type="button" id="es-csv">LONG en CSV</button></div><div id="emp-sec"><div class="loading"><span class="spin"></span>Cargando…</div></div>
           <p class="nota">Fuente: MTPE, Planilla Electrónica – PLAME y T-Registro. «No precisa» es la actividad sin clasificar del MTPE. El LONG trae una fila por región, actividad y mes: AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO, VAR_%. Para actualizar, ${irComun("act-empleo", "Scraper de empleo")} con «Por sectores».</p></div>`;
     } else if (id === "empleo-long") {
