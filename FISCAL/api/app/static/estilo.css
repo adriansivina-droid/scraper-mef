@@ -246,7 +246,16 @@ td.acciones-corrida { white-space: nowrap; }
 td.acciones-corrida .btn { margin-right: 10px; }
 
 /* ── Gráficos DRAE ── */
-.drae-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 560px), 1fr)); gap: 16px; }
+.drae-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
+.drae-cab { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.drae-nom { color: var(--navy); font-size: 15px; line-height: 1.3; }
+.drae-acc { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.drae-acc .drae-ocultar { margin-left: auto; }
+.drae-item.oculto { opacity: .75; border-style: dashed; }
+.pasos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; list-style: none; counter-reset: paso; padding: 0; margin: 0 0 14px; }
+.pasos li { counter-increment: paso; background: var(--paper); border: 1px solid var(--hair); border-radius: 10px; padding: 10px 12px 10px 44px; position: relative; font-size: 13px; color: var(--mid); }
+.pasos li::before { content: counter(paso); position: absolute; left: 12px; top: 10px; width: 22px; height: 22px; border-radius: 50%; background: var(--navy); color: #FEFEFE; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.pasos li b { color: var(--navy); }
 .drae-item { margin: 0; }
 .drae-prev svg { width: 100%; height: auto; max-width: 100%; }
 .drae-datos { margin-top: 8px; }
@@ -285,3 +294,10 @@ td.acciones-corrida .btn { margin-right: 10px; }
 .drae-secs a { color: var(--link); text-decoration: none; } .drae-secs a:hover { text-decoration: underline; }
 .drae-secs span, .drae-sec-t span { color: var(--mid); font-weight: 500; font-size: 12px; }
 .drae-sec-t { font-size: 16px; color: var(--navy); margin: 18px 0 10px; scroll-margin-top: 80px; }
+
+/* Panorama: accesos rápidos */
+.sub-t { font-family: var(--display); font-size: 22px; color: var(--navy); margin: 22px 0 10px; }
+.accesos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+.acceso { display: flex; flex-direction: column; gap: 4px; background: var(--paper); border: 1px solid var(--hair); border-left: 4px solid var(--s2); border-radius: 10px; padding: 14px 16px; cursor: pointer; text-decoration: none; color: var(--mid); font-size: 13px; }
+.acceso b { color: var(--navy); font-size: 15px; }
+.acceso:hover { border-left-color: var(--s3); box-shadow: 0 2px 8px rgba(17, 17, 73, .08); }

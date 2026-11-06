@@ -107,3 +107,34 @@ def test_series_y_libro_del_drae_conviven(cliente):
     assert {a["archivo"] for a in d["archivos"]} == {"SERIES_SMN.xlsx", "DRAE_SMT_Nov-26.xlsx"}
     subir("SERIES_SMN.xlsx")                                  # volver a subir las SERIES deja el libro del DRAE
     assert [g["fuente"] for g in cliente.get("/v1/drae?departamento=22").json()["graficos"]] == ["SERIES", "DRAE"]
+
+
+def _g(orden, hoja, titulo, cats, vals, tipo="barras", nombre="Loreto"):
+    return {"orden": orden, "hoja": hoja, "titulo": titulo, "subtitulo": "", "tipo": tipo, "categorias": cats,
+            "series": [{"nombre": nombre, "valores": vals}]}
+
+
+def test_graficos_innecesarios():
+    gs = [_g(1, "PBI (NUEVO)", "Evolución del PBI, 2015 - 2026", ["2015", "2016", "2017"], [1.0, 2.0, 3.0]),
+          _g(2, "PBI", "Evolución del PBI, 2016 - 2026", ["2016", "2017"], [2.0, 3.0]),            # contenido en 1
+          _g(3, "PBI T", "PBI trimestral", ["I", "II"], [5.0, 6.0]),
+          _g(4, "PBI T (2)", "PBI trimestral", ["I", "II"], [5.0, 6.0]),                            # duplicado de 3
+          _g(5, "XS LOR AGOS-2026", "Loreto: Principales mercados, periodo enero-agosto.", ["A", "B"], [1.0, 2.0]),
+          _g(6, "XS LOR AGOS-2026", "Loreto: Principales mercados, agosto 2025.", ["A", "B"], [3.0, 4.0]),   # año anterior: queda
+          _g(7, "XS LOR AGO-2026", "Loreto: Principales mercados, enero 2026.", ["A", "B"], [5.0, 6.0]),    # mes anterior
+          _g(8, "XS LOR AGO-2026", "Loreto: Principales productos de aduana Iquitos, enero 2026.", ["A"], [1.0])]  # su hoja ya es vieja
+    fuera = drae.innecesarios(gs)
+    assert sorted(fuera) == [2, 4, 7, 8]
+    assert fuera[4] == "duplicado de N° 3" and fuera[2].startswith("contenido en N° 1") and "mes anterior" in fuera[7]
+
+
+def test_ocultar_y_depurar(cliente):
+    cliente.post("/v1/cargas", files=[("archivos", ("SERIES LORETO (OFICIAL).xlsx", libro(), "application/octet-stream"))])
+    assert cliente.post("/v1/drae/ocultar?departamento=16&orden=1&oculto=true").json() == {"ok": True, "oculto": True}
+    assert cliente.get("/v1/drae?departamento=16").json()["graficos"][0]["oculto"] is True
+    cliente.post("/v1/cargas", files=[("archivos", ("SERIES LORETO (OFICIAL).xlsx", libro(), "application/octet-stream"))])
+    assert cliente.get("/v1/drae?departamento=16").json()["graficos"][0]["oculto"] is True     # se recuerda al volver a subir
+    cliente.post("/v1/drae/ocultar?departamento=16&orden=1&oculto=false")
+    assert cliente.get("/v1/drae?departamento=16").json()["graficos"][0]["oculto"] is False
+    assert cliente.post("/v1/drae/ocultar?departamento=16&orden=99").status_code == 404
+    assert drae.depurar("16") == []

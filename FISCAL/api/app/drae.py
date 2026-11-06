@@ -10,6 +10,7 @@ import io
 import json
 import posixpath
 import re
+import unicodedata
 import zipfile
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
@@ -370,9 +371,106 @@ def leer_series(contenido):
 
 
 # ── base de datos ──
+# ── Gráficos innecesarios: duplicados, contenidos en otro o de un mes ya reemplazado ──
+_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"]
+_RE_MES = re.compile(r"\b(" + "|".join(_MESES) + r"|septiembre)\b")
+
+
+def _sin_tilde(t):
+    return unicodedata.normalize("NFKD", str(t or "")).encode("ascii", "ignore").decode().lower()
+
+
+def _titulo_base(g):
+    """El título sin meses, años ni «periodo»: dos gráficos con el mismo título base son el mismo gráfico de otra fecha."""
+    t = _RE_MES.sub("", _sin_tilde(g.get("titulo")))
+    t = re.sub(r"\b(periodo|perido)\b|\b(19|20)\d\d\b", "", t)
+    return re.sub(r"[^a-z]+", " ", t).strip()
+
+
+def _fecha_titulo(g):
+    """(año, último mes, varios_meses) del título; el año sale de la hoja si el título no lo trae (p. ej. «XS LOR AGOS-2026»)."""
+    t = _sin_tilde(g.get("titulo")).replace("septiembre", "setiembre")
+    meses = [_MESES.index(m) + 1 for m in _RE_MES.findall(t)]
+    if not meses:
+        return None
+    anios = re.findall(r"\b((?:19|20)\d\d)\b", t) or re.findall(r"((?:19|20)\d\d)", str(g.get("hoja") or ""))
+    return (int(anios[-1]) if anios else None, meses[-1], len(meses) > 1)
+
+
+def _firma(g):
+    return json.dumps([[str(c) for c in g["categorias"]], [[None if v is None else round(v, 6) for v in x["valores"]] for x in g["series"]]])
+
+
+def _contenido(a, b):
+    """True si todo lo de «a» (cada serie en cada categoría) está en «b» con el mismo valor y «b» trae más categorías."""
+    if len(a["categorias"]) >= len(b["categorias"]) or a.get("tipo") == "anillo" or a.get("tipo") == "circular":
+        return False
+    pos = {str(c): i for i, c in enumerate(b["categorias"])}
+    series_b = {x["nombre"]: x["valores"] for x in b["series"]}
+    if not a["series"] or any(str(c) not in pos for c in a["categorias"]):
+        return False
+    for x in a["series"]:
+        if x["nombre"] not in series_b:
+            return False
+        for c, v in zip(a["categorias"], x["valores"]):
+            w = series_b[x["nombre"]][pos[str(c)]] if pos[str(c)] < len(series_b[x["nombre"]]) else None
+            if (v is None) != (w is None) or (v is not None and abs(v - w) > 1e-6):
+                return False
+    return True
+
+
+def innecesarios(graficos):
+    """{orden: motivo} de los gráficos que sobran:
+      1. duplicado exacto de otro (mismas categorías y cifras): queda el primero;
+      2. contenido en otro más completo (las mismas cifras con menos años, p. ej. «PBI» 2017-2026 dentro de «PBI (NUEVO)»
+         2015-2026);
+      3. la versión de un mes anterior del mismo gráfico y año (p. ej. «…, enero 2026» cuando ya está «…, enero-agosto
+         2026»); si la mayoría de los gráficos de una hoja quedan así, sale la hoja entera (la hoja del mes anterior).
+    Las comparaciones con el año anterior (agosto 2025 frente a agosto 2026) no se tocan."""
+    fuera, vistos = {}, {}
+    for g in graficos:
+        f = _firma(g)
+        if f in vistos:
+            fuera[g["orden"]] = f"duplicado de N° {vistos[f]}"
+        else:
+            vistos[f] = g["orden"]
+    for a in graficos:
+        if a["orden"] in fuera:
+            continue
+        b = next((b for b in graficos if b is not a and b["orden"] not in fuera and _contenido(a, b)), None)
+        if b:
+            fuera[a["orden"]] = f"contenido en N° {b['orden']} ({b['hoja']}), que trae más años"
+    por_titulo = {}
+    for g in graficos:
+        if g["orden"] not in fuera and _fecha_titulo(g) and _titulo_base(g):
+            por_titulo.setdefault(_titulo_base(g), []).append(g)
+    viejos = {}
+    for gs in por_titulo.values():
+        for a in gs:
+            ya, ma, _ = _fecha_titulo(a)
+            b = next((b for b in gs if b is not a and _fecha_titulo(b)[0] == ya and ya and _fecha_titulo(b)[1] > ma), None)
+            if b:
+                viejos[a["orden"]] = f"versión de un mes anterior (ya está N° {b['orden']}: «{b.get('titulo')}»)"
+    fuera.update(viejos)
+    hojas = {}
+    for g in graficos:
+        hojas.setdefault(g["hoja"], []).append(g)
+    for hoja, gs in hojas.items():
+        if len(gs) >= 2 and sum(g["orden"] in viejos for g in gs) * 2 >= len(gs):
+            for g in gs:
+                fuera.setdefault(g["orden"], f"hoja «{hoja}» de un mes anterior (sus gráficos ya están con fecha más reciente)")
+    return fuera
+
+
+def _clave(g):
+    """Identifica un gráfico entre cargas de las SERIES (para recordar los que se ocultan a mano)."""
+    return f"{g.get('fuente') or 'SERIES'}|{_sin_tilde(g['hoja'])}|{_sin_tilde(g.get('titulo'))}|{_sin_tilde(g.get('subtitulo'))}"
+
+
 def _tabla():
     with db.motor().begin() as cx:
         cx.execute(text("CREATE TABLE IF NOT EXISTS drae_graficos (depto TEXT, orden INTEGER, hoja TEXT, spec TEXT, archivo TEXT, fecha TEXT)"))
+        cx.execute(text("CREATE TABLE IF NOT EXISTS drae_ocultos (depto TEXT, clave TEXT, PRIMARY KEY (depto, clave))"))
 
 
 def guardar(depto, archivo, graficos):
@@ -389,6 +487,8 @@ def guardar(depto, archivo, graficos):
             g["series"] = [x for x in g["series"] if not re.match(r"^aux", x["nombre"].strip(), re.I)] or g["series"]
     for g in graficos:
         g["fuente"] = fuente
+    sobran = innecesarios(graficos)
+    graficos = [g for g in graficos if g["orden"] not in sobran]
     ahora = datetime.now(timezone.utc).isoformat(timespec="seconds")
     rango = "orden > :b" if fuente == "DRAE" else "orden <= :b"
     with db.motor().begin() as cx:
@@ -409,7 +509,12 @@ def leer(depto):
     archivos = {}
     for f in filas:
         archivos.setdefault(f[1], f[2])
-    return {"archivo": filas[0][1], "fecha": filas[0][2], "graficos": [json.loads(f[0]) for f in filas],
+    with db.motor().connect() as cx:
+        ocultos = {r[0] for r in cx.execute(text("SELECT clave FROM drae_ocultos WHERE depto = :d"), {"d": depto}).all()}
+    graficos = [json.loads(f[0]) for f in filas]
+    for g in graficos:
+        g["oculto"] = _clave(g) in ocultos
+    return {"archivo": filas[0][1], "fecha": filas[0][2], "graficos": graficos,
             "archivos": [{"archivo": a, "fecha": fe} for a, fe in archivos.items()]}
 
 
@@ -425,3 +530,33 @@ def cambiar_titulo(depto, orden, titulo, subtitulo):
         cx.execute(text("UPDATE drae_graficos SET spec = :s WHERE depto = :d AND orden = :o"),
                    {"s": json.dumps(g, ensure_ascii=False), "d": depto, "o": orden})
     return True
+
+
+def ocultar(depto, orden, oculto=True):
+    """Oculta (o vuelve a mostrar) un gráfico; se recuerda aunque se vuelvan a cargar las SERIES."""
+    _tabla()
+    with db.motor().begin() as cx:
+        fila = cx.execute(text("SELECT spec FROM drae_graficos WHERE depto = :d AND orden = :o"), {"d": depto, "o": orden}).first()
+        if fila is None:
+            return False
+        clave = _clave(json.loads(fila[0]))
+        cx.execute(text("DELETE FROM drae_ocultos WHERE depto = :d AND clave = :c"), {"d": depto, "c": clave})
+        if oculto:
+            cx.execute(text("INSERT INTO drae_ocultos (depto, clave) VALUES (:d, :c)"), {"d": depto, "c": clave})
+    return True
+
+
+def depurar(depto, aplicar=False):
+    """Quita de la base los gráficos innecesarios ya guardados (cada fuente por separado). -> [{orden, hoja, titulo, motivo}]"""
+    graficos = leer(depto)["graficos"]
+    salida = []
+    for fuente in ("SERIES", "DRAE"):
+        gs = [g for g in graficos if (g.get("fuente") or "SERIES") == fuente]
+        for orden, motivo in innecesarios(gs).items():
+            g = next(x for x in gs if x["orden"] == orden)
+            salida.append({"orden": orden, "hoja": g["hoja"], "titulo": g.get("titulo"), "motivo": motivo})
+    if aplicar and salida:
+        with db.motor().begin() as cx:
+            for x in salida:
+                cx.execute(text("DELETE FROM drae_graficos WHERE depto = :d AND orden = :o"), {"d": depto, "o": x["orden"]})
+    return sorted(salida, key=lambda x: x["orden"])

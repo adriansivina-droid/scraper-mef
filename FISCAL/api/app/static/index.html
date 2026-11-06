@@ -91,7 +91,7 @@
     lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
     smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
     uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
-    tres: { comun: true, indice: [{ id: "panorama" }, cap("Datos", ["mef-archivos", "bases-mef", "empleo-total", "empleo-sectores", "empleo-long", "bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
+    tres: { comun: true, indice: [{ id: "panorama" }, cap("Empleo", ["empleo-total", "empleo-sectores", "empleo-long"]), cap("MEF", ["mef-archivos", "bases-mef"]), cap("Comparar regiones", ["bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
   const C = { panorama: "Panorama de las tres regiones", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-total": "Empleo · total por región", "empleo-sectores": "Empleo · por sectores", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
               "act-empleo": "Scraper de empleo", "act-hidro": "Hidrocarburos (PERUPETRO)", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
@@ -1204,7 +1204,7 @@
 
   // ── Gráficos DRAE: los de las SERIES del departamento, con la paleta del Seminario de Periodistas (drae.js) ──
   const DRAE_TAB = "Gráficos DRAE";
-  const draeFiltro = {};
+  const draeFiltro = {}, draeOcultos = {};   // capítulo elegido y si se ven los ocultos, por región
   // capítulos y sectores del DRAE (como en la presentación): cada hoja de las SERIES va a su sector
   const DRAE_CAPS = [
     { n: 1, t: "Actividad sectorial", sec: [["PBI y actividad productiva", /^(PBI|VAR PBI)(?!.*(CAP|PER|CORR))|^ACT\.? ?ECON|EVOLUCION DEL PBI|ACTIVIDAD (ECONOMICA|PRODUCTIVA)/], ["Agropecuario", /AGRI|AGRO|SIEMBRA/], ["Pesca", /PESCA/],
@@ -1251,13 +1251,18 @@
     const D = window.DRAE, B = window.BCRP;
     const caps = [...DRAE_CAPS, { n: 6, t: "Otros", sec: [["Otros gráficos"]] }];
     d.graficos.forEach((g) => Object.assign(g, lugarDRAE(g)));
+    const nOcultos = d.graficos.filter((g) => g.oculto).length, verOcultos = !!draeOcultos[grupo] && nOcultos > 0;
+    d.graficos = d.graficos.filter((g) => !!g.oculto === verOcultos);   // a la vista, o solo los ocultos
     const cuenta = (n) => d.graficos.filter((g) => g.cap === n).length;
     const sel = draeFiltro[grupo] && cuenta(draeFiltro[grupo]) ? draeFiltro[grupo] : 0;   // 0 = todos los capítulos
     const lista = d.graficos.filter((g) => !sel || g.cap === sel)
       .sort((a, b) => a.cap - b.cap || caps[a.cap - 1].sec.findIndex((x) => x[0] === a.sec) - caps[b.cap - 1].sec.findIndex((x) => x[0] === b.sec) || a.orden - b.orden);
     const nombreDe = (g) => `DRAE ${r.corto} ${g.cap}. ${g.sec} ${String(g.orden).padStart(2, "0")} ${g.titulo || g.hoja}`;
-    const tarjeta = (g, k) => `<div class="caja drae-item"><div class="fila" style="justify-content:space-between;align-items:center"><span class="nota"><span class="chip ${g.fuente === "DRAE" ? "ok" : "vacio"}">${g.fuente === "DRAE" ? "Libro del DRAE" : "SERIES"}</span> ${esc(g.hoja)} · N° ${g.orden > 1000 ? g.orden - 1000 : g.orden}</span>
-          <div class="fila"><button class="btn" type="button" data-dcopiar="${k}">Copiar</button><button class="btn sec" type="button" data-dsvg="${k}">SVG</button><button class="btn sec" type="button" data-dpng="${k}">PNG</button><button class="btn sec" type="button" data-dtit="${k}">Título</button><button class="btn sec" type="button" data-ddatos="${k}">Datos</button></div></div>
+    const tarjeta = (g, k) => `<div class="caja drae-item${g.oculto ? " oculto" : ""}"><div class="drae-cab"><b class="drae-nom">${esc(g.titulo || g.hoja)}</b>
+          <span class="nota">${g.fuente === "DRAE" ? "Libro del DRAE" : "SERIES"} · hoja «${esc(g.hoja)}» · N° ${g.orden > 1000 ? g.orden - 1000 : g.orden}</span></div>
+          <div class="drae-acc"><button class="btn chico" type="button" data-dcopiar="${k}">Copiar</button><button class="btn sec chico" type="button" data-dsvg="${k}">SVG</button><button class="btn sec chico" type="button" data-dpng="${k}">PNG</button>
+            <button class="btn sec chico" type="button" data-ddatos="${k}">Datos</button><button class="btn sec chico" type="button" data-dtit="${k}">Corregir título</button>
+            <button class="btn sec chico drae-ocultar" type="button" data-docultar="${k}" title="${g.oculto ? "Volver a mostrarlo" : "Quitarlo de la vista (se recuerda al volver a subir las SERIES)"}">${g.oculto ? "Mostrar" : "Ocultar"}</button></div>
         <div id="drae-t${k}"></div><div class="bcrp-prev drae-prev" id="drae-v${k}"></div><div id="drae-n${k}"></div><div class="drae-datos" id="drae-d${k}" hidden></div><div class="bcrp-msj" id="drae-m${k}" aria-live="polite"></div></div>`;
     const textosExpo = tx ? `<details class="caja drae-textos" open><summary><b>Títulos para las láminas de exportaciones</b> · desde el sector Exportaciones (ESTAD de ${esc(r.nombre)}, hasta ${esc(etqMes(tx.periodo))})</summary>
         ${[["acumulado", "Enero-mes"], ["mes", "El mes"], ["no_tradicionales", "No tradicionales"]].filter(([k]) => tx[k]).map(([k, etq]) =>
@@ -1274,8 +1279,12 @@
     }).join("");
     caja.innerHTML = `<div class="drae-caps" role="tablist">${[0, ...caps.map((c) => c.n)].filter((n) => !n || cuenta(n)).map((n) =>
         `<button type="button" class="drae-chip" data-dcap="${n}" aria-pressed="${n === sel}">${n ? `${n <= 5 ? `<i>${n}</i>` : ""}${esc(caps[n - 1].t)}` : "Todos"} <span>${n ? cuenta(n) : d.graficos.length}</span></button>`).join("")}</div>
-      <div class="fila controles"><button class="btn sec" type="button" id="drae-todo">Descargar los ${lista.length} (SVG)</button><span class="nota">${(d.archivos || [{ archivo: d.archivo, fecha: d.fecha }]).map((a) => `De ${esc(a.archivo)} · cargado el ${esc(fecha(a.fecha))}`).join(" · ")}</span></div>
-      <p class="lead">Ordenados por capítulo y sector, como en el DRAE. Cada gráfico con los datos que guarda en las SERIES; la imagen lleva solo el gráfico y el título y la fuente van aparte, con su botón para copiarlos. Si el título no es el correcto, corrígelo con <b>Título</b>.</p>
+      <ol class="pasos"><li><b>Elige el capítulo</b> arriba (o deja «Todos»).</li><li><b>Copia</b> el gráfico o descárgalo en SVG o PNG: la imagen lleva solo el gráfico.</li>
+        <li><b>Pega aparte</b> el título y la fuente (recuadros sobre y bajo cada gráfico, Arial 10).</li><li><b>Oculta</b> los que no uses: no se borran y se recuerdan.</li></ol>
+      <div class="fila controles"><button class="btn sec" type="button" id="drae-todo">Descargar los ${lista.length} (SVG)</button>
+        ${nOcultos ? `<button class="btn sec" type="button" id="drae-ver-ocultos" aria-pressed="${verOcultos}">${verOcultos ? "Volver a los gráficos a la vista" : `Ver ocultos (${nOcultos})`}</button>` : ""}
+        <span class="nota">${(d.archivos || [{ archivo: d.archivo, fecha: d.fecha }]).map((a) => `De ${esc(a.archivo)} · cargado el ${esc(fecha(a.fecha))}`).join(" · ")} · los duplicados y las versiones de meses anteriores se quitan solos</span></div>
+      ${verOcultos ? '<p class="nota">Estos gráficos están ocultos. «Mostrar» los devuelve a su capítulo.</p>' : ""}
       ${cuerpo}`;
     const svgSolo = (k) => D.svg(lista[k], r.nombre, { soloGrafico: true });  // lo que se ve, se copia y se descarga: solo el gráfico
     const refDRAE = (k) => {
@@ -1311,6 +1320,12 @@
         g.titulo = t.trim(); g.subtitulo = sub.trim(); refDRAE(k); avisar(k, "Título guardado.", true);
       } catch (e) { avisar(k, e.message, false); }
     }));
+    caja.querySelectorAll("[data-docultar]").forEach((b) => b.addEventListener("click", async () => {
+      const k = +b.dataset.docultar, g = lista[k];
+      try { await api(`/v1/drae/ocultar?departamento=${r.cod}&orden=${g.orden}&oculto=${!g.oculto}`, { method: "POST" }); graficosDRAE(r, caja); }
+      catch (e) { avisar(k, e.message, false); }
+    }));
+    if ($("drae-ver-ocultos")) $("drae-ver-ocultos").addEventListener("click", () => { draeOcultos[grupo] = !verOcultos; graficosDRAE(r, caja); });
     $("drae-todo").addEventListener("click", async () => { for (let k = 0; k < lista.length; k++) { B.descargar(svgSolo(k), nombreDe(lista[k])); await new Promise((ok) => setTimeout(ok, 350)); } });
   }
 
@@ -1690,7 +1705,7 @@
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
     return `<div><div class="ruta"><b>${esc(r.nombre)}</b>${capitulo ? `<span>›</span><span>${esc(capitulo.titulo)}</span>` : ""}</div><h1>${esc(s.t)}</h1><p class="lead">${esc(s.lead)}</p></div>
       <div class="ficha"><div><small>Estado</small><span class="chip ${est}">${ETIQ[est]}</span></div><div><small>Fuente</small><b>${esc(s.fuente)}</b></div>
-        <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div><div><small>Datos hasta</small><b>${hasta ? esc(etqMes(hasta)) : "—"}</b></div></div>
+        <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div>${s.cuadros === "drae" ? '<div><small>Qué hay</small><b>Los gráficos de las SERIES, sin duplicados ni versiones viejas</b></div>' : `<div><small>Datos hasta</small><b>${hasta ? esc(etqMes(hasta)) : "—"}</b></div>`}</div>
       <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}">${esc(x)}${(x === "Cuadros" && Array.isArray(s.cuadros)) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
       <div class="panel" role="tabpanel">${panel}</div>`;
   }
@@ -1700,7 +1715,16 @@
     let cuerpo = "";
     if (id === "panorama") {
       const sects = ["resumen", "pesca", "hidro", "empleo", "expo", "impo", "gasto", "inversion"];
-      cuerpo = `<p class="lead">Qué sectores van en la síntesis de cada región y en qué estado está cada uno.</p><div class="caja"><div class="scroll"><table><tr><th>Sector</th><th>Loreto</th><th>San Martín</th><th>Ucayali</th></tr>
+      const acceso = (ir, t, d) => `<a class="acceso" data-ir="${ir}"><b>${t}</b><span>${d}</span></a>`;
+      cuerpo = `<p class="lead">Por dónde empezar y en qué estado está cada sector de las tres regiones.</p>
+        <h2 class="sub-t">¿Qué quieres hacer?</h2>
+        <div class="accesos">${acceso("lor-resumen", "Armar el informe de una región", "Resumen ejecutivo, cuadros y anexos de Loreto (cambia de región arriba)")}
+          ${acceso("lor-drae", "Gráficos DRAE", "Copiar o descargar los gráficos de las SERIES, ordenados por capítulo")}
+          ${acceso("tres-act-archivos", "Subir archivos del mes", "DIREPRO, ESTAD, SERIES o bases: la página reconoce cada uno")}
+          ${acceso("tres-empleo-total", "Empleo por región", "Total y por sectores de las 26 regiones, desde 2016")}
+          ${acceso("tres-mef-archivos", "Bases del MEF", "Los tres archivos y las bases de los 25 departamentos")}
+          ${acceso("tres-estado", "Estado de la base", "Qué hay cargado, cuánto espacio queda y las últimas cargas")}</div>
+        <h2 class="sub-t">Estado de cada sector</h2><p class="nota">Haz clic en un estado para ir a ese sector.</p><div class="caja"><div class="scroll"><table><tr><th>Sector</th><th>Loreto</th><th>San Martín</th><th>Ucayali</th></tr>
         ${sects.map((k) => `<tr><td><b>${esc(S[k].t)}</b></td>${["lor", "smn", "uca"].map((g) => planos(g).includes(k) ? `<td><a data-ir="${g}-${k}"><span class="chip ${estadoDe(k, REG[g])}">${ETIQ[estadoDe(k, REG[g])]}</span></a></td>` : '<td><span class="nota">no va en su síntesis</span></td>').join("")}</tr>`).join("")}</table></div></div>`;
     } else if (id === "mef-archivos") {
       cuerpo = `<p class="lead">DEV Función · Municipalidad, PIM Función y PIM Función · Municipalidad de los 25 departamentos, cada uno con su propio scraper: se actualizan y se descargan por separado, sin tocar el resto de la base fiscal.</p><div id="arch-mef"></div>`;
