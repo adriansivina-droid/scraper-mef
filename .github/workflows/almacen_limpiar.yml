@@ -1,11 +1,15 @@
 # Limpieza del almacén de archivos de la página (tabla «almacen» en Neon): borra lo repetido o lo que ya nadie usa
 # (CSV contenidos en otro de mayor rango, capturas de error viejas, capas del mapa que la última corrida no regeneró) y
-# compacta la tabla para devolver el espacio. Reglas en FISCAL/api/app/almacen.py (duplicados()).
+# compacta la tabla para devolver el espacio. Reglas en FISCAL/api/app/almacen.py (duplicados()). También quita los
+# gráficos DRAE innecesarios (FISCAL/api/app/drae.py, innecesarios()).
+#   · solo: el día 1 de cada mes, 09:17 hora de Lima (borra de verdad)
 #   · a mano: Actions → «Almacén · limpiar» → Run workflow. Sin «aplicar» solo lista lo que borraría.
 # Requiere el secreto DATABASE_URL.
 name: Almacén · limpiar
 
 on:
+  schedule:
+    - cron: "17 14 1 * *"          # 14:17 UTC = 09:17 en Lima, día 1 de cada mes
   workflow_dispatch:
     inputs:
       aplicar:
@@ -32,7 +36,7 @@ jobs:
         working-directory: FISCAL/api
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          APLICAR: ${{ inputs.aplicar }}
+          APLICAR: ${{ github.event_name == 'schedule' || inputs.aplicar }}
         run: |
           python - <<'PY'
           import os
@@ -47,6 +51,12 @@ jobs:
                     f"{len(r['archivos'])} archivos · {r['mb_liberados']} MB guardados en la base", "",
                     "| Archivo | Carpeta | KB | Motivo |", "|---|---|---|---|"]
           lineas += [f"| {x['nombre']} | {x['carpeta']} | {x['kb_guardado']:,} | {x['motivo']} |" for x in r["archivos"]]
+          # gráficos DRAE innecesarios (duplicados, contenidos en otro, de un mes ya reemplazado): drae.innecesarios()
+          from app import drae
+          lineas += ["", "### Gráficos DRAE innecesarios", "", "| Región | N° | Hoja | Título | Motivo |", "|---|---|---|---|---|"]
+          for d, nombre in (("16", "Loreto"), ("22", "San Martín"), ("25", "Ucayali")):
+              for x in drae.depurar(d, aplicar=r["aplicado"]):
+                  lineas.append(f"| {nombre} | {x['orden']} | {x['hoja']} | {(x['titulo'] or '')[:70]} | {x['motivo'][:90]} |")
           a1, d1 = tam()
           lineas += ["", f"Tabla almacen: {a0 / 2**20:.1f} → {a1 / 2**20:.1f} MB · base completa: {d0 / 2**20:.1f} → {d1 / 2**20:.1f} MB"]
           texto = "\n".join(lineas); print(texto)

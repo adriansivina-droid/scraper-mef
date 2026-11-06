@@ -211,6 +211,14 @@ def drae_titulo(departamento: str = Query(..., pattern="^(16|22|25)$"), orden: i
     return {"ok": True}
 
 
+@app.post("/v1/drae/ocultar", dependencies=[Depends(acceso)])
+def drae_ocultar(departamento: str = Query(..., pattern="^(16|22|25)$"), orden: int = Query(..., ge=1), oculto: bool = True):
+    """Oculta (o vuelve a mostrar) un gráfico DRAE; se recuerda aunque se vuelvan a cargar las SERIES."""
+    if not drae.ocultar(departamento, orden, oculto):
+        raise HTTPException(404, "No existe ese gráfico.")
+    return {"ok": True, "oculto": oculto}
+
+
 @app.get("/v1/hidrocarburos/almacen", dependencies=[Depends(acceso)])
 def hidro_almacen():
     """Lo que el flujo de hidrocarburos guarda en la página (archivos y MB de DATA y CONTROL), la última carga en las bases
