@@ -301,3 +301,22 @@ td.acciones-corrida .btn { margin-right: 10px; }
 .acceso { display: flex; flex-direction: column; gap: 4px; background: var(--paper); border: 1px solid var(--hair); border-left: 4px solid var(--s2); border-radius: 10px; padding: 14px 16px; cursor: pointer; text-decoration: none; color: var(--mid); font-size: 13px; }
 .acceso b { color: var(--navy); font-size: 15px; }
 .acceso:hover { border-left-color: var(--s3); box-shadow: 0 2px 8px rgba(17, 17, 73, .08); }
+
+/* Organización general */
+.sep-t { margin: 14px 8px 4px; padding-top: 10px; border-top: 1px solid var(--hair); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); font-weight: 600; }
+.ficha.compacta div { padding: 8px 12px; }
+.ficha.compacta b { font-size: 14px; line-height: 1.35; }
+.tabs button.de-datos { color: var(--mid); font-size: 14px; }
+.tabs button.de-datos.primero { margin-left: auto; border-left: 1px solid var(--hair); }
+.tabs button.de-datos[aria-selected="true"] { color: var(--navy); }
+tr.apagada td { color: var(--mid); opacity: .7; }
+.medidor { height: 6px; background: var(--canvas); border-radius: 999px; margin-top: 8px; overflow: hidden; }
+.medidor span { display: block; height: 100%; background: var(--s2); }
+.medidor span.alto { background: var(--s3); }
+.acepta { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 8px; margin: 10px 0 14px; }
+.acepta div { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--hair); border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--mid); background: var(--panel); }
+.acepta b { color: var(--navy); }
+.zona-subida { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 2px dashed var(--hair); border-radius: 12px; padding: 18px; margin-bottom: 12px; cursor: pointer; color: var(--mid); font-size: 13px; text-align: center; }
+.zona-subida:hover { border-color: var(--s2); background: var(--panel); }
+.zona-subida b { color: var(--navy); font-size: 15px; }
+.zona-subida input { margin-top: 6px; font-size: 13px; }

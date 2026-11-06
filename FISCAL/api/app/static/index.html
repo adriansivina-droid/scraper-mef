@@ -69,7 +69,7 @@
       bases: () => ["hidro-produccion", "hidro-canon", "hidro-expo-empresa"], actualizar: "hidro", cuadros: "hidrocarburos", mapa: true,
       lead: "Producción fiscalizada de petróleo, gas natural y LGN por lote, y canon y sobrecanon petrolero transferido." },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
-      lead: "Trabajadores asalariados privados formales: el total de la región por mes (desde 2025, sin sectores).", cuadros: "empleo" },
+      lead: "Trabajadores asalariados privados formales: el total de la región por mes y, desde la base por sectores, el detalle por rama de actividad.", cuadros: "empleo" },
     expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["expo-estad"], sinActualizar: true,
       lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos. En «Base mensual», la base del mes se limpia, se revisa y arma el ESTAD; «Resumen Export» trae los datos destacados y el borrador de la síntesis.", cuadros: "exportaciones", extra: ["Base mensual", "Resumen Export"] },
     impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["impo-estad"], sinActualizar: true,
@@ -99,7 +99,7 @@
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
 
   let CAT = null, ESTADO = null, MESES = [], grupo = "lor", id = "resumen";
-  const pestana = {}, abiertos = new Set(), paneles = {};
+  const pestana = {}, cerrados = new Set(), paneles = {};   // capítulos del índice que el usuario cerró
   const base = (b) => CAT.bases.find((x) => x.id === b);
   const planos = (g) => GRUPOS[g].indice.flatMap((e) => e.items ? e.items : [e.id]);
   const nombre = (sid) => GRUPOS[grupo].comun ? C[sid] : S[sid].t;
@@ -121,11 +121,13 @@
     $("indice-t").textContent = g.comun ? "Común a las tres regiones" : `Índice · ${r.nombre}`;
     $("leyenda").hidden = !!g.comun;
     const dot = (sid) => g.comun ? "" : `<span class="dot ${estadoDe(sid, r)}"></span>`;
-    const item = (sid) => `<button class="it" data-ir="${grupo}-${sid}" aria-current="${sid === id ? "page" : "false"}">${esc(nombre(sid))}${dot(sid)}</button>`;
+    const corto = (sid) => g.comun ? nombre(sid).replace(/^(Empleo|MEF) · /, (m, x) => "").replace(/^./, (c) => c.toUpperCase()) : nombre(sid);   // dentro de su grupo, sin repetirlo
+    const item = (sid) => `<button class="it" data-ir="${grupo}-${sid}" aria-current="${sid === id ? "page" : "false"}">${esc(corto(sid))}${dot(sid)}</button>`;
     $("indice").innerHTML = g.indice.map((e, i) => {
-      if (!e.items) return `<div class="cap"><button class="it solo" data-ir="${grupo}-${e.id}" aria-current="${e.id === id ? "page" : "false"}"><i>${esc(e.num || "")}</i>${esc(nombre(e.id))}${dot(e.id)}</button></div>`;
+      const sep = e.id === "drae" ? '<div class="sep-t">Herramientas</div>' : "";
+      if (!e.items) return `${sep}<div class="cap"><button class="it solo" data-ir="${grupo}-${e.id}" aria-current="${e.id === id ? "page" : "false"}"><i>${esc(e.num || "")}</i>${esc(nombre(e.id))}${dot(e.id)}</button></div>`;
       const [rom, ...resto] = (CORTO[e.titulo] || e.titulo).split(". "), num = /^[IVX]+$/.test(rom), clave = `${grupo}:${i}`;
-      const abierto = abiertos.has(clave) || e.items.includes(id);
+      const abierto = !cerrados.has(clave) || e.items.includes(id);
       return `<div class="cap"><button class="cap-b" type="button" data-cap="${clave}" aria-expanded="${abierto}"><i>${num ? rom : ""}</i>${esc(num ? resto.join(". ") : e.titulo)}<span class="flecha"></span></button>
         <div class="cap-items"${abierto ? "" : " hidden"}>${e.items.map(item).join("")}</div></div>`;
     }).join("");
@@ -135,7 +137,7 @@
     document.querySelectorAll("#indice [data-cap]").forEach((b) => b.addEventListener("click", () => {
       const abrir = b.getAttribute("aria-expanded") !== "true";
       b.setAttribute("aria-expanded", String(abrir)); b.nextElementSibling.hidden = !abrir;
-      abrir ? abiertos.add(b.dataset.cap) : abiertos.delete(b.dataset.cap);
+      abrir ? cerrados.delete(b.dataset.cap) : cerrados.add(b.dataset.cap);
     }));
   }
 
@@ -336,7 +338,7 @@
           <button class="btn" type="button" id="emp-xlsx">Descargar los cuadros en Excel</button></div>
         <div class="caja"><h3>Cuadro ${num} · ${esc(r.nombre.toUpperCase())}: TRABAJADORES ASALARIADOS PRIVADOS FORMALES</h3><p>(Número de trabajadores)</p>
           <div class="scroll"><table><tr><th>Rama de actividad</th><th class="n">${mes} ${a - 1}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Dic. ${a - 1}</th><th class="n">${mes.slice(0, 3)}. ${a}</th><th class="n">Var. %</th></tr>${cuadro}</table></div>
-          <p class="nota">Fuente: Planilla Electrónica – PLAME y T-Registro.${c.por_sectores ? " «Otros» es la actividad «No precisa» del MTPE." : " Desde 2025 el scraper trae solo el total de la región (sin sectores)."}</p></div>
+          <p class="nota">Fuente: Planilla Electrónica – PLAME y T-Registro.${c.por_sectores ? " «Otros» es la actividad «No precisa» del MTPE." : " Este mes todavía no tiene el detalle por sectores (base «Empleo por sectores»)."}</p></div>
         <div class="caja"><h3>${esc(r.nombre)}: trabajadores por mes · ${a - 1} y ${a}</h3><p>(Número de trabajadores; variación % respecto al mismo mes del año anterior)</p>
           <div class="scroll"><table><tr><th>Mes</th><th class="n">${a - 1}</th><th class="n">${a}</th><th class="n">Var. %</th></tr>${mensual}</table></div></div>
         ${graficoNiveles(c.niveles)}
@@ -1413,12 +1415,14 @@
     const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(base(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
     return `<div class="${ok ? "ok-box" : "err-box"}"><b>${esc(tit)}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
   }
-  function cajaSubida(clave, texto) {
-    return `<div class="caja"><h3>Subir archivos a mano</h3><p>${texto}</p><div class="fila"><input type="file" id="${clave}-arch" multiple accept=".zip,.csv,.xlsx,.xlsm">
-      <button class="btn" type="button" id="${clave}-subir">Cargar a la base de datos</button></div><div id="${clave}-res" aria-live="polite"></div></div>`;
+  function cajaSubida(clave, texto, lista) {
+    return `<div class="caja"><h3>Subir archivos a mano</h3><p>${texto}</p>${lista ? `<div class="acepta">${lista.map(([t, d]) => `<div><b>${t}</b><span>${d}</span></div>`).join("")}</div>` : ""}
+      <label class="zona-subida" for="${clave}-arch"><b>Elige uno o varios archivos</b><span>.xlsx, .xlsm, .csv o .zip</span><input type="file" id="${clave}-arch" multiple accept=".zip,.csv,.xlsx,.xlsm"></label>
+      <div class="fila"><button class="btn" type="button" id="${clave}-subir">Cargar a la base de datos</button><span class="nota" id="${clave}-elegidos"></span></div><div id="${clave}-res" aria-live="polite"></div></div>`;
   }
   function atarSubida(clave) {
     if (!$(`${clave}-subir`)) return;
+    $(`${clave}-arch`).addEventListener("change", (ev) => { const f = [...ev.target.files]; $(`${clave}-elegidos`).textContent = f.length ? `${f.length} elegido${f.length > 1 ? "s" : ""}: ${f.map((x) => x.name).join(", ")}` : ""; });
     $(`${clave}-subir`).addEventListener("click", async () => {
       const archivos = $(`${clave}-arch`).files, res = $(`${clave}-res`);
       if (!archivos.length) { res.innerHTML = '<div class="err-box"><b>Falta elegir los archivos</b></div>'; return; }
@@ -1704,9 +1708,9 @@
       : `<div class="vacio-caja"><b>Cómo entrará: ${esc(s.entra.toLowerCase())}.</b><span>Cuando se construya, aquí estarán su actualización y la carga del archivo del mes de ${esc(r.nombre)}.</span></div>`;
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
     return `<div><div class="ruta"><b>${esc(r.nombre)}</b>${capitulo ? `<span>›</span><span>${esc(capitulo.titulo)}</span>` : ""}</div><h1>${esc(s.t)}</h1><p class="lead">${esc(s.lead)}</p></div>
-      <div class="ficha"><div><small>Estado</small><span class="chip ${est}">${ETIQ[est]}</span></div><div><small>Fuente</small><b>${esc(s.fuente)}</b></div>
-        <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div>${s.cuadros === "drae" ? '<div><small>Qué hay</small><b>Los gráficos de las SERIES, sin duplicados ni versiones viejas</b></div>' : `<div><small>Datos hasta</small><b>${hasta ? esc(etqMes(hasta)) : "—"}</b></div>`}</div>
-      <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}">${esc(x)}${(x === "Cuadros" && Array.isArray(s.cuadros)) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
+      <div class="ficha compacta"><div><small>Estado</small><span class="chip ${est}">${ETIQ[est]}</span></div><div><small>Fuente</small><b>${esc(s.fuente)}</b></div>
+        <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div>${s.cuadros === "drae" ? '<div><small>Qué hay</small><b>Los gráficos de las SERIES, sin duplicados ni versiones viejas</b></div>' : `<div><small>Datos hasta</small><b>${hasta ? esc(etqMes(hasta)) : "Sin datos todavía"}</b></div>`}</div>
+      <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}"${["Datos", "Actualizar", ...DE_DATOS].includes(x) ? ` class="de-datos${x === tabs.find((y) => ["Datos", "Actualizar", ...DE_DATOS].includes(y)) ? " primero" : ""}"` : ""}>${esc(x)}${(x === "Cuadros" && Array.isArray(s.cuadros)) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
       <div class="panel" role="tabpanel">${panel}</div>`;
   }
 
@@ -1767,14 +1771,18 @@
     } else if (id === "act-mef") cuerpo = cajaScraper("mef");
     else if (id === "act-empleo") cuerpo = cajaScraper("empleo");
     else if (id === "act-hidro") cuerpo = '<div class="caja"><h3>Hidrocarburos: PERUPETRO → página</h3><div id="hidro-caja"></div></div>';
-    else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "Cualquier archivo que entienda la página: el .zip de Fiscal/Scrapeo/output, CSV del scraper o PIM_Funcion.xlsx (MEF); los Excel de las DIREPRO o los LONG de los notebooks (pesca); el Excel del scraper de empleo o el ESTAD de una región (exportaciones e importaciones). La página reconoce de qué sector y región es cada uno. Se reemplazan los meses y departamentos que traigan los archivos; lo demás se conserva.");
+    else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "La página reconoce de qué sector y región es cada archivo. Se reemplazan los meses y departamentos que traigan; lo demás se conserva.",
+      [["MEF", "El .zip de Fiscal/Scrapeo/output, los CSV del scraper o PIM_Funcion.xlsx"], ["Pesca", "Los Excel de las DIREPRO o los LONG de los notebooks"],
+       ["Empleo", "El Excel del scraper del MTPE (total o por sectores)"], ["Exportaciones e importaciones", "El ESTAD de la región (ESTADLO, ESTADSMN, ESTADUCA)"],
+       ["Gráficos DRAE", "Las SERIES de la región y el libro de gráficos del DRAE"], ["Hidrocarburos", "Los CSV de PERUPETRO o el Excel de crudo por empresa"]]);
     else if (id === "estado") {
       const u = ESTADO.ultima_carga;
       cuerpo = `<div class="stats"><div class="stat"><small>Datos hasta</small><b>${esc(etqMes(datosHasta()))}</b><span>último mes con datos</span></div>
-          <div class="stat"><small>Última carga</small><b style="font-size:17px">${u ? esc(fecha(u.fecha)) : "—"}</b><span>${u ? esc(u.origen) : "todavía no se cargó nada"}</span></div></div>
-        <div class="caja"><div class="scroll"><table><tr><th>Base</th><th>Grupo</th><th>Datos</th><th>Departamentos</th><th class="n">Filas</th></tr>
-        ${CAT.bases.map((b) => { const x = ESTADO.bases[b.id], ds = x.departamentos;
-          return `<tr><td>${esc(b.nombre)}</td><td>${esc(CAT.grupos[b.grupo].split(" · ")[0])}</td><td>${x.filas ? `${esc(etqMes(x.desde))} – ${esc(etqMes(x.hasta))}` : "sin datos"}</td>
+          <div class="stat"><small>Última carga</small><b style="font-size:17px">${u ? esc(fecha(u.fecha)) : "—"}</b><span>${u ? esc(u.origen) : "todavía no se cargó nada"}</span></div>
+          <div class="stat" id="espacio-stat"><small>Espacio usado</small><b>…</b><span>de 512 MB del plan gratuito de Neon</span></div></div>
+        <div class="caja"><h3>Bases de la página</h3><p class="nota">Primero las que tienen datos; en gris, las que todavía no se cargan.</p><div class="scroll"><table><tr><th>Base</th><th>Grupo</th><th>Datos</th><th>Departamentos</th><th class="n">Filas</th></tr>
+        ${[...CAT.bases].sort((a, b) => !ESTADO.bases[a.id].filas - !ESTADO.bases[b.id].filas).map((b) => { const x = ESTADO.bases[b.id], ds = x.departamentos;
+          return `<tr${x.filas ? "" : ' class="apagada"'}><td>${esc(b.nombre)}</td><td>${esc(CAT.grupos[b.grupo].split(" · ")[0])}</td><td>${x.filas ? `${esc(etqMes(x.desde))} – ${esc(etqMes(x.hasta))}` : "sin datos"}</td>
             <td>${ds.length > 6 ? `${ds.length} departamentos` : ds.map((c) => titulo(CAT.departamentos.find((d) => d.codigo === c).nombre)).join(", ") || "—"}</td><td class="n">${fmt(x.filas)}</td></tr>`; }).join("")}</table></div></div>`;
     } else cuerpo = `<p class="lead">Valores que usan los cálculos de las tres regiones.</p><div class="caja"><div class="scroll"><table><tr><th>Parámetro</th><th class="n">Valor</th><th>Usado en</th></tr>
         <tr><td>Precio base 2007 · pescado fresco</td><td class="n">3 275,04 S/ por t</td><td>VBP pesca</td></tr><tr><td>Precio base 2007 · seco salado</td><td class="n">2 987,78 S/ por t</td><td>VBP pesca</td></tr>
@@ -1805,6 +1813,10 @@
     }));
     document.querySelectorAll("#sector .dep").forEach((c) => c.addEventListener("change", () => { paneles.mefDeps = [...document.querySelectorAll(".dep")].filter((x) => x.checked).map((x) => x.value); vistaPrevia("p-mef"); }));
     if ($("el-vista")) atarEmpleoLong();
+    if ($("espacio-stat")) api("/v1/estado/espacio").then((e) => { if (e.total_mb == null) { $("espacio-stat").hidden = true; return; }
+      const p = e.total_mb / 512 * 100;
+      $("espacio-stat").innerHTML = `<small>Espacio usado</small><b>${B.num(e.total_mb, 0)} MB</b><span>${B.num(p, 0)} % de 512 MB del plan gratuito (aviso al 80 %)</span><div class="medidor"><span style="width:${Math.min(p, 100)}%" class="${p > 80 ? "alto" : ""}"></span></div>`;
+    }).catch(() => { $("espacio-stat").hidden = true; });
     if ($("emp-tot")) empleoTotales("et");
     if ($("emp-sec")) empleoTotales("es");
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
