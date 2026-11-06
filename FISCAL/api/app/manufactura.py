@@ -39,6 +39,12 @@ NOMBRES = {"1511": "Productos cárnicos", "1513": "Conservas de palmito", "1514"
            "2710": "Calaminas", "2899": "Mallas metálicas", "2911": "Motores para pozos", "2912": "Bombas para pozos",
            "3591": "Motocicletas y motokar"}
 NOMBRES_REGION = {"22": {"2320": "Biodiesel", "1520": "Queso y mantequilla"}, "25": {"2899": "Clavos para madera"}}
+# ramas que el cuadro de la síntesis presenta juntas: en Loreto, motores y bombas para pozos son la misma rama (bombas de agua)
+FUSIONES = {"16": {"2912": "2911"}}
+# orden de las ramas en Manufactura_Cuadro de cada región (las que no estén, al final en el orden del IVFM)
+ORDEN = {"16": ["2320", "1513", "1520", "1533", "1541", "1553", "1554", "2010", "2021", "2212", "2221", "2411", "2899", "2911", "3591"],
+         "22": ["2320", "1514", "1520", "1543", "1554", "2010", "2424", "2695", "2694"],
+         "25": ["2320", "1553", "1554", "2010", "2021", "2710", "2899"]}
 FUENTE = "Fuente: DIREPRO y Empresas. Elaboración: BCRP, Sucursal Iquitos. Departamento de Estudios Económicos."
 
 
@@ -155,6 +161,17 @@ def cuadros(depto, df, periodo=None):
     df["P"] = df["AÑO"] * 100 + df["MES"]
     df["W"], df["I"] = pd.to_numeric(df["PONDERACION"]), pd.to_numeric(df["INDICE"])
     df["CIIU"] = df["CIIU"].astype(str)
+    fus = FUSIONES.get(depto, {})
+    if fus and df["CIIU"].isin(list(fus)).any():
+        # la rama unida: ponderación = suma; índice = promedio ponderado de los índices (lo mismo que suma el IVF)
+        df["_o"] = range(len(df))                         # el orden del libro (la rama unida va donde la primera)
+        df["CIIU"] = df["CIIU"].replace(fus)
+        df["WI"] = df["W"] * df["I"]
+        claves = ["AÑO", "MES", "P", "CIIU"]
+        prim = df.drop_duplicates(claves)[claves + ["DEPARTAMENTO", "GRUPO", "RAMA", "_o"]]
+        sumas = df.groupby(claves, as_index=False)[["W", "WI"]].sum()
+        df = prim.merge(sumas, on=claves).sort_values("_o").reset_index(drop=True)
+        df["I"] = (df["WI"] / df["W"]).where(df["W"] > 0, 0.0)
     periodos = sorted(df["P"].unique())
     ultimo = int(periodos[-1])
     p = int(periodo.replace("-", "")) if periodo else ultimo
@@ -164,7 +181,8 @@ def cuadros(depto, df, periodo=None):
     # ramas en el orden del libro (primaria primero), con la ponderación y el grupo de la carga más reciente
     orden = list(dict.fromkeys(df["CIIU"]))
     ramas = df.sort_values(["AÑO", "MES"]).drop_duplicates("CIIU", keep="last").set_index("CIIU")
-    pos = {c: i for i, c in enumerate(orden)}
+    pref = ORDEN.get(depto, [])
+    pos = {c: (pref.index(c) if c in pref else len(pref) + i) for i, c in enumerate(orden)}
     orden.sort(key=lambda c: (ramas.at[c, "GRUPO"] != PRIMARIA, pos[c]))
     ramas = ramas.loc[orden]
     w = ramas["W"]

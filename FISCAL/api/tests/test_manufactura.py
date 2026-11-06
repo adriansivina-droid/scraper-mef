@@ -59,3 +59,19 @@ def test_carga_y_cuadro(cliente):
     assert cliente.get("/v1/cuadros/manufactura?departamento=16&formato=xlsx").status_code == 200
     assert cliente.get("/v1/cuadros/manufactura?departamento=16&periodo=2027-01").status_code == 422
     assert cliente.get("/v1/cuadros/manufactura?departamento=22").json()["cuadros"] is None
+
+
+def test_motores_y_bombas_de_loreto_van_juntos(cliente):
+    """En Loreto, motores (2911) y bombas para pozos (2912) son la misma rama: una sola fila con su índice ponderado."""
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(ivfm()))
+    ws = wb.active
+    for r, ciiu, w, i in ((59, 2911, 3.0, 100.0), (60, 2912, 1.0, 200.0)):
+        ws.cell(r, 2, "FAB. MOTORES" if ciiu == 2911 else "FAB. BOMBAS"); ws.cell(r, 3, ciiu); ws.cell(r, 4, w)
+        for c0 in (6, 20):
+            ws.cell(r, c0, i); ws.cell(r, c0 + 1, i)
+    b = io.BytesIO(); wb.save(b)
+    cliente.post("/v1/cargas", files=[("archivos", ("IVFM-LO 2026 TOTAL.xlsx", b.getvalue(), "application/octet-stream"))])
+    f = {x["nombre"]: x for x in cliente.get("/v1/cuadros/manufactura?departamento=16&periodo=2026-02").json()["cuadros"]["cuadro"]}
+    assert "Bombas para pozos" not in f
+    assert f["Motores para pozos"]["ponderacion"] == 4.0 and f["Motores para pozos"]["mes_a"] == pytest.approx(125.0)   # (3×100 + 1×200)/4
