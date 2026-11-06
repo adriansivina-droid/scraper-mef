@@ -1,0 +1,54 @@
+# Limpieza del almacén de archivos de la página (tabla «almacen» en Neon): borra lo repetido o lo que ya nadie usa
+# (CSV contenidos en otro de mayor rango, capturas de error viejas, capas del mapa que la última corrida no regeneró) y
+# compacta la tabla para devolver el espacio. Reglas en FISCAL/api/app/almacen.py (duplicados()).
+#   · a mano: Actions → «Almacén · limpiar» → Run workflow. Sin «aplicar» solo lista lo que borraría.
+# Requiere el secreto DATABASE_URL.
+name: Almacén · limpiar
+
+on:
+  workflow_dispatch:
+    inputs:
+      aplicar:
+        description: "Borrar de verdad (sin marcar, solo lista)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  limpiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+      - run: pip install -r FISCAL/api/requirements.txt
+      - name: Limpiar
+        working-directory: FISCAL/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APLICAR: ${{ inputs.aplicar }}
+        run: |
+          python - <<'PY'
+          import os
+          from sqlalchemy import text
+          from app import almacen, db
+          def tam():
+              with db.motor().connect() as cx:
+                  return cx.execute(text("SELECT pg_total_relation_size('almacen'), pg_database_size(current_database())")).one()
+          a0, d0 = tam()
+          r = almacen.limpiar(aplicar=os.environ.get("APLICAR") == "true")
+          lineas = [f"## Almacén · {'limpieza' if r['aplicado'] else 'prueba (no se borró nada)'}", "",
+                    f"{len(r['archivos'])} archivos · {r['mb_liberados']} MB guardados en la base", "",
+                    "| Archivo | Carpeta | KB | Motivo |", "|---|---|---|---|"]
+          lineas += [f"| {x['nombre']} | {x['carpeta']} | {x['kb_guardado']:,} | {x['motivo']} |" for x in r["archivos"]]
+          a1, d1 = tam()
+          lineas += ["", f"Tabla almacen: {a0 / 2**20:.1f} → {a1 / 2**20:.1f} MB · base completa: {d0 / 2**20:.1f} → {d1 / 2**20:.1f} MB"]
+          texto = "\n".join(lineas); print(texto)
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(texto + "\n")
+          PY

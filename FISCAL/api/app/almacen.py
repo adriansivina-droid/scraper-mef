@@ -364,3 +364,64 @@ def arbol():
     return [{"id": i, "nombre": n, "padre": p, "carpeta": m == CARPETA, "kb": round((t or 0) / 1024), "modificado": f}
             for i, n, p, m, t, f in filas]
 
+
+
+# ── Limpieza: archivos repetidos o que ya nadie usa (para cuidar los 0,5 GB de Neon) ──
+_RANGO = re.compile(r"^(?P<pre>.+)_(?P<a>\d{4})-(?P<b>\d{4})\.csv$")
+_CAPTURA = re.compile(r"^CONTROL PP mef_error_\d{4}\.png$")
+CAPAS_QUE_SE_LEEN = {"PP_lotes_indicadores.geojson"}     # el notebook del mapa la relee como respaldo
+
+
+def duplicados():
+    """Lo que se puede borrar sin perder nada:
+      1. un CSV cuyo rango de años está contenido en otro del mismo tipo y carpeta (p. ej. ..._2026-2026.csv dentro de
+         ..._1994-2026.csv): los notebooks y la página usan siempre el de mayor cobertura;
+      2. las capturas de error de prueba del MEF (CONTROL PP mef_error_AAAA.png), que ningún código genera ya;
+      3. las capas del mapa (MAPA/*.geojson) que la última corrida ya no regeneró (más de 7 días más viejas que la más
+         reciente): son de fuentes que el mapa dejó de elegir, el notebook no las vuelve a leer y el HTML ya trae lo suyo.
+    -> [{id, nombre, carpeta, kb_guardado, motivo}]"""
+    _tabla()
+    with db.motor().connect() as cx:
+        filas = cx.execute(text("SELECT id, nombre, padre, mime, modificado, LENGTH(contenido) FROM almacen")).all()
+    nombres = {i: n for i, n, *_ in filas}
+    salida = []
+    por_carpeta = {}
+    for i, n, p, m, f, largo in filas:
+        if m != CARPETA:
+            por_carpeta.setdefault(p, []).append((i, n, f, largo or 0))
+    for p, archivos in por_carpeta.items():
+        carpeta = RAICES.get(p) or nombres.get(p, p)
+        rangos = [(i, n, x.group("pre"), int(x.group("a")), int(x.group("b")), largo)
+                  for i, n, f, largo in archivos if (x := _RANGO.match(n))]
+        for i, n, pre, a, b, largo in rangos:
+            mayor = next((o for o in rangos if o[0] != i and o[2] == pre and o[3] <= a and b <= o[4] and (o[3], o[4]) != (a, b)), None)
+            if mayor:
+                salida.append({"id": i, "nombre": n, "carpeta": carpeta, "kb_guardado": round(largo / 1024),
+                               "motivo": f"contenido en {mayor[1]}"})
+        for i, n, f, largo in archivos:
+            if _CAPTURA.match(n):
+                salida.append({"id": i, "nombre": n, "carpeta": carpeta, "kb_guardado": round(largo / 1024),
+                               "motivo": "captura de error de una prueba vieja"})
+        if carpeta == "MAPA":
+            capas = [(i, n, f, largo) for i, n, f, largo in archivos if n.endswith(".geojson") and n not in CAPAS_QUE_SE_LEEN]
+            if capas:
+                ultima = max(datetime.fromisoformat(f.replace("Z", "+00:00")) for _, _, f, _ in capas)
+                for i, n, f, largo in capas:
+                    dias = (ultima - datetime.fromisoformat(f.replace("Z", "+00:00"))).days
+                    if dias > 7:
+                        salida.append({"id": i, "nombre": n, "carpeta": carpeta, "kb_guardado": round(largo / 1024),
+                                       "motivo": f"capa vieja: la última corrida del mapa no la regeneró ({dias} días antes)"})
+    return sorted(salida, key=lambda x: -x["kb_guardado"])
+
+
+def limpiar(aplicar=False):
+    """Borra lo que da duplicados() y compacta la tabla (en Postgres, VACUUM FULL para devolver el espacio a Neon)."""
+    lista = duplicados()
+    if aplicar and lista:
+        with db.motor().begin() as cx:
+            for x in lista:
+                cx.execute(text("DELETE FROM almacen WHERE id = :i"), {"i": x["id"]})
+        if db.motor().dialect.name == "postgresql":
+            with db.motor().connect().execution_options(isolation_level="AUTOCOMMIT") as cx:
+                cx.execute(text("VACUUM FULL almacen"))
+    return {"aplicado": bool(aplicar), "archivos": lista, "mb_liberados": round(sum(x["kb_guardado"] for x in lista) / 1024, 1)}
