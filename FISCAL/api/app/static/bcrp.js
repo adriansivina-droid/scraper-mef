@@ -54,7 +54,7 @@
       spec.filas.forEach((f) => { if (f.c[j] != null) m = Math.max(m, ancho(f.c[j], F, f.b) + (j ? 0 : (f.ind || 0) * 12) + pad * 2); });
       return Math.ceil(m);
     });
-    spec.cab.forEach((fila) => { let j = 0; fila.forEach((h) => { const span = h.span || 1; const need = ancho(h.t, F, true) + pad * 2;
+    spec.cab.forEach((fila) => { let j = 0; fila.forEach((h) => { const span = h.span || 1; const need = ancho(h.t, F, true) + (h.sup ? ancho(h.sup, 7.5, true) : 0) + pad * 2;
       const tiene = w.slice(j, j + span).reduce((a, b) => a + b, 0); if (need > tiene) for (let k = j; k < j + span; k++) w[k] += Math.ceil((need - tiene) / span); j += span; }); });
     const T = w.reduce((a, b) => a + b, 0), M = 16, W = T + 2 * M, xs = [M];
     w.forEach((x, j) => xs.push(xs[j] + x));
@@ -65,7 +65,7 @@
       let j = 0;
       fila.forEach((c) => {
         const span = c.span || 1, x0 = xs[j], x1 = xs[j + span];
-        if (c.t) out.push(`<text x="${j === 0 ? x0 + pad : (x0 + x1) / 2 + (span === 1 ? (x1 - x0) / 2 - pad : 0)}" y="${y + 12}" font-size="${F}" font-weight="bold" text-anchor="${j === 0 ? "start" : span === 1 ? "end" : "middle"}">${esc(c.t)}</text>`);
+        if (c.t) out.push(`<text x="${j === 0 ? x0 + pad : (x0 + x1) / 2 + (span === 1 ? (x1 - x0) / 2 - pad : 0)}" y="${y + 12}" font-size="${F}" font-weight="bold" text-anchor="${j === 0 ? "start" : span === 1 ? "end" : "middle"}">${esc(c.t)}${c.sup ? `<tspan font-size="7.5" dy="-4">${esc(c.sup)}</tspan>` : ""}</text>`);   // c.sup: superíndice (llamada a nota)
         if (c.linea) out.push(`<line x1="${x0 + 4}" x2="${x1 - 4}" y1="${y + filaH}" y2="${y + filaH}" stroke="${TINTA}" stroke-width="0.8"/>`);
         j += span;
       });
