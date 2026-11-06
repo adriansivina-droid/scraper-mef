@@ -329,8 +329,7 @@
       const B = window.BCRP, n1 = (v) => v == null ? "-" : B.num(v, 1), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
       const g = (f, k) => f.vacia || f[k] == null ? "-" : n1(f[k]);
       const filas = c.cuadro.map((f) => `<tr class="${f.total ? "total" : ""}${f.vacia ? " apagada" : ""}"><td${f.nivel ? ' style="padding-left:22px"' : ""}>${f.nivel ? esc(f.nombre) : `<b>${esc(f.nombre)}</b>`}</td>
-        <td class="n">${f.estructura == null ? "-" : n1(f.estructura)}</td><td class="n">${f.vacia ? "-" : n1(f.mes_b)}</td><td class="n">${f.vacia ? "-" : n1(f.mes_a)}</td>
-        <td class="n ${cls(f.var_mes)}">${g(f, "var_mes")}</td><td class="n">${g(f, "contrib_mes")}</td><td class="n">${f.vacia ? "-" : n1(f.acum_b)}</td><td class="n">${f.vacia ? "-" : n1(f.acum_a)}</td>
+        <td class="n">${f.estructura == null ? "-" : n1(f.estructura)}</td><td class="n ${cls(f.var_mes)}">${g(f, "var_mes")}</td><td class="n">${g(f, "contrib_mes")}</td>
         <td class="n ${cls(f.var_acum)}">${g(f, "var_acum")}</td><td class="n">${g(f, "contrib_acum")}</td></tr>`).join("");
       const graf = (k, nom) => { const pts = c.serie_25.filter((x) => x[`var_${k}`] != null);
         return pts.length ? `<div class="caja"><h3>${esc(r.nombre.toUpperCase())}: IVF ${nom}</h3><p>(Var. % real respecto a similar periodo del año anterior)</p>
@@ -341,8 +340,8 @@
         <div class="stats"><div class="stat"><small>${esc(c.titulo_mes)} ${c.anio}</small><b class="${cls(t.var_mes)}">${n1(t.var_mes)} %</b><span>frente a ${esc(c.titulo_mes.toLowerCase())} ${c.comparar}</span></div>
           <div class="stat"><small>${esc(c.acumulado)} ${c.anio}</small><b class="${cls(t.var_acum)}">${n1(t.var_acum)} %</b><span>frente a igual periodo de ${c.comparar}</span></div></div>
         <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO 1/</h3><p>(Var. % real respecto a similar periodo del año anterior)</p>
-          <div class="scroll"><table><tr><th rowspan="2">Ramas de actividad</th><th class="n">Estructura %</th><th class="n" colspan="4" style="text-align:center">${esc(c.titulo_mes)}</th><th class="n" colspan="4" style="text-align:center">${esc(c.acumulado)}</th></tr>
-            <tr><th class="n">${c.estructura_de || c.comparar} 2/</th><th class="n">${c.comparar}</th><th class="n">${c.anio}</th><th class="n">Var. %</th><th class="n">Contrib. 3/</th><th class="n">${c.comparar}</th><th class="n">${c.anio}</th><th class="n">Var. %</th><th class="n">Contrib. 3/</th></tr>${filas}</table></div>
+          <div class="scroll"><table><tr><th rowspan="2">Ramas de actividad</th><th class="n">Estructura porcentual</th><th class="n" colspan="2" style="text-align:center">${esc(c.titulo_mes)}</th><th class="n" colspan="2" style="text-align:center">${esc(c.acumulado)}</th></tr>
+            <tr><th class="n">${c.estructura_de || c.comparar} 2/</th><th class="n">Var. %</th><th class="n">Contribución 3/</th><th class="n">Var. %</th><th class="n">Contribución 3/</th></tr>${filas}</table></div>
           <p class="nota">1/ Cifras preliminares. 2/ Estimado a precios de 2007: participación de cada rama en el IVF ponderado de ${c.estructura_de || c.comparar}${c.meses_estructura && c.meses_estructura < 12 ? ` (${c.meses_estructura} meses)` : ""}. 3/ Puntos porcentuales: var. % de la rama por su peso (ponderación 2007 × índice del año anterior); suman la variación del sector. «-»: la rama no tuvo producción en ninguno de los dos años. Fuente: DIREPRO y Empresas.</p></div>
         ${graf("no_primaria", "MANUFACTURA NO PRIMARIA")}${graf("total", "SECTOR MANUFACTURA")}`;
       $("manu-p").addEventListener("change", (ev) => cuadrosManu(r, caja, ev.target.value));
@@ -1071,10 +1070,11 @@
     const g = (f, k) => f.vacia || f[k] == null ? "-" : v1(f[k]);
     items.push({ clave: "c", tipo: "CUADRO", num: N.c, nombre: `${R}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO`, svg: (n) => B.cuadro({ numero: n, titulo: tit,
       unidad: "(Var. % real respecto a similar periodo del año anterior)",
-      cab: [[{ t: "Ramas de actividad" }, { t: "Estructura" }, { t: mes, span: 4, linea: true }, { t: c.acumulado, span: 4, linea: true }],
-            [{ t: "" }, { t: `% ${c.estructura_de || b} 2/` }, { t: b }, { t: a }, { t: "Var. %" }, { t: "Contrib. 3/" }, { t: b }, { t: a }, { t: "Var. %" }, { t: "Contrib. 3/" }]],
-      filas: c.cuadro.map((f) => ({ c: [f.nombre, f.estructura == null ? "-" : n1(f.estructura), f.vacia ? "-" : n1(f.mes_b), f.vacia ? "-" : n1(f.mes_a), g(f, "var_mes"), g(f, "contrib_mes"),
-        f.vacia ? "-" : n1(f.acum_b), f.vacia ? "-" : n1(f.acum_a), g(f, "var_acum"), g(f, "contrib_acum")], b: f.nivel === 0, total: !!f.total, ind: f.nivel ? 1 : 0 })),
+      cab: [[{ t: "Ramas de actividad" }, { t: "Estructura" }, { t: mes, span: 2, linea: true }, { t: c.acumulado, span: 2, linea: true }],
+            [{ t: "" }, { t: "Porcentual" }, { t: "" }, { t: "" }, { t: "" }, { t: "" }],
+            [{ t: "" }, { t: `${c.estructura_de || b} 2/` }, { t: "Var. %" }, { t: "Contribución 3/" }, { t: "Var. %" }, { t: "Contribución 3/" }]],
+      filas: c.cuadro.map((f) => ({ c: [f.nombre, f.estructura == null ? "-" : n1(f.estructura), g(f, "var_mes"), g(f, "contrib_mes"), g(f, "var_acum"), g(f, "contrib_acum")],
+        b: f.nivel === 0, total: !!f.total, ind: f.nivel ? 1 : 0 })),
       notas: ["1/ Cifras preliminares.", "2/ Estimado a precios de 2007.", "3/ Puntos porcentuales: var. % de la rama por su peso (ponderación 2007 × índice del año anterior).", "Fuente: DIREPRO y Empresas."] }) });
     [["no_primaria", "MANUFACTURA NO PRIMARIA", "g"], ["total", "SECTOR MANUFACTURA", "g2"]].forEach(([k, nom, cl]) => {
       const pts = c.serie_25.filter((x) => x[`var_${k}`] != null);

@@ -243,16 +243,17 @@ def excel(region, c):
     ws.append([f"{region.upper()}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO 1/"])
     ws.append(["(Var. % real respecto a similar periodo del año anterior)"])
     ws.append([])
-    ws.append(["Ramas de actividad", "Estructura %", mes, None, "Var. %", "Contribución 3/", c["acumulado"], None, "Var. %", "Contribución 3/"])
-    ws.append([None, f"{c['estructura_de'] or b} 2/", b, a, None, None, b, a, None, None])
+    ws.append(["Ramas de actividad", "Estructura porcentual", mes, None, c["acumulado"], None])
+    ws.append([None, f"{c['estructura_de'] or b} 2/", "Var. %", "Contribución 3/", "Var. %", "Contribución 3/"])
     for f in c["cuadro"]:
         guion = lambda v: "-" if f["vacia"] or v is None else v
-        ws.append([("   " * (f["nivel"] // 2)) + f["nombre"], f["estructura"], f["mes_b"], f["mes_a"], guion(f["var_mes"]), guion(f["contrib_mes"]),
-                   f["acum_b"], f["acum_a"], guion(f["var_acum"]), guion(f["contrib_acum"])])
+        ws.append([("   " * (f["nivel"] // 2)) + f["nombre"], f["estructura"], guion(f["var_mes"]), guion(f["contrib_mes"]),
+                   guion(f["var_acum"]), guion(f["contrib_acum"])])
         if f["nivel"] == 0:
             for celda in ws[ws.max_row]:
                 celda.font = neg
-    for fila in ws.iter_rows(min_row=6, min_col=2, max_col=10):
+    ws.merge_cells("C4:D4"); ws.merge_cells("E4:F4")
+    for fila in ws.iter_rows(min_row=6, min_col=2, max_col=6):
         for celda in fila:
             celda.number_format = "0.0"
             celda.alignment = Alignment(horizontal="right")
@@ -264,6 +265,14 @@ def excel(region, c):
         ws.append([t])
     ws["A1"].font = neg
     ws.column_dimensions["A"].width = 34
+    wi = wb.create_sheet("Índices")
+    wi.append([f"{region.upper()}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO (índices, 2007 = 100)"]); wi.append([])
+    wi.append(["Ramas de actividad", f"{mes} {b}", f"{mes} {a}", f"{c['acumulado']} {b}", f"{c['acumulado']} {a}"])
+    for f in c["cuadro"]:
+        wi.append([("   " * (f["nivel"] // 2)) + f["nombre"], f["mes_b"], f["mes_a"], f["acum_b"], f["acum_a"]])
+        for celda in wi[wi.max_row][1:]:
+            celda.number_format = "0.0"
+    wi.column_dimensions["A"].width = 34
     wg = wb.create_sheet("Serie")
     wg.append([f"{region.upper()}: ÍNDICE DE VOLUMEN FÍSICO MANUFACTURERO"])
     wg.append(["(Índice y var. % respecto a similar mes del año anterior)"])
