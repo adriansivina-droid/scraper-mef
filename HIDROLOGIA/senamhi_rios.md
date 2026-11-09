@@ -33,6 +33,7 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
 | `/mapas/mapa-monitoreohidro/include/ajaxEstaciones.php` | POST multipart `cod_zonal=-1` (todas las direcciones zonales) | JSON con **143 estaciones**: `idEstacion`, `codEstacion`, `nomEstacion`, `subEstacion`, `estado` |
 | `/mapas/mapa-monitoreohidro/include/ajaxIdesep.php` | POST multipart `url=<WMS GetFeatureInfo del GeoServer>` | Es un intermediario hacia `idesep.senamhi.gob.pe/geoserver/g_dbphisis/wms`, capa `estaciones_monitoreo`. Por estación devuelve `{"id","fecha_hora","variable","variable_opcion"}`; si el clic no cae sobre una estación, devuelve `null` |
 | `/mapas/mapa-monitoreohidro/include/mnt-grafica-new.php` | POST `rbtVariable=NIVEL\|CAUDAL`, `fecha_hora=AAAA-MM-DD hh:mm:ss`, `btnTipo=D\|H`, `variable_opcion`, `id=<codEstacion>` | HTML del hidrograma. Los datos vienen en `var data = {...}` (Highcharts) |
+| `/include/ajax-informacion-diaria.php` | POST multipart `fecha=AAAA-MM-DD`, `hora=00:00\|06:00\|12:00\|18:00` | JSON de la pestaña «Información Diaria»: **~72 estaciones** (las principales, casi todas en caudal), con el dato a esa hora, la anomalía respecto a la normal, la tendencia, el umbral rojo, la cuenca y el departamento. Hay datos **desde 2023** (probado con 01/01/2023) |
 | `/include/ajax-informacion-mensual.php` | POST multipart `fecha=AAAA-MM` | JSON de la pestaña «Información Mensual»: **57 estaciones**, con valor del mes, mes anterior, anomalía, tendencia y umbral rojo |
 
 **Hidrograma «Diario» (`btnTipo=D`).** Trae un **año hidrológico**, de setiembre a agosto. `fechaHora` es la lista de días, en ms UTC, y cada serie es una lista de pares `[ms, valor]`:
@@ -49,6 +50,8 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
 
 **Información Mensual.** Si se pide un mes aún no publicado, devuelve el último publicado: con `2026-11` devolvió `OCT-26`. El notebook compara el mes servido (`primDescripcion`, por ejemplo `JAN-23`) con el pedido y descarta el que no coincide. Viene en m³/s en 54 estaciones; las demás, en m o m.s.n.m.
 
+**Información Diaria.** A una hora dada, varias estaciones salen `-999` (sin dato). Por ejemplo, el 01/01/2023 a las 00:00 salen así Requena, Contamana, Tamshiyacu y Borja. Por eso se piden las 4 horas del desplegable. Es la fuente principal de **historia diaria desde 2023** para las estaciones principales. El hidrograma cubre las 143 estaciones, pero quizá solo los 2 últimos años hidrológicos.
+
 **Acceso.** SENAMHI corta la conexión desde servidores en la nube (el entorno de Claude Code); responde desde el navegador. La primera corrida es en **Colab**. Si Colab también es bloqueado, se verá en el primer paso: falla la lista de estaciones.
 
 ## 4. Notebook (3 bloques)
@@ -64,6 +67,11 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
    - Para llegar a 2023 pide `fecha_hora = 31/08` de años anteriores: un año Y trae Y y Y-1, el siguiente pedido Y-2, y así.
    - **Si SENAMHI ignora la fecha pasada** y devuelve otra vez el año actual en las 3 primeras pruebas, deja de intentarlo y avisa. En ese caso el hidrograma solo llega al 01/09 del año hidrológico anterior, y la historia más antigua queda solo en la Información Mensual. **Esto se confirma en la primera corrida.**
    - Si un día aparece como `ACTUAL` (año pedido) y como `ANTERIOR` (visto desde el año siguiente), se queda el `ACTUAL`.
+   - **Información Diaria** (punto 9, al final porque es lo más largo):
+     - 4 consultas por día desde el año elegido, unas 5.600 desde 2023, es decir ~1,5–2 h la primera vez;
+     - guarda en Drive cada 200 consultas;
+     - al volver a ejecutar salta las fechas y horas ya `OK` del control, y siempre vuelve a pedir hoy y ayer;
+     - en la prueba rápida, con códigos en el Bloque 2, solo pide los 2 primeros días.
 
 ## 5. Archivos
 
@@ -72,6 +80,7 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
 | Archivo | Contenido |
 |---|---|
 | `SENAMHI_rios_diario.csv` | Una fila por estación, variable y día. Columnas: `COD_ESTACION, ESTACION, RIO, VARIABLE, UNIDAD, FECHA (dd/mm/aaaa), AÑO, MES, DIA, AÑO_HIDROLOGICO, VALOR, MINIMO, MAXIMO, PROM_HISTORICO, UMBRAL_ROJO/NARANJA/AMARILLO, SERIE (ACTUAL/ANTERIOR), FECHA_EXTRACCION`. Se acumula: cada corrida reemplaza los días que vuelve a leer |
+| `SENAMHI_rios_info_diaria.csv` | Una fila por estación, día y hora con dato (sin `-999`): `COD_ESTACION, ESTACION, CUERPO_AGUA, CUENCA, DEPARTAMENTO, ZONA, REGION_HIDROGRAFICA, COD_ZONAL, FECHA, AÑO, MES, DIA, HORA, UNIDAD, VALOR, ANOMALIA, UNIDAD_ANOMALIA, TENDENCIA, UMBRAL_ROJO, FECHA_EXTRACCION` |
 | `SENAMHI_rios_mensual.csv` | Una fila por estación y mes: valor del mes, mes anterior, anomalía, tendencia, umbral rojo, departamento, cuerpo de agua y región hidrográfica |
 | `SENAMHI_ESTACIONES.csv` | Las 143 estaciones, con la última fecha y hora, `variable_opcion`, río, departamento cuando lo hay, y coordenadas si el WFS del GeoServer responde |
 
@@ -81,6 +90,7 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
 |---|---|
 | `CONTROL SENAMHI rios_diario.csv` | Por estación y variable: primera y última fecha, días con dato, días faltantes y saltos raros (20 veces mayores que lo usual). Incluye el cruce con la Información Mensual: diferencia máxima entre el promedio de los días del mes y el valor mensual publicado, cuando la unidad es la misma. Estado: `OK`, `OK desde …`, `SIN DATOS` o `REVISAR` |
 | `CONTROL SENAMHI rios_mensual.csv` | Por mes pedido: mes servido, número de estaciones y estado |
+| `CONTROL SENAMHI rios_info_diaria.csv` | Por fecha y hora consultada: estaciones, cuántas con dato y estado (`OK` o `SIN RESPUESTA`). Sirve también para reanudar |
 | `LOG SENAMHI consultas.csv` | Cada consulta al hidrograma: fecha pedida, inicio de la serie devuelta, filas y estado |
 | `SENAMHI_respuesta_vacia.html` | Primera respuesta sin datos, tal cual, para diagnóstico |
 
