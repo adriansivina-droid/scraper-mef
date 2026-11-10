@@ -1,6 +1,6 @@
 # Nivel y caudal de los ríos · SENAMHI · Contexto del proyecto
 
-Documento de traspaso para retomar el proyecto sin perder contexto. Última actualización: **09/11/2026**.
+Documento de traspaso para retomar el proyecto sin perder contexto. Última actualización: **10/11/2026**.
 
 ---
 
@@ -52,26 +52,56 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
 
 **Información Diaria.** A una hora dada, varias estaciones salen `-999` (sin dato). Por ejemplo, el 01/01/2023 a las 00:00 salen así Requena, Contamana, Tamshiyacu y Borja. Por eso se piden las 4 horas del desplegable. Es la fuente principal de **historia diaria desde 2023** para las estaciones principales. El hidrograma cubre las 143 estaciones, pero quizá solo los 2 últimos años hidrológicos.
 
-**Acceso.** SENAMHI corta la conexión desde servidores en la nube (el entorno de Claude Code); responde desde el navegador. La primera corrida es en **Colab**. Si Colab también es bloqueado, se verá en el primer paso: falla la lista de estaciones.
+**Acceso: SENAMHI no responde a servidores en la nube.** Solo responde al navegador, desde una conexión normal. Comprobado el 10/11/2026 desde tres orígenes distintos:
 
-## 4. Notebook (3 bloques)
+| Origen | Resultado |
+|---|---|
+| Colab (Google) | `Max retries exceeded` en la lista de estaciones |
+| GitHub Actions (workflow «Hidrología · prueba de conexión a SENAMHI») | las 6 consultas agotaron los 45 s de espera, incluido el GeoServer `idesep` |
+| Entorno de Claude Code | conexión cortada (`connection reset`) en `www.senamhi.gob.pe`, `senamhi.gob.pe` e `idesep.senamhi.gob.pe` |
 
-1. **Instalación y funciones.** Lectura de cada endpoint y conversión del hidrograma a filas diarias. `-999` se toma como sin dato.
+No es un fallo del código: es un bloqueo de red de SENAMHI. Por eso **la descarga la hace el navegador** y Colab solo procesa (sección 4). La actualización automática diaria con GitHub Actions, como en HIDROCARBUROS, **no es posible** mientras dure ese bloqueo.
+
+## 4. Cómo se ejecuta (dos pasos)
+
+### Paso A · Recolector en el navegador (`HIDROLOGIA/senamhi_navegador.js`)
+
+1. Abrir https://www.senamhi.gob.pe/?p=monitoreo-hidrologico
+2. **F12 → Console**, pegar esta línea y Enter. Si Chrome pide permiso para pegar, escribir `allow pasting`, Enter, y volver a pegar:
+
+   ```js
+   fetch('https://raw.githubusercontent.com/adriansivina-droid/scraper-mef/main/HIDROLOGIA/senamhi_navegador.js').then(r=>r.text()).then(eval)
+   ```
+
+   Si la consola responde con un error en rojo y no aparece el panel, abrir `HIDROLOGIA/senamhi_navegador.js` en GitHub, copiar todo su contenido (botón «Copy raw file») y pegarlo en la consola.
+
+3. Aparece un panel abajo a la derecha. Elegir el año inicial (2023) y pulsar **Iniciar**. Dejar la pestaña abierta.
+4. Al terminar se descarga `SENAMHI_crudo_AAAA-MM-DD.json`.
+
+Detalles:
+- **Prueba rápida:** 3 estaciones (240001, 240111, 240103) y 2 días de Información Diaria. Tarda ~1 minuto y descarga `…_prueba.json`.
+- **Corrida completa desde 2023:** unas 6.400 consultas, con 0,3 s de pausa entre una y otra. Estimado: 1–2 horas la primera vez.
+- **Se puede cortar.** El avance queda en el navegador (IndexedDB). Al volver a cargar el script en el mismo navegador, «Iniciar» sigue donde quedó. Las corridas siguientes solo piden lo nuevo: el año hidrológico actual, los 3 últimos meses y los 2 últimos días.
+- «Descargar archivo» baja lo reunido hasta ese momento. «Empezar de cero» borra el avance guardado.
+- Hace las mismas consultas que la página y con las mismas reglas que el notebook: el orden de estaciones, el retroceso de 2 en 2 años hidrológicos y el corte si SENAMHI ignora la fecha en las 3 primeras pruebas.
+- El archivo es compacto. Del hidrograma guarda las series sin repetir fechas. De la Información Diaria guarda solo las estaciones con dato.
+- No envía nada a ningún otro sitio.
+
+### Paso B · Notebook de Colab (`HIDROLOGIA/SENAMHI_Rios.ipynb`, 3 bloques)
+
+1. **Instalación y funciones.** Lectura de cada endpoint y conversión del hidrograma a filas diarias. `-999` se toma como sin dato. `usar_crudo()` hace que esas funciones lean del archivo del navegador en vez de consultar a SENAMHI.
 2. **Selectores:**
-   - año inicial (2023 por defecto);
-   - nivel y/o caudal;
-   - Información Mensual;
-   - lista opcional de códigos para una prueba rápida, por ejemplo `240001, 240111, 240103`.
+   - origen de los datos: **archivo del navegador** (por defecto) o consulta directa, que solo sirve desde una red a la que SENAMHI responda;
+   - subir el archivo desde la PC, o usar el más reciente de la carpeta `SENAMHI_HIDROLOGIA/CRUDO` de Drive;
+   - año inicial (2023 por defecto), nivel y/o caudal, Información Mensual, Información Diaria y sus horas;
+   - lista opcional de códigos de estación.
 3. **Descarga, control y Drive.**
-   - Por estación, primero pide la ficha, que da la última `fecha_hora` y el `variable_opcion`. Después pide el «Diario» del año hidrológico actual, que también trae el anterior.
-   - Para llegar a 2023 pide `fecha_hora = 31/08` de años anteriores: un año Y trae Y y Y-1, el siguiente pedido Y-2, y así.
-   - **Si SENAMHI ignora la fecha pasada** y devuelve otra vez el año actual en las 3 primeras pruebas, deja de intentarlo y avisa. En ese caso el hidrograma solo llega al 01/09 del año hidrológico anterior, y la historia más antigua queda solo en la Información Mensual. **Esto se confirma en la primera corrida.**
+   - En modo archivo pide el `SENAMHI_crudo_….json`, guarda una copia en `CRUDO` y toma como fecha de extracción el día en que se recolectó.
+   - Hidrograma: por estación usa la ficha (última `fecha_hora` y `variable_opcion`) y el «Diario» del año hidrológico actual, que también trae el anterior. Para llegar a 2023 usa los pedidos con `fecha_hora = 31/08` de años anteriores: un año Y trae Y y Y-1, el siguiente pedido Y-2, y así.
+   - **Si SENAMHI ignora la fecha pasada** y devuelve otra vez el año actual en las 3 primeras pruebas, deja de intentarlo y avisa. En ese caso el hidrograma solo llega al 01/09 del año hidrológico anterior, y la historia más antigua queda en la Información Diaria y la Mensual. **Esto se confirma en la primera corrida real.**
+   - Si una estación no tiene datos recientes y la consulta «actual» devuelve su último año hidrológico, se acepta ese año.
    - Si un día aparece como `ACTUAL` (año pedido) y como `ANTERIOR` (visto desde el año siguiente), se queda el `ACTUAL`.
-   - **Información Diaria** (punto 9, al final porque es lo más largo):
-     - 4 consultas por día desde el año elegido, unas 5.600 desde 2023, es decir ~1,5–2 h la primera vez;
-     - guarda en Drive cada 200 consultas;
-     - al volver a ejecutar salta las fechas y horas ya `OK` del control, y siempre vuelve a pedir hoy y ayer;
-     - en la prueba rápida, con códigos en el Bloque 2, solo pide los 2 primeros días.
+   - **Información Diaria** (punto 9): 4 horas por día desde el año elegido. Salta las fechas y horas ya `OK` del control y siempre vuelve a leer hoy y ayer.
 
 ## 5. Archivos
 
@@ -96,7 +126,7 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
 
 ## 6. Pendiente
 
-- [ ] Primera corrida en Colab, con prueba rápida de 3 estaciones y luego todas. Confirmar si `fecha_hora` pasada devuelve años anteriores.
-- [ ] Confirmar `variable_opcion` en una estación con caudal.
+- [ ] Primera corrida real: prueba rápida en el navegador, subir el archivo a Colab y revisar el resultado. Luego la corrida completa. Confirmar si `fecha_hora` pasada devuelve años anteriores.
+- [ ] Confirmar `variable_opcion` en una estación con caudal. El archivo del navegador guarda el formulario del hidrograma de las estaciones con `variable_opcion` distinto de `N`, para verlo.
 - [ ] Anotar los IDs de DATA y CONTROL (sección 2).
-- [ ] Si Colab llega a SENAMHI, ver si GitHub Actions también llega, para la actualización diaria automática en la página, como en HIDROCARBUROS.
+- [ ] Cargar los CSV en la página (almacén), como en HIDROCARBUROS. La actualización diaria no puede ser automática mientras SENAMHI bloquee a los servidores en la nube: hay que repetir los pasos A y B.

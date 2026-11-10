@@ -1,15 +1,14 @@
 # Hidrología · prueba de conexión: ¿responde SENAMHI desde los servidores de GitHub?
 # SENAMHI corta la conexión desde Colab y desde otros servidores en la nube; esta prueba dice si desde GitHub Actions
 # sí se puede (de eso depende que el scraper HIDROLOGIA/SENAMHI_Rios.ipynb pueda automatizarse aquí).
+# Resultado del 10/11/2026: NO responde (las 6 consultas agotaron los 45 s de espera). Por eso la descarga se hace
+# desde el navegador (HIDROLOGIA/senamhi_navegador.js). Sirve para volver a probar si SENAMHI cambia su bloqueo.
 # A mano: Actions → «Hidrología · prueba de conexión a SENAMHI» → Run workflow. No guarda nada: el resultado sale en el
 # resumen de la corrida (Summary).
 name: Hidrología · prueba de conexión a SENAMHI
 
 on:
   workflow_dispatch:
-  push:
-    branches: ["claude/keen-bell-kvimjx"]
-    paths: [".github/workflows/hidrologia_prueba_senamhi.yml"]
 
 permissions:
   contents: read
