@@ -1,0 +1,44 @@
+# Hidrología · prueba de conexión: ¿responde SENAMHI desde los servidores de GitHub?
+# SENAMHI corta la conexión desde Colab y desde otros servidores en la nube; esta prueba dice si desde GitHub Actions
+# sí se puede (de eso depende que el scraper HIDROLOGIA/SENAMHI_Rios.ipynb pueda automatizarse aquí).
+# Resultado del 10/11/2026: NO responde (las 6 consultas agotaron los 45 s de espera). Por eso la descarga se hace
+# desde el navegador (HIDROLOGIA/senamhi_navegador.js). Sirve para volver a probar si SENAMHI cambia su bloqueo.
+# A mano: Actions → «Hidrología · prueba de conexión a SENAMHI» → Run workflow. No guarda nada: el resultado sale en el
+# resumen de la corrida (Summary).
+name: Hidrología · prueba de conexión a SENAMHI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probar las direcciones de SENAMHI
+        run: |
+          probar() {   # nombre, argumentos de curl
+            nombre="$1"; shift
+            r=$(curl -sS -m 45 -o /tmp/resp.bin -w "%{http_code} · %{size_download} bytes · %{time_total}s" "$@" 2>&1 | tail -1)
+            echo "| $nombre | $r |" | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+          {
+            echo "## ¿Responde SENAMHI desde GitHub Actions?"
+            echo "IP de salida: $(curl -sS -m 20 https://api.ipify.org || echo desconocida)"
+            echo
+            echo "| Consulta | Resultado (código HTTP · tamaño · tiempo, o el error) |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          B=https://www.senamhi.gob.pe
+          probar "Página del mapa" "$B/mapas/mapa-monitoreohidro/mapa-monitoreo.php"
+          probar "Lista de estaciones" -F cod_zonal=-1 "$B/mapas/mapa-monitoreohidro/include/ajaxEstaciones.php"
+          echo "Inicio de la lista de estaciones: $(head -c 200 /tmp/resp.bin 2>/dev/null)"
+          probar "Información Diaria 01/01/2023" -F fecha=2023-01-01 -F hora=06:00 "$B/include/ajax-informacion-diaria.php"
+          probar "Información Mensual 01/2023" -F fecha=2023-01 "$B/include/ajax-informacion-mensual.php"
+          probar "Hidrograma diario (240001)" -d rbtVariable=NIVEL -d "fecha_hora=2024-08-31 06:00:00" -d btnTipo=D -d variable_opcion=N -d id=240001 "$B/mapas/mapa-monitoreohidro/include/mnt-grafica-new.php"
+          echo "Inicio de la serie del hidrograma pedido para 2023-2024: $(grep -o '"fechaHora":\[[0-9]*' /tmp/resp.bin | head -1)" | tee -a "$GITHUB_STEP_SUMMARY"
+          probar "GeoServer (idesep, WFS)" "https://idesep.senamhi.gob.pe/geoserver/g_dbphisis/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=g_dbphisis:estaciones_monitoreo&outputFormat=application/json&maxFeatures=2"
+          echo "Inicio del WFS: $(head -c 600 /tmp/resp.bin 2>/dev/null)"
