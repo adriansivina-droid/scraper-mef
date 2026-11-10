@@ -75,12 +75,14 @@ No es un fallo del código: es un bloqueo de red de SENAMHI. Por eso **la descar
 
    Si la consola responde con un error en rojo y no aparece el panel, abrir `HIDROLOGIA/senamhi_navegador.js` en GitHub, copiar todo su contenido (botón «Copy raw file») y pegarlo en la consola.
 
-3. Aparece un panel abajo a la derecha. Elegir el año inicial (2023) y pulsar **Iniciar**. Dejar la pestaña abierta.
+3. Aparece un panel abajo a la derecha. Elegir las fechas **Desde** y **hasta** y pulsar **Iniciar**. Dejar la pestaña abierta.
 4. Al terminar se descarga `SENAMHI_crudo_AAAA-MM-DD.json`.
 
 Detalles:
 - **Prueba rápida:** 3 estaciones (240001, 240111, 240103) y 2 días de Información Diaria. Tarda ~1 minuto y descarga `…_prueba.json`.
-- **Corrida completa desde 2023:** unas 6.400 consultas, con 0,3 s de pausa entre una y otra. Estimado: 1–2 horas la primera vez.
+- **Corrida completa desde 01/01/2023:** unas 6.400 consultas, con 0,3 s de pausa entre una y otra. En la primera corrida real (10/11/2026) el panel estimó unas 4 horas.
+- **Actualización:** poner «Desde» unos días atrás. Con una semana son unas 480 consultas (pocos minutos): el hidrograma del año hidrológico actual de todas las estaciones y la Información Diaria de esos días. Se puede desmarcar «Hidrograma diario» para pedir solo la Información Diaria y la Mensual.
+- **Dirección zonal:** una sola vez pide la lista de estaciones de cada dirección zonal (01 a 13), para saber cuáles son de la DZ 8 (Loreto).
 - **Se puede cortar.** El avance queda en el navegador (IndexedDB). Al volver a cargar el script en el mismo navegador, «Iniciar» sigue donde quedó. Las corridas siguientes solo piden lo nuevo: el año hidrológico actual, los 3 últimos meses y los 2 últimos días.
 - «Descargar archivo» baja lo reunido hasta ese momento. «Empezar de cero» borra el avance guardado.
 - Hace las mismas consultas que la página y con las mismas reglas que el notebook: el orden de estaciones, el retroceso de 2 en 2 años hidrológicos y el corte si SENAMHI ignora la fecha en las 3 primeras pruebas.
@@ -112,7 +114,7 @@ Detalles:
 | `SENAMHI_rios_diario.csv` | Una fila por estación, variable y día. Columnas: `COD_ESTACION, ESTACION, RIO, VARIABLE, UNIDAD, FECHA (dd/mm/aaaa), AÑO, MES, DIA, AÑO_HIDROLOGICO, VALOR, MINIMO, MAXIMO, PROM_HISTORICO, UMBRAL_ROJO/NARANJA/AMARILLO, SERIE (ACTUAL/ANTERIOR), FECHA_EXTRACCION`. Se acumula: cada corrida reemplaza los días que vuelve a leer |
 | `SENAMHI_rios_info_diaria.csv` | Una fila por estación, día y hora con dato (sin `-999`): `COD_ESTACION, ESTACION, CUERPO_AGUA, CUENCA, DEPARTAMENTO, ZONA, REGION_HIDROGRAFICA, COD_ZONAL, FECHA, AÑO, MES, DIA, HORA, UNIDAD, VALOR, ANOMALIA, UNIDAD_ANOMALIA, TENDENCIA, UMBRAL_ROJO, FECHA_EXTRACCION` |
 | `SENAMHI_rios_mensual.csv` | Una fila por estación y mes: valor del mes, mes anterior, anomalía, tendencia, umbral rojo, departamento, cuerpo de agua y región hidrográfica |
-| `SENAMHI_ESTACIONES.csv` | Las 143 estaciones, con la última fecha y hora, `variable_opcion`, río, departamento cuando lo hay, y coordenadas si el WFS del GeoServer responde |
+| `SENAMHI_ESTACIONES.csv` | Las 143 estaciones, con la dirección zonal (`COD_ZONAL`, `DIRECCION_ZONAL`), la última fecha y hora, `variable_opcion`, río, departamento cuando lo hay, y coordenadas si el WFS del GeoServer responde |
 
 **CONTROL**
 
@@ -124,9 +126,14 @@ Detalles:
 | `LOG SENAMHI consultas.csv` | Cada consulta al hidrograma: fecha pedida, inicio de la serie devuelta, filas y estado |
 | `SENAMHI_respuesta_vacia.html` | Primera respuesta sin datos, tal cual, para diagnóstico |
 
+El detalle de cada columna está en **`HIDROLOGIA/docs/Diccionario_SENAMHI_rios.pdf`**. Se genera con `python HIDROLOGIA/docs/mk_diccionario.py`; si cambian las columnas, se actualiza ese script y se vuelve a generar.
+
+**Departamento de las estaciones.** SENAMHI solo da el departamento en la Información Diaria y la Mensual (~72 estaciones). Para las demás se usa la dirección zonal. En la primera prueba real el GeoServer no entregó la capa de estaciones, así que no hay coordenadas.
+
 ## 6. Pendiente
 
-- [ ] Primera corrida real: prueba rápida en el navegador, subir el archivo a Colab y revisar el resultado. Luego la corrida completa. Confirmar si `fecha_hora` pasada devuelve años anteriores.
-- [ ] Confirmar `variable_opcion` en una estación con caudal. El archivo del navegador guarda el formulario del hidrograma de las estaciones con `variable_opcion` distinto de `N`, para verlo.
+- [x] Prueba rápida real (10/11/2026): funcionó de punta a punta. **SENAMHI sí acepta fechas pasadas** (nivel desde 2023 en las 3 estaciones) y el caudal sale en 2 de las 3. Información Diaria: 64 estaciones con dato a las 06:00, 12:00 y 18:00, y 30 a las 00:00.
+- [ ] Corrida completa desde 01/01/2023 y revisión del control.
+- [ ] Llevar los datos a la página. La base usa 211,9 MB de 512 MB (10/11/2026) y los CSV comprimidos de SENAMHI pesarían unos 15–20 MB, así que caben. Se hará cuando la corrida completa esté revisada.
 - [ ] Anotar los IDs de DATA y CONTROL (sección 2).
 - [ ] Cargar los CSV en la página (almacén), como en HIDROCARBUROS. La actualización diaria no puede ser automática mientras SENAMHI bloquee a los servidores en la nube: hay que repetir los pasos A y B.
