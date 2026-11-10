@@ -17,7 +17,7 @@
   'use strict';
   if (window.__senamhiRecolector) { window.__senamhiRecolector.mostrar(); return; }
 
-  const VERSION = 1;
+  const VERSION = 2;
   const B = location.origin;
   const U = {
     estaciones: B + '/mapas/mapa-monitoreohidro/include/ajaxEstaciones.php',
@@ -42,6 +42,7 @@
     return new Date(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
   }
   const anioHidrologico = (d) => (d.getMonth() + 1 >= 9 ? d.getFullYear() : d.getFullYear() - 1);
+  const deIso = (t) => { const [a, m, d] = t.split('-').map(Number); return new Date(a, m - 1, d); };
 
   // ── almacén local (IndexedDB) ─────────────────────────────────────────────
   let db;
@@ -157,16 +158,32 @@
   // ── recolección ───────────────────────────────────────────────────────────
   let estado = 'listo', detalle = '', hecho = 0, total = 0;
   async function recolectar(cfg) {
-    const HOY = hoyLima(), AH_HOY = anioHidrologico(HOY), AH_MIN = cfg.desde - 1;
-    const hoyIso = iso(HOY);
-    await guardar('meta', { version: VERSION, desde: cfg.desde, prueba: cfg.prueba, hoy: hoyIso, origen: B,
-                            variables: cfg.variables, horas: cfg.horas });
+    const HOY = hoyLima(), AH_HOY = anioHidrologico(HOY), hoyIso = iso(HOY);
+    const DESDE = deIso(cfg.desdeFecha), HASTA = deIso(cfg.hastaFecha) > HOY ? HOY : deIso(cfg.hastaFecha);
+    if (DESDE > HASTA) throw new Error('La fecha «Desde» es posterior a «Hasta»');
+    const AH_MIN = anioHidrologico(DESDE);
+    await guardar('meta', { version: VERSION, desde: DESDE.getFullYear(), desdeFecha: iso(DESDE), hastaFecha: iso(HASTA),
+                            prueba: cfg.prueba, hoy: hoyIso, origen: B, variables: cfg.variables, horas: cfg.horas });
 
     // 1. estaciones
     estado = 'Estaciones'; pintar();
     let lista = json(await pedir(U.estaciones, form({ cod_zonal: '-1' })));
     if (!Array.isArray(lista) || !lista.length) throw new Error('SENAMHI no respondió la lista de estaciones');
     await guardar('estaciones', lista);
+    // dirección zonal de cada estación (el mismo filtro «Dirección Zonal» del mapa); se pide una sola vez
+    let zonales = await leer('zonales');
+    if (!zonales) {
+      zonales = {};
+      for (let z = 1; z <= 13; z++) {
+        detalle = `dirección zonal ${z}`; pintar();
+        let l = json(await pedir(U.estaciones, form({ cod_zonal: p2(z) }), 2));
+        if (!Array.isArray(l) || !l.length) l = json(await pedir(U.estaciones, form({ cod_zonal: String(z) }), 2));
+        for (const e of Array.isArray(l) ? l : []) zonales[String(e.codEstacion)] = p2(z);
+      }
+      // si el filtro no distingue (todas las listas iguales), no sirve: no se guarda
+      const n = Object.keys(zonales).length;
+      if (n && new Set(Object.values(zonales)).size > 1) await guardar('zonales', zonales); else zonales = null;
+    }
     const wfs = (await leer('wfs')) || (await leerWfs());
     if (wfs) await guardar('wfs', wfs);
     const coord = {};
@@ -180,11 +197,14 @@
     // plan aproximado para la barra de avance
     const dias = [];
     if (cfg.infoDiaria) {
-      for (let d = new Date(cfg.desde, 0, 1); d <= HOY; d.setDate(d.getDate() + 1)) dias.push(new Date(d));
+      for (let d = new Date(DESDE); d <= HASTA; d.setDate(d.getDate() + 1)) dias.push(new Date(d));
       if (cfg.prueba) dias.splice(2);
     }
     const meses = [];
-    if (cfg.mensual) for (let a = cfg.desde, m = 1; a < HOY.getFullYear() || m <= HOY.getMonth() + 1; m === 12 ? (a++, m = 1) : m++) meses.push([a, m]);
+    if (cfg.mensual) {
+      for (let a = DESDE.getFullYear(), m = DESDE.getMonth() + 1; a < HASTA.getFullYear() || (a === HASTA.getFullYear() && m <= HASTA.getMonth() + 1); m === 12 ? (a++, m = 1) : m++) meses.push([a, m]);
+    }
+    if (!cfg.hidrograma) lista = [];
     total = lista.length * (1 + cfg.variables.length) + meses.length + dias.length * cfg.horas.length;
     hecho = 0;
 
@@ -303,7 +323,7 @@
   async function exportar() {
     const t = await todo();
     const out = { version: VERSION, generado: new Date().toISOString(), meta: t.meta || {}, estaciones: t.estaciones || [],
-                  wfs: t.wfs || null, historiaOk: t.historiaOk === undefined ? null : t.historiaOk,
+                  wfs: t.wfs || null, zonales: t.zonales || null, historiaOk: t.historiaOk === undefined ? null : t.historiaOk,
                   fichas: {}, graficas: [], mensual: {}, infoMeta: t.infoMeta || {}, infoDiaria: {} };
     for (const k in t) {
       if (k.startsWith('ficha:')) out.fichas[k.slice(6)] = t[k].f;
@@ -328,8 +348,11 @@
   caja.innerHTML =
     '<div style="font-weight:bold;color:#0b3c8c;margin-bottom:6px">SENAMHI · recolector de niveles y caudales</div>' +
     '<div id="sr-opciones">' +
-    '<label>Desde el año <input id="sr-desde" type="number" min="2010" max="2100" value="2023" style="width:70px"></label><br>' +
+    '<label>Desde <input id="sr-desde" type="date" value="2023-01-01"></label> ' +
+    '<label>hasta <input id="sr-hasta" type="date"></label><br>' +
+    '<div style="color:#555;font-size:11px;margin:2px 0 4px">Lo ya descargado no se vuelve a pedir. Para actualizar, basta poner «Desde» unos días atrás.</div>' +
     '<label><input id="sr-prueba" type="checkbox"> Prueba rápida (3 estaciones y 2 días, ~1 min)</label><br>' +
+    '<label><input id="sr-hidro" type="checkbox" checked> Hidrograma diario (todas las estaciones)</label><br>' +
     '<label><input id="sr-caudal" type="checkbox" checked> Caudal, además del nivel</label><br>' +
     '<label><input id="sr-diaria" type="checkbox" checked> Información Diaria (4 horas por día; es lo más largo)</label><br>' +
     '<label><input id="sr-mensual" type="checkbox" checked> Información Mensual</label></div>' +
@@ -358,7 +381,8 @@
     if (corriendo) return;
     corriendo = true; detenido = false; pausado = false; fallos = 0; t0 = Date.now();
     $('sr-iniciar').disabled = true; $('sr-pausa').disabled = false;
-    const cfg = { desde: Number($('sr-desde').value) || 2023, prueba: $('sr-prueba').checked,
+    const cfg = { desdeFecha: $('sr-desde').value || '2023-01-01', hastaFecha: $('sr-hasta').value || iso(hoyLima()),
+                  prueba: $('sr-prueba').checked, hidrograma: $('sr-hidro').checked,
                   variables: $('sr-caudal').checked ? ['NIVEL', 'CAUDAL'] : ['NIVEL'],
                   infoDiaria: $('sr-diaria').checked, mensual: $('sr-mensual').checked, horas: HORAS };
     try {
@@ -384,6 +408,10 @@
                                  detener: () => { detenido = true; } };
   abrirDb().then(async () => {
     const m = await leer('meta');
-    if (m) $('sr-estado').textContent = `Hay un avance guardado (desde ${m.desde}${m.prueba ? ', prueba' : ''}). «Iniciar» sigue donde quedó.`;
+    $('sr-hasta').value = iso(hoyLima());
+    if (m) {
+      if (m.desdeFecha) $('sr-desde').value = m.desdeFecha;
+      $('sr-estado').textContent = `Hay un avance guardado (desde ${m.desdeFecha || m.desde}${m.prueba ? ', prueba' : ''}). «Iniciar» sigue donde quedó.`;
+    }
   }).catch((e) => { $('sr-estado').textContent = '⚠️ No se pudo abrir el almacén del navegador: ' + e; });
 })();
