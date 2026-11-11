@@ -243,8 +243,16 @@ def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None):
         d = Deflactor(ipc, q)
         ra, rb = d.real(panel, [q]), d.real(panel, [q - 100]) if (q - 100) in periodos else None
         na, nb = float(mensual.get(q, 0)), float(mensual.get(q - 100, 0)) if (q - 100) in periodos else None
+        # acumulada 12 meses: los 12 meses que terminan en q contra los 12 anteriores a esos (todos deflactados a q)
+        w_a = [(q // 100 - (q % 100 - k <= 0)) * 100 + (q % 100 - k - 1) % 12 + 1 for k in range(12)]
+        w_b = [x - 100 for x in w_a]
+        hay12 = all(x in periodos for x in w_a + w_b)
+        ra12, rb12 = (d.real(panel, w_a), d.real(panel, w_b)) if hay12 else (None, None)
+        na12, nb12 = (float(mensual.reindex(w_a).sum()), float(mensual.reindex(w_b).sum())) if hay12 else (None, None)
         interanual.append({"periodo": etiqueta(q, True), "var": _var(rb, ra) if ra is not None and rb is not None else None,
-                           "var_nominal": _var(nb, na) if nb is not None else None})
+                           "var_nominal": _var(nb, na) if nb is not None else None,
+                           "var_12m": _var(rb12, ra12) if ra12 is not None and rb12 is not None else None,
+                           "var_12m_nominal": _var(nb12, na12) if na12 is not None else None})
     total = niveles[-1]
     participacion = [{"nivel": CORTO[n], "valor": f["acum_a"], "pct": round(f["acum_a"] / total["acum_a"] * 100, 1) if total["acum_a"] else None}
                      for n, f in zip(NIVELES, niveles[:3])]

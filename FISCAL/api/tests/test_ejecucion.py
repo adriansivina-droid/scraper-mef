@@ -78,7 +78,7 @@ def test_gasto_corriente_real_y_nominal(datos):
     assert c["detalle"][0]["var_acum"] == 4.8                         # 1,10 / 1,05
     assert [p["nivel"] for p in c["participacion"]] == ["G.N.", "G.R.", "G.L."]
     assert c["mensual"]["a"][8] == 84.0 and c["mensual"]["a"][9] is None and c["mensual"]["acum_b"][11] == 900.0
-    assert c["interanual"][-1] == {"periodo": "Set. 2026", "var": 6.7, "var_nominal": 12.0}
+    assert c["interanual"][-1] == {"periodo": "Set. 2026", "var": 6.7, "var_nominal": 12.0, "var_12m": None, "var_12m_nominal": None}   # 12 meses: faltan 2024
 
 
 def test_inversion_avance_pim_y_comparar(datos):
@@ -341,3 +341,16 @@ def test_ipc_del_inei_manda(cliente, monkeypatch):  # noqa: F811
     assert "se usa el del INEI" in r["mensaje"] and r["hasta"] == "2026-10" and ipc.serie()["2026-10"] == 117.0
     monkeypatch.setattr(ipc, "_ultimo_intento", [0.0])
     assert ipc.refrescar(hoy=date(2026, 12, 20)) is False                          # ni en la actualización automática
+
+
+def test_variacion_acumulada_12_meses(datos):
+    """Cada mes del gráfico de la síntesis lleva la variación interanual y la acumulada de los 12 meses que terminan en él."""
+    c = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion").json()["cuadros"]
+    assert all({"var", "var_12m", "var_12m_nominal"} <= set(x) for x in c["interanual"])
+    r = datos.post("/v1/bcrp/excel", json={"tipo": "barraslinea", "nombre": "g", "spec": {"titulo": "X", "puntos": [
+        {"periodo": "Set. 2025", "valor": 34.4, "linea": None}, {"periodo": "Oct. 2025", "valor": -1.5, "linea": 40.1}]}})
+    assert r.status_code == 200
+    ws = load_workbook(io.BytesIO(r.content)).active
+    fila = next(i for i in range(1, 10) if ws.cell(i, 1).value == "Mes")
+    assert [ws.cell(fila, j).value for j in (2, 3)] == ["Var. % interanual", "Var. % acumulada 12 meses"] and ws.cell(fila + 2, 3).value == 40.1
+    assert len(ws._charts) == 1

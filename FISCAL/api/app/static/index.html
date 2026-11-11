@@ -1005,6 +1005,7 @@
     smn: { pesca: {}, hidro: {}, empleo: { c: 4, g: 3 }, expo: { c: 5, a: [4] }, gasto: { c: 9, a: [5, 6, 7] }, inversion: { c: 10, g: 7, a: [8, 9, 10] } },
     uca: { pesca: { c: 4, a: [2] }, hidro: { c: 5, g: 1, a: [3] }, empleo: { c: 7, g: 3 }, expo: { c: 8, a: [6] }, gasto: { c: 12, a: [7, 8, 9] }, inversion: { c: 13, g: 7, a: [10, 11, 12] } },
   };
+  const verBcrp = {};                                              // la versión elegida de cada gráfico (si tiene varias)
   const numBcrp = {};                                              // lo que el usuario escribió, por cuadro
   const B = window.BCRP, n0 = (v) => B.num(v, 0), n1 = (v) => B.num(v, 1), v1 = B.var1;
   const partirLlamada = (t) => { const m = String(t).match(/^(.*?)\s*((?:\d\/\s*)+)$/); return m ? [m[1], m[2].replace(/\s+/g, " ").trim()] : [t, ""]; };
@@ -1119,8 +1120,14 @@
       filas: c.niveles.map((f) => ({ c: [nombreNivel[f.nombre] || f.nombre, n1(f.mes_b), n1(f.mes_a), v1(vm(f)), n1(f.acum_b), n1(f.acum_a), v1(va(f))], b: f.nombre === "Total", total: f.nombre === "Total" })),
       notas: [act, ...(inv ? ["2/ Comprende la adquisición de activos no financieros."] : []), ...(real ? [] : ["Variación nominal: falta el IPC de Lima (INEI) del mes."]), real ? "Fuente: MEF e INEI." : "Fuente: MEF."] }) });
     const g = c.interanual.map((x) => ({ periodo: x.periodo, valor: real ? x.var : x.var_nominal })).filter((x) => x.valor != null);
-    if (g.length) items.push({ clave: "g", tipo: "GRÁFICO", num: N.g, nombre: `${R}: ${titulo} (variación)`, svg: (n) => B.barras({ numero: n, titulo: `${R}: ${titulo}`,
-      unidad: `(Variación porcentual ${real ? "real " : ""}respecto a similar periodo del año anterior)`, puntos: g, notas: ["Fuente: MEF."] }) });
+    const unidadG = `(Variación porcentual ${real ? "real " : ""}respecto a similar periodo del año anterior)`;
+    const g2 = c.interanual.map((x) => ({ periodo: x.periodo, valor: real ? x.var : x.var_nominal, linea: real ? x.var_12m : x.var_12m_nominal })).filter((x) => x.valor != null || x.linea != null);
+    const barrasG = (n) => B.barras({ numero: n, titulo: `${R}: ${titulo}`, unidad: unidadG, puntos: g, notas: ["Fuente: MEF."] });
+    // otra versión: la de la síntesis (barras de la var. interanual y línea punteada de la acumulada 12 meses), 25 meses
+    const sintesisG = (n) => B.barrasLinea({ numero: n, titulo: `${R}: ${titulo}`, unidad: unidadG, puntos: g2,
+      leyenda: ["Var. % interanual", "Var. % acumulada 12 meses"], notas: [real ? "Fuente: MEF e INEI." : "Fuente: MEF."] });
+    if (g.length) items.push({ clave: "g", tipo: "GRÁFICO", num: N.g, nombre: `${R}: ${titulo} (variación)`, svg: barrasG,
+      versiones: [{ etq: "Barras", svg: barrasG }, { etq: "Barras y acumulada 12 meses (síntesis)", svg: sintesisG }] });
     (c.anexos || []).forEach((ax, k) => {
       const t = inv ? `${R}: INVERSIÓN NO FINANCIERA ${ax.nivel}` : `${R}: EJECUCIÓN DEL PRESUPUESTO DE GASTOS ${ax.nivel}`;
       items.push({ clave: `a${k}`, tipo: "ANEXO", num: (N.a || [])[k], nombre: t, svg: (n) => B.anexo({ numero: n, titulo: t, llamada: "1/", unidad: "(Millones de soles)", rotulo: inv ? "FUNCIONES" : "",
@@ -1186,11 +1193,14 @@
   function galeriaBCRP(caja, clave, items, controles) {
     const etiqueta = (it, n) => n === "" || n == null ? (it.tipo === "ANEXO" ? "ANEXO" : `${it.tipo} N°`) : it.tipo === "ANEXO" ? `ANEXO ${n}` : `${it.tipo} N° ${n}`;
     const valorNum = (it) => numBcrp[`${clave}-${it.clave}`] ?? (it.num ?? "");
+    const verDe = (it) => verBcrp[`${clave}-${it.clave}`] ?? 0;
+    items.forEach((it) => { if (it.versiones) it.svg = (n) => it.versiones[verDe(it)].svg(n); });
     const listos = items.map((it, k) => [it, k]).filter(([it]) => it.svg);
     caja.innerHTML = `<div class="fila controles">${controles}<button class="btn sec" type="button" id="${clave}-todo"${listos.length ? "" : " disabled"}>Descargar todos (SVG)</button></div>
       <p class="lead">Con el formato de la síntesis. La imagen lleva solo el cuadro o el gráfico: el título y las notas van aparte, como referencia, con su botón para copiarlos. <b>Copiar</b> deja la imagen lista para pegar en Word (Ctrl+V); <b>SVG</b> es vectorial (en Word: Insertar → Imágenes) y no pierde nitidez al ampliarla; <b>Excel</b> lo baja completo, con título y notas. Cambia el número si el informe lo pide.</p>
       ${items.map((it, k) => it.svg ? `<div class="caja bcrp-item"><div class="fila" style="justify-content:space-between;align-items:center">
           <label class="campo bcrp-num">${esc(it.tipo === "ANEXO" ? "Anexo" : it.tipo === "CUADRO" ? "Cuadro N°" : "Gráfico N°")}<input type="text" inputmode="numeric" data-k="${k}" value="${esc(valorNum(it))}" size="3"></label>
+          ${it.versiones ? `<div class="segmento" role="group" aria-label="Versión del gráfico">${it.versiones.map((v, j) => `<button type="button" data-ver="${k}" data-j="${j}" aria-pressed="${j === verDe(it)}">${esc(v.etq)}</button>`).join("")}</div>` : ""}
           <div class="fila"><button class="btn" type="button" data-copiar="${k}">Copiar</button><button class="btn sec" type="button" data-svg="${k}">SVG</button><button class="btn sec" type="button" data-png="${k}">PNG</button><button class="btn sec" type="button" data-xlsx="${k}">Excel</button></div></div>
         <div id="${clave}-t${k}"></div><div class="bcrp-prev" id="${clave}-v${k}"></div><div id="${clave}-n${k}"></div><div class="bcrp-msj" id="${clave}-m${k}" aria-live="polite"></div></div>`
         : `<div class="vacio-caja bcrp-pendiente"><b>${esc(etiqueta(it, it.num))} · ${esc(it.nombre)}</b><span>${esc(it.pendiente)}</span></div>`).join("")}`;
@@ -1206,6 +1216,9 @@
     };
     listos.forEach(([, k]) => pintar(k));
     const avisar = (k, t, ok) => { const m = $(`${clave}-m${k}`); m.textContent = t; m.className = `bcrp-msj ${ok ? "ok" : "mal"}`; setTimeout(() => { m.textContent = ""; }, 3500); };
+    caja.querySelectorAll("[data-ver]").forEach((bt) => bt.addEventListener("click", () => { const k = +bt.dataset.ver, it = items[k];
+      verBcrp[`${clave}-${it.clave}`] = +bt.dataset.j;
+      caja.querySelectorAll(`[data-ver="${k}"]`).forEach((x) => x.setAttribute("aria-pressed", String(x === bt))); pintar(k); }));
     caja.querySelectorAll(".bcrp-num input").forEach((inp) => inp.addEventListener("input", () => { const k = +inp.dataset.k; numBcrp[`${clave}-${items[k].clave}`] = inp.value.trim(); pintar(k); }));
     caja.querySelectorAll("[data-copiar]").forEach((bt) => bt.addEventListener("click", async () => { const k = +bt.dataset.copiar;
       try { await B.copiar(svgDe(k)); avisar(k, "Copiado: pégalo en Word con Ctrl+V.", true); } catch (e) { avisar(k, e.message, false); } }));
