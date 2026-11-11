@@ -351,8 +351,9 @@ def _expo_al_almacen():
         return f"Exportaciones de crudo: no se pudieron copiar a DATA para el mapa ({e})."
 
 
-def cargar(origen, archivos):
-    """archivos: lista de (nombre, bytes) o (nombre, ruta de un archivo en disco, que se mueve). Un .zip se descomprime. Guarda en la base de datos y devuelve el resumen."""
+def cargar(origen, archivos, excluir=()):
+    """archivos: lista de (nombre, bytes) o (nombre, ruta de un archivo en disco, que se mueve). Un .zip se descomprime. Guarda en la base de datos y devuelve el resumen.
+    excluir: bases que no se guardan (p. ej. el detalle municipal de una corrida de años anteriores)."""
     avisos_ipc = []
     with tempfile.TemporaryDirectory() as tmp:
         for nombre, contenido in archivos:
@@ -380,6 +381,9 @@ def cargar(origen, archivos):
             else:
                 (Path(tmp) / nombre).write_bytes(contenido)
         bases, avisos = leer_archivos(tmp)
+        for b in sorted(set(excluir) & set(bases)):
+            del bases[b]
+            avisos.append(f"{b}: no se guardó (corrida de años anteriores, solo lo que piden los gráficos).")
         # los CSV de CONTROL del scraper del MEF: lo publicado en la vista anual de Consulta Amigable (pestaña «Contraste»)
         n_ctl = controles.guardar([(r.name, controles.leer(r.name, pd.read_csv(r, encoding="utf-8-sig"))) for r in Path(tmp).rglob("CONTROL*.csv")])
     resumen = {"bases": {}, "avisos": avisos_ipc + avisos}
