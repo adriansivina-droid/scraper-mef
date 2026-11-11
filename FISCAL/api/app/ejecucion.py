@@ -187,12 +187,12 @@ class Deflactor:
 def _fila(nombre, df, ventanas, defl, pim=None, pim_b=None):
     nom = {w: float(df.loc[df["P"].isin(ps), "MONTO"].sum()) for w, ps in ventanas.items()}
     real = {w: defl.real(df, ps) for w, ps in ventanas.items()}
-    f = {"nombre": nombre, **{w: round(v / 1e6, 3) for w, v in nom.items()},
+    f = {"nombre": nombre, **{w: round(v / 1e6, 6) for w, v in nom.items()},
          "var_mes": _var(real["mes_b"], real["mes_a"]) if real["mes_a"] is not None and real["mes_b"] is not None else None,
          "var_acum": _var(real["acum_b"], real["acum_a"]) if real["acum_a"] is not None and real["acum_b"] is not None else None,
          "var_mes_nominal": _var(nom["mes_b"], nom["mes_a"]), "var_acum_nominal": _var(nom["acum_b"], nom["acum_a"])}
     if pim is not None:
-        f["pim"] = round(pim / 1e6, 3)
+        f["pim"] = round(pim / 1e6, 6)
         f["avance"] = round(nom["acum_a"] / pim * 100, 1) if pim else None
         f["avance_b"] = round(nom["acum_b"] / pim_b * 100, 1) if pim_b else None
     return f
@@ -235,7 +235,7 @@ def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None):
     serie = lambda anio: [round(float(mensual.get(anio * 100 + k, 0)), 3) if anio * 100 + k in mensual.index else None for k in range(1, 13)]
     acumulada = lambda s: [None if v is None else round(sum(x or 0 for x in s[:i + 1]), 3) for i, v in enumerate(s)]
     sa, sb = serie(a), serie(b)
-    por_nivel = {CORTO[n]: {"a": [round(float(panel[(panel["NIVEL"] == n) & (panel["P"] == a * 100 + k)]["MONTO"].sum()) / 1e6, 3) if a * 100 + k in mensual.index else None for k in range(1, 13)]}
+    por_nivel = {CORTO[n]: {"a": [round(float(panel[(panel["NIVEL"] == n) & (panel["P"] == a * 100 + k)]["MONTO"].sum()) / 1e6, 6) if a * 100 + k in mensual.index else None for k in range(1, 13)]}
                  for n in NIVELES}
     # variación real interanual del total, mes a mes (hasta 25 meses)
     interanual = []
@@ -268,8 +268,8 @@ def _tops(t):
     t = t[(t["ANTES"] != 0) | (t["AHORA"] != 0)].assign(DIF=lambda x: x["AHORA"] - x["ANTES"])
     sube = t.sort_values("DIF", ascending=False).head(TOP)
     baja = t[~t["ITEM"].isin(sube["ITEM"])].sort_values("DIF").head(TOP)
-    fila = lambda r: {"item": r.ITEM, "antes": round(r.ANTES / 1e6, 3), "ahora": round(r.AHORA / 1e6, 3),
-                      "dif": round(r.DIF / 1e6, 3), "var": _var(r.ANTES, r.AHORA)}
+    fila = lambda r: {"item": r.ITEM, "antes": round(r.ANTES / 1e6, 6), "ahora": round(r.AHORA / 1e6, 6),
+                      "dif": round(r.DIF / 1e6, 6), "var": _var(r.ANTES, r.AHORA)}
     return [fila(r) for r in sube.itertuples()], [fila(r) for r in baja.itertuples()], len(t)
 
 
@@ -299,7 +299,7 @@ def variaciones(panel, muni, periodo=None, comparar=None):
             t["AHORA"] = t["ITEM"].map(df[df["P"].isin(ahora)].groupby(item)["MONTO"].sum()).fillna(0)
             sube, baja, n = _tops(t)
             ta, tb = float(t["ANTES"].sum()), float(t["AHORA"].sum())
-            bloques.append({"nombre": nombre, "total": {"antes": round(ta / 1e6, 3), "ahora": round(tb / 1e6, 3), "dif": round((tb - ta) / 1e6, 3), "var": _var(ta, tb)},
+            bloques.append({"nombre": nombre, "total": {"antes": round(ta / 1e6, 6), "ahora": round(tb / 1e6, 6), "dif": round((tb - ta) / 1e6, 6), "var": _var(ta, tb)},
                             "aumentos": sube, "caidas": baja, "pocos": n < 2 * TOP})
 
         todos = panel.assign(ITEM2=panel["NIVEL"].map(CORTO) + " · " + panel["ITEM"])

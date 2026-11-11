@@ -522,6 +522,7 @@
   }
 
   // ── Ejecución del presupuesto: gasto corriente no financiero e inversión pública ──
+  const soles = (v) => v == null ? "" : Math.round(v * 1e6).toLocaleString("es-PE");     // de millones a soles completos
   const mill = (v) => v == null ? "" : v.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const delta = (v) => v == null ? '<span class="delta">n.d.</span>' : `<span class="delta ${v >= 0 ? "sube" : "baja"}">${v >= 0 ? "▲" : "▼"} ${pct(Math.abs(v))} %</span>`;
   const estadoEjec = (clave) => paneles[clave] || (paneles[clave] = { periodo: "", comparar: "", vista: "mes" });
@@ -882,23 +883,23 @@
       const vm = (f) => real ? f.var_mes : f.var_mes_nominal, va = (f) => real ? f.var_acum : f.var_acum_nominal;
       const tot = c.niveles[c.niveles.length - 1], parejo = Math.round(+c.periodo.slice(5) / 12 * 1000) / 10;
       const tiles = `<div class="stats tiles">
-        <div class="stat"><small>${esc(mes)} ${a}</small><b>S/ ${mill(tot.mes_a)} mill.</b>${delta(vm(tot))}<span>vs ${esc(mes.toLowerCase())} ${b}: S/ ${mill(tot.mes_b)} mill.</span></div>
-        <div class="stat"><small>Ene.-${m3}. ${a}</small><b>S/ ${mill(tot.acum_a)} mill.</b>${delta(va(tot))}<span>vs Ene.-${m3}. ${b}: S/ ${mill(tot.acum_b)} mill.</span></div>
+        <div class="stat"><small>${esc(mes)} ${a}</small><b>S/ ${soles(tot.mes_a)}</b>${delta(vm(tot))}<span>vs ${esc(mes.toLowerCase())} ${b}: S/ ${soles(tot.mes_b)}</span></div>
+        <div class="stat"><small>Ene.-${m3}. ${a}</small><b>S/ ${soles(tot.acum_a)}</b>${delta(va(tot))}<span>vs Ene.-${m3}. ${b}: S/ ${soles(tot.acum_b)}</span></div>
         ${inv ? `<div class="stat"><small>Avance del PIM ${a}</small><b>${pct(tot.avance)} %</b>${avanceBarra(tot.avance, parejo)}<span>${tot.avance_b != null ? `a ${esc(mes.toLowerCase())} de ${b}: ${pct(tot.avance_b)} %` : ""} · ritmo parejo: ${pct(parejo)} %</span></div>
-          <div class="stat"><small>PIM ${a}</small><b>S/ ${mill(tot.pim)} mill.</b><span>por ejecutar: S/ ${mill(Math.max(tot.pim - tot.acum_a, 0))} mill.</span></div>`
-        : c.participacion.map((p) => `<div class="stat"><small>${esc(p.nivel)} · Ene.-${m3}. ${a}</small><b>${pct(p.pct)} %</b><span>del gasto corriente (S/ ${mill(p.valor)} mill.)</span></div>`).join("")}
+          <div class="stat"><small>PIM ${a}</small><b>S/ ${soles(tot.pim)}</b><span>por ejecutar: S/ ${soles(Math.max(tot.pim - tot.acum_a, 0))}</span></div>`
+        : c.participacion.map((p) => `<div class="stat"><small>${esc(p.nivel)} · Ene.-${m3}. ${a}</small><b>${pct(p.pct)} %</b><span>del gasto corriente (S/ ${soles(p.valor)})</span></div>`).join("")}
       </div>`;
       const cab = `<tr><th></th><th class="n">${mes} ${b}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Ene.-${m3}. ${b}</th><th class="n">Ene.-${m3}. ${a}</th><th class="n">Var. %</th>${inv ? '<th class="n">PIM</th><th>Avance del PIM</th>' : ""}</tr>`;
-      const fila = (f) => `<tr class="${f.nombre === "Total" ? "total" : ""}"><td>${esc(f.nombre)}</td><td class="n">${mill(f.mes_b)}</td><td class="n">${mill(f.mes_a)}</td><td class="n ${vm(f) == null ? "" : vm(f) >= 0 ? "sube" : "baja"}">${pct(vm(f))}</td>
-        <td class="n">${mill(f.acum_b)}</td><td class="n">${mill(f.acum_a)}</td><td class="n ${va(f) == null ? "" : va(f) >= 0 ? "sube" : "baja"}">${pct(va(f))}</td>${inv ? `<td class="n">${mill(f.pim)}</td><td>${avanceBarra(f.avance, parejo)}</td>` : ""}</tr>`;
+      const fila = (f) => `<tr class="${f.nombre === "Total" ? "total" : ""}"><td>${esc(f.nombre)}</td><td class="n">${soles(f.mes_b)}</td><td class="n">${soles(f.mes_a)}</td><td class="n ${vm(f) == null ? "" : vm(f) >= 0 ? "sube" : "baja"}">${pct(vm(f))}</td>
+        <td class="n">${soles(f.acum_b)}</td><td class="n">${soles(f.acum_a)}</td><td class="n ${va(f) == null ? "" : va(f) >= 0 ? "sube" : "baja"}">${pct(va(f))}</td>${inv ? `<td class="n">${soles(f.pim)}</td><td>${avanceBarra(f.avance, parejo)}</td>` : ""}</tr>`;
       const titulo = inv ? "INVERSIÓN PÚBLICA" : "GASTO CORRIENTE NO FINANCIERO";
       const inei = !!(j.ipc && String(j.ipc.fuente || "").startsWith("INEI")), hastaIpc = j.ipc && j.ipc.hasta ? ` (hasta ${esc(etqMes(j.ipc.hasta))})` : "";
       const nota = `${real ? `Var. % real: deflactada con el índice mensual del IPC de Lima Metropolitana ${inei ? "del INEI, base dic. 2021 = 100" : `(respaldo: ${esc((j.ipc && j.ipc.fuente) || "")}; sube el Excel del INEI en «Actualizar»)`}${hastaIpc}`
-        : `Var. % nominal: falta el IPC de Lima del mes${hastaIpc}. Sube el Excel del INEI (n01_indice-precios_al_consumidor-lm_….xlsx) en «Actualizar»`}. Millones de soles corrientes.`;
+        : `Var. % nominal: falta el IPC de Lima del mes${hastaIpc}. Sube el Excel del INEI (n01_indice-precios_al_consumidor-lm_….xlsx) en «Actualizar»`}. Soles corrientes.`;
       const comp = c.participacion, sumaP = comp.reduce((s, p) => s + (p.valor || 0), 0);
       caja.innerHTML = `${selectorEjec(c, clave, `<button class="btn" type="button" id="${clave}-x">Descargar en Excel</button>`)}
         ${tiles}
-        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ${titulo} POR NIVEL DE GOBIERNO</h3><p>(Millones de soles y variación % ${real ? "real" : "nominal"})</p>
+        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ${titulo} POR NIVEL DE GOBIERNO</h3><p>(Soles y variación % ${real ? "real" : "nominal"})</p>
           <div class="scroll"><table>${cab}${c.niveles.map(fila).join("")}</table></div><p class="nota">${nota}${inv ? " La marca en la barra de avance es el ritmo parejo (meses transcurridos / 12)." : ""}</p></div>
         <div class="caja"><h3>Mes a mes · ${a} vs ${b}</h3><p>(Millones de soles)</p>${leyenda([["anio-a", a], ["anio-b", b]])}<div class="scroll">${barrasAnios(c.mensual, a, b)}</div></div>
           <div class="caja"><h3>Acumulado del año · ${a} vs ${b}</h3><p>(Millones de soles)</p>${leyenda([["anio-a", a], ["anio-b", b]])}<div class="scroll">${lineas([{ nombre: String(b), clase: "anio-b", valores: c.mensual.acum_b }, { nombre: String(a), clase: "anio-a", valores: c.mensual.acum_a }], c.mensual.meses, "")}</div></div>
@@ -908,9 +909,9 @@
           <div class="caja"><h3>Variación % ${real ? "real" : "nominal"} respecto al mismo mes del año anterior</h3><p>(Total de los tres niveles)</p><div id="${clave}-ia"></div></div>
           <div class="caja"><h3>Participación por nivel · Ene.-${m3}. ${a}</h3><p>(% del total)</p>
             <div class="participa">${comp.map((p, i) => `<div class="niv-${i}" style="flex:${Math.max(p.valor || 0, 0.0001)}" title="${esc(p.nivel)}: ${pct(p.pct)} %"><b>${esc(p.nivel)}</b><span>${pct(p.pct)} %</span></div>`).join("")}</div>
-            <table class="mini">${comp.map((p, i) => `<tr><td><i class="cuadro niv-${i}"></i>${esc(p.nivel)}</td><td class="n">S/ ${mill(p.valor)} mill.</td><td class="n">${pct(p.pct)} %</td></tr>`).join("")}<tr class="total"><td>Total</td><td class="n">S/ ${mill(sumaP)} mill.</td><td class="n">100,0 %</td></tr></table></div>
+            <table class="mini">${comp.map((p, i) => `<tr><td><i class="cuadro niv-${i}"></i>${esc(p.nivel)}</td><td class="n">S/ ${soles(p.valor)}</td><td class="n">${pct(p.pct)} %</td></tr>`).join("")}<tr class="total"><td>Total</td><td class="n">S/ ${soles(sumaP)}</td><td class="n">100,0 %</td></tr></table></div>
         </div>
-        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ${titulo} POR ${inv ? "FUNCIÓN" : "GENÉRICA"}</h3><p>(Millones de soles y variación % ${real ? "real" : "nominal"}${inv ? "; 16: Comunicaciones va en 15: Transporte" : ""})</p>
+        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ${titulo} POR ${inv ? "FUNCIÓN" : "GENÉRICA"}</h3><p>(Soles y variación % ${real ? "real" : "nominal"}${inv ? "; 16: Comunicaciones va en 15: Transporte" : ""})</p>
           <div class="scroll"><table>${cab}${c.detalle.map(fila).join("")}</table></div></div>`;
       const g = c.interanual.map((x) => ({ periodo: x.periodo, var: real ? x.var : x.var_nominal })).filter((x) => x.var != null);
       $(`${clave}-ia`).innerHTML = barrasVar(g, 380);
@@ -928,15 +929,15 @@
       if (!v) { caja.innerHTML = '<div class="vacio-caja"><b>Todavía no hay inversión del MEF cargada.</b></div>'; return; }
       const anios = [...new Set(MESES.map((m) => +m.slice(0, 4)))].filter((x) => x < v.anio && x >= v.anio - 5);
       const comp = v.comparaciones.find((x) => x.clave === st.vista) || v.comparaciones[0];
-      const lista = (items, signo, max) => items.length ? items.map((f, i) => `<tr><td class="n">${i + 1}</td><td>${esc(f.item)}</td><td class="n">${mill(f.antes)}</td><td class="n">${mill(f.ahora)}</td>
-          <td class="dif"><div class="difbar ${f.dif >= 0 ? "sube" : "baja"}"><i style="width:${Math.abs(f.dif) / max * 100}%"></i><span>${f.dif >= 0 ? "+" : ""}${mill(f.dif)}</span></div></td><td class="n">${pct(f.var)}</td></tr>`).join("")
+      const lista = (items, signo, max) => items.length ? items.map((f, i) => `<tr><td class="n">${i + 1}</td><td>${esc(f.item)}</td><td class="n">${soles(f.antes)}</td><td class="n">${soles(f.ahora)}</td>
+          <td class="dif"><div class="difbar ${f.dif >= 0 ? "sube" : "baja"}"><i style="width:${Math.abs(f.dif) / max * 100}%"></i><span>${f.dif >= 0 ? "+" : ""}${soles(f.dif)}</span></div></td><td class="n">${pct(f.var)}</td></tr>`).join("")
         : `<tr><td></td><td colspan="5" class="nota">Ningún ítem en la lista de ${signo}.</td></tr>`;
       const bloques = comp.bloques.map((bl) => {
         if (bl.sin_datos) return `<div class="caja"><h3>${esc(bl.nombre)}</h3><p class="nota">Sin datos para comparar${bl.falta && bl.falta.length ? ` (falta ${esc(bl.falta.join(", "))})` : ""}.</p></div>`;
         const max = Math.max(1e-9, ...[...bl.aumentos, ...bl.caidas].map((f) => Math.abs(f.dif))), t = bl.total;
         return `<div class="caja var-bloque"><div class="fila" style="justify-content:space-between;align-items:baseline"><h3>${esc(bl.nombre)}</h3>
-            <div class="var-total"><span>Total: S/ ${mill(t.antes)} → ${mill(t.ahora)} mill.</span><b class="${t.dif >= 0 ? "sube" : "baja"}">${t.dif >= 0 ? "+" : ""}${mill(t.dif)} mill. (${pct(t.var)} %)</b></div></div>
-          <div class="scroll"><table><tr><th class="n">#</th><th>Ítem</th><th class="n">Antes</th><th class="n">Ahora</th><th>Diferencia (millones S/)</th><th class="n">Var. %</th></tr>
+            <div class="var-total"><span>Total: S/ ${soles(t.antes)} → ${soles(t.ahora)}</span><b class="${t.dif >= 0 ? "sube" : "baja"}">${t.dif >= 0 ? "+" : ""}${soles(t.dif)} (${pct(t.var)} %)</b></div></div>
+          <div class="scroll"><table><tr><th class="n">#</th><th>Ítem</th><th class="n">Antes</th><th class="n">Ahora</th><th>Diferencia (S/)</th><th class="n">Var. %</th></tr>
             <tr class="grupo"><td colspan="6"><b class="sube">▲ Mayores aumentos</b></td></tr>${lista(bl.aumentos, "aumentos", max)}
             <tr class="grupo"><td colspan="6"><b class="baja">▼ Mayores caídas</b></td></tr>${lista(bl.caidas, "caídas", max)}</table></div>
           ${bl.pocos ? '<p class="nota">No hay más ítems con inversión en estos periodos.</p>' : ""}</div>`;
@@ -944,7 +945,7 @@
       caja.innerHTML = `<div class="fila controles">
           <div class="segmento">${v.comparaciones.map((x) => `<button type="button" data-vista="${x.clave}" aria-pressed="${x.clave === comp.clave}">${x.clave === "mes" ? "Mes" : "Acumulado"}</button>`).join("")}</div>
           <label class="campo" for="${clave}-c">Comparar con<select id="${clave}-c">${anios.reverse().map((x) => `<option value="${x}"${x === v.comparar ? " selected" : ""}>${x}</option>`).join("")}</select></label></div>
-        <p class="lead">${esc(comp.titulo)} · inversión (genérica 2.6) en millones de soles corrientes. Ordenado por la diferencia en soles, no por %; la Var. % es referencial.</p>${bloques}`;
+        <p class="lead">${esc(comp.titulo)} · inversión (genérica 2.6) en soles corrientes. Ordenado por la diferencia en soles, no por %; la Var. % es referencial.</p>${bloques}`;
       caja.querySelectorAll("[data-vista]").forEach((bt) => bt.addEventListener("click", () => { st.vista = bt.dataset.vista; variacionesAlarmantes(r, caja); }));
       $(`${clave}-c`).addEventListener("change", (ev) => { st.comparar = ev.target.value; variacionesAlarmantes(r, caja); });
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron calcular las variaciones</b><span>${esc(e.message)}</span></div>`; }
@@ -957,11 +958,11 @@
       const boton = `<button class="btn sec" type="button" id="pr-lanzar">Volver a consultar al MEF</button>`;
       if (!j.proyectos) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no se consultaron los proyectos.</b><span>Se consultan solos al terminar cada corrida del scraper del MEF (unas 45 consultas, pocos minutos).</span></div><div class="fila">${boton}</div><div id="pr-res"></div>`; }
       else {
-        const sol = (v) => mill(v / 1e6);
+        const sol = (v) => v == null ? "" : Math.round(v).toLocaleString("es-PE");
         caja.innerHTML = `<div class="fila controles" style="justify-content:space-between"><p class="lead" style="margin:0">${esc(etqMes(j.periodo))} vs ${esc(etqMes(`${+j.periodo.slice(0, 4) - 1}${j.periodo.slice(4)}`))}: si el nivel subió, se abren las 5 funciones que más crecieron (proyectos del año actual); si bajó, las 5 que más cayeron (proyectos del año anterior).</p>${boton}</div><div id="pr-res"></div>
-          ${j.proyectos.map((n) => `<div class="caja"><div class="fila" style="justify-content:space-between;align-items:baseline"><h3>${esc(n.nivel)}</h3><b class="${n.diferencia >= 0 ? "sube" : "baja"}">${n.diferencia >= 0 ? "▲ +" : "▼ "}${sol(n.diferencia)} mill. · proyectos de ${esc(n.consultado)}</b></div>
-            ${n.funciones.length ? n.funciones.map((f) => `<details class="funcion" open><summary><b>${esc(f.funcion)}</b><span class="${f.diferencia >= 0 ? "sube" : "baja"}">${f.diferencia >= 0 ? "+" : ""}${sol(f.diferencia)} mill.</span><small>${sol(f.anterior)} → ${sol(f.actual)} mill.</small></summary>
-              ${f.proyectos.length ? `<div class="scroll"><table><tr><th class="n">#</th><th>Código</th><th>Proyecto</th><th class="n">Devengado (mill. S/)</th><th>% de la función</th></tr>${f.proyectos.map((p, i) => `<tr><td class="n">${i + 1}</td><td>${esc(p.codigo)}</td><td>${esc(p.proyecto)}</td><td class="n">${sol(p.devengado)}</td><td>${avanceBarra(p.pct, null)}</td></tr>`).join("")}</table></div>` : `<p class="nota">${esc(f.nota || "Sin proyectos")}</p>`}</details>`).join("")
+          ${j.proyectos.map((n) => `<div class="caja"><div class="fila" style="justify-content:space-between;align-items:baseline"><h3>${esc(n.nivel)}</h3><b class="${n.diferencia >= 0 ? "sube" : "baja"}">${n.diferencia >= 0 ? "▲ +" : "▼ "}${sol(n.diferencia)} · proyectos de ${esc(n.consultado)}</b></div>
+            ${n.funciones.length ? n.funciones.map((f) => `<details class="funcion" open><summary><b>${esc(f.funcion)}</b><span class="${f.diferencia >= 0 ? "sube" : "baja"}">${f.diferencia >= 0 ? "+" : ""}${sol(f.diferencia)}</span><small>${sol(f.anterior)} → ${sol(f.actual)}</small></summary>
+              ${f.proyectos.length ? `<div class="scroll"><table><tr><th class="n">#</th><th>Código</th><th>Proyecto</th><th class="n">Devengado (S/)</th><th>% de la función</th></tr>${f.proyectos.map((p, i) => `<tr><td class="n">${i + 1}</td><td>${esc(p.codigo)}</td><td>${esc(p.proyecto)}</td><td class="n">${sol(p.devengado)}</td><td>${avanceBarra(p.pct, null)}</td></tr>`).join("")}</table></div>` : `<p class="nota">${esc(f.nota || "Sin proyectos")}</p>`}</details>`).join("")
               : `<p class="nota">${esc(n.nota || "Sin funciones")}</p>`}</div>`).join("")}`;
       }
       $("pr-lanzar").addEventListener("click", async () => {
