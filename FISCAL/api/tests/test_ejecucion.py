@@ -308,3 +308,36 @@ def test_excel_de_los_cuadros_bcrp(datos):
     wb = load_workbook(io.BytesIO(datos.post("/v1/bcrp/excel", json={"tipo": "barras", "spec": g}).content))
     assert [c.value for c in next(row for row in wb.active.iter_rows() if row[0].value == "Jun. 2025")[:2]] == ["Jun. 2025", -27.2]
     assert datos.post("/v1/bcrp/excel", json={"tipo": "otro", "spec": {}}).status_code == 422
+
+
+def inei_xlsx(meses):
+    """El Excel del INEI: hoja «Base Dic2021» (Año solo en enero, Mes en letras, Índice) y otra de base anterior más corta."""
+    wb = Workbook()
+    nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"]
+    for titulo, base, hasta in (("Base Dic2021", "(Base Dic 2021 = 100)", None), ("Base 2009", "(Base 2009 = 100)", (2021, 12))):
+        ws = wb.active if titulo.startswith("Base Dic") else wb.create_sheet()
+        ws.title = titulo
+        ws.append(["INDICE DE PRECIOS AL CONSUMIDOR DE LIMA METROPOLITANA"]); ws.append([base]); ws.append([])
+        ws.append(["Año", "Mes", "Índice", "Mensual", "Acumulada", "Anual"])
+        for (a, m), v in sorted(meses.items()):
+            if hasta and (a, m) > hasta:
+                break
+            ws.append([a if m == 1 or (a, m) == min(meses) else None, nombres[m - 1], v * (1.4 if hasta else 1), "-", "-", "-"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_ipc_del_inei_manda(cliente, monkeypatch):  # noqa: F811
+    """El Excel del INEI se reconoce por su nombre y contenido; mientras esté cargado, el BCRP no lo reemplaza."""
+    meses = {(2025, m): 115.0 + m / 10 for m in range(1, 13)} | {(2026, m): 116.0 + m / 10 for m in range(1, 11)}
+    r = cliente.post("/v1/cargas", files=[("archivos", ("n01_indice-precios_al_consumidor-lm_oct26.xlsx", inei_xlsx(meses), "application/octet-stream"))])
+    assert any("IPC de Lima del INEI, 22 meses (2025-01 a 2026-10)" in a for a in r.json()["avisos"]), r.json()["avisos"]
+    e = cliente.get("/v1/ipc").json()
+    assert e["fuente"].startswith("INEI") and "Base Dic 2021" in e["fuente"] and e["hasta"] == "2026-10"
+    assert ipc.serie()["2026-10"] == 117.0                                          # la hoja de base dic. 2021, no la de 2009
+    monkeypatch.setattr(ipc, "de_bcrp", lambda serie=None: {"2026-10": 999.0, "2026-11": 999.5})
+    r = cliente.post("/v1/ipc/actualizar").json()
+    assert "se usa el del INEI" in r["mensaje"] and r["hasta"] == "2026-10" and ipc.serie()["2026-10"] == 117.0
+    monkeypatch.setattr(ipc, "_ultimo_intento", [0.0])
+    assert ipc.refrescar(hoy=date(2026, 12, 20)) is False                          # ni en la actualización automática
