@@ -212,7 +212,8 @@ def _barras_linea(ws, s):
     bar.dataLabels.showSerName = bar.dataLabels.showCatName = bar.dataLabels.showLegendKey = bar.dataLabels.showPercent = False
     bar.dataLabels.numFmt = fmt
     bar.y_axis.majorGridlines = None
-    bar.y_axis.delete = True
+    bar.y_axis.delete = False
+    bar.y_axis.numFmt = "#,##0.0"
     lin = LineChart()
     lin.add_data(Reference(ws, min_col=3, min_row=r, max_row=r + n), titles_from_data=True)
     sl = lin.series[0]
