@@ -299,6 +299,13 @@ Cada exportación se asigna al lote que operaba la empresa exportadora ese año.
 
 Falta el precio del crudo (Reuters), que no está en DATA. La pestaña **Mapa** muestra el mapa de lotes del flujo de
 hidrocarburos (`/v1/hidrocarburos/mapa`, aislado en un iframe), con botones de pantalla completa y descarga.
+En el celular (pantallas de hasta 700 px) la página le agrega al mapa un ajuste: el selector de capas empieza cerrado
+(se abre y cierra con el botón de capas; tocar el mapa lo cierra), con letra más chica y alto limitado. El mapa
+descargado queda tal como lo arma el notebook.
+
+Los CSV del almacén (pestaña «Actualizar») se bajan tal cual (UTF-8) o en **Excel** (`formato=xlsx`). Algunos visores,
+como Google Sheets en el celular o Excel con doble clic, leen el CSV como Latin-1 y muestran «AÃ‘O»: el Excel se abre
+bien en todos.
 
 ## Cuadros de pesca
 
