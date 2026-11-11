@@ -580,6 +580,13 @@ El mapa (colores de los lotes) no cambia.
 - Por defecto se incluye, como en la pestaña del lote: así el total coincide con el canon asignado al departamento.
 - El título de referencia pasa a «Loreto: Transferencias de canon y sobrecanon petrolero según beneficiario, 2015-2026» (o «según nivel de gobierno»).
 
+**Ficha del lote: «Descuento Ley 29289: Incluir / Excluir» (11/11/2026).** El selector de «Comparar lotes» también está en la
+pestaña «Canon y sobrecanon» de la ficha de cada lote, en las vistas del departamento («Por beneficiario» y «Por nivel de
+gobierno»), junto a «Desde» y «Hasta». Solo aparece si el departamento tiene ese descuento (Loreto, 2009–2023).
+- **Excluir** quita «Descuento: pago de deuda (Ley 29289)» del gráfico, de la tabla del año, del total y del CSV; el
+  alcance lo dice («Sin el descuento…: el total es lo que llegó a los beneficiarios»).
+- Por defecto se incluye. La elección se recuerda al abrir otro lote.
+
 **«Comparar lotes»: cuadro «mes y acumulado» (26/10/2026).** En la variable «Producción fiscalizada», el selector **«Formato»** ofrece **«Cuadro: mes y acumulado del año»**, al estilo de los cuadros del BCRP:
 - **Columnas:** estructura porcentual del año anterior · último mes con dato (año anterior, año actual y variación %) · acumulado de enero a ese mes (año anterior, año actual y variación %).
 - **Filas:** un lote por fila y el TOTAL en banda azul. Con lotes de varios departamentos, cada departamento lleva su subtotal en negrita.
