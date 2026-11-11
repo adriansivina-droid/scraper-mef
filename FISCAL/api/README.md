@@ -61,6 +61,11 @@ los cuadros y anexos del mes por región.
 - **Página más liviana**: las respuestas viajan comprimidas (gzip; la página pasa de 253 KB a 66 KB) y los estilos y
   scripts llevan su versión en la dirección, así el navegador los guarda y no los vuelve a pedir en cada visita.
   `/v1/estado` hace una consulta por base en vez de dos.
+- **Almacén en binario**: los archivos del almacén (`app/almacen.py`) se guardan comprimidos en una columna binaria
+  (`binario`); antes iban además en base64 en una de texto, que ocupa un tercio más. Lo guardado antes se sigue
+  leyendo tal cual. `almacen.convertir()` lo pasa a binario archivo por archivo, comprobando cada uno, y compacta la
+  tabla: en la prueba con Postgres, 73,0 → 54,8 MB (25 % menos). Corre con el flujo «Almacén · limpiar» (día 1 de cada
+  mes, o a mano con «aplicar»).
 
 ## Bases
 

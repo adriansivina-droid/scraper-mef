@@ -25,3 +25,39 @@ def test_limpiar(tmp_path, monkeypatch):
     assert {a["name"] for a in almacen.hijos(mapa)} == {"PP_OLEODUCTO_NORPERUANO.geojson", "PP_lotes_indicadores.geojson", "PP_mapa_lotes_plus.html"}
     assert almacen.hijos(C) == [] and almacen.limpiar(aplicar=True)["archivos"] == []
     db.reiniciar_motor()
+
+
+def test_convertir_de_texto_a_binario(tmp_path, monkeypatch):
+    """Lo guardado antes (zlib en base64, columna de texto) se sigue leyendo y `convertir` lo pasa a binario sin cambiar
+    un byte; un archivo dañado se deja como estaba."""
+    import base64
+    import os
+    import zlib
+
+    from sqlalchemy import text
+    monkeypatch.setenv("DATABASE_URL", os.environ.get("PRUEBA_DATABASE_URL") or f"sqlite:///{tmp_path / 'alm2.db'}")
+    db.reiniciar_motor()
+    with db.motor().begin() as cx:                      # la tabla como la creaba la versión anterior, sin «binario»
+        cx.execute(text("DROP TABLE IF EXISTS almacen"))
+        cx.execute(text("CREATE TABLE almacen (id TEXT PRIMARY KEY, nombre TEXT, padre TEXT, mime TEXT, contenido TEXT, tamano BIGINT, modificado TEXT)"))
+        viejo = {"v1": os.urandom(5000) + b"a" * 20000, "v2": "año;mes\n2026;11\n".encode("utf-8") * 300}
+        for i, datos in viejo.items():
+            cx.execute(text("INSERT INTO almacen VALUES (:i, :n, :p, 'text/csv', :c, :t, '2026-11-01T00:00:00Z')"),
+                       {"i": i, "n": i + ".csv", "p": almacen.CARPETA_DATA, "c": base64.b64encode(zlib.compress(datos, 6)).decode(), "t": len(datos)})
+        cx.execute(text("INSERT INTO almacen VALUES ('malo', 'malo.csv', :p, 'text/csv', 'no-es-base64-valido', 10, '2026-11-01T00:00:00Z')"),
+                   {"p": almacen.CARPETA_DATA})
+    almacen._tabla_lista = None
+    assert almacen.leer("v1") == viejo["v1"] and almacen.descargar("v2") == ("v2.csv", viejo["v2"])   # se lee sin convertir
+    nuevo = almacen.crear("nuevo.csv", almacen.CARPETA_DATA, b"n" * 4000)
+    prueba = almacen.convertir(aplicar=False)
+    assert prueba["pendientes"] == 3 and prueba["convertidos"] == 0 and not prueba["aplicado"]
+    r = almacen.convertir()
+    assert r["convertidos"] == 2 and r["sin_tocar"] == ["malo.csv"]
+    assert almacen.leer("v1") == viejo["v1"] and almacen.leer("v2") == viejo["v2"] and almacen.leer(nuevo) == b"n" * 4000
+    with db.motor().connect() as cx:
+        filas = dict(cx.execute(text("SELECT id, contenido IS NULL FROM almacen")).all())
+    assert filas["v1"] and filas["v2"] and filas[nuevo] and not filas["malo"]
+    assert almacen.convertir()["convertidos"] == 0                       # repetirlo no hace nada
+    almacen.reemplazar("v1", b"otro")
+    assert almacen.leer("v1") == b"otro" and {a["name"] for a in almacen.hijos(almacen.CARPETA_DATA)} == {"v1.csv", "v2.csv", "malo.csv", "nuevo.csv"}
+    db.reiniciar_motor()

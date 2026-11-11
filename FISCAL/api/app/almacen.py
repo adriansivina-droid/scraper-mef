@@ -8,7 +8,8 @@ corren sin cambios (HIDROCARBUROS/automatizacion/ejecutar_notebooks.py lo instal
 
 `sincronizar` carga en las bases de la página lo nuevo de DATA (producción de líquidos, gas y diaria por lote, canon
 por departamento) y el mapa de lotes. La corre el mismo flujo al terminar, y el botón de la página.
-Los archivos van comprimidos (zlib) y en base64, en una columna de texto (igual en Postgres y en SQLite).
+Los archivos van comprimidos (zlib) en la columna binaria «binario». Antes iban además en base64 en la columna de
+texto «contenido», que ocupa un tercio más: lo guardado así se sigue leyendo, y `convertir()` lo pasa a binario.
 
 Excepción: DATA/PDF (los PDF anuales de PERUPETRO, ~450 MB, públicos y que el notebook vuelve a bajar si faltan) no va a
 la base, para no llenarla: si ALMACEN_LOCAL apunta a una carpeta, se guarda allí (en GitHub Actions, la caché del flujo).
@@ -24,7 +25,7 @@ import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from . import carga, db, hidrocarburos
 
@@ -45,17 +46,32 @@ def _ahora():
     return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
+_tabla_lista = None                                      # el motor para el que ya se comprobó la tabla
+
+
 def _tabla():
-    with db.motor().begin() as cx:
+    """Crea la tabla si falta y, a una tabla anterior, le agrega la columna «binario». Una sola vez por conexión."""
+    global _tabla_lista
+    m = db.motor()
+    if _tabla_lista is m:
+        return
+    binario = "BYTEA" if m.dialect.name == "postgresql" else "BLOB"
+    with m.begin() as cx:
         cx.execute(text("CREATE TABLE IF NOT EXISTS almacen (id TEXT PRIMARY KEY, nombre TEXT, padre TEXT, mime TEXT, "
-                        "contenido TEXT, tamano BIGINT, modificado TEXT)"))
+                        f"contenido TEXT, tamano BIGINT, modificado TEXT, binario {binario})"))
+        if "binario" not in {c["name"] for c in inspect(cx).get_columns("almacen")}:
+            cx.execute(text(f"ALTER TABLE almacen ADD COLUMN binario {binario}"))
+    _tabla_lista = m
 
 
 def _codificar(datos):
-    return base64.b64encode(zlib.compress(datos, 6)).decode("ascii")
+    return zlib.compress(datos, 6)
 
 
-def _decodificar(texto):
+def _decodificar(binario, texto=None):
+    """Los bytes del archivo: de la columna binaria o, en lo guardado antes, de la de texto (zlib en base64)."""
+    if binario is not None:
+        return zlib.decompress(bytes(binario))
     return zlib.decompress(base64.b64decode(texto)) if texto else b""
 
 
@@ -117,7 +133,7 @@ def crear(nombre, padre, contenido=None, mime=None, id_=None, modificado=None):
     id_ = id_ or uuid.uuid4().hex
     with db.motor().begin() as cx:
         cx.execute(text("DELETE FROM almacen WHERE id = :i"), {"i": id_})
-        cx.execute(text("INSERT INTO almacen (id, nombre, padre, mime, contenido, tamano, modificado) "
+        cx.execute(text("INSERT INTO almacen (id, nombre, padre, mime, binario, tamano, modificado) "
                         "VALUES (:i, :n, :p, :m, :c, :t, :f)"),
                    {"i": id_, "n": nombre, "p": padre, "m": mime or "application/octet-stream",
                     "c": None if contenido is None else _codificar(contenido), "t": len(contenido or b""), "f": modificado or _ahora()})
@@ -139,7 +155,7 @@ def reemplazar(id_, contenido, nombre=None):
         ruta.write_bytes(contenido)
         return
     with db.motor().begin() as cx:
-        r = cx.execute(text("UPDATE almacen SET contenido = :c, tamano = :t, modificado = :f" + (", nombre = :n" if nombre else "")
+        r = cx.execute(text("UPDATE almacen SET binario = :c, contenido = NULL, tamano = :t, modificado = :f" + (", nombre = :n" if nombre else "")
                             + " WHERE id = :i"),
                        {"c": _codificar(contenido), "t": len(contenido), "f": _ahora(), "n": nombre, "i": id_})
     if r.rowcount == 0:
@@ -154,10 +170,10 @@ def leer(id_):
             raise FileNotFoundError(id_)
         return ruta.read_bytes()
     with db.motor().connect() as cx:
-        r = cx.execute(text("SELECT contenido FROM almacen WHERE id = :i"), {"i": id_}).first()
+        r = cx.execute(text("SELECT binario, contenido FROM almacen WHERE id = :i"), {"i": id_}).first()
     if r is None:
         raise FileNotFoundError(f"no hay ningún archivo {id_} en el almacén")
-    return _decodificar(r[0])
+    return _decodificar(r[0], r[1])
 
 
 def resumen():
@@ -350,10 +366,10 @@ def descargar(id_):
     """(nombre, bytes) de un archivo del almacén, para bajarlo desde la página."""
     _tabla()
     with db.motor().connect() as cx:
-        r = cx.execute(text("SELECT nombre, contenido, mime FROM almacen WHERE id = :i"), {"i": id_}).first()
-    if r is None or r[2] == CARPETA:
+        r = cx.execute(text("SELECT nombre, mime, binario, contenido FROM almacen WHERE id = :i"), {"i": id_}).first()
+    if r is None or r[1] == CARPETA:
         raise FileNotFoundError(id_)
-    return r[0], _decodificar(r[1])
+    return r[0], _decodificar(r[2], r[3])
 
 
 def arbol():
@@ -382,7 +398,7 @@ def duplicados():
     -> [{id, nombre, carpeta, kb_guardado, motivo}]"""
     _tabla()
     with db.motor().connect() as cx:
-        filas = cx.execute(text("SELECT id, nombre, padre, mime, modificado, LENGTH(contenido) FROM almacen")).all()
+        filas = cx.execute(text("SELECT id, nombre, padre, mime, modificado, COALESCE(LENGTH(binario), LENGTH(contenido)) FROM almacen")).all()
     nombres = {i: n for i, n, *_ in filas}
     salida = []
     por_carpeta = {}
@@ -414,6 +430,46 @@ def duplicados():
     return sorted(salida, key=lambda x: -x["kb_guardado"])
 
 
+def _compactar():
+    """En Postgres, VACUUM FULL: devuelve a Neon el espacio de lo borrado o convertido."""
+    if db.motor().dialect.name == "postgresql":
+        with db.motor().connect().execution_options(isolation_level="AUTOCOMMIT") as cx:
+            cx.execute(text("VACUUM FULL almacen"))
+
+
+def convertir(aplicar=True):
+    """Pasa a la columna binaria lo que quedó guardado en texto (zlib en base64, un tercio más grande). Archivo por
+    archivo, cada uno en su transacción: antes de escribir comprueba que el binario se descomprime y mide lo que dice
+    «tamano»; si no, lo deja como estaba. Se puede cortar y repetir. -> {aplicado, pendientes, convertidos, sin_tocar, mb_antes, mb_despues}"""
+    _tabla()
+    with db.motor().connect() as cx:
+        ids = cx.execute(text("SELECT id, nombre, tamano, LENGTH(contenido) FROM almacen WHERE contenido IS NOT NULL AND binario IS NULL")).all()
+    salida = {"aplicado": bool(aplicar), "pendientes": len(ids), "convertidos": 0, "sin_tocar": [],
+              "mb_antes": round(sum(x[3] or 0 for x in ids) / 2**20, 1), "mb_despues": 0.0}
+    despues = 0
+    for id_, nombre, tamano, _ in ids:
+        with db.motor().begin() as cx:
+            r = cx.execute(text("SELECT contenido FROM almacen WHERE id = :i AND binario IS NULL"), {"i": id_}).first()
+            if r is None or r[0] is None:
+                continue                              # otra corrida ya lo convirtió o lo reemplazó
+            try:
+                binario = base64.b64decode(r[0])
+                bien = len(zlib.decompress(binario)) == int(tamano or 0)
+            except Exception:
+                bien = False
+            if not bien:
+                salida["sin_tocar"].append(nombre)
+                continue
+            despues += len(binario)
+            if aplicar:
+                cx.execute(text("UPDATE almacen SET binario = :b, contenido = NULL WHERE id = :i"), {"b": binario, "i": id_})
+                salida["convertidos"] += 1
+    salida["mb_despues"] = round(despues / 2**20, 1)
+    if aplicar and salida["convertidos"]:
+        _compactar()
+    return salida
+
+
 def limpiar(aplicar=False):
     """Borra lo que da duplicados() y compacta la tabla (en Postgres, VACUUM FULL para devolver el espacio a Neon)."""
     lista = duplicados()
@@ -421,7 +477,5 @@ def limpiar(aplicar=False):
         with db.motor().begin() as cx:
             for x in lista:
                 cx.execute(text("DELETE FROM almacen WHERE id = :i"), {"i": x["id"]})
-        if db.motor().dialect.name == "postgresql":
-            with db.motor().connect().execution_options(isolation_level="AUTOCOMMIT") as cx:
-                cx.execute(text("VACUUM FULL almacen"))
+        _compactar()
     return {"aplicado": bool(aplicar), "archivos": lista, "mb_liberados": round(sum(x["kb_guardado"] for x in lista) / 1024, 1)}
