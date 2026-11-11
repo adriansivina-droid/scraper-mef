@@ -6,7 +6,7 @@
 #   · a mano: Actions → «Fiscal · scraper del MEF» → Run workflow (eliges el periodo) o el botón «Actualizar desde el MEF»
 # Requiere el secreto DATABASE_URL. Los CSV quedan como artefacto de la corrida (30 días).
 name: Fiscal · scraper del MEF
-run-name: "Scraper del MEF · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
+run-name: "Scraper del MEF · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.superficial && ' · solo función y genérica' || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
 
 on:
   schedule:
@@ -23,6 +23,10 @@ on:
         default: ""
       prueba:
         description: "Prueba rápida (solo el mes «desde» y Loreto; no carga en la base)"
+        type: boolean
+        default: false
+      superficial:
+        description: "Años anteriores para los gráficos: solo devengado por función y genérica de LOR, SMN y UCA (sin PIM ni detalle municipal), en 3 jobs"
         type: boolean
         default: false
       consultas:
@@ -43,7 +47,7 @@ jobs:
       max-parallel: 1                    # los tramos van uno tras otro (en paralelo serían 6 consultas al MEF)
       fail-fast: false
       matrix:
-        tramo: [1, 2]
+        tramo: [1, 2, 3]                 # el 3 solo con «superficial» (periodos largos de años anteriores)
     name: raspar (tramo ${{ matrix.tramo }})
     runs-on: ubuntu-latest
     timeout-minutes: 355                 # máximo de GitHub: 360 (con 25 departamentos, mejor un año por corrida)
@@ -65,11 +69,19 @@ jobs:
           DESDE: ${{ inputs.desde }}
           HASTA: ${{ inputs.hasta }}
           PRUEBA: ${{ inputs.prueba }}
+          SUPERFICIAL: ${{ inputs.superficial }}
           FISCAL_WORKERS: ${{ inputs.consultas || '3' }}
           TRAMO: ${{ matrix.tramo }}
           FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
           PYTHONUNBUFFERED: "1"            # el avance se ve en vivo en los registros (sin esto sale todo al final)
         run: |
+          if [ "$SUPERFICIAL" = "true" ] && [ "$PRUEBA" != "true" ]; then
+            # años anteriores: el periodo elegido, partido en 3 jobs seguidos
+            [ -z "$DESDE" ] || [ -z "$HASTA" ] && { echo "::error::Con «superficial» hay que poner desde y hasta"; exit 1; }
+            python FISCAL/automatizacion/scraper_servidor.py --superficial --desde "$DESDE" --hasta "$HASTA" --partes 3 --tramo "$TRAMO"
+            exit $?
+          fi
+          [ "$TRAMO" = "3" ] && { echo "El tramo 3 es solo para corridas «superficial»."; exit 0; }
           if [ -n "$DESDE$HASTA" ] || [ "$PRUEBA" = "true" ]; then
             # con periodo elegido (o prueba) corre todo en el tramo 1
             [ "$TRAMO" = "2" ] && { echo "Periodo elegido a mano: todo va en el tramo 1."; exit 0; }
@@ -79,6 +91,7 @@ jobs:
           [ -n "$DESDE" ] && args+=(--desde "$DESDE")
           [ -n "$HASTA" ] && args+=(--hasta "$HASTA")
           [ "$PRUEBA" = "true" ] && args+=(--prueba)
+          [ "$SUPERFICIAL" = "true" ] && args+=(--superficial)
           python FISCAL/automatizacion/scraper_servidor.py "${args[@]}"
 
       - name: Guardar los CSV como artefacto

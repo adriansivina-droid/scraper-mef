@@ -3,6 +3,8 @@
     python FISCAL/automatizacion/scraper_servidor.py                       # año en curso hasta el último mes cerrado
     python FISCAL/automatizacion/scraper_servidor.py --desde 2025-01 --hasta 2026-09
     python FISCAL/automatizacion/scraper_servidor.py --prueba              # PRUEBA_RAPIDA del notebook: un mes, Loreto
+    python FISCAL/automatizacion/scraper_servidor.py --superficial --desde 2022-10 --hasta 2024-12 --partes 3 --tramo 1
+        # años anteriores para los gráficos: solo función y genérica de las tres regiones (sin PIM ni detalle municipal)
     python FISCAL/automatizacion/scraper_servidor.py --archivo pim-funcion --desde 2026-01   # solo un archivo (ver ARCHIVOS)
     python FISCAL/automatizacion/scraper_servidor.py --archivo dev-municipalidad --desde 2025-01 --hasta 2025-12 \
         --departamentos 02 --funciones 15      # remiendo: solo esas funciones (la página deja las demás como estaban)
@@ -37,6 +39,12 @@ ARCHIVOS = {
     "pim-municipalidad": {"nombre": "PIM Funcion.Municipalidad", "anual": True,
                           "fijar": {"BLOQUES_MENSUALES": [], "BLOQUES_ANUALES": ["PIM_Municipalidad"]}},
 }
+# Años anteriores, solo lo que piden los cuadros y gráficos (variación interanual y acumulada 12 meses): devengado por
+# función (inversión) y por genérica y deuda (gasto corriente) de Loreto, San Martín y Ucayali. Sin PIM, fuentes ni el
+# detalle por municipalidad (en gobiernos locales se baja para sumarlo por función, pero no se guarda).
+SUPERFICIAL = {"BLOQUES_MENSUALES": ["Funcion", "Generica", "Deuda"], "BLOQUES_ANUALES": []}
+REGIONES = ["16", "22", "25"]
+NO_GUARDAR_SUPERFICIAL = {"inv-dev-municipalidad"}
 
 
 def periodo_por_defecto(hoy=None):
@@ -173,13 +181,16 @@ def periodo_anual(desde, hasta, hoy=None):
 AVANCE = [None]
 
 
-def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=None):
+def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=None, superficial=False):
     a0, m0 = map(int, desde.split("-"))
     a1, m1 = map(int, hasta.split("-"))
     fijar = {"PRUEBA_RAPIDA": prueba, "AÑO_INICIO": a0, "MES_INICIO": m0, "AÑO_FIN": a1, "MES_FIN": m1,
              "WORKERS": int(os.environ.get("FISCAL_WORKERS", "3"))}   # consultas simultáneas: con 6, el MEF devolvió páginas cruzadas (2026)
     if archivo:
         fijar.update(ARCHIVOS[archivo]["fijar"])
+    if superficial:
+        fijar.update(SUPERFICIAL)
+        departamentos = departamentos or REGIONES
     fijar["DEPARTAMENTOS_NACIONAL"] = departamentos or "TODOS"   # en el servidor, los 25 salvo que se pidan otros
                                                                   # (en Colab el notebook trae Loreto, San Martín y Ucayali)
     if funciones:
@@ -197,11 +208,11 @@ def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=Non
     return TRABAJO / "Fiscal" / "Scrapeo" / "output"
 
 
-def cargar(carpeta):
+def cargar(carpeta, excluir=()):
     sys.path.insert(0, str(FISCAL / "api"))
     from app import carga
     archivos = [(str(p.relative_to(carpeta)), p.read_bytes()) for p in sorted(carpeta.rglob("*.csv"))]
-    return carga.cargar(f"scraper en GitHub Actions ({datetime.now():%Y-%m-%d %H:%M})", archivos)
+    return carga.cargar(f"scraper en GitHub Actions ({datetime.now():%Y-%m-%d %H:%M})", archivos, excluir=excluir)
 
 
 def main():
@@ -213,6 +224,8 @@ def main():
     ap.add_argument("--tramo", type=int, choices=[1, 2, 3, 4], help="sin --desde/--hasta: 1 = enero-junio, 2 = julio-último mes cerrado; "
                     "con --partes: el tramo del periodo que toca a este job")
     ap.add_argument("--partes", type=int, choices=[2, 3, 4], help="con --desde/--hasta y --tramo: parte el periodo en tramos seguidos (un job cada uno)")
+    ap.add_argument("--superficial", action="store_true", help="años anteriores: solo función y genérica de las tres regiones, "
+                    "sin PIM, fuentes ni detalle municipal (para los gráficos de variación)")
     ap.add_argument("--archivo", choices=list(ARCHIVOS), help="solo ese archivo de los 25 departamentos (sin el resto de la base fiscal)")
     ap.add_argument("--departamentos", default="", help="con --archivo: TODOS (por defecto) o códigos separados por comas, p. ej. 16,22,25")
     ap.add_argument("--funciones", default="", help="con --archivo dev-municipalidad: remiendo de solo esas funciones, p. ej. 13,15 "
@@ -248,12 +261,14 @@ def main():
         desde, hasta = t
     if a.prueba:
         hasta = desde
-    titulo = f"{ARCHIVOS[a.archivo]['nombre']} · " if a.archivo else ""
+    if a.superficial and a.archivo:
+        sys.exit("--superficial no va con --archivo")
+    titulo = f"{ARCHIVOS[a.archivo]['nombre']} · " if a.archivo else "solo función y genérica · " if a.superficial else ""
     rango = f"{desde[:4]} a {hasta[:4]}" if anual and desde[:4] != hasta[:4] else desde[:4] if anual else f"{desde} a {hasta}"
     lineas = [f"## Scraper del MEF · {titulo}{rango}{' · ' + ', '.join(deps) if deps else ''}{' · funciones ' + ', '.join(funcs) if funcs else ''}{' · PRUEBA' if a.prueba else ''} · {datetime.now():%d/%m/%Y %H:%M}", ""]
     t0, ok = time.time(), True
     try:
-        carpeta = raspar(desde, hasta, a.prueba, a.archivo, deps, funcs)
+        carpeta = raspar(desde, hasta, a.prueba, a.archivo, deps, funcs, a.superficial)
         csvs = sorted(carpeta.rglob("*.csv"))
         logs = [p.name for p in csvs if p.name.startswith("LOG")]
         lineas.append(f"**Raspado: ✅** {len(csvs)} archivos en {(time.time() - t0) / 60:.1f} min.")
@@ -267,7 +282,7 @@ def main():
         else:
             if AVANCE[0]:
                 AVANCE[0].avisar("Cargando en la base de datos…", 0.99, forzar=True)
-            r = cargar(carpeta)
+            r = cargar(carpeta, NO_GUARDAR_SUPERFICIAL if a.superficial else ())
             lineas += ["**Carga en la base de datos: ✅**", "", "| Base | Filas | Periodos |", "|---|---|---|"]
             lineas += [f"| {b} | {x['filas']:,} | {x['periodos'][0]} a {x['periodos'][-1]} |" for b, x in r["bases"].items()]
             lineas += [f"- {x}" for x in r["avisos"]]
