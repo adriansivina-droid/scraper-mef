@@ -322,3 +322,40 @@ tr.apagada td { color: var(--mid); opacity: .7; }
 .zona-subida input { margin-top: 6px; font-size: 13px; }
 
 tr.nueva-region td { border-top: 2px solid var(--hair); }
+
+/* ── subida de archivos: zona para arrastrar, lista de elegidos y avance ── */
+.solo-lector { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip-path: inset(50%); }
+.zona-subida { position: relative; padding: 26px 18px; transition: border-color .15s, background .15s; }
+.zona-subida:focus-within { border-color: var(--teal); }
+.zona-subida.sobre { border-color: var(--teal); border-style: solid; background: var(--panel); }
+.zona-subida.ocupada { pointer-events: none; opacity: .55; }
+.elegidos { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.elegidos li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--hair); border-radius: 8px; padding: 6px 6px 6px 12px; font-size: 13px; background: var(--paper); }
+.elegidos li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.elegidos li small { color: var(--mid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.elegidos li.mal { border-color: var(--error); }
+.elegidos li.mal small { color: var(--error); }
+.elegidos button { border: 0; background: none; cursor: pointer; font-size: 18px; line-height: 1; width: 26px; height: 26px; border-radius: 6px; color: var(--mid); }
+.elegidos button:hover { background: var(--canvas); color: var(--ink); }
+.rojo { color: var(--error); }
+.avance { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.avance .medidor { height: 8px; margin-top: 0; }
+.avance .medidor span { transition: width .2s; }
+.avance .medidor span.vaiven { animation: vaiven 1.2s ease-in-out infinite alternate; }
+@keyframes vaiven { from { opacity: .45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .avance .medidor span.vaiven { animation: none; } }
+
+/* ── guía de uso ── */
+.ayuda { font-size: 13px; font-weight: 600; text-decoration: none; border: 1px solid var(--hair); border-radius: 999px; padding: 6px 12px; color: var(--navy); white-space: nowrap; }
+.ayuda:hover { border-color: var(--s2); background: var(--panel); }
+.pasos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.pasos > div { display: flex; flex-direction: column; gap: 6px; background: var(--paper); border: 1px solid var(--hair); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: var(--mid); line-height: 1.5; }
+.pasos > div > b { color: var(--navy); font-size: 15px; }
+.pasos span b { color: var(--ink); }
+.pasos i { font-style: normal; font-family: var(--display); font-size: 20px; color: var(--teal); line-height: 1; }
+.pasos .dot { margin: 0 2px; vertical-align: middle; }
+.glosario { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 14px 28px; }
+.glosario dt { font-weight: 600; color: var(--navy); }
+.glosario dd { margin: 2px 0 0; font-size: 13px; color: var(--mid); line-height: 1.5; }
+
+@media (max-width: 700px) { iframe.mapa { height: 82vh; min-height: 420px; } .mapa-caja > .fila p { font-size: 13px; } }

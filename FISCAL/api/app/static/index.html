@@ -16,6 +16,7 @@
   <div class="brand"><img class="mark logo" src="/static/logo_bcrp.svg" alt="Logo del BCRP" width="40" height="40"><div><b>Departamento de Estudios Económicos</b><span>BCRP · Sucursal Iquitos · Síntesis de Actividad Económica</span></div></div>
   <nav class="grupos" id="grupos" aria-label="Regiones"></nav>
   <div class="hasta" id="datos-hasta"></div>
+  <a class="ayuda" href="#tres-guia" title="Cómo usar la página">Guía de uso</a>
 </header>
 
 <div class="selector-movil"><label class="campo" for="sel-movil">Sección</label><select id="sel-movil"></select></div>
@@ -94,9 +95,9 @@
     lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
     smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
     uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
-    tres: { comun: true, indice: [{ id: "panorama" }, cap("Empleo", ["empleo-total", "empleo-sectores", "empleo-long"]), cap("MEF", ["mef-archivos", "bases-mef"]), cap("Comparar regiones", ["bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
+    tres: { comun: true, indice: [{ id: "panorama" }, { id: "guia" }, cap("Empleo", ["empleo-total", "empleo-sectores", "empleo-long"]), cap("MEF", ["mef-archivos", "bases-mef"]), cap("Comparar regiones", ["bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
-  const C = { panorama: "Panorama de las tres regiones", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-total": "Empleo · total por región", "empleo-sectores": "Empleo · por sectores", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
+  const C = { panorama: "Panorama de las tres regiones", guia: "Guía de uso", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-total": "Empleo · total por región", "empleo-sectores": "Empleo · por sectores", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
               "act-empleo": "Scraper de empleo", "act-hidro": "Hidrocarburos (PERUPETRO)", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
   const CORTO = { [V]: "IV. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
@@ -1472,26 +1473,66 @@
     return `<div class="${ok ? "ok-box" : "err-box"}"><b>${esc(tit)}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
   }
   const IPC_TXT = "El IPC de Lima Metropolitana del INEI tal como se publica (n01_indice-precios_al_consumidor-lm_<mes><año>.xlsx, hoja «Base Dic2021»: Año, Mes, Índice). Con su índice mensual se deflacta el gasto y la inversión (variación % real). Cada mes se sube el nuevo: reemplaza la serie cargada; mientras esté el del INEI, el BCRP no la reemplaza.";
+  // ── Subida de archivos: arrastrar o elegir, lista con pesos, barra de avance y aviso si pasa del máximo ──
+  const MAX_SUBIDA_MB = 200, EXT_OK = /\.(zip|csv|xlsx|xlsm)$/i;
+  const peso = (b) => b >= 1048576 ? `${(b / 1048576).toLocaleString("es-PE", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
   function cajaSubida(clave, texto, lista) {
     return `<div class="caja"><h3>Subir archivos a mano</h3><p>${texto}</p>${lista ? `<div class="acepta">${lista.map(([t, d]) => `<div><b>${t}</b><span>${d}</span></div>`).join("")}</div>` : ""}
-      <label class="zona-subida" for="${clave}-arch"><b>Elige uno o varios archivos</b><span>.xlsx, .xlsm, .csv o .zip</span><input type="file" id="${clave}-arch" multiple accept=".zip,.csv,.xlsx,.xlsm"></label>
-      <div class="fila"><button class="btn" type="button" id="${clave}-subir">Cargar a la base de datos</button><span class="nota" id="${clave}-elegidos"></span></div><div id="${clave}-res" aria-live="polite"></div></div>`;
+      <label class="zona-subida" for="${clave}-arch" id="${clave}-zona"><b>Arrastra aquí los archivos o haz clic para elegirlos</b><span>.xlsx, .xlsm, .csv o .zip · varios a la vez · hasta ${MAX_SUBIDA_MB} MB por carga</span><input class="solo-lector" type="file" id="${clave}-arch" multiple accept=".zip,.csv,.xlsx,.xlsm"></label>
+      <ul class="elegidos" id="${clave}-lista"></ul>
+      <div class="fila"><button class="btn" type="button" id="${clave}-subir" disabled>Cargar a la base de datos</button><span class="nota" id="${clave}-elegidos">Todavía no elegiste archivos.</span></div><div id="${clave}-res" aria-live="polite"></div></div>`;
+  }
+  function enviarArchivos(datos, alAvanzar) {          // con XMLHttpRequest: es lo que informa cuánto se ha subido
+    return new Promise((ok, mal) => {
+      const x = new XMLHttpRequest(); x.open("POST", "/v1/cargas"); x.responseType = "json";
+      x.upload.onprogress = (e) => { if (e.lengthComputable) alAvanzar(e.loaded / e.total); };
+      x.upload.onload = () => alAvanzar(1);
+      x.onload = () => { const j = x.response || {};
+        if (x.status >= 200 && x.status < 300) ok(j);
+        else mal(new Error(typeof j.detail === "string" ? j.detail : x.status === 413 ? `Lo subido pasa de ${MAX_SUBIDA_MB} MB: súbelo en dos partes.` : x.status === 502 || x.status === 504 ? "La página tardó demasiado en responder. La carga puede haber terminado igual: revisa «Estado de la base de datos» antes de volver a subir." : `El servidor respondió ${x.status}.`)); };
+      x.onerror = () => mal(new Error("Se cortó la conexión con la página. Revisa el internet y vuelve a intentar."));
+      x.send(datos);
+    });
   }
   function atarSubida(clave) {
     if (!$(`${clave}-subir`)) return;
-    $(`${clave}-arch`).addEventListener("change", (ev) => { const f = [...ev.target.files]; $(`${clave}-elegidos`).textContent = f.length ? `${f.length} elegido${f.length > 1 ? "s" : ""}: ${f.map((x) => x.name).join(", ")}` : ""; });
-    $(`${clave}-subir`).addEventListener("click", async () => {
-      const archivos = $(`${clave}-arch`).files, res = $(`${clave}-res`);
-      if (!archivos.length) { res.innerHTML = '<div class="err-box"><b>Falta elegir los archivos</b></div>'; return; }
-      const datos = new FormData(); [...archivos].forEach((a) => datos.append("archivos", a));
-      const btn = $(`${clave}-subir`); btn.disabled = true; btn.textContent = "Cargando…";
-      res.innerHTML = '<div class="loading"><span class="spin"></span>Leyendo los archivos y guardando en la base de datos…</div>';
-      try { const r = await api("/v1/cargas", { method: "POST", body: datos }); const ok = Object.keys(r.bases).length > 0 || (r.avisos || []).some((a) => a.includes("gráficos DRAE guardados"));
+    const zona = $(`${clave}-zona`), entrada = $(`${clave}-arch`), btn = $(`${clave}-subir`), res = $(`${clave}-res`), nota = $(`${clave}-elegidos`);
+    let lista = [];
+    const pintar = () => {
+      const buenos = lista.filter((a) => EXT_OK.test(a.name)), total = buenos.reduce((t, a) => t + a.size, 0), pasa = total > MAX_SUBIDA_MB * 1048576;
+      $(`${clave}-lista`).innerHTML = lista.map((a, i) => `<li${EXT_OK.test(a.name) ? "" : ' class="mal"'}><span>${esc(a.name)}</span><small>${EXT_OK.test(a.name) ? peso(a.size) : "tipo no admitido: no se subirá"}</small><button type="button" data-quitar="${i}" aria-label="Quitar ${esc(a.name)}" title="Quitar">×</button></li>`).join("");
+      nota.innerHTML = !lista.length ? "Todavía no elegiste archivos." : pasa ? `<b class="rojo">${peso(total)}: pasa de ${MAX_SUBIDA_MB} MB. Quita archivos y súbelos en dos cargas.</b>` : `${buenos.length} archivo${buenos.length === 1 ? "" : "s"} · ${peso(total)}`;
+      btn.disabled = !buenos.length || pasa;
+      document.querySelectorAll(`#${clave}-lista [data-quitar]`).forEach((q) => q.addEventListener("click", () => { lista.splice(+q.dataset.quitar, 1); pintar(); }));
+    };
+    const agregar = (nuevos) => { nuevos.forEach((a) => { if (!lista.some((x) => x.name === a.name && x.size === a.size)) lista.push(a); }); res.innerHTML = ""; pintar(); };
+    entrada.addEventListener("change", () => { agregar([...entrada.files]); entrada.value = ""; });
+    ["dragenter", "dragover"].forEach((t) => zona.addEventListener(t, (ev) => { ev.preventDefault(); zona.classList.add("sobre"); }));
+    ["dragleave", "drop"].forEach((t) => zona.addEventListener(t, (ev) => { ev.preventDefault(); zona.classList.remove("sobre"); }));
+    zona.addEventListener("drop", (ev) => agregar([...ev.dataTransfer.files]));
+    btn.addEventListener("click", async () => {
+      const buenos = lista.filter((a) => EXT_OK.test(a.name));
+      if (!buenos.length) return;
+      const datos = new FormData(); buenos.forEach((a) => datos.append("archivos", a));
+      btn.disabled = true; btn.textContent = "Cargando…"; zona.classList.add("ocupada");
+      res.innerHTML = '<div class="avance"><div class="medidor"><span style="width:0%"></span></div><span class="nota" id="' + clave + '-paso">Subiendo los archivos… 0 %</span></div>';
+      const barra = res.querySelector(".medidor span"), paso = $(`${clave}-paso`), inicio = Date.now();
+      let reloj = null;
+      const avanzar = (f) => { barra.style.width = `${Math.round(f * 100)}%`;
+        if (f < 1) { paso.textContent = `Subiendo los archivos… ${Math.round(f * 100)} %`; return; }
+        if (reloj) return;
+        barra.classList.add("vaiven");
+        reloj = setInterval(() => { const t = Math.round((Date.now() - inicio) / 1000); paso.textContent = `Archivos recibidos. La página los está leyendo y guardando en la base de datos… ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} (puede tardar unos minutos con archivos grandes; no cierres la pestaña)`; }, 1000);
+      };
+      try { const r = await enviarArchivos(datos, avanzar); const ok = Object.keys(r.bases || {}).length > 0 || (r.avisos || []).some((a) => a.includes("gráficos DRAE guardados"));
         ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); res.innerHTML = resultado(r, ok ? "Carga terminada" : "No se cargó nada", ok);
+        if (ok) lista = [];
       } catch (e) { res.innerHTML = `<div class="err-box"><b>No se pudo cargar</b><span>${esc(e.message)}</span></div>`; }
-      finally { btn.disabled = false; btn.textContent = "Cargar a la base de datos"; }
+      finally { clearInterval(reloj); btn.textContent = "Cargar a la base de datos"; zona.classList.remove("ocupada"); pintar(); }
     });
   }
+  // un archivo soltado fuera de la zona de subida no debe abrirse en la pestaña (se perdería la página)
+  ["dragover", "drop"].forEach((t) => window.addEventListener(t, (ev) => { if (ev.dataTransfer && [...ev.dataTransfer.types].includes("Files")) ev.preventDefault(); }));
   const ESTADO_CORRIDA = (c) => c.estado !== "completed" ? (c.estado === "queued" && !(c.progreso && c.progreso.length) ? '<span class="chip vacio">en cola</span>' : '<span class="chip vacio">corriendo</span>')
     : c.resultado === "success" ? '<span class="chip ok">terminó bien</span>' : c.resultado === "cancelled" ? '<span class="chip falta">cancelada</span>' : '<span class="chip error">falló</span>';
   // botón para cancelar una corrida en curso (en GitHub); la base no se toca porque la carga va al final de la corrida
@@ -1715,7 +1756,7 @@
         const j = await api("/v1/hidrocarburos/archivos"), a = j.archivos, nombre = { ...Object.fromEntries(a.map((x) => [x.id, x.nombre])), ...j.raices };
         const ruta = (x) => { const p = []; let q = x.padre, n = 0; while (q && nombre[q] && n++ < 9) { p.unshift(nombre[q]); q = (a.find((y) => y.id === q) || {}).padre; } return p.join("/"); };
         const filas = a.filter((x) => !x.carpeta).map((x) => ({ ...x, ruta: ruta(x) })).sort((x, y) => x.ruta.localeCompare(y.ruta) || x.nombre.localeCompare(y.nombre));
-        ev.target.querySelector(".loading").outerHTML = filas.length ? `<div class="scroll"><table><tr><th>Carpeta</th><th>Archivo</th><th>Modificado</th><th class="n">Tamaño</th><th></th></tr>${filas.map((x) => `<tr><td>${esc(x.ruta)}</td><td>${esc(x.nombre)}</td><td>${x.modificado ? esc(fecha(x.modificado)) : ""}</td><td class="n">${fmt(x.kb)} KB</td><td><a href="/v1/hidrocarburos/archivos/descargar?id=${encodeURIComponent(x.id)}">Descargar</a></td></tr>`).join("")}</table></div>` : "<p class='nota'>Todavía no hay archivos.</p>";
+        ev.target.querySelector(".loading").outerHTML = filas.length ? `<div class="scroll"><table><tr><th>Carpeta</th><th>Archivo</th><th>Modificado</th><th class="n">Tamaño</th><th></th></tr>${filas.map((x) => `<tr><td>${esc(x.ruta)}</td><td>${esc(x.nombre)}</td><td>${x.modificado ? esc(fecha(x.modificado)) : ""}</td><td class="n">${fmt(x.kb)} KB</td><td><a href="/v1/hidrocarburos/archivos/descargar?id=${encodeURIComponent(x.id)}">Descargar</a>${/\.csv$/i.test(x.nombre) ? ` · <a href="/v1/hidrocarburos/archivos/descargar?id=${encodeURIComponent(x.id)}&formato=xlsx" title="El mismo archivo en Excel: se abre bien en el celular y en Excel, sin letras raras">Excel</a>` : ""}</td></tr>`).join("")}</table></div>` : "<p class='nota'>Todavía no hay archivos.</p>";
       });
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar el almacén</b><span>${esc(e.message)}</span></div>`; }
   }
@@ -1781,6 +1822,7 @@
       cuerpo = `<p class="lead">Por dónde empezar y en qué estado está cada sector de las tres regiones.</p>
         <h2 class="sub-t">¿Qué quieres hacer?</h2>
         <div class="accesos">${acceso("lor-resumen", "Armar el informe de una región", "Resumen ejecutivo, cuadros y anexos de Loreto (cambia de región arriba)")}
+          ${acceso("tres-guia", "Guía de uso", "Cómo está organizada la página, qué hacer cada mes y qué significa cada término")}
           ${acceso("lor-drae", "Gráficos DRAE", "Copiar o descargar los gráficos de las SERIES, ordenados por capítulo")}
           ${acceso("tres-act-archivos", "Subir archivos del mes", "DIREPRO, ESTAD, SERIES o bases: la página reconoce cada uno")}
           ${acceso("tres-empleo-total", "Empleo por región", "Total y por sectores de las 26 regiones, desde 2016")}
@@ -1788,6 +1830,61 @@
           ${acceso("tres-estado", "Estado de la base", "Qué hay cargado, cuánto espacio queda y las últimas cargas")}</div>
         <h2 class="sub-t">Estado de cada sector</h2><p class="nota">Haz clic en un estado para ir a ese sector.</p><div class="caja"><div class="scroll"><table><tr><th>Sector</th><th>Loreto</th><th>San Martín</th><th>Ucayali</th></tr>
         ${sects.map((k) => `<tr><td><b>${esc(S[k].t)}</b></td>${["lor", "smn", "uca"].map((g) => planos(g).includes(k) ? `<td><a data-ir="${g}-${k}"><span class="chip ${estadoDe(k, REG[g])}">${ETIQ[estadoDe(k, REG[g])]}</span></a></td>` : '<td><span class="nota">no va en su síntesis</span></td>').join("")}</tr>`).join("")}</table></div></div>`;
+    } else if (id === "guia") {
+      const hastaDe = (bs) => { const h = bs.map((b) => ESTADO.bases[b] && ESTADO.bases[b].hasta).filter(Boolean).sort().pop(); return h ? esc(etqMes(h)) : '<span class="nota">sin datos</span>'; };
+      const pescas = Object.values(REG).map((r) => r.pesca);
+      const rutina = [
+        ["Gasto corriente e inversión pública", "MEF, Consulta Amigable", "auto", "Nada: se baja solo los días 2 y 21 de cada mes. Si urge, usa el botón.", [...GASTO, ...INV], "tres-act-mef", "Scraper del MEF"],
+        ["Empleo", "MTPE, Planilla Electrónica", "auto", "Nada: se baja solo los días 2 y 21. Si urge, usa el botón.", ["empleo"], "tres-act-empleo", "Scraper de empleo"],
+        ["Hidrocarburos", "PERUPETRO", "auto", "Nada: se baja solo todos los días a las 7:00 a. m.", ["hidro-produccion", "hidro-canon"], "tres-act-hidro", "Hidrocarburos"],
+        ["Pesca", "DIREPRO de cada región", "mano", "Subir el Excel que envía cada DIREPRO, tal como llega.", pescas, "tres-act-archivos", "Subir archivos"],
+        ["Exportaciones", "Base mensual de SUNAT (X_AAAAMM.xlsx)", "mano", "Subirla en Exportaciones → «Base mensual», revisar lo que la página marca y pulsar «Pasar al ESTAD».", ["expo-estad"], "lor-expo", "Exportaciones"],
+        ["Importaciones (Loreto)", "Base mensual de SUNAT (M_AAAAMM.xlsx)", "mano", "Igual que exportaciones, en Importaciones → «Base mensual».", ["impo-estad"], "lor-impo", "Importaciones"],
+        ["Manufactura", "IVFM de cada región", "mano", "Subir el IVFM del año (IVFM-LO / SM / UCA … TOTAL.xlsx).", ["manu-ivf"], "tres-act-archivos", "Subir archivos"],
+        ["Gráficos DRAE", "SERIES de cada departamento", "mano", "Subir las SERIES solo cuando cambien.", null, "lor-drae", "Gráficos DRAE"],
+      ];
+      const glosario = [
+        ["Síntesis", "El informe mensual «Síntesis de Actividad Económica» de cada región. La página sigue su mismo orden de capítulos."],
+        ["Base", "Una tabla de datos guardada en la página (por ejemplo, «Inversión por función»). Cada base se descarga en Excel desde la pestaña «Datos»."],
+        ["Scraper", "Programa que entra a una web pública (MEF, MTPE, PERUPETRO) y baja los datos sin que nadie los copie a mano. Corren solos en GitHub."],
+        ["Devengado", "Gasto ya ejecutado: la obligación de pago está reconocida. Es la cifra de «gasto» e «inversión» de los cuadros."],
+        ["PIM", "Presupuesto Institucional Modificado: el presupuesto vigente del año. «Avance» es devengado ÷ PIM."],
+        ["Var. % real", "Variación descontando la inflación, con el IPC de Lima que la página trae sola del BCRP."],
+        ["VBP", "Valor Bruto de Producción de la pesca, a precios de 2007."],
+        ["ESTAD", "El libro Excel de la sucursal con las exportaciones e importaciones por grupo de productos. Los cuadros del sector externo salen de ahí."],
+        ["Base mensual", "La base de SUNAT del mes, operación por operación. La página la limpia y clasifica, y con ella propone el ESTAD del mes."],
+        ["LONG", "Formato de tabla con una fila por dato (año, mes, región, valor): el más cómodo para tablas dinámicas."],
+        ["SERIES / DRAE", "Los Excel de la sucursal con los gráficos de cada departamento. La página los redibuja con un formato uniforme."],
+        ["Contraste", "Comparación entre lo guardado en la página y el total anual que publica el MEF, para detectar descargas incompletas."],
+        ["Corrida", "Cada vez que un scraper se ejecuta. Su avance y resultado se ven en la sección «Actualización»."],
+      ];
+      cuerpo = `<p class="lead">Lo necesario para usar la página sin haberla construido: qué es, cómo moverse, qué hacer cada mes y qué significa cada término.</p>
+        <h2 class="sub-t">Qué es</h2>
+        <div class="caja"><p>Esta página junta los datos con que se escribe la <b>Síntesis de Actividad Económica</b> de Loreto, San Martín y Ucayali, y con ellos arma los cuadros, gráficos y anexos del informe, listos para copiar a Word o descargar en Excel. Unos datos llegan solos (MEF, empleo, hidrocarburos); otros se suben cada mes (pesca, exportaciones, importaciones).</p></div>
+        <h2 class="sub-t">Cómo moverse</h2>
+        <div class="pasos"><div><i>1</i><b>Arriba, la región</b><span>Loreto, San Martín o Ucayali muestran su informe. «Las tres regiones» reúne lo común: actualizar datos, subir archivos, descargas de varios departamentos y esta guía.</span></div>
+          <div><i>2</i><b>A la izquierda, el índice</b><span>Sigue los capítulos de la síntesis. El punto <span class="dot ok"></span> indica que el sector ya tiene datos; <span class="dot vacio"></span>, que todavía falta cargarlos.</span></div>
+          <div><i>3</i><b>En cada sector, las pestañas</b><span><b>Cuadros</b>: las cifras del mes para analizar. <b>Cuadros y gráficos BCRP</b>: lo mismo con el formato del informe, para copiar. <b>Datos</b>: descarga de la base en Excel. <b>Actualizar</b>: cargar o volver a bajar los datos.</span></div></div>
+        <h2 class="sub-t">Qué hacer cada mes</h2>
+        <div class="caja"><div class="scroll"><table><tr><th>Sector</th><th>Fuente</th><th>Cómo llega</th><th>Qué te toca hacer</th><th>Datos hasta</th><th>Dónde</th></tr>
+          ${rutina.map(([t, f, modo, que, bs, ir, donde]) => `<tr><td><b>${t}</b></td><td>${f}</td><td><span class="chip ${modo === "auto" ? "ok" : "vacio"}">${modo === "auto" ? "Automático" : "Se sube a mano"}</span></td><td>${que}</td><td>${bs ? hastaDe(bs) : "—"}</td><td><a data-ir="${ir}">${donde} →</a></td></tr>`).join("")}</table></div>
+          <p class="nota">Lo que se sube reemplaza solo los meses y departamentos que trae el archivo: volver a subir el mismo archivo no duplica nada. Todo lo manual también se puede subir junto en ${irComun("act-archivos", "Subir archivos")}: la página reconoce cada archivo por su nombre o sus hojas.</p></div>
+        <h2 class="sub-t">Para armar el informe</h2>
+        <div class="pasos"><div><i>1</i><b>Comprueba que los datos están al día</b><span>En ${irComun("panorama", "Panorama")} todos los sectores deben decir «Con datos en la página», y en la tabla de arriba «Datos hasta» debe ser el mes del informe.</span></div>
+          <div><i>2</i><b>Abre la región y su Resumen ejecutivo</b><span>Elige el mes del informe: salen los hechos de importancia y el Cuadro 1, listos para copiar.</span></div>
+          <div><i>3</i><b>Recorre cada sector</b><span>En «Cuadros y gráficos BCRP», el botón <b>Copiar</b> deja la imagen lista para pegar en Word con Ctrl+V; <b>SVG</b> y <b>PNG</b> la descargan; <b>Excel</b> baja el cuadro con sus notas.</span></div>
+          <div><i>4</i><b>Termina con los Anexos</b><span>El último ítem del índice trae todos los anexos en el orden y con la numeración de la síntesis.</span></div></div>
+        <h2 class="sub-t">Si algo no sale como esperas</h2>
+        <div class="caja"><div class="scroll"><table><tr><th>Qué ves</th><th>Qué significa</th><th>Qué hacer</th></tr>
+          <tr><td>Un sector con punto amarillo</td><td>La página no tiene datos de ese sector para esa región.</td><td>Mira en la tabla de arriba cómo llega y cárgalo o lanza su actualización.</td></tr>
+          <tr><td>«Datos hasta» se quedó en un mes anterior</td><td>La fuente aún no publica el mes, o la descarga automática falló.</td><td>En «Actualización» revisa la última corrida; si falló, vuelve a lanzarla con el botón.</td></tr>
+          <tr><td>«Falta el token de GitHub»</td><td>La página no puede lanzar los scrapers con el botón.</td><td>Renovar el token (pasos en FISCAL/api/README.md). Las descargas automáticas siguen funcionando.</td></tr>
+          <tr><td>Al subir: «nombre no reconocido; se ignoró»</td><td>La página no supo de qué sector es el archivo.</td><td>Sube el archivo original, sin renombrar ni cambiar sus hojas.</td></tr>
+          <tr><td>Un cuadro dice «variación nominal»</td><td>Falta el IPC del mes: no se pudo descontar la inflación.</td><td>Suele arreglarse solo al día siguiente; si no, sube el IPC.xlsx en «Subir archivos».</td></tr>
+          <tr><td>«Contraste» marca «revisar»</td><td>Lo guardado no coincide con el total que publica el MEF.</td><td>Vuelve a bajar ese periodo en «Scraper del MEF», o usa «Corregir» en «MEF · 3 archivos».</td></tr>
+          <tr><td>Espacio usado por encima de 80 %</td><td>La base gratuita (512 MB) se está llenando.</td><td>Míralo en ${irComun("estado", "Estado de la base de datos")} y avisa antes de cargar más históricos.</td></tr></table></div></div>
+        <h2 class="sub-t">Glosario</h2>
+        <div class="caja"><dl class="glosario">${glosario.map(([t, d]) => `<div><dt>${t}</dt><dd>${d}</dd></div>`).join("")}</dl></div>`;
     } else if (id === "mef-archivos") {
       cuerpo = `<p class="lead">DEV Función · Municipalidad, PIM Función y PIM Función · Municipalidad de los 25 departamentos, cada uno con su propio scraper: se actualizan y se descargan por separado, sin tocar el resto de la base fiscal.</p><div id="arch-mef"></div>`;
     } else if (id === "bases-mef") {

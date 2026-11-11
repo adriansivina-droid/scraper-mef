@@ -65,10 +65,14 @@ def guardar(base_id, df):
                 cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE _nivel = :n AND (_anio * 100 + _mes) BETWEEN :p0 AND :p1'),
                            {"n": nivel, "p0": int(p.min()), "p1": int(p.max())})
         elif existe(b.tabla):
-            claves = df[INTERNAS].drop_duplicates().itertuples(index=False)
-            for anio, mes, depto, nivel in claves:
-                cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE _anio = :a AND _mes = :m AND _depto = :d AND _nivel = :n'),
-                           {"a": int(anio), "m": int(mes), "d": depto, "n": nivel})
+            # un solo DELETE por cada 400 claves (antes, uno por clave: cada uno recorría la tabla entera)
+            claves = [(int(a), int(m), str(d), str(n)) for a, m, d, n in df[INTERNAS].drop_duplicates().itertuples(index=False)]
+            for i in range(0, len(claves), 400):
+                lote, params = claves[i:i + 400], {}
+                for j, (a, m, d, n) in enumerate(lote):
+                    params.update({f"a{j}": a, f"m{j}": m, f"d{j}": d, f"n{j}": n})
+                valores = ", ".join(f"(:a{j}, :m{j}, :d{j}, :n{j})" for j in range(len(lote)))
+                cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE (_anio, _mes, _depto, _nivel) IN (VALUES {valores})'), params)
         df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
     return len(df)
 
@@ -130,17 +134,21 @@ def _completar(df, b):
 
 
 def disponibilidad():
-    """Por base: departamentos cargados, primer y último periodo y número de filas."""
+    """Por base: departamentos cargados, primer y último periodo y número de filas. Una consulta por base (la página la
+    pide cada vez que se abre)."""
     salida = {}
-    with motor().connect() as cx:
+    m = motor()
+    tablas = set(inspect(m).get_table_names())
+    with m.connect() as cx:
         for b in BASES.values():
-            if not existe(b.tabla):
+            if b.tabla not in tablas:
                 salida[b.id] = {"filas": 0, "departamentos": [], "desde": None, "hasta": None}
                 continue
-            r = cx.execute(text(f'SELECT COUNT(*), MIN(_anio * 100 + _mes), MAX(_anio * 100 + _mes) FROM "{b.tabla}"')).one()
-            deptos = [d for (d,) in cx.execute(text(f'SELECT DISTINCT _depto FROM "{b.tabla}" ORDER BY _depto'))]
+            filas = cx.execute(text(f'SELECT _depto, COUNT(*), MIN(_anio * 100 + _mes), MAX(_anio * 100 + _mes) FROM "{b.tabla}" '
+                                    f'GROUP BY _depto ORDER BY _depto')).all()
             periodo = (lambda p: None if p is None else (str(p // 100) if b.periodicidad == "anual" else f"{p // 100}-{p % 100:02d}"))
-            salida[b.id] = {"filas": int(r[0]), "departamentos": deptos, "desde": periodo(r[1]), "hasta": periodo(r[2])}
+            salida[b.id] = {"filas": int(sum(f[1] for f in filas)), "departamentos": [f[0] for f in filas],
+                            "desde": periodo(min((f[2] for f in filas), default=None)), "hasta": periodo(max((f[3] for f in filas), default=None))}
     return salida
 
 
