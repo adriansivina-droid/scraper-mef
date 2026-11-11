@@ -45,6 +45,23 @@ corren en **GitHub Actions** y escriben directo en Neon; los archivos mensuales 
 seis archivos mensuales, con el formato en que llegan; (3) hidrocarburos (scraper listo) y SBS; (4) un botón que genere
 los cuadros y anexos del mes por región.
 
+## Uso, rapidez y subida de archivos
+
+- **Guía de uso** (botón arriba a la derecha, o Las tres regiones → Guía de uso): qué es la página, cómo moverse, qué
+  toca hacer cada mes por sector (automático o a mano, con «Datos hasta»), cómo armar el informe, qué hacer si algo
+  falla y un glosario. Está pensada para quien no construyó la página.
+- **Subir archivos**: se arrastran a la zona de subida o se eligen; la lista muestra el peso de cada uno, deja quitarlos
+  y avisa antes de enviar si el tipo no se admite o si se pasa de 200 MB. Al cargar hay una barra de avance de la subida
+  y luego el tiempo que lleva el procesamiento.
+- **`POST /v1/cargas`** corre en un hilo aparte (la página y `/salud` siguen respondiendo durante una carga larga) y
+  pasa cada archivo de la subida a un archivo temporal, sin tenerlo entero en la memoria (Render Starter: 512 MB).
+- **Recargas más rápidas**: `db.guardar` borra lo que va a reemplazar con un `DELETE` por cada 400 claves en vez de uno
+  por clave. Recargar 300 000 filas (25 departamentos, 48 meses) en Postgres bajó de 26,5 s a 8,5 s. No usa índices:
+  no ocupa espacio en Neon.
+- **Página más liviana**: las respuestas viajan comprimidas (gzip; la página pasa de 253 KB a 66 KB) y los estilos y
+  scripts llevan su versión en la dirección, así el navegador los guarda y no los vuelve a pedir en cada visita.
+  `/v1/estado` hace una consulta por base en vez de dos.
+
 ## Bases
 
 | Grupo | Base (`base=`) | Hoja del Excel | Viene de |

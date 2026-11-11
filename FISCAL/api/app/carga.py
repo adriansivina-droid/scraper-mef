@@ -11,6 +11,7 @@ por sus hojas: ver pesca.py.
 import io
 import os
 import re
+import shutil
 import tempfile
 import unicodedata
 import zipfile
@@ -351,26 +352,30 @@ def _expo_al_almacen():
 
 
 def cargar(origen, archivos):
-    """archivos: lista de (nombre, bytes). Un .zip se descomprime. Guarda en la base de datos y devuelve el resumen."""
+    """archivos: lista de (nombre, bytes) o (nombre, ruta de un archivo en disco, que se mueve). Un .zip se descomprime. Guarda en la base de datos y devuelve el resumen."""
     avisos_ipc = []
     with tempfile.TemporaryDirectory() as tmp:
         for nombre, contenido in archivos:
             nombre = os.path.basename(nombre)
+            en_disco = isinstance(contenido, (str, Path))   # la página sube a un archivo temporal: no pasa por la memoria
             if ipc.es_ipc(nombre):                    # el IPC no es una base: va a su tabla (variaciones reales)
                 try:
-                    s = ipc.de_excel(contenido)
+                    s = ipc.de_excel(Path(contenido).read_bytes() if en_disco else contenido)
                     avisos_ipc.append(f"{nombre}: IPC de Lima, {ipc.guardar(s, nombre)} meses ({min(s)} a {max(s)}).")
                 except Exception as e:
                     avisos_ipc.append(f"{nombre}: no se pudo leer como IPC ({e}).")
                 continue
             if nombre.lower().endswith(".zip"):
-                with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+                with zipfile.ZipFile(contenido if en_disco else io.BytesIO(contenido)) as z:
                     for info in z.infolist():
                         destino = (Path(tmp) / info.filename).resolve()
                         if info.is_dir() or not str(destino).startswith(str(Path(tmp).resolve())):
                             continue                  # sin rutas fuera de la carpeta temporal
                         destino.parent.mkdir(parents=True, exist_ok=True)
-                        destino.write_bytes(z.read(info))
+                        with z.open(info) as origen_, open(destino, "wb") as salida:
+                            shutil.copyfileobj(origen_, salida, 1 << 20)
+            elif en_disco:
+                shutil.move(str(contenido), str(Path(tmp) / nombre))
             else:
                 (Path(tmp) / nombre).write_bytes(contenido)
         bases, avisos = leer_archivos(tmp)
