@@ -209,7 +209,8 @@ def test_mapa_desde_el_almacen(cliente, tmp_path):
     r = almacen.sincronizar(origen="GitHub Actions")
     assert "hidro-produccion" in r["bases"] and any("Mapa de lotes" in a for a in r["avisos"])
     m = cliente.get("/v1/hidrocarburos/mapa")
-    assert m.status_code == 200 and m.text == "<html>plus · Perú</html>"
+    assert m.status_code == 200 and m.text.startswith("<html>plus · Perú</html>") and "mapa-celular" in m.text   # + ajuste para celular
+    assert cliente.get("/v1/hidrocarburos/mapa?descargar=true").text == "<html>plus · Perú</html>"                 # descargado: tal cual
     assert "attachment" in cliente.get("/v1/hidrocarburos/mapa?descargar=true").headers["content-disposition"]
 
 
