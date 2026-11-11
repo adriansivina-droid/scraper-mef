@@ -2,6 +2,8 @@
 # (CSV contenidos en otro de mayor rango, capturas de error viejas, capas del mapa que la última corrida no regeneró) y
 # compacta la tabla para devolver el espacio. Reglas en FISCAL/api/app/almacen.py (duplicados()). También quita los
 # gráficos DRAE innecesarios (FISCAL/api/app/drae.py, innecesarios()).
+# Antes pasa a binario los archivos que quedaron guardados en texto (base64, un tercio más grandes): almacen.convertir().
+# No cambia su contenido y se puede repetir; sin «aplicar» solo dice cuánto ahorraría.
 #   · solo: el día 1 de cada mes, 09:17 hora de Lima (borra de verdad)
 #   · a mano: Actions → «Almacén · limpiar» → Run workflow. Sin «aplicar» solo lista lo que borraría.
 # Requiere el secreto DATABASE_URL.
@@ -46,8 +48,14 @@ jobs:
               with db.motor().connect() as cx:
                   return cx.execute(text("SELECT pg_total_relation_size('almacen'), pg_database_size(current_database())")).one()
           a0, d0 = tam()
-          r = almacen.limpiar(aplicar=os.environ.get("APLICAR") == "true")
-          lineas = [f"## Almacén · {'limpieza' if r['aplicado'] else 'prueba (no se borró nada)'}", "",
+          aplicar = os.environ.get("APLICAR") == "true"
+          c = almacen.convertir(aplicar=aplicar)
+          r = almacen.limpiar(aplicar=aplicar)
+          lineas = ["## Almacén · de texto a binario", "",
+                    f"{c['pendientes']} archivos guardados en texto ({c['mb_antes']} MB) → {c['mb_despues']} MB en binario · "
+                    + (f"{c['convertidos']} convertidos" if aplicar else "prueba: no se cambió nada")
+                    + (f" · sin tocar (no se pudieron comprobar): {', '.join(c['sin_tocar'])}" if c["sin_tocar"] else ""), ""]
+          lineas += [f"## Almacén · {'limpieza' if r['aplicado'] else 'prueba (no se borró nada)'}", "",
                     f"{len(r['archivos'])} archivos · {r['mb_liberados']} MB guardados en la base", "",
                     "| Archivo | Carpeta | KB | Motivo |", "|---|---|---|---|"]
           lineas += [f"| {x['nombre']} | {x['carpeta']} | {x['kb_guardado']:,} | {x['motivo']} |" for x in r["archivos"]]

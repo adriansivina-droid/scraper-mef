@@ -4,6 +4,8 @@ import json
 import os
 import re
 import secrets
+import shutil
+import tempfile
 import unicodedata
 from datetime import date
 from pathlib import Path
@@ -12,6 +14,7 @@ from urllib.parse import quote
 import pandas as pd
 import requests
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
@@ -22,7 +25,21 @@ from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
 _basic = HTTPBasic(auto_error=False)
 ESTATICOS = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=ESTATICOS), name="static")   # solo estilos: los datos siempre piden clave
+
+class Estaticos(StaticFiles):
+    """Los estilos y scripts llevan su versión en la dirección (?v=…): el navegador los guarda un año y no los vuelve a
+    pedir en cada visita; tras un despliegue cambia la versión y baja los nuevos. Logos y favicon: un día."""
+    async def get_response(self, path, scope):
+        respuesta = await super().get_response(path, scope)
+        if respuesta.status_code == 200:
+            con_version = b"v=" in scope.get("query_string", b"")
+            respuesta.headers["Cache-Control"] = "public, max-age=31536000, immutable" if con_version else "public, max-age=86400"
+        return respuesta
+
+
+app.mount("/static", Estaticos(directory=ESTATICOS), name="static")   # solo estilos: los datos siempre piden clave
+# la página (240 KB) y los JSON de los cuadros viajan comprimidos: unas 5 veces menos (nivel 5: casi no cuesta al servidor)
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 _RE_PERIODO = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 MAX_CARGA_MB = 200
 
@@ -115,9 +132,10 @@ def salud():
 def inicio():
     # la hoja de estilos lleva su fecha de modificación: tras cada despliegue el navegador baja la nueva y no mezcla la
     # página nueva con estilos viejos guardados en caché
-    version = int((ESTATICOS / "estilo.css").stat().st_mtime)
-    html = (ESTATICOS / "index.html").read_text(encoding="utf-8").replace('href="/static/estilo.css"', f'href="/static/estilo.css?v={version}"')
-    html = html.replace('src="/static/bcrp.js"', f'src="/static/bcrp.js?v={int((ESTATICOS / "bcrp.js").stat().st_mtime)}"')
+    html = (ESTATICOS / "index.html").read_text(encoding="utf-8")
+    for archivo, atributo in (("estilo.css", "href"), ("bcrp.js", "src"), ("drae.js", "src")):
+        version = int((ESTATICOS / archivo).stat().st_mtime)
+        html = html.replace(f'{atributo}="/static/{archivo}"', f'{atributo}="/static/{archivo}?v={version}"')
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
@@ -184,16 +202,23 @@ def descargas(base: str = "", departamento: str = "", nivel: str = "", desde: st
 
 
 @app.post("/v1/cargas", dependencies=[Depends(acceso)])
-async def cargas(archivos_subidos: list[UploadFile] = File(..., alias="archivos")):
-    """Carga los CSV del scraper (sueltos o la carpeta Scrapeo/output en un .zip), PIM_Funcion.xlsx o los Excel de pesca."""
-    contenido, total = [], 0
-    for a in archivos_subidos:
-        datos = await a.read()
-        total += len(datos)
-        if total > MAX_CARGA_MB * 1024 * 1024:
-            raise HTTPException(413, f"Lo subido pasa de {MAX_CARGA_MB} MB.")
-        contenido.append((a.filename or "archivo", datos))
-    return carga.cargar(f"subida del {date.today().isoformat()}: {', '.join(n for n, _ in contenido)[:200]}", contenido)
+def cargas(archivos_subidos: list[UploadFile] = File(..., alias="archivos")):
+    """Carga los CSV del scraper (sueltos o la carpeta Scrapeo/output en un .zip), PIM_Funcion.xlsx o los Excel de pesca.
+
+    Sin `async`: FastAPI la corre en un hilo aparte, así la página (y /salud) sigue respondiendo mientras se procesa una
+    carga larga. Cada archivo va de la subida a un archivo temporal, sin copiarse entero en la memoria."""
+    total = sum(a.size or 0 for a in archivos_subidos)
+    if total > MAX_CARGA_MB * 1024 * 1024:
+        raise HTTPException(413, f"Lo subido pesa {total / 2**20:,.0f} MB y el máximo por carga es {MAX_CARGA_MB} MB: súbelo en dos partes.")
+    with tempfile.TemporaryDirectory() as tmp:
+        contenido = []
+        for i, a in enumerate(archivos_subidos):
+            ruta = Path(tmp) / f"{i:03d}"
+            with open(ruta, "wb") as salida:
+                shutil.copyfileobj(a.file, salida, 1 << 20)
+            a.file.close()
+            contenido.append((a.filename or "archivo", ruta))
+        return carga.cargar(f"subida del {date.today().isoformat()}: {', '.join(n for n, _ in contenido)[:200]}", contenido)
 
 
 @app.get("/v1/drae", dependencies=[Depends(acceso)])
