@@ -1524,7 +1524,7 @@
         barra.classList.add("vaiven");
         reloj = setInterval(() => { const t = Math.round((Date.now() - inicio) / 1000); paso.textContent = `Archivos recibidos. La página los está leyendo y guardando en la base de datos… ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} (puede tardar unos minutos con archivos grandes; no cierres la pestaña)`; }, 1000);
       };
-      try { const r = await enviarArchivos(datos, avanzar); const ok = Object.keys(r.bases || {}).length > 0 || (r.avisos || []).some((a) => a.includes("gráficos DRAE guardados"));
+      try { const r = await enviarArchivos(datos, avanzar); const ok = Object.keys(r.bases || {}).length > 0 || (r.avisos || []).some((a) => a.includes("gráficos DRAE guardados") || /: IPC de Lima.*\d+ meses \(/.test(a));
         ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); res.innerHTML = resultado(r, ok ? "Carga terminada" : "No se cargó nada", ok);
         if (ok) lista = [];
       } catch (e) { res.innerHTML = `<div class="err-box"><b>No se pudo cargar</b><span>${esc(e.message)}</span></div>`; }
