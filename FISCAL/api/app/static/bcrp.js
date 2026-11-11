@@ -186,7 +186,7 @@
   function barrasLinea(spec) {
     api.ultimo = { tipo: "barraslinea", spec };
     const p = spec.puntos.filter((x) => x.valor != null || x.linea != null), dec = spec.dec ?? 1;
-    const W = 680, izq = 18, der = 46, arr = 40, alto = 300, abajo = 24, leyenda = spec.leyenda || ["Var. % interanual", "Var. % acumulada 12 meses"];
+    const W = 700, izq = 46, der = 46, arr = 40, alto = 300, abajo = 24, leyenda = spec.leyenda || ["Var. % interanual", "Var. % acumulada 12 meses"];
     const rango = (vals) => { let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals); const paso = pasoBonito(hi - lo || 1, 6);
       lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso; if (hi - lo < paso) hi = lo + paso; return { lo, hi, paso }; };
     const vb = p.map((x) => x.valor).filter((v) => v != null), vl = p.map((x) => x.linea).filter((v) => v != null);
@@ -198,6 +198,11 @@
     const h = cabecera(spec, W, 18), y0 = h.y + arr, out = [h.svg];
     const YB = (v) => y0 + (eb.hi - v) / (eb.hi - eb.lo) * alto, YL = (v) => y0 + (el.hi - v) / (el.hi - el.lo) * alto;
     const bw = (W - izq - der) / Math.max(p.length, 1), ult = p.length ? p[p.length - 1].periodo.split(" ")[0].replace(".", "") : "";
+    // eje izquierdo (barras)
+    for (let v = eb.lo; v <= eb.hi + 1e-9; v += eb.paso) {
+      out.push(`<line x1="${izq - 4}" x2="${izq}" y1="${YB(v).toFixed(1)}" y2="${YB(v).toFixed(1)}" stroke="#808080" stroke-width="0.8"/><text x="${izq - 7}" y="${(YB(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="9.5">${esc(num(v, 1))}</text>`);
+    }
+    out.push(`<line x1="${izq}" x2="${izq}" y1="${YB(eb.hi)}" y2="${YB(eb.lo)}" stroke="#808080" stroke-width="0.8"/>`);
     // eje derecho (línea)
     for (let v = el.lo; v <= el.hi + 1e-9; v += el.paso) {
       out.push(`<line x1="${W - der}" x2="${W - der + 4}" y1="${YL(v).toFixed(1)}" y2="${YL(v).toFixed(1)}" stroke="#808080" stroke-width="0.8"/><text x="${W - der + 7}" y="${(YL(v) + 3.5).toFixed(1)}" font-size="9.5">${esc(num(v, 1))}</text>`);
@@ -222,7 +227,7 @@
     const lx = W - der - 200, ly = y0 + 8;
     out.push(`<rect x="${lx}" y="${ly - 7}" width="22" height="8" fill="${CELESTE}" stroke="${CELESTE_BORDE}" stroke-width="0.6"/><text x="${lx + 28}" y="${ly}" font-size="9.5">${esc(leyenda[0])}</text>`);
     out.push(`<line x1="${lx}" x2="${lx + 22}" y1="${ly + 13}" y2="${ly + 13}" stroke="${ROJO}" stroke-width="1.2" stroke-dasharray="4 3"/><text x="${lx + 28}" y="${ly + 16.5}" font-size="9.5">${esc(leyenda[1])}</text>`);
-    const n = notas([...(spec.notas || []), ELABORACION], izq, y0 + alto + abajo + 12);
+    const n = notas([...(spec.notas || []), ELABORACION], izq - 30, y0 + alto + abajo + 12);
     out.push(n.svg);
     return envolver(W, n.y + 4, out.join(""));
   }
