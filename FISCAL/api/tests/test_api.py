@@ -188,3 +188,23 @@ def test_mismo_periodo_en_dos_archivos_no_duplica(cliente):
     assert any("más de un archivo" in a for a in r["avisos"])
     v = cliente.get("/v1/descargas?base=inv-pim-funcion&formato=json&departamento=16&nivel=nacional&desde=2026-01&hasta=2026-12").json()
     assert sorted((f["FUNCION"], f["PIM"]) for f in v["inv-pim-funcion"]["datos"]) == [("15: TRANSPORTE", 1000000), ("22: EDUCACION", 1000000)]
+
+
+def test_csv_del_almacen_en_excel_y_mapa_para_celular(cliente):
+    """Un CSV del almacén (UTF-8 con BOM, como lo guardan los notebooks) se baja también en Excel con «AÑO» bien
+    escrito; el mapa que se muestra en la página lleva el ajuste para celular y el descargado queda tal cual."""
+    import io
+
+    import pandas as pd
+    from app import almacen
+    csv = "AÑO,DEPARTAMENTO,CANON_MM_SOLES\n1993,LORETO,8.17\n1994,HUÁNUCO,0.17\n".encode("utf-8-sig")
+    i = almacen.crear("PP_canon_departamento_anio.csv", almacen.CARPETA_DATA, csv, "text/csv")
+    r = cliente.get(f"/v1/hidrocarburos/archivos/descargar?id={i}")
+    assert r.content == csv and r.headers["content-type"].startswith("text/csv; charset=utf-8")
+    r = cliente.get(f"/v1/hidrocarburos/archivos/descargar?id={i}&formato=xlsx")
+    assert r.status_code == 200 and "PP_canon_departamento_anio.xlsx" in r.headers["content-disposition"]
+    df = pd.read_excel(io.BytesIO(r.content))
+    assert list(df.columns) == ["AÑO", "DEPARTAMENTO", "CANON_MM_SOLES"] and df["DEPARTAMENTO"].tolist() == ["LORETO", "HUÁNUCO"]
+    db.guardar_documento("mapa-hidrocarburos", "<html><body><div id='m'></div></body></html>", "2026-11-10")
+    assert "mapa-celular" in cliente.get("/v1/hidrocarburos/mapa").text
+    assert "mapa-celular" not in cliente.get("/v1/hidrocarburos/mapa?descargar=true").text

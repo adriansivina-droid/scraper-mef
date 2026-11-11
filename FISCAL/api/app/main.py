@@ -285,12 +285,27 @@ def hidro_archivos():
 
 
 @app.get("/v1/hidrocarburos/archivos/descargar", dependencies=[Depends(acceso)])
-def hidro_archivo(id: str = Query(..., max_length=80)):
+def hidro_archivo(id: str = Query(..., max_length=80), formato: str = Query("original", pattern="^(original|xlsx)$")):
+    """Un archivo del almacén tal cual, o un CSV convertido a Excel (formato=xlsx). Los CSV están en UTF-8, pero algunos
+    visores (Google Sheets en el celular, Excel con doble clic) los leen como Latin-1 y muestran «AÃ‘O»: el Excel no tiene
+    ese problema."""
     try:
         nombre, contenido = almacen.descargar(id)
     except FileNotFoundError:
         raise HTTPException(404, "No hay ese archivo en el almacén.")
-    return Response(contenido, media_type="application/octet-stream", headers=_adjunto(nombre))
+    if nombre.lower().endswith(".csv") and formato == "xlsx":
+        try:
+            df = pd.read_csv(io.BytesIO(contenido), sep=None, engine="python", encoding="utf-8-sig")
+        except Exception as e:
+            raise HTTPException(422, f"No se pudo leer {nombre} como tabla: {e}")
+        if len(df) > 1_000_000:
+            raise HTTPException(422, f"{nombre} tiene {len(df):,} filas: pasa del límite de Excel. Bájalo en CSV.")
+        buf = io.BytesIO()
+        df.to_excel(buf, index=False, sheet_name=re.sub(r"[\\/*?:\[\]]", "", nombre[:-4])[:31] or "Hoja1")
+        return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(nombre[:-4] + ".xlsx"))
+    tipo = "text/csv; charset=utf-8" if nombre.lower().endswith(".csv") else "application/octet-stream"
+    return Response(contenido, media_type=tipo, headers=_adjunto(nombre))
 
 
 @app.get("/v1/mef", dependencies=[Depends(acceso)])
@@ -939,7 +954,48 @@ def mapa_hidrocarburos(descargar: bool = False):
         return HTMLResponse("<p style='font-family:sans-serif;color:#5A5A9E;padding:24px'>Todavía no se cargó el mapa: "
                             "sincroniza Drive (el flujo de hidrocarburos lo deja en DATA/MAPA).</p>", status_code=404)
     extra = _adjunto("Mapa de Hidrocarburos - Perú.html") if descargar else {}
-    return HTMLResponse(doc[0], headers={**extra, "X-Mapa-Modificado": doc[1] or ""})
+    html = doc[0]
+    if not descargar:                                   # el archivo descargado queda tal como lo arma el notebook
+        html = html.replace("</body>", _MAPA_CELULAR + "</body>", 1) if "</body>" in html else html + _MAPA_CELULAR
+    return HTMLResponse(html, headers={**extra, "X-Mapa-Modificado": doc[1] or ""})
+
+
+# El mapa lo arma PP_Mapa_Lotes_Plus.ipynb con el selector de capas siempre abierto: en el celular tapa casi todo el mapa.
+# Al mostrarlo en la página se le agrega esto: en pantallas angostas el selector empieza cerrado (botón de capas arriba a
+# la izquierda, que lo abre y lo cierra; tocar el mapa lo cierra), con letra y casillas más chicas y alto limitado, y los
+# botones de abajo se achican para no tapar los lotes. En la computadora no cambia nada.
+_MAPA_CELULAR = """<style id="mapa-celular">
+@media (max-width: 700px) {
+  .leaflet-control-layers-expanded { max-height: 62vh; max-width: min(78vw, 300px); overflow: auto; font-size: 12px; padding: 6px 8px 6px 6px; }
+  .leaflet-control-layers-expanded label { margin: 1px 0; }
+  .leaflet-control-layers-expanded input { transform: scale(.85); margin: 0 3px 0 0; }
+  .leaflet-control-layers-expanded button { font-size: 12px !important; padding: 5px 8px !important; }
+  .leaflet-control-layers-toggle { width: 40px !important; height: 40px !important; }
+  .leaflet-bottom .leaflet-control, .leaflet-bottom button { font-size: 12px !important; }
+  .leaflet-bottom button { padding: 5px 9px !important; }
+  .leaflet-control-scale { display: none; }
+}
+</style>
+<script id="mapa-celular-js">(function () {
+  if (!window.matchMedia || !matchMedia("(max-width: 700px)").matches) return;
+  var intentos = 0;
+  (function esperar() {
+    var c = document.querySelector(".leaflet-control-layers");
+    if (!c) { if (intentos++ < 60) setTimeout(esperar, 250); return; }
+    c.classList.remove("leaflet-control-layers-expanded");
+    var b = c.querySelector(".leaflet-control-layers-toggle");
+    if (b) {
+      b.setAttribute("title", "Capas y productos"); b.setAttribute("role", "button"); b.setAttribute("aria-label", "Capas y productos");
+      // Leaflet abre el selector al recibir el foco, que llega entre el toque y el clic: se decide con el estado de antes
+      var estaba = false;
+      b.addEventListener("pointerdown", function () { estaba = c.classList.contains("leaflet-control-layers-expanded"); });
+      b.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); c.classList.toggle("leaflet-control-layers-expanded", !estaba); if (estaba) b.blur(); });
+    }
+    c.addEventListener("click", function (e) { e.stopPropagation(); });
+    var mapa = document.querySelector(".leaflet-container");
+    if (mapa) mapa.addEventListener("click", function () { c.classList.remove("leaflet-control-layers-expanded"); });
+  })();
+})();</script>"""
 
 
 @app.get("/v1/cuadros/hidrocarburos", dependencies=[Depends(acceso)])

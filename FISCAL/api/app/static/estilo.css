@@ -357,3 +357,5 @@ tr.nueva-region td { border-top: 2px solid var(--hair); }
 .glosario { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 14px 28px; }
 .glosario dt { font-weight: 600; color: var(--navy); }
 .glosario dd { margin: 2px 0 0; font-size: 13px; color: var(--mid); line-height: 1.5; }
+
+@media (max-width: 700px) { iframe.mapa { height: 82vh; min-height: 420px; } .mapa-caja > .fila p { font-size: 13px; } }
