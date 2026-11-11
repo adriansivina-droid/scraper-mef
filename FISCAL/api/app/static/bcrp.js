@@ -191,10 +191,18 @@
       lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso; if (hi - lo < paso) hi = lo + paso; return { lo, hi, paso }; };
     const vb = p.map((x) => x.valor).filter((v) => v != null), vl = p.map((x) => x.linea).filter((v) => v != null);
     // espacio arriba para la leyenda (como en la síntesis, las barras no llegan al borde)
-    const eb = rango(vb.length ? [...vb, Math.max(0, ...vb) * 1.3] : [0]);
+    let eb = rango(vb.length ? [...vb, Math.max(0, ...vb) * 1.3] : [0]);
+    // escalas como el gráfico del BCRP: barras de 40 en 40 desde -50 (… -50, -10, 30, 70 …); línea simétrica de 10 en 10
+    // con medios pasos (… -45, -35 … 35, 45)
+    const bcrp = spec.escalas === "bcrp";
+    if (bcrp) {
+      const a = (v) => Math.floor((v + 50) / 40) * 40 - 50, b = (v) => Math.ceil((v + 50) / 40) * 40 - 50;
+      eb = { lo: a(Math.min(0, ...vb)), hi: Math.max(b(Math.max(0, ...vb) * 1.05), a(0) + 40), paso: 40 };
+    }
     // la línea en su propio eje (derecha), simétrico como en la síntesis cuando cruza el cero
     let el = rango(vl.length ? vl : [0]);
     if (el.lo < 0 && el.hi > 0) { const m = Math.max(-el.lo, el.hi); el = { lo: -m, hi: m, paso: el.paso }; }
+    if (bcrp) { const m = Math.max(5, Math.ceil((Math.max(0, ...vl.map(Math.abs)) - 5) / 10) * 10 + 5); el = { lo: -m, hi: m, paso: 10 }; }
     const h = cabecera(spec, W, 18), y0 = h.y + arr, out = [h.svg];
     const YB = (v) => y0 + (eb.hi - v) / (eb.hi - eb.lo) * alto, YL = (v) => y0 + (el.hi - v) / (el.hi - el.lo) * alto;
     const bw = (W - izq - der) / Math.max(p.length, 1), ult = p.length ? p[p.length - 1].periodo.split(" ")[0].replace(".", "") : "";

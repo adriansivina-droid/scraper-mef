@@ -1124,10 +1124,11 @@
     const g2 = c.interanual.map((x) => ({ periodo: x.periodo, valor: real ? x.var : x.var_nominal, linea: real ? x.var_12m : x.var_12m_nominal })).filter((x) => x.valor != null || x.linea != null);
     const barrasG = (n) => B.barras({ numero: n, titulo: `${R}: ${titulo}`, unidad: unidadG, puntos: g, notas: ["Fuente: MEF."] });
     // otra versión: la de la síntesis (barras de la var. interanual y línea punteada de la acumulada 12 meses), 25 meses
-    const sintesisG = (n) => B.barrasLinea({ numero: n, titulo: `${R}: ${titulo}`, unidad: unidadG, puntos: g2,
+    const sintesisG = (n, escalas) => B.barrasLinea({ escalas, numero: n, titulo: `${R}: ${titulo}`, unidad: unidadG, puntos: g2,
       leyenda: ["Var. % interanual", "Var. % acumulada 12 meses"], notas: [real ? "Fuente: MEF e INEI." : "Fuente: MEF."] });
     if (g.length) items.push({ clave: "g", tipo: "GRÁFICO", num: N.g, nombre: `${R}: ${titulo} (variación)`, svg: barrasG,
-      versiones: [{ etq: "Barras", svg: barrasG }, { etq: "Barras y acumulada 12 meses (síntesis)", svg: sintesisG }] });
+      versiones: [{ etq: "Barras", svg: barrasG }, { etq: "Barras y acumulada 12 meses (síntesis)", svg: (n) => sintesisG(n) },
+        { etq: "Barras y acumulada 12 meses (escalas del BCRP)", svg: (n) => sintesisG(n, "bcrp") }] });
     (c.anexos || []).forEach((ax, k) => {
       const t = inv ? `${R}: INVERSIÓN NO FINANCIERA ${ax.nivel}` : `${R}: EJECUCIÓN DEL PRESUPUESTO DE GASTOS ${ax.nivel}`;
       items.push({ clave: `a${k}`, tipo: "ANEXO", num: (N.a || [])[k], nombre: t, svg: (n) => B.anexo({ numero: n, titulo: t, llamada: "1/", unidad: "(Millones de soles)", rotulo: inv ? "FUNCIONES" : "",
