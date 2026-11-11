@@ -360,8 +360,9 @@ def cargar(origen, archivos):
             en_disco = isinstance(contenido, (str, Path))   # la página sube a un archivo temporal: no pasa por la memoria
             if ipc.es_ipc(nombre):                    # el IPC no es una base: va a su tabla (variaciones reales)
                 try:
-                    s = ipc.de_excel(Path(contenido).read_bytes() if en_disco else contenido)
-                    avisos_ipc.append(f"{nombre}: IPC de Lima, {ipc.guardar(s, nombre)} meses ({min(s)} a {max(s)}).")
+                    s, fuente = ipc.leer_excel(Path(contenido).read_bytes() if en_disco else contenido, nombre)
+                    avisos_ipc.append(f"{nombre}: IPC de Lima{' del INEI' if fuente.startswith(ipc.FUENTE_INEI) else ''}, "
+                                      f"{ipc.guardar(s, fuente)} meses ({min(s)} a {max(s)}).")
                 except Exception as e:
                     avisos_ipc.append(f"{nombre}: no se pudo leer como IPC ({e}).")
                 continue

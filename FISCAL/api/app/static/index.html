@@ -892,7 +892,9 @@
       const fila = (f) => `<tr class="${f.nombre === "Total" ? "total" : ""}"><td>${esc(f.nombre)}</td><td class="n">${mill(f.mes_b)}</td><td class="n">${mill(f.mes_a)}</td><td class="n ${vm(f) == null ? "" : vm(f) >= 0 ? "sube" : "baja"}">${pct(vm(f))}</td>
         <td class="n">${mill(f.acum_b)}</td><td class="n">${mill(f.acum_a)}</td><td class="n ${va(f) == null ? "" : va(f) >= 0 ? "sube" : "baja"}">${pct(va(f))}</td>${inv ? `<td class="n">${mill(f.pim)}</td><td>${avanceBarra(f.avance, parejo)}</td>` : ""}</tr>`;
       const titulo = inv ? "INVERSIÓN PÚBLICA" : "GASTO CORRIENTE NO FINANCIERO";
-      const nota = `${real ? "Var. % real: deflactada con el IPC de Lima" + (j.ipc && j.ipc.fuente ? ` (${esc(j.ipc.fuente)})` : "") : "Var. % nominal: falta el IPC de Lima (se trae solo del BCRP; si no responde, sube IPC.xlsx en «Subir archivos»)"}. Millones de soles corrientes.`;
+      const inei = !!(j.ipc && String(j.ipc.fuente || "").startsWith("INEI")), hastaIpc = j.ipc && j.ipc.hasta ? ` (hasta ${esc(etqMes(j.ipc.hasta))})` : "";
+      const nota = `${real ? `Var. % real: deflactada con el índice mensual del IPC de Lima Metropolitana ${inei ? "del INEI, base dic. 2021 = 100" : `(respaldo: ${esc((j.ipc && j.ipc.fuente) || "")}; sube el Excel del INEI en «Actualizar»)`}${hastaIpc}`
+        : `Var. % nominal: falta el IPC de Lima del mes${hastaIpc}. Sube el Excel del INEI (n01_indice-precios_al_consumidor-lm_….xlsx) en «Actualizar»`}. Millones de soles corrientes.`;
       const comp = c.participacion, sumaP = comp.reduce((s, p) => s + (p.valor || 0), 0);
       caja.innerHTML = `${selectorEjec(c, clave, `<button class="btn" type="button" id="${clave}-x">Descargar en Excel</button>`)}
         ${tiles}
@@ -1114,7 +1116,7 @@
     items.push({ clave: "c", tipo: "CUADRO", num: N.c, nombre: `${R}: ${titulo}`, svg: (n) => B.cuadro({ numero: n, titulo: `${R}: ${titulo}`, llamada: inv ? "1/ 2/" : "1/", unidad: "(Millones de soles)",
       cab: [[{ t: "" }, { t: mes, span: 3, linea: true }, { t: `Enero - ${mes}`, span: 3, linea: true }], [{ t: "" }, { t: b }, { t: a }, { t: vtxt }, { t: b }, { t: a }, { t: vtxt }]],
       filas: c.niveles.map((f) => ({ c: [nombreNivel[f.nombre] || f.nombre, n1(f.mes_b), n1(f.mes_a), v1(vm(f)), n1(f.acum_b), n1(f.acum_a), v1(va(f))], b: f.nombre === "Total", total: f.nombre === "Total" })),
-      notas: [act, ...(inv ? ["2/ Comprende la adquisición de activos no financieros."] : []), ...(real ? [] : ["Variación nominal: falta el IPC de Lima del mes."]), "Fuente: MEF."] }) });
+      notas: [act, ...(inv ? ["2/ Comprende la adquisición de activos no financieros."] : []), ...(real ? [] : ["Variación nominal: falta el IPC de Lima (INEI) del mes."]), real ? "Fuente: MEF e INEI." : "Fuente: MEF."] }) });
     const g = c.interanual.map((x) => ({ periodo: x.periodo, valor: real ? x.var : x.var_nominal })).filter((x) => x.valor != null);
     if (g.length) items.push({ clave: "g", tipo: "GRÁFICO", num: N.g, nombre: `${R}: ${titulo} (variación)`, svg: (n) => B.barras({ numero: n, titulo: `${R}: ${titulo}`,
       unidad: `(Variación porcentual ${real ? "real " : ""}respecto a similar periodo del año anterior)`, puntos: g, notas: ["Fuente: MEF."] }) });
@@ -1428,7 +1430,7 @@
       titulo: `${R}: OTROS INDICADORES DE ACTIVIDAD ECONÓMICA`, unidad: `(Variación % respecto a similar periodo de ${a - 1})`, minCol: 100,
       cab: [[{ t: "Indicador" }, { t: `${m3} ${a}` }, { t: `Ene.-${m3} ${a}` }]],
       filas: filas.map((f) => ({ c: [f.nombre, v1(f.vm), v1(f.va)] })),
-      notas: ["Gasto corriente e inversión pública: variación real (IPC de Lima).", "Fuente: DIREPRO, PERUPETRO, MTPE, SUNAT y MEF."] }) }] : [];
+      notas: ["Gasto corriente e inversión pública: variación real (IPC de Lima Metropolitana, INEI).", "Fuente: DIREPRO, PERUPETRO, MTPE, SUNAT y MEF."] }) }] : [];
     const meses = MESES.filter((m) => m >= "2025-01" && m <= ult).reverse();
     caja.innerHTML = `<div class="caja"><div class="fila" style="justify-content:space-between;align-items:center"><h3>Principales hechos de importancia · ${esc(nm)} ${a}</h3>
         ${hechos.length ? '<button class="btn" type="button" id="res-copiar">Copiar texto</button>' : ""}</div>
@@ -1470,6 +1472,7 @@
     const filas = Object.entries(r.bases).map(([k, x]) => `<li>${esc(base(k).nombre)}: ${fmt(x.filas)} filas · ${x.departamentos.length} departamento(s) · ${esc(x.periodos.length === 1 ? x.periodos[0] : `${x.periodos[0]} a ${x.periodos[x.periodos.length - 1]}`)}</li>`).join("");
     return `<div class="${ok ? "ok-box" : "err-box"}"><b>${esc(tit)}</b>${filas ? `<ul>${filas}</ul>` : ""}${r.avisos.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
   }
+  const IPC_TXT = "El IPC de Lima Metropolitana del INEI tal como se publica (n01_indice-precios_al_consumidor-lm_<mes><año>.xlsx, hoja «Base Dic2021»: Año, Mes, Índice). Con su índice mensual se deflacta el gasto y la inversión (variación % real). Cada mes se sube el nuevo: reemplaza la serie cargada; mientras esté el del INEI, el BCRP no la reemplaza.";
   // ── Subida de archivos: arrastrar o elegir, lista con pesos, barra de avance y aviso si pasa del máximo ──
   const MAX_SUBIDA_MB = 200, EXT_OK = /\.(zip|csv|xlsx|xlsm)$/i;
   const peso = (b) => b >= 1048576 ? `${(b / 1048576).toLocaleString("es-PE", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
@@ -1794,7 +1797,7 @@
     else if (t === "Contraste") panel = `<div id="contraste" data-sector="${id}"></div>`;
     else if (t === "Cuadros") panel = s.cuadros === "manufactura" ? '<div id="cuadros-manu"></div>' : s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
-    else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>`
+    else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>${cajaSubida("sub-ipc", IPC_TXT)}`
       : s.actualizar === "hidro" ? `<div><div class="caja"><h3>PERUPETRO → página</h3><div id="hidro-caja"></div></div>${cajaSubida("sub-hidro", "Los CSV de producción o canon (PP_produccion_lote_mes_….csv, PP_produccion_gas_lote_mes_….csv o PP_canon_departamento_mes.csv), o el Excel de exportaciones de crudo por empresa («Petróleo crudo - Loreto.xlsx», hoja Consolidado). Traen la serie completa y reemplazan lo cargado.")}</div>`
       : s.actualizar === "series" ? cajaSubida("sub-series", `Las SERIES de ${esc(r.nombre)} (${{ lor: "SERIES LORETO (OFICIAL).xlsx", smn: "SERIES SMN … .xlsx", uca: "SERIES UCAYALI.xlsx" }[grupo]}) y el libro de gráficos del DRAE (${{ lor: "DRAE_LOR_….xlsx", smn: "DRAE_SMT_Nov-26.xlsx", uca: "DRAE_Ucayali-….xlsx" }[grupo]}), tal como están: el nombre debe empezar con «SERIES» o «DRAE» y el departamento. La página lee los datos que guarda cada gráfico, su tipo y sus series; cada archivo reemplaza solo los gráficos de su fuente (las SERIES o el libro del DRAE) y se ordenan juntos por capítulo y sector.`)
       : s.actualizar === "subir" ? cajaSubida("sub-" + grupo, `El Excel tal como llega de DIREPRO ${esc(r.nombre)}${grupo === "smn" ? " (con el año y el mes en el nombre: SMN_PESCA_AAAA-MM.xlsx)" : ""}, o el LONG o la base histórica del notebook. Queda guardado en la página.`)
@@ -1920,13 +1923,14 @@
       cuerpo = `<p class="lead">Pesca y empleo de las tres regiones juntas, para comparar.</p>
         <div class="caja"><h3>Pesca</h3>${panelBases("p-cpesca", ["pesca-loreto", "pesca-san-martin", "pesca-ucayali"], { deptos: () => LSU, marcar: 3 })}</div>
         <div class="caja"><h3>Empleo</h3>${panelBases("p-cempleo", ["empleo"], { deptos: () => LSU, marcar: 1 })}</div>`;
-    } else if (id === "act-mef") cuerpo = cajaScraper("mef");
+    } else if (id === "act-mef") cuerpo = cajaScraper("mef") + cajaSubida("sub-ipc", IPC_TXT);
     else if (id === "act-empleo") cuerpo = cajaScraper("empleo");
     else if (id === "act-hidro") cuerpo = '<div class="caja"><h3>Hidrocarburos: PERUPETRO → página</h3><div id="hidro-caja"></div></div>';
     else if (id === "act-archivos") cuerpo = cajaSubida("sub-todo", "La página reconoce de qué sector y región es cada archivo. Se reemplazan los meses y departamentos que traigan; lo demás se conserva.",
       [["MEF", "El .zip de Fiscal/Scrapeo/output, los CSV del scraper o PIM_Funcion.xlsx"], ["Pesca", "Los Excel de las DIREPRO o los LONG de los notebooks"],
        ["Empleo", "El Excel del scraper del MTPE (total o por sectores)"], ["Exportaciones e importaciones", "El ESTAD de la región (ESTADLO, ESTADSMN, ESTADUCA)"],
-       ["Gráficos DRAE", "Las SERIES de la región y el libro de gráficos del DRAE"], ["Hidrocarburos", "Los CSV de PERUPETRO o el Excel de crudo por empresa"]]);
+       ["Gráficos DRAE", "Las SERIES de la región y el libro de gráficos del DRAE"], ["Hidrocarburos", "Los CSV de PERUPETRO o el Excel de crudo por empresa"],
+       ["IPC de Lima", "El Excel del INEI (n01_indice-precios_al_consumidor-lm_….xlsx), para la variación real del gasto y la inversión"]]);
     else if (id === "estado") {
       const u = ESTADO.ultima_carga;
       cuerpo = `<div class="stats"><div class="stat"><small>Datos hasta</small><b>${esc(etqMes(datosHasta()))}</b><span>último mes con datos</span></div>
@@ -1972,7 +1976,7 @@
     if ($("emp-tot")) empleoTotales("et");
     if ($("emp-sec")) empleoTotales("es");
     Object.keys(paneles).forEach((k) => { if (k.startsWith("p-")) atarPanel(k); });
-    ["sub-todo", "sub-emp", "sub-manu", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo", "sub-series"].forEach(atarSubida);
+    ["sub-todo", "sub-emp", "sub-manu", "sub-hidro", "sub-lor", "sub-smn", "sub-uca", "sub-estad", "sub-sunat", "sub-impo", "sub-series", "sub-ipc"].forEach(atarSubida);
     atarScraper("mef"); atarScraper("empleo");
     if ($("hidro-caja")) cajaHidro($("hidro-caja"));
     if ($("arch-mef")) cajaArchivosMef($("arch-mef"));

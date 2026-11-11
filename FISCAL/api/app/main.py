@@ -938,11 +938,11 @@ def ipc_estado():
 
 @app.post("/v1/ipc/actualizar", dependencies=[Depends(acceso)])
 def ipc_actualizar():
-    """Trae el IPC de Lima del BCRP (también se hace en cada sincronización con Drive)."""
+    """Trae el IPC de Lima del BCRP, solo de respaldo: si el cargado es el del INEI (la fuente oficial), no lo reemplaza."""
     try:
         return {"mensaje": ipc.actualizar_bcrp(), **ipc.estado()}
     except Exception as e:
-        raise HTTPException(502, f"No se pudo traer el IPC del BCRP: {e}. Sube el IPC.xlsx en «Subir archivos».")
+        raise HTTPException(502, f"No se pudo traer el IPC del BCRP: {e}. Sube el Excel del IPC del INEI (n01_indice-precios_al_consumidor-lm_….xlsx) en «Actualizar».")
 
 
 @app.get("/v1/hidrocarburos/mapa", dependencies=[Depends(acceso)])

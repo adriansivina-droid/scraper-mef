@@ -1,6 +1,10 @@
 """IPC de Lima Metropolitana para deflactar el gasto y la inversión (variaciones % reales).
 
-Dos fuentes:
+La fuente oficial es el INEI: el Excel «n01_indice-precios_al_consumidor-lm_<mes><aa>.xlsx» que publica cada mes (hoja
+«Base Dic2021»: Año, Mes, Índice; el año solo en enero), subido en la página. Es el índice mensual con el que se deflacta.
+Mientras haya un IPC del INEI cargado, el BCRP no lo reemplaza (ni a mano ni en las actualizaciones automáticas): si al
+índice le falta el último mes, la variación de ese mes queda nominal hasta subir el Excel nuevo del INEI.
+Respaldo, solo si no hay IPC del INEI:
   · la API de estadísticas del BCRP: prueba las series de IPC_SERIE_BCRP (separadas por comas; por defecto la del
     índice de Lima base dic. 2021 = 100 y la de base anterior) y se queda con la que llega al mes más reciente; una
     serie que no llega a los últimos 4 meses se descarta (la de base anterior terminó en dic. 2021). Se consulta sola
@@ -99,8 +103,60 @@ def de_excel(contenido):
     return salida
 
 
+_MESES_ES = {"enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7, "agosto": 8, "setiembre": 9,
+             "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12}
+FUENTE_INEI = "INEI"
+
+
+def _hoja_inei(filas):
+    """{'AAAA-MM': índice} de una hoja del INEI: encabezado «Año | Mes | Índice», el año solo en enero."""
+    cab = next((i for i, f in enumerate(filas[:15]) if len(f) > 2 and str(f[0] or "").strip().lower() == "año"
+                and str(f[1] or "").strip().lower() == "mes" and str(f[2] or "").strip().lower().startswith(("índice", "indice"))), None)
+    if cab is None:
+        return {}
+    salida, anio = {}, None
+    for f in filas[cab + 1:]:
+        if len(f) < 3:
+            continue
+        if isinstance(f[0], (int, float)) and not isinstance(f[0], bool) and 1900 < f[0] < 2200:
+            anio = int(f[0])
+        mes = _MESES_ES.get(str(f[1] or "").strip().lower())
+        if anio and mes and isinstance(f[2], (int, float)) and not isinstance(f[2], bool) and 20 < float(f[2]) < 1000:
+            salida[f"{anio}-{mes:02d}"] = float(f[2])
+    return salida
+
+
+def de_inei(contenido):
+    """(serie, base) del Excel del INEI: de sus hojas (una por base del índice), la que llega al mes más reciente."""
+    hojas = pd.read_excel(io.BytesIO(contenido), sheet_name=None, header=None)
+    mejores = []
+    for nombre, h in hojas.items():
+        filas = [list(r) for r in h.itertuples(index=False)]
+        s = _hoja_inei(filas)
+        if s:
+            base = next((str(v) for f in filas[:4] for v in f if isinstance(v, str) and "base" in v.lower()), nombre)
+            mejores.append((max(s), len(s), s, base.strip("() ")))
+    if not mejores:
+        return None, None
+    _, _, s, base = max(mejores, key=lambda x: (x[0], x[1]))
+    return s, base
+
+
+def leer_excel(contenido, nombre):
+    """(serie, fuente) de un Excel de IPC: el del INEI (fuente oficial) o, de respaldo, el IPC.xlsx de Fiscal_Procesamiento."""
+    s, base = de_inei(contenido)
+    if s:
+        return s, f"{FUENTE_INEI}, IPC de Lima Metropolitana ({base}): {nombre}"
+    return de_excel(contenido), nombre
+
+
 def es_ipc(nombre):
-    return bool(re.match(r"^IPC.*\.xlsx$", nombre, re.I))
+    """IPC.xlsx (Fiscal_Procesamiento) o el Excel del INEI («n01_indice-precios_al_consumidor-lm_oct26.xlsx»)."""
+    return bool(re.match(r"^IPC.*\.xlsx$", nombre, re.I) or re.search(r"indice[-_ ]?precios[-_ ]?al[-_ ]?consumidor.*\.xlsx$", nombre, re.I))
+
+
+def es_inei_cargado():
+    return str(estado().get("fuente") or "").startswith(FUENTE_INEI)
 
 
 def _vigente(s, hoy=None):
@@ -111,7 +167,11 @@ def _vigente(s, hoy=None):
 
 
 def actualizar_bcrp():
-    """Trae el IPC del BCRP (la serie vigente que llegue más lejos) y lo guarda. Devuelve el texto para el resumen."""
+    """Trae el IPC del BCRP (la serie vigente que llegue más lejos) y lo guarda. Devuelve el texto para el resumen.
+    Si el IPC cargado es el del INEI (la fuente oficial), no lo reemplaza."""
+    if es_inei_cargado():
+        e = estado()
+        return f"IPC de Lima: se usa el del INEI (hasta {e['hasta']}); el BCRP no lo reemplaza. Para un mes nuevo, sube el Excel del INEI."
     mejores, motivos = [], []
     for serie in SERIES_BCRP:
         try:
@@ -140,7 +200,10 @@ def refrescar(horas=24, hoy=None):
     Nunca falla ni demora la respuesta: si el BCRP no responde, se queda el cargado."""
     hoy = hoy or date.today()
     anterior = f"{hoy.year - (hoy.month == 1)}-{(hoy.month - 2) % 12 + 1:02d}"
-    hasta = estado()["hasta"]
+    e = estado()
+    hasta = e["hasta"]
+    if str(e.get("fuente") or "").startswith(FUENTE_INEI):
+        return False                                   # el del INEI no se reemplaza con el del BCRP
     if (hasta and hasta >= anterior) or time.time() - _ultimo_intento[0] < horas * 3600:
         return False
     _ultimo_intento[0] = time.time()
