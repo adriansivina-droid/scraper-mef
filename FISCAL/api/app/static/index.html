@@ -557,7 +557,7 @@
     return `<svg class="lineas" viewBox="0 0 ${W} ${H}" role="img">${rejilla}${trazos}${meses.map((m, i) => `<text x="${X(i)}" y="${H - 12}" text-anchor="middle">${esc(m)}</text>`).join("")}</svg>`;
   }
   const leyenda = (items) => `<div class="ley-graf">${items.map(([cl, t]) => `<span><i class="${cl}"></i>${esc(t)}</span>`).join("")}</div>`;
-  const avanceBarra = (v, ref) => v == null ? "" : `<div class="avance"><div class="pista"><div style="width:${Math.min(v, 100)}%"></div>${ref != null ? `<b style="left:${Math.min(ref, 100)}%" title="Ritmo parejo: ${pct(ref)} %"></b>` : ""}</div><span>${pct(v)} %</span></div>`;
+  const avanceBarra = (v, ref) => v == null ? "" : `<div class="avance-pim"><div class="pista"><div style="width:${Math.min(v, 100)}%"></div>${ref != null ? `<b style="left:${Math.min(ref, 100)}%" title="Ritmo parejo: ${pct(ref)} %"></b>` : ""}</div><span>${pct(v)} %</span></div>`;
 
   // barras de variación % (positivas y negativas) con el año debajo de los meses
   function barrasVar(g, W) {
