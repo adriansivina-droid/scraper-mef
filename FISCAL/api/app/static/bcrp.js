@@ -1,7 +1,7 @@
 // Cuadros y gráficos con el formato de la Síntesis de Actividad Económica (BCRP, Sucursal Iquitos), en SVG para
 // pegarlos en el informe: Arial, filetes horizontales, miles con espacio y decimales con coma; los gráficos, con la paleta
 // del Seminario de Periodistas: barras turquesa con borde azul marino (el mismo mes de cada año, en blanco), meses «J.24 J A S … J.25», notas de fuente y elaboración.
-// window.BCRP.cuadro(spec) / .anexo(spec) / .barras(spec) / .circulares(spec) / .hbarras(spec) / .apiladas(spec) devuelven el SVG (texto); .descargar, .copiar, .png lo exportan.
+// window.BCRP.cuadro(spec) / .anexo(spec) / .barras(spec) / .barrasLinea(spec) / .circulares(spec) / .hbarras(spec) / .apiladas(spec) devuelven el SVG (texto); .descargar, .copiar, .png lo exportan.
 (function () {
   "use strict";
   const FUENTE = "Arial, Helvetica, sans-serif", TINTA = "#000", AZUL = "#111149", RELLENO = "#72D2D5", GRIS = "#C0C0C0";
@@ -178,6 +178,55 @@
     return envolver(W, n.y + 4, out.join(""));
   }
 
+  // ── Barras y línea, como el gráfico de la síntesis (hoja «Inversión Pública»): barras celestes de la variación % interanual
+  // (el mismo mes de cada año, en blanco) con su valor, y la línea roja punteada de la variación % acumulada 12 meses en el
+  // eje de la derecha; meses «S O N D E.25 F …» (el año en enero). spec = {numero, titulo, unidad, puntos: [{periodo, valor, linea}],
+  // leyenda: [barras, línea], dec, notas}
+  const CELESTE = "#B4C7E7", CELESTE_BORDE = "#8FAADC", ROJO = "#FF0000";
+  function barrasLinea(spec) {
+    api.ultimo = { tipo: "barraslinea", spec };
+    const p = spec.puntos.filter((x) => x.valor != null || x.linea != null), dec = spec.dec ?? 1;
+    const W = 680, izq = 18, der = 46, arr = 40, alto = 300, abajo = 24, leyenda = spec.leyenda || ["Var. % interanual", "Var. % acumulada 12 meses"];
+    const rango = (vals) => { let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals); const paso = pasoBonito(hi - lo || 1, 6);
+      lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso; if (hi - lo < paso) hi = lo + paso; return { lo, hi, paso }; };
+    const vb = p.map((x) => x.valor).filter((v) => v != null), vl = p.map((x) => x.linea).filter((v) => v != null);
+    // espacio arriba para la leyenda (como en la síntesis, las barras no llegan al borde)
+    const eb = rango(vb.length ? [...vb, Math.max(0, ...vb) * 1.3] : [0]);
+    // la línea en su propio eje (derecha), simétrico como en la síntesis cuando cruza el cero
+    let el = rango(vl.length ? vl : [0]);
+    if (el.lo < 0 && el.hi > 0) { const m = Math.max(-el.lo, el.hi); el = { lo: -m, hi: m, paso: el.paso }; }
+    const h = cabecera(spec, W, 18), y0 = h.y + arr, out = [h.svg];
+    const YB = (v) => y0 + (eb.hi - v) / (eb.hi - eb.lo) * alto, YL = (v) => y0 + (el.hi - v) / (el.hi - el.lo) * alto;
+    const bw = (W - izq - der) / Math.max(p.length, 1), ult = p.length ? p[p.length - 1].periodo.split(" ")[0].replace(".", "") : "";
+    // eje derecho (línea)
+    for (let v = el.lo; v <= el.hi + 1e-9; v += el.paso) {
+      out.push(`<line x1="${W - der}" x2="${W - der + 4}" y1="${YL(v).toFixed(1)}" y2="${YL(v).toFixed(1)}" stroke="#808080" stroke-width="0.8"/><text x="${W - der + 7}" y="${(YL(v) + 3.5).toFixed(1)}" font-size="9.5">${esc(num(v, 1))}</text>`);
+    }
+    out.push(`<line x1="${W - der}" x2="${W - der}" y1="${YL(el.hi)}" y2="${YL(el.lo)}" stroke="#808080" stroke-width="0.8"/>`);
+    p.forEach((x, i) => {
+      const [m, a] = x.periodo.split(" "), mm = m.replace(".", ""), resalta = mm === ult, x0 = izq + i * bw + bw * 0.18, wv = bw * 0.64;
+      if (x.valor != null) {
+        const v = x.valor, yv = YB(Math.max(v, 0)), hv = Math.max(Math.abs(YB(v) - YB(0)), 0.8);
+        out.push(`<rect x="${x0.toFixed(1)}" y="${yv.toFixed(1)}" width="${wv.toFixed(1)}" height="${hv.toFixed(1)}" fill="${resalta ? "#fff" : CELESTE}" stroke="${CELESTE_BORDE}" stroke-width="${resalta ? 1 : 0.6}"/>`);
+        out.push(`<text x="${(x0 + wv / 2).toFixed(1)}" y="${(v >= 0 ? yv - 4 : yv + hv + 10).toFixed(1)}" text-anchor="middle" font-size="9">${esc(num(v, dec))}</text>`);
+      }
+      out.push(`<text x="${(x0 + wv / 2).toFixed(1)}" y="${y0 + alto + 15}" text-anchor="middle" font-size="9.5">${esc((INICIAL[mm] || mm[0]) + (mm === "Ene" ? "." + a.slice(2) : ""))}</text>`);
+    });
+    out.push(`<line x1="${izq}" x2="${W - der}" y1="${YB(0).toFixed(1)}" y2="${YB(0).toFixed(1)}" stroke="#808080" stroke-width="0.8"/>`);
+    // la línea punteada, por tramos (sin dato, se corta)
+    let tramo = [];
+    const cerrar = () => { if (tramo.length > 1) out.push(`<polyline points="${tramo.join(" ")}" fill="none" stroke="${ROJO}" stroke-width="1.2" stroke-dasharray="4 3"/>`); tramo = []; };
+    p.forEach((x, i) => { if (x.linea == null) return cerrar(); tramo.push(`${(izq + (i + 0.5) * bw).toFixed(1)},${YL(x.linea).toFixed(1)}`); });
+    cerrar();
+    // leyenda arriba a la derecha
+    const lx = W - der - 200, ly = y0 + 8;
+    out.push(`<rect x="${lx}" y="${ly - 7}" width="22" height="8" fill="${CELESTE}" stroke="${CELESTE_BORDE}" stroke-width="0.6"/><text x="${lx + 28}" y="${ly}" font-size="9.5">${esc(leyenda[0])}</text>`);
+    out.push(`<line x1="${lx}" x2="${lx + 22}" y1="${ly + 13}" y2="${ly + 13}" stroke="${ROJO}" stroke-width="1.2" stroke-dasharray="4 3"/><text x="${lx + 28}" y="${ly + 16.5}" font-size="9.5">${esc(leyenda[1])}</text>`);
+    const n = notas([...(spec.notas || []), ELABORACION], izq, y0 + alto + abajo + 12);
+    out.push(n.svg);
+    return envolver(W, n.y + 4, out.join(""));
+  }
+
   // ── Circulares (uno o dos lado a lado): spec = {numero, titulo, unidad, circulos: [{subtitulo, partes: [{nombre, valor}]}], notas}
   // paleta de las SERIES (info_export §11); «Otros» siempre en gris
   const PALETA = ["#111149", "#72D2D5", "#DD6140", "#FFC41D", "#D59D00", "#7030A0", "#CFF0F1"], OTROS = "#CCD3DF";   // paleta del Seminario de Periodistas
@@ -319,5 +368,5 @@
     bajar(await r.blob(), nombreArchivo(nombre) + ".xlsx");
   }
 
-  window.BCRP = Object.assign(api, { cuadro, anexo, barras, circulares, hbarras, apiladas, descargar, descargarPng, copiar, excel, num, var1, ELABORACION });
+  window.BCRP = Object.assign(api, { cuadro, anexo, barras, barrasLinea, circulares, hbarras, apiladas, descargar, descargarPng, copiar, excel, num, var1, ELABORACION });
 })();

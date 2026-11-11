@@ -4,6 +4,7 @@ Recibe el tipo y los datos del cuadro (los mismos con que se dibujó el SVG) y a
   · cuadro: título centrado, filetes horizontales (cabecera y total), sangrías y negritas;
   · anexo: horizontal, cabecera gris con los años arriba, total Ene.-Dic. separado, rótulos repetidos a la derecha;
   · barras: la serie (mes y valor) y el gráfico de barras de Excel con los colores de la síntesis;
+  · barraslinea: la variación interanual (barras) y la acumulada 12 meses (línea punteada roja, eje derecho), como la síntesis;
   · circular: la tabla de cada círculo (valor y %) con su gráfico circular; hbarras: los principales productos en barras.
 Los números van como números (no como texto), con los decimales que se ven en el cuadro.
 """
@@ -11,7 +12,7 @@ import io
 import re
 
 from openpyxl import Workbook
-from openpyxl.chart import BarChart, PieChart, Reference
+from openpyxl.chart import BarChart, LineChart, PieChart, Reference
 from openpyxl.chart.label import DataLabelList
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter as L
@@ -185,6 +186,53 @@ def _barras(ws, s):
     ws.column_dimensions["A"].width = 12
 
 
+def _barras_linea(ws, s):
+    puntos, dec = [p for p in s.get("puntos", []) if p.get("valor") is not None or p.get("linea") is not None], int(s.get("dec", 1))
+    ley = s.get("leyenda") or ["Var. % interanual", "Var. % acumulada 12 meses"]
+    r = _encabezado(ws, s, 8) + 1
+    for j, t in enumerate(["Mes", *ley], start=1):
+        ws.cell(r, j, t).font = NEG
+    fmt = "#,##0" + ("." + "0" * dec if dec else "")
+    for k, p in enumerate(puntos, start=1):
+        ws.cell(r + k, 1, p.get("periodo")).font = NOR
+        for j, campo in ((2, "valor"), (3, "linea")):
+            c = ws.cell(r + k, j, p.get(campo))
+            c.font, c.number_format = NOR, fmt
+    n = len(puntos)
+    bar = BarChart()
+    bar.type, bar.gapWidth = "col", 60
+    bar.add_data(Reference(ws, min_col=2, min_row=r, max_row=r + n), titles_from_data=True)
+    bar.set_categories(Reference(ws, min_col=1, min_row=r + 1, max_row=r + n))
+    sb = bar.series[0]
+    sb.graphicalProperties.solidFill = "B4C7E7"
+    sb.graphicalProperties.line.solidFill = "8FAADC"
+    sb.invertIfNegative = False
+    bar.dataLabels = DataLabelList()
+    bar.dataLabels.showVal = True
+    bar.dataLabels.showSerName = bar.dataLabels.showCatName = bar.dataLabels.showLegendKey = bar.dataLabels.showPercent = False
+    bar.dataLabels.numFmt = fmt
+    bar.y_axis.majorGridlines = None
+    bar.y_axis.delete = True
+    lin = LineChart()
+    lin.add_data(Reference(ws, min_col=3, min_row=r, max_row=r + n), titles_from_data=True)
+    sl = lin.series[0]
+    sl.graphicalProperties.line.solidFill = "FF0000"
+    sl.graphicalProperties.line.dashStyle = "dash"
+    sl.graphicalProperties.line.width = 15000
+    sl.smooth = False
+    lin.y_axis.axId = 200
+    lin.y_axis.crosses = "max"
+    lin.y_axis.majorGridlines = None
+    lin.y_axis.numFmt = "#,##0.0"
+    bar += lin
+    bar.legend.position = "t"
+    bar.height, bar.width = 10, 24
+    ws.add_chart(bar, f"E{r}")
+    _notas(ws, s.get("notas"), r + n + 2)
+    ws.column_dimensions["A"].width = 12
+    ws.column_dimensions["B"].width = ws.column_dimensions["C"].width = 16
+
+
 def _circular(ws, s):
     """Cada círculo: su tabla (rubro, valor, %) y el gráfico circular de Excel."""
     r = _encabezado(ws, s, 8) + 1
@@ -243,9 +291,9 @@ def libro(tipo, spec):
     ws = wb.active
     ws.title = re.sub(r"[\[\]\*\?/\\:]", "", (spec.get("numero") or "Cuadro"))[:31] or "Cuadro"
     ws.sheet_view.showGridLines = False
-    {"cuadro": _cuadro, "anexo": _anexo, "barras": _barras, "circular": _circular, "hbarras": _hbarras}[tipo](ws, spec)
+    {"cuadro": _cuadro, "anexo": _anexo, "barras": _barras, "barraslinea": _barras_linea, "circular": _circular, "hbarras": _hbarras}[tipo](ws, spec)
     # al imprimir: una página de ancho (los anexos, horizontales, como en la síntesis)
-    ws.page_setup.orientation = "landscape" if tipo in ("anexo", "barras") else "portrait"
+    ws.page_setup.orientation = "landscape" if tipo in ("anexo", "barras", "barraslinea") else "portrait"
     ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     buf = io.BytesIO()

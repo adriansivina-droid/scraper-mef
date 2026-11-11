@@ -603,10 +603,10 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
 
 @app.post("/v1/bcrp/excel", dependencies=[Depends(acceso)])
 def bcrp_excel_(cuerpo: dict = Body(...)):
-    """Excel de un cuadro de «Cuadros y gráficos BCRP» con el formato de la síntesis: {tipo: cuadro|anexo|barras|circular|hbarras, spec, nombre}."""
+    """Excel de un cuadro de «Cuadros y gráficos BCRP» con el formato de la síntesis: {tipo: cuadro|anexo|barras|barraslinea|circular|hbarras, spec, nombre}."""
     tipo, spec = cuerpo.get("tipo"), cuerpo.get("spec")
-    if tipo not in ("cuadro", "anexo", "barras", "circular", "hbarras") or not isinstance(spec, dict):
-        raise HTTPException(422, "Falta el tipo (cuadro, anexo, barras, circular o hbarras) o los datos del cuadro.")
+    if tipo not in ("cuadro", "anexo", "barras", "barraslinea", "circular", "hbarras") or not isinstance(spec, dict):
+        raise HTTPException(422, "Falta el tipo (cuadro, anexo, barras, barraslinea, circular o hbarras) o los datos del cuadro.")
     try:
         contenido = bcrp_excel.libro(tipo, spec)
     except (KeyError, TypeError, ValueError) as e:
