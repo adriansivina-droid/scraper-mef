@@ -238,7 +238,7 @@
         <p>SENAMHI no responde a servidores (ni a esta página, ni a Colab, ni a GitHub): solo a un navegador. Por eso la recolección corre en tu navegador y luego subes aquí el archivo que deja. Sirve para las tres regiones a la vez.</p>
         <div class="pasos">
           <div><b>1 · Abre SENAMHI</b><span>Abre <a href="${SENAMHI}" target="_blank" rel="noopener">Monitoreo Hidrológico de SENAMHI</a> en una pestaña nueva y espera a que cargue el mapa.</span></div>
-          <div><b>2 · Pega el código en la consola</b><span>Copia el código con este botón:</span><button class="btn" type="button" id="hid-copiar" style="align-self:flex-start">Copiar el código</button>
+          <div><b>2 · Pega el código en la consola</b><span>Este es el código (es el mismo todos los días):</span><textarea class="hid-codigo" id="hid-codigo" readonly rows="4" aria-label="Código para la consola">${esc(CONSOLA)}</textarea><button class="btn" type="button" id="hid-copiar" style="align-self:flex-start">Copiar el código</button>
             <span>En la pestaña de SENAMHI pulsa <b>F12</b>, entra a <b>Console</b>, pega con <b>Ctrl+V</b> y pulsa <b>Enter</b>. Aparece el panel abajo a la derecha y empieza solo. Tarda unos 5 minutos; deja la pestaña abierta. Si Chrome no deja pegar, escribe <b>allow pasting</b>, Enter, y vuelve a pegar.</span></div>
           <div><b>3 · Sube aquí el archivo</b><span>Al terminar se descarga <b>SENAMHI_crudo_AAAA-MM-DD.json</b> (carpeta Descargas). Arrástralo al recuadro de abajo. La página compara y sube solo lo nuevo.</span></div></div>
         <label class="zona-subida" for="hid-arch" id="hid-zona"><b>Arrastra aquí SENAMHI_crudo_….json o haz clic para elegirlo</b><span>El archivo trae todo lo recolectado desde 2023 (unos 33 MB); solo viaja lo que cambió</span><input class="solo-lector" type="file" id="hid-arch" accept=".json,application/json"></label>
@@ -251,8 +251,9 @@
         <p><b>¿Puedo subir un archivo viejo por error?</b> Sí, sin daño: la página no reemplaza una pieza por otra recolectada antes.</p>
         <p><b>¿Y el notebook de Colab?</b> Sigue sirviendo con el mismo archivo si quieres además la copia en Google Drive, pero ya no hace falta para la página.</p></details>`;
     const $ = (id) => caja.querySelector("#" + id), zona = $("hid-zona"), barra = caja.querySelector(".hid-barra"), res = $("hid-res");
+    $("hid-codigo").addEventListener("focus", (ev) => ev.target.select());
     const copiar = $("hid-copiar");
-    copiar.addEventListener("click", async () => { try { await navigator.clipboard.writeText(CONSOLA); copiar.textContent = "Copiado ✓ · pégalo en la consola"; } catch (e) { prompt("Copia este código:", CONSOLA); } });
+    copiar.addEventListener("click", async () => { try { await navigator.clipboard.writeText(CONSOLA); copiar.textContent = "Copiado ✓ · pégalo en la consola"; } catch (e) { $("hid-codigo").focus(); copiar.textContent = "Selecciónalo arriba y cópialo con Ctrl+C"; } });
     caja.querySelector(".hid-fav").addEventListener("click", (ev) => { ev.preventDefault(); res.innerHTML = '<div class="err-box"><b>Este botón no se pulsa aquí</b><span>Arrástralo a la barra de favoritos y úsalo desde allí.</span></div>'; });
     async function procesar(archivo) {
       if (!archivo) return;
