@@ -664,7 +664,8 @@ def anios(codigo, variable):
         if g.get("estado") == "OK" and (g.get("data") or {}).get("fechaHora"):
             y = int(clave.rsplit(":", 1)[1])
             disponibles.update({y, y - 1})
-    series = {y: s for y in sorted(disponibles) if (s := serie(codigo, variable, y)) and any(v is not None for v in s["actual"])}
+    ah_min = año_hidrologico(inicio())                       # desde el año en que empieza la recolección
+    series = {y: s for y in sorted(disponibles) if y >= ah_min and (s := serie(codigo, variable, y)) and any(v is not None for v in s["actual"])}
     if not series:
         return None
     base = date(2023, 9, 1)                                   # eje de referencia: setiembre 2023 a agosto 2024 (tiene 29 de febrero)
@@ -678,4 +679,5 @@ def anios(codigo, variable):
     ultimo = series[max(series)]
     return {"codigo": codigo, "variable": variable, "estacion": ultimo["estacion"], "rio": ultimo["rio"], "unidad": ultimo["unidad"],
             "desde": base.isoformat(), "dias": 366, "años": {str(y): sobre_el_eje(s, "actual") for y, s in series.items()},
+            "inicio": inicio().isoformat(),
             **{k: sobre_el_eje(ultimo, k) for k in ("promedio", "rojo", "naranja", "amarillo")}}
