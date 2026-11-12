@@ -13,6 +13,8 @@
   const RECOLECTOR = "https://raw.githubusercontent.com/adriansivina-droid/scraper-mef/main/HIDROLOGIA/senamhi_navegador.js";
   const SENAMHI = "https://www.senamhi.gob.pe/?p=monitoreo-hidrologico";
   // favorito: en la página de SENAMHI carga el recolector y lo pone a trabajar; en cualquier otra, lleva a SENAMHI
+  // línea para la consola (F12): carga el recolector y, si hay avance guardado, empieza solo
+  const CONSOLA = `window.__senamhiAuto=1;fetch('${RECOLECTOR}').then(r=>r.text()).then(eval)`;
   const FAVORITO = `javascript:(function(){if(!/senamhi\\.gob\\.pe$/.test(location.hostname)){location.href='${SENAMHI}';return}window.__senamhiAuto=1;fetch('${RECOLECTOR}').then(function(r){return r.text()}).then(eval)})()`;
 
   async function api(url, opciones) {
@@ -235,19 +237,22 @@
     caja.innerHTML = `<div class="caja"><h3>Actualizar los datos de SENAMHI</h3>
         <p>SENAMHI no responde a servidores (ni a esta página, ni a Colab, ni a GitHub): solo a un navegador. Por eso la recolección corre en tu navegador y luego subes aquí el archivo que deja. Sirve para las tres regiones a la vez.</p>
         <div class="pasos">
-          <div><b>1 · Una sola vez: guarda el favorito</b><span>Arrastra este botón a la barra de favoritos de tu navegador (Ctrl+Mayús+B la muestra):</span><a class="btn sec hid-fav" href="${esc(FAVORITO)}" title="Arrástrame a la barra de favoritos">Recolector SENAMHI</a><span>Si no se deja arrastrar: crea un favorito nuevo y pega como dirección <a href="#" id="hid-copiar-fav">este código (copiar)</a>.</span></div>
-          <div><b>2 · Cada día: clic en el favorito</b><span>Estando en cualquier página, haz clic en el favorito: te lleva a <a href="${SENAMHI}" target="_blank" rel="noopener">Monitoreo Hidrológico de SENAMHI</a>. Ya en esa página, <b>haz clic otra vez</b>: aparece el panel abajo a la derecha y empieza solo. La actualización diaria tarda unos 5 minutos; deja la pestaña abierta.</span></div>
+          <div><b>1 · Abre SENAMHI</b><span>Abre <a href="${SENAMHI}" target="_blank" rel="noopener">Monitoreo Hidrológico de SENAMHI</a> en una pestaña nueva y espera a que cargue el mapa.</span></div>
+          <div><b>2 · Pega el código en la consola</b><span>Copia el código con este botón:</span><button class="btn" type="button" id="hid-copiar" style="align-self:flex-start">Copiar el código</button>
+            <span>En la pestaña de SENAMHI pulsa <b>F12</b>, entra a <b>Console</b>, pega con <b>Ctrl+V</b> y pulsa <b>Enter</b>. Aparece el panel abajo a la derecha y empieza solo. Tarda unos 5 minutos; deja la pestaña abierta. Si Chrome no deja pegar, escribe <b>allow pasting</b>, Enter, y vuelve a pegar.</span></div>
           <div><b>3 · Sube aquí el archivo</b><span>Al terminar se descarga <b>SENAMHI_crudo_AAAA-MM-DD.json</b> (carpeta Descargas). Arrástralo al recuadro de abajo. La página compara y sube solo lo nuevo.</span></div></div>
         <label class="zona-subida" for="hid-arch" id="hid-zona"><b>Arrastra aquí SENAMHI_crudo_….json o haz clic para elegirlo</b><span>El archivo trae todo lo recolectado desde 2023 (unos 33 MB); solo viaja lo que cambió</span><input class="solo-lector" type="file" id="hid-arch" accept=".json,application/json"></label>
         <div class="hid-barra" hidden><span></span></div><div id="hid-res" aria-live="polite"></div></div>
       <details class="caja"><summary><b>Preguntas frecuentes</b></summary>
+        <p><b>¿Hay algo más rápido que la consola?</b> Puedes probar un favorito: arrastra <a class="hid-fav" href="${esc(FAVORITO)}" title="Arrástrame a la barra de favoritos">Recolector SENAMHI</a> a la barra de favoritos (Ctrl+Mayús+B la muestra) y haz clic en él estando en SENAMHI. En algunos navegadores la página de SENAMHI no deja correr favoritos; si al hacer clic no aparece el panel, usa la consola.</p>
         <p><b>¿Qué fechas pongo en el panel?</b> Ninguna: deja «Desde 01/01/2023». El recolector recuerda lo que ya bajó y cada día solo pide lo nuevo: el año hidrológico en curso de todas las estaciones (así recoge también las correcciones que SENAMHI hace a días pasados), los 3 últimos meses de la Información Mensual y la Información Diaria de hoy, de ayer y de los días que falten.</p>
         <p><b>¿Y si un día no lo hago?</b> No se pierde nada: al día siguiente recoge también los días que faltaron.</p>
         <p><b>¿Tiene que ser en la misma computadora?</b> Conviene: el avance se guarda en ese navegador. En otra computadora o tras borrar los datos de navegación, la primera vez vuelve a bajar todo (unas 4 horas); lo que ya está en la página no se pierde.</p>
         <p><b>¿Puedo subir un archivo viejo por error?</b> Sí, sin daño: la página no reemplaza una pieza por otra recolectada antes.</p>
         <p><b>¿Y el notebook de Colab?</b> Sigue sirviendo con el mismo archivo si quieres además la copia en Google Drive, pero ya no hace falta para la página.</p></details>`;
     const $ = (id) => caja.querySelector("#" + id), zona = $("hid-zona"), barra = caja.querySelector(".hid-barra"), res = $("hid-res");
-    $("hid-copiar-fav").addEventListener("click", async (ev) => { ev.preventDefault(); try { await navigator.clipboard.writeText(FAVORITO); ev.target.textContent = "copiado ✓"; } catch (e) { prompt("Copia este código:", FAVORITO); } });
+    const copiar = $("hid-copiar");
+    copiar.addEventListener("click", async () => { try { await navigator.clipboard.writeText(CONSOLA); copiar.textContent = "Copiado ✓ · pégalo en la consola"; } catch (e) { prompt("Copia este código:", CONSOLA); } });
     caja.querySelector(".hid-fav").addEventListener("click", (ev) => { ev.preventDefault(); res.innerHTML = '<div class="err-box"><b>Este botón no se pulsa aquí</b><span>Arrástralo a la barra de favoritos y úsalo desde allí.</span></div>'; });
     async function procesar(archivo) {
       if (!archivo) return;

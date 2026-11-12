@@ -64,7 +64,7 @@ No es un fallo del código: es un bloqueo de red de SENAMHI. Por eso **la descar
 
 ## 4. Cómo se ejecuta (dos pasos)
 
-**Rutina diaria (desde el 12/11/2026): favorito + página.** En la página del departamento, sección **Hidrología → Actualizar**, está el botón «Recolector SENAMHI» para arrastrar a la barra de favoritos. Cada día: clic en el favorito (lleva a SENAMHI), clic otra vez (carga el recolector y, si hay avance guardado, empieza solo; ~5 minutos) y arrastrar el `SENAMHI_crudo_….json` descargado al recuadro de esa misma pestaña. La página compara con lo que ya tiene y sube solo las piezas nuevas o cambiadas. El notebook de Colab (Paso B) queda como opción para tener además la copia en Drive.
+**Rutina diaria (desde el 12/11/2026): consola + página.** En la página del departamento, sección **Hidrología → Actualizar**, el botón «Copiar el código» copia una línea para la consola. Cada día: abrir Monitoreo Hidrológico de SENAMHI, F12 → Console, Ctrl+V y Enter (si hay avance guardado, el recolector empieza solo; ~5 minutos), y arrastrar el `SENAMHI_crudo_….json` descargado al recuadro de esa misma pestaña. La página compara con lo que ya tiene y sube solo las piezas nuevas o cambiadas. El favorito «Recolector SENAMHI» (en Preguntas frecuentes) hace lo mismo, pero en el primer uso real (12/11/2026) no funcionó en Chrome sobre la página de SENAMHI; la consola sí. El notebook de Colab (Paso B) queda como opción para tener además la copia en Drive.
 
 No hay que cambiar las fechas del panel: con «Desde 01/01/2023» el recolector solo pide lo nuevo (el año hidrológico en curso de todas las estaciones, los 3 últimos meses de la Información Mensual, y la Información Diaria de hoy, de ayer y de los días que falten).
 

@@ -371,6 +371,6 @@ tr.nueva-region td { border-top: 2px solid var(--hair); }
 .hid-tip > b { color: var(--navy); display: block; margin-bottom: 4px; } .hid-tip div { display: flex; align-items: center; gap: 6px; }
 .hid-tip div b { margin-left: auto; color: var(--ink); } .hid-tip div i { width: 10px; height: 3px; border-radius: 2px; flex: none; }
 .hid-enl { white-space: nowrap; }
-.hid-fav { align-self: flex-start; cursor: grab; border-style: dashed; border-color: var(--navy); }
+.hid-fav { cursor: grab; font-weight: 600; }
 .hid-barra { height: 8px; border-radius: 4px; background: var(--grey-soft); overflow: hidden; } .hid-barra span { display: block; height: 100%; width: 0; background: var(--teal); transition: width .2s; }
 #hidrologia { display: flex; flex-direction: column; gap: 16px; }
