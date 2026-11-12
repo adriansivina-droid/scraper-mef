@@ -19,9 +19,10 @@
   if (window.__senamhiRecolector) { window.__senamhiRecolector.mostrar(); return; }
   const AUTO = !!window.__senamhiAuto;      // cargado desde el favorito: si hay avance guardado, empieza solo
 
-  const VERSION = 3;
+  const VERSION = 4;
   const B = location.origin;
   const U = {
+    mapa: B + '/mapas/mapa-monitoreohidro/mapa-monitoreo.php',
     estaciones: B + '/mapas/mapa-monitoreohidro/include/ajaxEstaciones.php',
     idesep: B + '/mapas/mapa-monitoreohidro/include/ajaxIdesep.php',
     grafica: B + '/mapas/mapa-monitoreohidro/include/mnt-grafica-new.php',
@@ -172,6 +173,11 @@
     let lista = json(await pedir(U.estaciones, form({ cod_zonal: '-1' })));
     if (!Array.isArray(lista) || !lista.length) throw new Error('SENAMHI no respondió la lista de estaciones');
     await guardar('estaciones', lista);
+    // la lista que pinta el mapa de SENAMHI: coordenadas, dirección zonal y color de alerta de cada estación
+    try {
+      const html = await pedir(U.mapa, null, 2), m = /var\s+listaMonitoreo\s*=\s*/.exec(html || '');
+      if (m) { const ini = m.index + m[0].length, l = json(html.slice(ini, html.indexOf('];', ini) + 1)); if (Array.isArray(l) && l.length) await guardar('monitoreo', l); }
+    } catch (e) { /* sin la lista del mapa se usan las coordenadas guardadas en la página */ }
     // dirección zonal de cada estación (el mismo filtro «Dirección Zonal» del mapa); se pide una sola vez
     let zonales = await leer('zonales');
     if (!zonales) {
@@ -325,7 +331,7 @@
   async function exportar() {
     const t = await todo();
     const out = { version: VERSION, generado: new Date().toISOString(), meta: t.meta || {}, estaciones: t.estaciones || [],
-                  wfs: t.wfs || null, zonales: t.zonales || null, historiaOk: t.historiaOk === undefined ? null : t.historiaOk,
+                  wfs: t.wfs || null, zonales: t.zonales || null, monitoreo: t.monitoreo || null, historiaOk: t.historiaOk === undefined ? null : t.historiaOk,
                   fichas: {}, graficas: [], mensual: {}, infoMeta: t.infoMeta || {}, infoDiaria: {} };
     for (const k in t) {
       if (k.startsWith('ficha:')) out.fichas[k.slice(6)] = t[k].f;

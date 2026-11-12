@@ -377,3 +377,12 @@ tr.nueva-region td { border-top: 2px solid var(--hair); }
 .hid-codigo { width: 100%; font: 12px/1.4 var(--mono); color: var(--ink); background: var(--panel); border: 1px solid var(--hair); border-radius: 8px; padding: 8px; resize: none; word-break: break-all; }
 .hid-marco { min-width: 640px; } .hid-nav { margin-top: 2px; } .hid-nav svg { width: 100%; height: auto; display: block; user-select: none; }
 .hid-lienzo .hid-guia { top: 0; bottom: auto; }
+.hid-mapa { height: 520px; border: 1px solid var(--hair); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.hid-mapa .loading, .hid-mapa .err-box { margin: 16px; }
+.hid-ley { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--mid); }
+.hid-ley i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid #333; margin-right: 6px; vertical-align: -1px; }
+.hid-largo { max-height: 460px; overflow-y: auto; }
+.hid-largo table tr:first-child th { position: sticky; top: 0; background: var(--paper); z-index: 1; }
+.hid-pop { display: flex; flex-direction: column; gap: 3px; font: 13px/1.4 var(--font); min-width: 190px; }
+.hid-pop span { color: var(--mid); font-size: 12px; } .hid-pop small { color: var(--mid); } .hid-pop .btn { margin-top: 6px; align-self: flex-start; }
+@media (max-width: 700px) { .hid-mapa { height: 420px; } }

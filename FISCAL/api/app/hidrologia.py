@@ -33,7 +33,7 @@ DEPTOS = {"16": "LORETO", "22": "SAN MARTIN", "25": "UCAYALI"}
 ZONAL_DE = {"16": "08", "22": "09", "25": "10"}  # dirección zonal que atiende a cada departamento (si SENAMHI no da el departamento)
 MES_EN = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6, "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10,
           "NOV": 11, "DEC": 12}
-_RE_CLAVE = re.compile(r"^(meta|estaciones|zonales|infoMeta|fichas|historiaOk|graf:[^:]{1,40}:(NIVEL|CAUDAL):\d{4}"
+_RE_CLAVE = re.compile(r"^(meta|estaciones|zonales|infoMeta|fichas|historiaOk|monitoreo|graf:[^:]{1,40}:(NIVEL|CAUDAL):\d{4}"
                        r"|men:\d{4}-\d{2}|inf:\d{4}-\d{2}-\d{2}:\d{2}:\d{2})$")
 ARCHIVOS = {"diario": "SENAMHI_rios_diario.csv", "info-diaria": "SENAMHI_rios_info_diaria.csv",
             "mensual": "SENAMHI_rios_mensual.csv", "estaciones": "SENAMHI_ESTACIONES.csv",
@@ -49,7 +49,7 @@ COLS = {
                 "COD_ZONAL", "UNIDAD", "VALOR_MES", "VALOR_MES_ANTERIOR", "ANOMALIA", "UNIDAD_ANOMALIA", "TENDENCIA", "UMBRAL_ROJO",
                 "FECHA_EXTRACCION"],
     "estaciones": ["ID_ESTACION", "COD_ESTACION", "ESTACION", "SUB_ESTACION", "ESTADO", "COD_ZONAL", "DIRECCION_ZONAL", "DEPARTAMENTO",
-                   "FECHA_HORA_ULTIMA", "VARIABLE_OPCION", "RIO", "VARIABLES_CON_DATOS", "FECHA_EXTRACCION"],
+                   "FECHA_HORA_ULTIMA", "VARIABLE_OPCION", "RIO", "VARIABLES_CON_DATOS", "LATITUD", "LONGITUD", "FECHA_EXTRACCION"],
     "control": ["COD_ESTACION", "ESTACION", "VARIABLE", "ESTADO", "PRIMERA_FECHA", "ULTIMA_FECHA", "DIAS_CON_DATO", "DIAS_FALTANTES",
                 "SALTOS_RAROS", "LLEGA_AL_INICIO", "CRUCE_MENSUAL_DIF_MAX_%", "FECHA_EXTRACCION"],
     "control-info": ["FECHA", "HORA", "ESTACIONES", "CON_DATO", "ESTADO", "FECHA_EXTRACCION"],
@@ -160,7 +160,7 @@ def guardar(piezas, dia):
 
 def piezas_de_archivo(crudo):
     """El archivo «SENAMHI_crudo_….json» del navegador, partido en piezas (lo mismo que hace la página al subirlo)."""
-    out = [{"clave": k, "valor": crudo[k]} for k in ("meta", "estaciones", "zonales", "infoMeta", "fichas") if crudo.get(k)]
+    out = [{"clave": k, "valor": crudo[k]} for k in ("meta", "estaciones", "zonales", "infoMeta", "fichas", "monitoreo") if crudo.get(k)]
     for g in crudo.get("graficas") or []:
         out.append({"clave": f"graf:{g['cod']}:{g['variable']}:{g['y']}", "valor": g})
     out += [{"clave": f"men:{k}", "valor": v} for k, v in (crudo.get("mensual") or {}).items()]
@@ -197,6 +197,26 @@ def version():
     with db.motor().connect() as cx:
         n, a = cx.execute(text("SELECT COUNT(*), MAX(actualizado) FROM senamhi_crudo")).first()
     return f"{n}-{a or ''}"
+
+
+# ── ubicación de las estaciones ──────────────────────────────────────────────
+_UBICACION = Path(__file__).with_name("senamhi_ubicacion.json")
+
+
+def ubicacion():
+    """{código: {lat, lon, zonal, color}}. La lista del mapa de SENAMHI que trae el recolector (pieza «monitoreo»: es la que
+    pinta el mapa, con el color de alerta del día) y, si no está, la copia guardada en el repositorio (09/11/2026)."""
+    out = {c: {"lat": v[0], "lon": v[1], "zonal": v[2], "color": None}
+           for c, v in json.loads(_UBICACION.read_text(encoding="utf-8"))["estaciones"].items()}
+    for x in _leer("monitoreo", []) or []:
+        try:
+            cod = str(x["codEstacion"])
+            color = str(x.get("nomZonal") or "").split("-")[0].upper()
+            out[cod] = {"lat": round(float(x["latitud"]), 5), "lon": round(float(x["longitud"]), 5), "zonal": str(x.get("codZonal") or ""),
+                        "color": color if re.match(r"^#[0-9A-F]{6}$", color) else None}
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
 
 
 # ── del crudo a filas (las mismas reglas que el notebook) ────────────────────
@@ -253,7 +273,8 @@ def armar(carpeta):
     carpeta = Path(carpeta)
     meta = _leer("meta", {}) or {}
     estaciones = _leer("estaciones", []) or []
-    zonales = {str(k): str(v) for k, v in (_leer("zonales", {}) or {}).items()}
+    ubic = ubicacion()
+    zonales = {**{c: u["zonal"] for c, u in ubic.items() if u["zonal"]}, **{str(k): str(v) for k, v in (_leer("zonales", {}) or {}).items()}}
     fichas = _leer("fichas", {}) or {}
     meta_info = {str(k): v for k, v in (_leer("infoMeta", {}) or {}).items()}
     nombre_est = {str(e.get("codEstacion")): e.get("nomEstacion", "") for e in estaciones}
@@ -399,7 +420,8 @@ def armar(carpeta):
         fi = fichas.get(cod) or {}
         w.writerow([_v(e.get("idEstacion")), cod, e.get("nomEstacion", ""), _v(e.get("subEstacion")), _v(e.get("estado")),
                     zonales.get(cod, ""), ZONALES.get(zonales.get(cod, ""), ""), depto, fi.get("fecha_hora", ""),
-                    fi.get("variable_opcion", ""), rio.get(cod, ""), " / ".join(sorted(variables.get(cod, []))), hoy_txt])
+                    fi.get("variable_opcion", ""), rio.get(cod, ""), " / ".join(sorted(variables.get(cod, []))),
+                    _v((ubic.get(cod) or {}).get("lat")), _v((ubic.get(cod) or {}).get("lon")), hoy_txt])
         if cod in variables:
             por_depto[depto or "(sin departamento)"] = por_depto.get(depto or "(sin departamento)", 0) + 1
     f.close()
@@ -443,17 +465,22 @@ def estado():
     return {"hay": True, **preparado()[1]}
 
 
+def _zonales():
+    return {**{c: u["zonal"] for c, u in ubicacion().items() if u["zonal"]}, **{str(k): str(v) for k, v in (_leer("zonales", {}) or {}).items()}}
+
+
 def _codigos(departamento):
-    """Estaciones de un departamento («16», «22», «25»): las que SENAMHI marca con ese departamento y, de las que no
-    traen departamento, las de la dirección zonal que lo atiende. Devuelve {código: True si el departamento es seguro}."""
-    nombre = DEPTOS[departamento]
+    """Estaciones de un departamento («16», «22», «25»; «todos» = todo el país): las que SENAMHI marca con ese departamento
+    y, de las que no traen departamento, las de la dirección zonal que lo atiende. {código: True si el departamento es seguro}."""
     meta_info = {str(k): v for k, v in (_leer("infoMeta", {}) or {}).items()}
-    zonales = {str(k): str(v) for k, v in (_leer("zonales", {}) or {}).items()}
+    zonales = _zonales()
     out = {}
     for e in _leer("estaciones", []) or []:
         cod = str(e.get("codEstacion"))
         d = sin_tildes((meta_info.get(cod) or {}).get("nomDepa") or "")
-        if d == nombre:
+        if departamento == "todos":
+            out[cod] = bool(d)
+        elif d == DEPTOS[departamento]:
             out[cod] = True
         elif not d and zonales.get(cod) == ZONAL_DE[departamento]:
             out[cod] = False
@@ -503,6 +530,7 @@ def estaciones_de(departamento):
     codigos = _codigos(departamento)
     meta_info = {str(k): v for k, v in (_leer("infoMeta", {}) or {}).items()}
     nombres = {str(e.get("codEstacion")): e.get("nomEstacion", "") for e in _leer("estaciones", []) or []}
+    ubic, zonales = ubicacion(), _zonales()
     out = {}
     for clave, g, dia in _piezas("graf:"):
         _, cod, var, y = clave.split(":")
@@ -511,7 +539,10 @@ def estaciones_de(departamento):
             continue
         e = out.setdefault(cod, {"codigo": cod, "estacion": c.get("nomEstacion") or nombres.get(cod, cod), "rio": c.get("nomRio", ""),
                                  "cuenca": (meta_info.get(cod) or {}).get("nomCuenca", ""), "departamento_seguro": codigos[cod],
-                                 "variables": {}})
+                                 "departamento": sin_tildes((meta_info.get(cod) or {}).get("nomDepa") or ""),
+                                 "zonal": zonales.get(cod, ""), "direccion_zonal": ZONALES.get(zonales.get(cod, ""), ""),
+                                 "lat": (ubic.get(cod) or {}).get("lat"), "lon": (ubic.get(cod) or {}).get("lon"),
+                                 "color": (ubic.get(cod) or {}).get("color"), "variables": {}})
         v = e["variables"].setdefault(var, {"unidad": c.get("unidad", ""), "años": set(), "ultimo": None})
         y = int(y)
         v["años"].add(y)

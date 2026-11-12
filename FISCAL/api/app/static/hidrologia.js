@@ -136,15 +136,23 @@
       caja.innerHTML = `<div class="vacio-caja"><b>${j.resumen.hay ? `SENAMHI no tiene estaciones con datos en ${esc(r.nombre)}.` : "Todavía no hay datos de SENAMHI en la página."}</b><span>${j.resumen.hay ? "Los datos de las demás regiones están en «Descargar datos»." : "Ve a la pestaña «Actualizar»: allí se sube el archivo que deja el recolector."}</span></div>`;
       return;
     }
-    const e0 = st[r.cod] || (st[r.cod] = {});
+    const e0 = st[r.cod] || (st[r.cod] = {}), pais = r.cod === "todos";
+    if (pais) j.estaciones.sort((a, b) => (a.zonal || "99").localeCompare(b.zonal || "99") || a.rio.localeCompare(b.rio) || a.estacion.localeCompare(b.estacion));
     const filas = j.estaciones.flatMap((e) => Object.entries(e.variables).map(([v, d]) => ({ e, v, d })));
-    const dudosas = j.estaciones.filter((e) => !e.departamento_seguro).length;
-    caja.innerHTML = `<div class="caja"><h3>Situación de los ríos de ${esc(r.nombre)}</h3>
+    const dudosas = pais ? 0 : j.estaciones.filter((e) => !e.departamento_seguro).length;
+    const zonas = [...new Set(j.estaciones.map((e) => e.zonal).filter(Boolean))].sort();
+    caja.innerHTML = `${pais ? `<div class="caja"><h3>Red de monitoreo hidrológico de SENAMHI</h3>
+        <p>Las ${j.estaciones.length} estaciones con datos, en el mapa. El color es el de la alerta de SENAMHI. Haz clic en una estación para ver su último dato y su hidrograma.</p>
+        <div class="fila"><label class="campo">Dirección zonal<select id="hid-dz"><option value="">Todas</option>${zonas.map((z) => `<option value="${z}">${esc(ZONAS[z] || "DZ " + z)}</option>`).join("")}</select></label>
+          <label class="campo">Estación<select id="hid-buscar"></select></label></div>
+        <div class="hid-mapa" id="hid-mapa"><div class="loading"><span class="spin"></span>Cargando el mapa…</div></div>
+        <div class="hid-ley">${[["normal", "Sin alerta"], ["amarillo", "Alerta amarilla"], ["naranja", "Alerta naranja"], ["rojo", "Alerta roja"]].map(([k, t]) => `<span><i style="background:${PUNTO[k]}"></i>${t}</span>`).join("")}</div></div>` : ""}
+      <div class="caja"><h3>Situación de los ríos ${pais ? "del Perú" : "de " + esc(r.nombre)}</h3>
         <p>Último dato de cada estación, comparado con el mismo día del año pasado y con el promedio histórico. Haz clic en una fila para ver su gráfico.</p>
-        <div class="scroll"><table class="hid-tabla"><tr><th>Río</th><th>Estación</th><th>Variable</th><th>Fecha</th><th class="n">Último dato</th><th class="n">Año anterior</th><th class="n">Promedio histórico</th><th>Alerta de SENAMHI</th></tr>
+        <div class="scroll${pais ? " hid-largo" : ""}"><table class="hid-tabla"><tr>${pais ? "<th>Dirección zonal</th><th>Departamento</th>" : ""}<th>Río</th><th>Estación</th><th>Variable</th><th>Fecha</th><th class="n">Último dato</th><th class="n">Año anterior</th><th class="n">Promedio histórico</th><th>Alerta de SENAMHI</th></tr>
         ${filas.map(({ e, v, d }, k) => { const u = d.ultimo || {}, dif = (b) => b == null || u.valor == null ? "" : ` <small class="${u.valor - b >= 0 ? "sube" : "baja"}">${u.valor - b >= 0 ? "+" : "−"}${num(Math.abs(u.valor - b))}</small>`;
-          return `<tr data-fila="${k}" tabindex="0"><td>${esc(titulo(e.rio))}</td><td><b>${esc(titulo(e.estacion))}</b>${e.departamento_seguro ? "" : " *"}</td><td>${VAR[v]} <small>(${esc(d.unidad)})</small></td><td>${dmy(u.fecha)}</td><td class="n"><b>${num(u.valor)}</b></td><td class="n">${num(u.anterior)}${dif(u.anterior)}</td><td class="n">${num(u.promedio)}${dif(u.promedio)}</td><td>${chip(alerta(u))}</td></tr>`; }).join("")}</table></div>
-        <p class="nota">La diferencia en color es cuánto está el río por encima (+) o por debajo (−) de esa referencia. Los umbrales los fija SENAMHI para cada estación: en unas avisan de nivel bajo (vaciante) y en otras de crecida.${dudosas ? ` * SENAMHI no indica el departamento de esa estación: se incluye por pertenecer a la dirección zonal que atiende a ${esc(r.nombre)}.` : ""}</p></div>
+          return `<tr data-fila="${k}" data-zona="${esc(e.zonal)}" tabindex="0">${pais ? `<td>${esc(ZONAS[e.zonal] || "—")}</td><td>${esc(titulo(e.departamento)) || "—"}</td>` : ""}<td>${esc(titulo(e.rio))}</td><td><b>${esc(titulo(e.estacion))}</b>${e.departamento_seguro || pais ? "" : " *"}</td><td>${VAR[v]} <small>(${esc(d.unidad)})</small></td><td>${dmy(u.fecha)}</td><td class="n"><b>${num(u.valor)}</b></td><td class="n">${num(u.anterior)}${dif(u.anterior)}</td><td class="n">${num(u.promedio)}${dif(u.promedio)}</td><td>${chip(alerta(u))}</td></tr>`; }).join("")}</table></div>
+        <p class="nota">La diferencia en color es cuánto está el río por encima (+) o por debajo (−) de esa referencia. Los umbrales los fija SENAMHI para cada estación: en unas avisan de nivel bajo (vaciante) y en otras de crecida.${dudosas ? ` * SENAMHI no indica el departamento de esa estación: se incluye por pertenecer a la dirección zonal que atiende a ${esc(r.nombre)}.` : ""}${pais ? " El departamento lo da SENAMHI solo para las estaciones principales." : ""}</p></div>
       <div class="caja"><h3>Hidrograma</h3>
         <div class="fila"><label class="campo">Estación<select id="hid-est">${j.estaciones.map((e) => `<option value="${esc(e.codigo)}">${esc(titulo(e.rio))} · ${esc(titulo(e.estacion))}</option>`).join("")}</select></label>
           <label class="campo">Variable<select id="hid-var"></select></label>
@@ -260,6 +268,8 @@
     }
     if (j.estaciones.some((e) => e.codigo === e0.c)) $("hid-est").value = e0.c;
     opciones(); cargar();
+    const verHidrograma = (cod) => { $("hid-est").value = cod; e0.a = null; opciones(); cargar(); $("hid-graf").scrollIntoView({ behavior: "smooth", block: "center" }); };
+    if (pais) mapa(caja, j.estaciones, e0, verHidrograma);
     $("hid-est").addEventListener("change", () => { opciones(); cargar(); });
     $("hid-var").addEventListener("change", () => { e0.v = $("hid-var").value; opciones(); cargar(); });
     $("hid-anio").addEventListener("change", () => { e0.a = +$("hid-anio").value; cargar(); });
@@ -280,6 +290,66 @@
       tr.addEventListener("click", ir); tr.addEventListener("keydown", (ev) => { if (ev.key === "Enter") ir(); }); });
   }
 
+  // ── mapa de estaciones (todo el país), como el de SENAMHI ──
+  const ZONAS = { "01": "DZ 1 · Piura", "02": "DZ 2 · Lambayeque", "03": "DZ 3 · Cajamarca", "04": "DZ 4 · Lima", "05": "DZ 5 · Ica", "06": "DZ 6 · Arequipa",
+    "07": "DZ 7 · Tacna", "08": "DZ 8 · Loreto", "09": "DZ 9 · San Martín", "10": "DZ 10 · Huánuco", "11": "DZ 11 · Junín", "12": "DZ 12 · Cusco", "13": "DZ 13 · Puno" };
+  const PUNTO = { normal: "#FFFFFF", amarillo: "#FFFF00", naranja: "#FFA500", rojo: "#FF0000" };
+  let leaflet = null;
+  function cargarLeaflet() {
+    if (window.L) return Promise.resolve(window.L);
+    if (leaflet) return leaflet;
+    leaflet = new Promise((ok, mal) => {
+      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"; document.head.appendChild(css);
+      const js = document.createElement("script"); js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js";
+      js.onload = () => ok(window.L); js.onerror = () => { leaflet = null; mal(new Error("no se pudo cargar el mapa (Leaflet)")); }; document.head.appendChild(js);
+    });
+    return leaflet;
+  }
+  // color del punto: el que pinta SENAMHI ese día (si el recolector trajo su mapa) o, si no, el que sale de los umbrales
+  function colorDe(e) {
+    if (e.color && e.color !== "#FFFFFF") return e.color;
+    const v = e.variables.NIVEL || e.variables.CAUDAL, a = alerta(v && v.ultimo);
+    return PUNTO[a ? a.nivel : "normal"];
+  }
+  async function mapa(caja, estaciones, e0, verHidrograma) {
+    const div = caja.querySelector("#hid-mapa"), zona = caja.querySelector("#hid-dz"), buscar = caja.querySelector("#hid-buscar");
+    let L;
+    try { L = await cargarLeaflet(); } catch (er) { div.innerHTML = `<div class="err-box"><b>No se pudo mostrar el mapa</b><span>${esc(er.message)}. La tabla y el hidrograma de abajo funcionan igual.</span></div>`; return; }
+    div.innerHTML = "";
+    const m = L.map(div, { scrollWheelZoom: false, zoomSnap: 0.5 }).setView([-9.2, -75], 5);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 13, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Estaciones: SENAMHI' }).addTo(m);
+    const puntos = {};
+    const ultimo = (e) => Object.entries(e.variables).map(([v, d]) => d.ultimo ? `<div>${VAR[v]}: <b>${num(d.ultimo.valor)}</b> ${esc(d.unidad)} <small>(${dmy(d.ultimo.fecha)})</small></div>` : "").join("");
+    estaciones.filter((e) => e.lat != null).forEach((e) => {
+      const p = L.circleMarker([e.lat, e.lon], { radius: 6, weight: 1.5, color: "#333", fillColor: colorDe(e), fillOpacity: 1 });
+      p.bindTooltip(`${titulo(e.estacion)} · ${titulo(e.rio)}`, { direction: "top", offset: [0, -6] });
+      p.bindPopup(`<div class="hid-pop"><b>${esc(titulo(e.estacion))}</b><span>${esc(titulo(e.rio))} · ${esc(ZONAS[e.zonal] || "")}${e.departamento ? " · " + esc(titulo(e.departamento)) : ""}</span>${ultimo(e)}<button class="btn chico" type="button" data-ver="${esc(e.codigo)}">Ver hidrograma</button></div>`);
+      p.on("popupopen", (ev) => { const b = ev.popup.getElement().querySelector("[data-ver]"); if (b) b.onclick = () => { m.closePopup(); verHidrograma(e.codigo); }; });
+      puntos[e.codigo] = { p, e };
+    });
+    const filtrar = () => {
+      const z = zona.value, vis = Object.values(puntos).filter(({ e }) => !z || e.zonal === z);
+      Object.values(puntos).forEach(({ p, e }) => { if (!z || e.zonal === z) p.addTo(m); else p.remove(); });
+      buscar.innerHTML = '<option value="">Seleccione</option>' + vis.map(({ e }) => `<option value="${esc(e.codigo)}">${esc(titulo(e.estacion))} · ${esc(titulo(e.rio))}</option>`).join("");
+      caja.querySelectorAll("tr[data-zona]").forEach((tr) => { tr.hidden = !!z && tr.dataset.zona !== z; });
+      if (vis.length) m.fitBounds(L.latLngBounds(vis.map(({ e }) => [e.lat, e.lon])).pad(0.15), { maxZoom: 8 });
+      e0.zona = z;
+    };
+    zona.value = e0.zona || ""; filtrar();
+    zona.addEventListener("change", filtrar);
+    buscar.addEventListener("change", () => { const x = puntos[buscar.value]; if (!x) return; m.setView([x.e.lat, x.e.lon], 9); x.p.openPopup(); });
+    setTimeout(() => m.invalidateSize(), 50);
+  }
+
+  // Perú: la misma sección con el mapa de todas las estaciones y las descargas de todo el país
+  function peru(caja, pestaña) {
+    const tabs = ["Mapa y gráfico", "Descargar datos", "Actualizar"], t = tabs.includes(pestaña) ? pestaña : tabs[0];
+    caja.innerHTML = `<div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-hid-tab="${x}" aria-selected="${x === t}">${x}</button>`).join("")}</div><div id="hid-peru"></div>`;
+    caja.querySelectorAll("[data-hid-tab]").forEach((b) => b.addEventListener("click", () => { HIDRO.pestañaPeru = b.dataset.hidTab; peru(caja, b.dataset.hidTab); }));
+    const r = { cod: "todos", nombre: "Perú" }, c = caja.querySelector("#hid-peru");
+    (t === "Actualizar" ? actualizar : t === "Descargar datos" ? descargas : grafico)(r, c);
+  }
+
   function ponerHasta(res) {
     const b = document.getElementById("hid-hasta");
     if (b) b.textContent = res && res.hay ? `${dmy(res.ultima_fecha)} (recolectado el ${dmy(res.recolectado)})` : "Sin datos todavía";
@@ -297,12 +367,14 @@
     try { res = await api("/v1/hidrologia"); } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar</b><span>${esc(e.message)}</span></div>`; return; }
     ponerHasta(res);
     if (!res.hay) { caja.innerHTML = '<div class="vacio-caja"><b>Todavía no hay datos de SENAMHI en la página.</b><span>Ve a la pestaña «Actualizar»: allí se sube el archivo que deja el recolector.</span></div>'; return; }
+    const pais = r.cod === "todos";
     const u = (a, d, f) => `/v1/hidrologia/descargar?archivo=${a}${d ? "&departamento=" + d : ""}${f ? "&formato=" + f : ""}`;
     caja.innerHTML = `<div class="caja"><h3>Datos del scraper de SENAMHI</h3>
       <p>Son los mismos archivos que arma el notebook de Colab. Hay <b>${num(res.filas_diario, 0)}</b> filas diarias de <b>${res.estaciones_con_datos}</b> estaciones, <b>${num(res.filas_info_diaria, 0)}</b> de Información Diaria y <b>${num(res.filas_mensual, 0)}</b> mensuales; el último dato es del <b>${dmy(res.ultima_fecha)}</b>.</p>
-      <div class="scroll"><table><tr><th>Archivo</th><th>Qué trae</th><th>Solo ${esc(r.nombre)}</th><th>Todo el país</th></tr>
-      ${ARCH.map(([a, t, d]) => `<tr><td><b>${t}</b></td><td>${d}</td><td class="hid-enl"><a href="${u(a, r.cod, "xlsx")}">Excel</a> · <a href="${u(a, r.cod)}">CSV</a></td><td class="hid-enl"><a href="${u(a)}">CSV</a>${a === "diario" || a === "info-diaria" ? "" : ` · <a href="${u(a, "", "xlsx")}">Excel</a>`}</td></tr>`).join("")}</table></div>
-      <div class="fila"><a class="btn" href="${u("todo", r.cod)}">Todo lo de ${esc(r.nombre)} (.zip)</a><a class="btn sec" href="${u("todo")}">Todo el país, con los controles (.zip)</a></div>
+      <div class="scroll"><table><tr><th>Archivo</th><th>Qué trae</th>${pais ? "" : `<th>Solo ${esc(r.nombre)}</th>`}<th>Todo el país</th></tr>
+      ${ARCH.map(([a, t, d]) => `<tr><td><b>${t}</b></td><td>${d}</td>${pais ? "" : `<td class="hid-enl"><a href="${u(a, r.cod, "xlsx")}">Excel</a> · <a href="${u(a, r.cod)}">CSV</a></td>`}<td class="hid-enl"><a href="${u(a)}">CSV</a>${a === "diario" || a === "info-diaria" ? "" : ` · <a href="${u(a, "", "xlsx")}">Excel</a>`}</td></tr>`).join("")}</table></div>
+      <div class="fila">${pais ? "" : `<a class="btn" href="${u("todo", r.cod)}">Todo lo de ${esc(r.nombre)} (.zip)</a>`}<a class="btn${pais ? "" : " sec"}" href="${u("todo")}">Todo el país, con los controles (.zip)</a></div>
+      ${pais ? `<p class="nota">Para un departamento en particular, cada región (Loreto, San Martín, Ucayali) tiene su sección Hidrología con sus propios archivos. Los CSV de todo el país traen las columnas COD_ZONAL y DEPARTAMENTO para filtrar.</p>` : ""}
       <p class="nota">Los CSV están en UTF-8 con comas. Si Excel muestra «AÃ‘O», usa el enlace «Excel» o ábrelo desde Datos → Desde texto/CSV. El significado de cada columna está en <a href="https://github.com/adriansivina-droid/scraper-mef/blob/main/HIDROLOGIA/docs/Diccionario_SENAMHI_rios.pdf" target="_blank" rel="noopener">el diccionario de datos</a>.${res.a_revisar ? ` El control marca ${res.a_revisar} series con «REVISAR (saltos)»: son cambios bruscos de un día a otro que conviene mirar; los datos se guardan tal como los publica SENAMHI.` : ""}</p></div>`;
   }
 
@@ -315,7 +387,7 @@
   }
   function piezasDe(crudo) {
     const out = [], pon = (clave, valor, base) => { const texto = JSON.stringify(valor); out.push({ clave, valor, huella: huella(base === undefined ? texto : JSON.stringify(base)), peso: texto.length }); };
-    ["meta", "estaciones", "zonales", "infoMeta", "fichas"].forEach((k) => { if (crudo[k] && Object.keys(crudo[k]).length) pon(k, crudo[k]); });
+    ["meta", "estaciones", "zonales", "infoMeta", "fichas", "monitoreo"].forEach((k) => { if (crudo[k] && Object.keys(crudo[k]).length) pon(k, crudo[k]); });
     (crudo.graficas || []).forEach((g) => pon(`graf:${g.cod}:${g.variable}:${g.y}`, g, [g.estado, g.data]));   // la huella no mira el día de la consulta
     Object.entries(crudo.mensual || {}).forEach(([k, v]) => pon(`men:${k}`, v));
     Object.entries(crudo.infoDiaria || {}).forEach(([k, v]) => pon(`inf:${k.slice(0, 10)}:${k.slice(11)}`, v));
@@ -393,6 +465,6 @@
     api("/v1/hidrologia").then(ponerHasta).catch(() => {});
   }
 
-  window.HIDRO = { TABS: ["Gráfico", "Descargar datos", "Actualizar"], hidrograma, navegador, alerta, piezasDe,
+  window.HIDRO = { TABS: ["Gráfico", "Descargar datos", "Actualizar"], hidrograma, navegador, peru, alerta, piezasDe,
     pintar(r, caja, pestaña) { return (pestaña === "Actualizar" ? actualizar : pestaña === "Descargar datos" ? descargas : grafico)(r, caja); } };
 })();

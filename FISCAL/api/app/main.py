@@ -334,7 +334,7 @@ def hidrologia_subir(cuerpo: dict = Body(...)):
 
 
 @app.get("/v1/hidrologia/estaciones", dependencies=[Depends(acceso)])
-def hidrologia_estaciones(departamento: str = Query(..., pattern="^(16|22|25)$")):
+def hidrologia_estaciones(departamento: str = Query(..., pattern="^(16|22|25|todos)$")):
     """Estaciones del departamento con datos, sus variables, años hidrológicos y el último dato."""
     if not hidrologia.hay_datos():
         return {"estaciones": [], "resumen": {"hay": False}}
