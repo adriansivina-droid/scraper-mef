@@ -98,14 +98,29 @@
     lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "hidrologia", num: "V" }, { id: "anexos", num: "VI" }, { id: "drae" }] },
     smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "hidrologia", num: "V" }, { id: "anexos", num: "VI" }, { id: "drae" }] },
     uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "hidrologia", num: "V" }, { id: "anexos", num: "VI" }, { id: "drae" }] },
-    tres: { comun: true, indice: [{ id: "panorama" }, { id: "guia" }, cap("Empleo", ["empleo-total", "empleo-sectores", "empleo-long"]), cap("MEF", ["mef-archivos", "bases-mef"]), cap("Comparar regiones", ["bases"]), cap("Hidrología", ["hidro-peru"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
+    tres: { comun: true, indice: [{ id: "panorama" }, { id: "guia" }, cap("Empleo", ["empleo-total", "empleo-sectores", "empleo-long"]), cap("MEF", ["mef-archivos", "bases-mef"]), cap("Comparar regiones", ["bases"]), cap("Hidrología", ["hidro-peru"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "compartir", "parametros"])] },
   };
   const C = { "hidro-peru": "Ríos del Perú (SENAMHI)", panorama: "Panorama de las tres regiones", guia: "Guía de uso", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-total": "Empleo · total por región", "empleo-sectores": "Empleo · por sectores", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
-              "act-empleo": "Scraper de empleo", "act-hidro": "Hidrocarburos (PERUPETRO)", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", parametros: "Parámetros" };
+              "act-empleo": "Scraper de empleo", "act-hidro": "Hidrocarburos (PERUPETRO)", "act-archivos": "Subir archivos", estado: "Estado de la base de datos", compartir: "Compartir la página", parametros: "Parámetros" };
   const CORTO = { [V]: "IV. Ejecución del presupuesto" };
   const NACIONAL = ["inv-dev-funcion", "inv-dev-municipalidad", "inv-pim-funcion", "inv-pim-municipalidad"];   // bases con los 25 departamentos
 
-  let CAT = null, ESTADO = null, MESES = [], grupo = "lor", id = "resumen";
+  let CAT = null, ESTADO = null, MESES = [], grupo = "lor", id = "resumen", INVITADO = null;
+  // lo que un invitado puede ver: de cada pestaña, los sectores que se le dieron (el servidor lo hace cumplir; esto solo oculta lo demás)
+  const PAGINAS_PERU = { "hidro-peru": ["hidro-peru"], empleo: ["empleo-total", "empleo-sectores", "empleo-long"], mef: ["mef-archivos", "bases-mef"], bases: ["bases"] };
+  const TABS_DE_EQUIPO = ["Actualizar", "Archivos", "Base mensual", "Resumen Export", "Resumen Import", "Contraste"];
+  function restringir(acceso) {
+    INVITADO = acceso;
+    const perm = acceso.permisos;
+    for (const g of Object.keys(GRUPOS)) {
+      const dadas = perm[g] || [];
+      if (!dadas.length) { delete GRUPOS[g]; continue; }
+      const permitidos = g === "tres" ? dadas.flatMap((k) => PAGINAS_PERU[k] || []) : dadas;
+      GRUPOS[g].indice = GRUPOS[g].indice.map((e) => e.items ? { ...e, items: e.items.filter((x) => permitidos.includes(x)) } : e)
+        .filter((e) => e.items ? e.items.length : permitidos.includes(e.id));
+      if (!GRUPOS[g].indice.length) delete GRUPOS[g];
+    }
+  }
   const pestana = {}, cerrados = new Set(), paneles = {};   // capítulos del índice que el usuario cerró
   const base = (b) => CAT.bases.find((x) => x.id === b);
   const planos = (g) => GRUPOS[g].indice.flatMap((e) => e.items ? e.items : [e.id]);
@@ -120,7 +135,7 @@
 
   // ── Grupos e índice desplegable ──
   function pintarGrupos() {
-    const g = { lor: ["Loreto", "LOR"], smn: ["San Martín", "SMN"], uca: ["Ucayali", "UCA"], tres: ["Perú", "Nacional · LOR · SMN · UCA"] };
+    const g = Object.fromEntries(Object.entries({ lor: ["Loreto", "LOR"], smn: ["San Martín", "SMN"], uca: ["Ucayali", "UCA"], tres: ["Perú", "Nacional · LOR · SMN · UCA"] }).filter(([k]) => GRUPOS[k]));
     $("grupos").innerHTML = Object.entries(g).map(([k, [n, c]]) => `<button type="button" data-grupo="${k}" aria-pressed="${k === grupo}">${esc(n)}<small>${esc(c)}</small></button>`).join("");
     document.querySelectorAll("[data-grupo]").forEach((b) => b.addEventListener("click", () => { location.hash = `${b.dataset.grupo}-${planos(b.dataset.grupo)[0]}`; }));
   }
@@ -1786,8 +1801,9 @@
     const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
     // primero lo del informe (cuadros, gráficos, mapa, revisiones); al final, los datos y la actualización
     const DE_DATOS = ["Archivos", "Base mensual"], extra = s.extra || [];
-    const tabs = s.cuadros === "hidrologia" ? HIDRO.TABS : s.cuadros === "anexos" ? [ANEXOS_TAB] : s.cuadros === "resumen" ? [RESUMEN_TAB] : s.cuadros === "drae" ? [DRAE_TAB, "Actualizar"] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
+    const tabs0 = s.cuadros === "hidrologia" ? HIDRO.TABS : s.cuadros === "anexos" ? [ANEXOS_TAB] : s.cuadros === "resumen" ? [RESUMEN_TAB] : s.cuadros === "drae" ? [DRAE_TAB, "Actualizar"] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
       ...extra.filter((x) => !DE_DATOS.includes(x)), "Datos", ...extra.filter((x) => DE_DATOS.includes(x)), ...(s.sinActualizar ? [] : ["Actualizar"])];
+    const tabs = INVITADO ? tabs0.filter((x) => !TABS_DE_EQUIPO.includes(x)) : tabs0;
     const t = s.cuadros === "hidrologia" ? (HIDRO.TABS.includes(pestana[grupo + id]) ? pestana[grupo + id] : HIDRO.TABS[0]) : s.cuadros === "anexos" ? ANEXOS_TAB : s.cuadros === "resumen" ? RESUMEN_TAB : s.cuadros === "drae" ? (pestana[grupo + id] || DRAE_TAB) : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
@@ -1831,6 +1847,50 @@
         <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div>${s.cuadros === "drae" ? '<div><small>Qué hay</small><b>Los gráficos de las SERIES, sin duplicados ni versiones viejas</b></div>' : `<div><small>Datos hasta</small><b${s.cuadros === "hidrologia" ? ' id="hid-hasta"' : ""}>${s.cuadros === "hidrologia" ? "…" : hasta ? esc(etqMes(hasta)) : "Sin datos todavía"}</b></div>`}</div>
       <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}"${["Datos", "Actualizar", ...DE_DATOS].includes(x) ? ` class="de-datos${x === tabs.find((y) => ["Datos", "Actualizar", ...DE_DATOS].includes(y)) ? " primero" : ""}"` : ""}>${esc(x)}${(x === "Cuadros" && Array.isArray(s.cuadros)) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
       <div class="panel" role="tabpanel">${panel}</div>`;
+  }
+
+  // ── Compartir la página con terceros (solo el equipo) ──
+  async function cajaCompartir(caja) {
+    caja.innerHTML = '<div class="loading"><span class="spin"></span>Consultando…</div>';
+    let j;
+    try { j = await api("/v1/compartir"); } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo consultar</b><span>${esc(e.message)}</span></div>`; return; }
+    const TABS = ["lor", "smn", "uca"], nomTab = j["pestañas"], existe = (t, k) => j.existen[t].includes(k);
+    const fecha = (f) => f ? new Date(f).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" }) : "—";
+    const resumen = (p) => Object.entries(p).map(([t, l]) => `<b>${esc(nomTab[t])}:</b> ${l.map((k) => esc(((j.sectores[t].find((x) => x[0] === k) || [k, k])[1]).split(":")[0])).join(", ")}`).join("<br>");
+    caja.innerHTML = `<div class="caja"><h3>Nuevo enlace de acceso</h3>
+        <p>Quien abra el enlace entra sin usuario ni clave y ve <b>solo</b> lo que marques: los sectores elegidos en cada pestaña, para consultar y descargar. No puede subir archivos, actualizar datos ni ver la administración. El servidor lo hace cumplir, aunque alguien intente pedir otra cosa.</p>
+        <div class="fila"><label class="campo">Para quién<input type="text" id="cmp-nombre" maxlength="80" placeholder="Ej.: Gerencia de la Sucursal"></label>
+          <label class="campo">Vale por<select id="cmp-dias">${[[7, "7 días"], [15, "15 días"], [30, "30 días"], [90, "3 meses"], [180, "6 meses"], [365, "1 año"]].map(([d, t]) => `<option value="${d}"${d === 30 ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
+        <div class="scroll"><table class="cmp-matriz"><tr><th>Sector</th>${TABS.map((t) => `<th class="c"><label><input type="checkbox" data-col="${t}"> ${esc(nomTab[t])}</label></th>`).join("")}</tr>
+          ${j.sectores.lor.map(([k, n]) => `<tr><td><label><input type="checkbox" data-fil="${k}"> ${esc(n)}</label></td>${TABS.map((t) => `<td class="c">${existe(t, k) ? `<input type="checkbox" data-t="${t}" data-k="${k}" aria-label="${esc(n)} · ${esc(nomTab[t])}">` : '<span class="nota">—</span>'}</td>`).join("")}</tr>`).join("")}</table></div>
+        <fieldset class="cmp-peru"><legend><b>Pestaña Perú</b> (nacional)</legend>${j.sectores.tres.map(([k, n]) => `<label><input type="checkbox" data-t="tres" data-k="${k}"> ${esc(n)}</label>`).join("")}</fieldset>
+        <div class="fila"><button class="btn" type="button" id="cmp-crear">Crear enlace</button><span class="nota" id="cmp-msj"></span></div><div id="cmp-res"></div></div>
+      <div class="caja"><h3>Enlaces creados</h3>${j.invitaciones.length ? `<div class="scroll"><table><tr><th>Para quién</th><th>Qué incluye</th><th>Creado</th><th>Vence</th><th class="n">Ingresos</th><th>Último uso</th><th>Estado</th><th></th></tr>
+        ${j.invitaciones.map((x) => `<tr><td><b>${esc(x.nombre)}</b></td><td class="cmp-inc">${resumen(x.permisos)}</td><td>${fecha(x.creado)}</td><td>${fecha(x.vence)}</td><td class="n">${x.accesos}</td><td>${fecha(x.ultimo_acceso)}</td>
+          <td><span class="chip ${x.estado === "activa" ? "ok" : "falta"}">${x.estado}</span></td><td>${x.estado === "activa" ? `<button class="btn sec chico" type="button" data-revocar="${esc(x.id)}">Revocar</button>` : ""}</td></tr>`).join("")}</table></div>`
+        : '<p class="nota">Todavía no hay enlaces.</p>'}<p class="nota">Un enlace revocado deja de funcionar al instante, también para quien ya entró. Si se pierde un enlace, revócalo y crea otro: por seguridad, la página no guarda los enlaces, solo una huella que permite reconocerlos.</p></div>`;
+    const marcas = (sel) => [...caja.querySelectorAll(sel)];
+    caja.querySelectorAll("[data-col]").forEach((c) => c.addEventListener("change", () => marcas(`[data-t="${c.dataset.col}"]`).forEach((x) => { x.checked = c.checked; })));
+    caja.querySelectorAll("[data-fil]").forEach((c) => c.addEventListener("change", () => marcas(`[data-k="${c.dataset.fil}"]:not([data-t="tres"])`).forEach((x) => { x.checked = c.checked; })));
+    $("cmp-crear").addEventListener("click", async () => {
+      const permisos = {};
+      marcas("[data-t][data-k]:checked").forEach((x) => { (permisos[x.dataset.t] = permisos[x.dataset.t] || []).push(x.dataset.k); });
+      const msj = $("cmp-msj"); msj.textContent = "Creando…";
+      try {
+        const r = await api("/v1/compartir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: $("cmp-nombre").value, dias: +$("cmp-dias").value, permisos }) });
+        msj.textContent = "";
+        $("cmp-res").innerHTML = `<div class="ok-box"><b>Enlace creado para ${esc($("cmp-nombre").value)}</b><span>Cópialo ahora y envíalo: <b>no se vuelve a mostrar</b>.</span>
+          <div class="fila"><input type="text" class="cmp-enlace" id="cmp-enlace" readonly value="${esc(r.enlace)}"><button class="btn" type="button" id="cmp-copiar">Copiar enlace</button></div>
+          <span class="nota">Para ver lo que verá esa persona, ábrelo en una ventana privada (Ctrl+Mayús+N).</span><button class="btn sec chico" type="button" id="cmp-listo">Listo, actualizar la lista</button></div>`;
+        $("cmp-enlace").addEventListener("focus", (ev) => ev.target.select());
+        $("cmp-copiar").addEventListener("click", async (ev) => { try { await navigator.clipboard.writeText(r.enlace); ev.target.textContent = "Copiado ✓"; } catch (e) { $("cmp-enlace").focus(); } });
+        $("cmp-listo").addEventListener("click", () => cajaCompartir(caja));
+      } catch (e) { msj.textContent = e.message; msj.style.color = "var(--error)"; }
+    });
+    caja.querySelectorAll("[data-revocar]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("¿Revocar este enlace? Deja de funcionar al instante.")) return;
+      try { await api(`/v1/compartir/${encodeURIComponent(b.dataset.revocar)}`, { method: "DELETE" }); cajaCompartir(caja); } catch (e) { alert(e.message); }
+    }));
   }
 
   // ── Páginas comunes ──
@@ -1944,6 +2004,8 @@
       cuerpo = `<p class="lead">Pesca y empleo de las tres regiones juntas, para comparar.</p>
         <div class="caja"><h3>Pesca</h3>${panelBases("p-cpesca", ["pesca-loreto", "pesca-san-martin", "pesca-ucayali"], { deptos: () => LSU, marcar: 3 })}</div>
         <div class="caja"><h3>Empleo</h3>${panelBases("p-cempleo", ["empleo"], { deptos: () => LSU, marcar: 1 })}</div>`;
+    } else if (id === "compartir") {
+      cuerpo = '<div id="compartir-caja"></div>';
     } else if (id === "hidro-peru") {
       cuerpo = `<p class="lead">Nivel y caudal de los ríos de todo el país, de la red de monitoreo hidrológico de SENAMHI: el mapa de las estaciones, la situación de cada una, su hidrograma y la descarga de los datos. Cada región (Loreto, San Martín, Ucayali) tiene además su propia sección Hidrología.</p><div id="hidrologia-peru"></div>`;
     } else if (id === "act-mef") cuerpo = cajaScraper("mef") + cajaSubida("sub-ipc", IPC_TXT);
@@ -1976,7 +2038,7 @@
   function mostrar() {
     let [g, ...resto] = (location.hash.slice(1) || "lor-resumen").split("-");
     if (g === "actualizar") { g = "tres"; resto = ["act", "archivos"]; }
-    grupo = GRUPOS[g] ? g : "lor";
+    grupo = GRUPOS[g] ? g : GRUPOS.lor ? "lor" : Object.keys(GRUPOS)[0];
     const ids = planos(grupo), pedido = resto.join("-");
     id = ids.includes(pedido) ? pedido : ids[0];
     pintarGrupos(); pintarIndice();
@@ -2017,6 +2079,7 @@
     if ($("archivos-fiscal")) archivosFiscales(REG[grupo], $("archivos-fiscal"));
     if ($("bcrp")) cuadrosBCRP($("bcrp").dataset.sector, REG[grupo], $("bcrp"));
     if ($("anexos-bcrp")) anexosBCRP(REG[grupo], $("anexos-bcrp"));
+    if ($("compartir-caja")) cajaCompartir($("compartir-caja"));
     if ($("hidrologia-peru")) HIDRO.peru($("hidrologia-peru"), HIDRO.pestañaPeru);
     if ($("hidrologia")) { HIDRO.alActualizar = () => { if (!ESTADO.hidrologia) { ESTADO.hidrologia = true; pintarIndice(); const c = document.querySelector("#sector .ficha .chip"); if (c) { c.className = "chip ok"; c.textContent = ETIQ.ok; } } }; HIDRO.pintar(REG[grupo], $("hidrologia"), $("hidrologia").dataset.pestana); }
     if ($("resumen-ejec")) resumenEjecutivo(REG[grupo], $("resumen-ejec"));
@@ -2029,8 +2092,18 @@
   window.addEventListener("hashchange", mostrar);
 
   (async function iniciar() {
-    try { [CAT, ESTADO] = await Promise.all([api("/v1/catalogo"), api("/v1/estado")]); }
+    try {
+      const [acceso, c, e] = await Promise.all([api("/v1/acceso/yo"), api("/v1/catalogo"), api("/v1/estado")]);
+      CAT = c; ESTADO = e;
+      if (!acceso.equipo) {
+        restringir(acceso);
+        if (!Object.keys(GRUPOS).length) throw new Error("Tu acceso no incluye ninguna sección.");
+        HIDRO.invitado = true;
+        document.querySelector(".ayuda").outerHTML = `<span class="invitado" title="Acceso compartido por el Departamento de Estudios Económicos">Acceso de ${esc(acceso.nombre)} · vence el ${new Date(acceso.vence).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}</span>`;
+      }
+    }
     catch (e) { $("sector").innerHTML = `<div class="cuerpo"><div class="err-box"><b>No se pudo conectar con el API</b><span>${esc(e.message)}</span></div></div>`; return; }
+    if (INVITADO) $("datos-hasta").hidden = true;
     const hoy = new Date(), tope = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
     for (let a = 2006; a <= hoy.getFullYear(); a++) for (let m = 1; m <= 12; m++) { const ym = `${a}-${String(m).padStart(2, "0")}`; if (ym <= tope) MESES.push(ym); }
     pintarHasta(); mostrar();

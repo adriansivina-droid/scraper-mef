@@ -17,7 +17,6 @@
 (() => {
   'use strict';
   if (window.__senamhiRecolector) { window.__senamhiRecolector.mostrar(); return; }
-  const AUTO = !!window.__senamhiAuto;      // cargado desde el favorito: si hay avance guardado, empieza solo
 
   const VERSION = 4;
   const B = location.origin;
@@ -165,8 +164,10 @@
     const DESDE = deIso(cfg.desdeFecha), HASTA = deIso(cfg.hastaFecha) > HOY ? HOY : deIso(cfg.hastaFecha);
     if (DESDE > HASTA) throw new Error('La fecha «Desde» es posterior a «Hasta»');
     const AH_MIN = anioHidrologico(DESDE);
+    // la Información Mensual puede empezar antes que lo diario (por ejemplo, mensual desde 2000 y diario desde 2020)
+    const M_DESDE = cfg.mensualDesde && deIso(cfg.mensualDesde + '-01') < DESDE ? deIso(cfg.mensualDesde + '-01') : DESDE;
     await guardar('meta', { version: VERSION, desde: DESDE.getFullYear(), desdeFecha: iso(DESDE), hastaFecha: iso(HASTA),
-                            prueba: cfg.prueba, hoy: hoyIso, origen: B, variables: cfg.variables, horas: cfg.horas });
+                            mensualDesde: iso(M_DESDE).slice(0, 7), prueba: cfg.prueba, hoy: hoyIso, origen: B, variables: cfg.variables, horas: cfg.horas });
 
     // 1. estaciones
     estado = 'Estaciones'; pintar();
@@ -210,7 +211,7 @@
     }
     const meses = [];
     if (cfg.mensual) {
-      for (let a = DESDE.getFullYear(), m = DESDE.getMonth() + 1; a < HASTA.getFullYear() || (a === HASTA.getFullYear() && m <= HASTA.getMonth() + 1); m === 12 ? (a++, m = 1) : m++) meses.push([a, m]);
+      for (let a = M_DESDE.getFullYear(), m = M_DESDE.getMonth() + 1; a < HASTA.getFullYear() || (a === HASTA.getFullYear() && m <= HASTA.getMonth() + 1); m === 12 ? (a++, m = 1) : m++) meses.push([a, m]);
     }
     if (!cfg.hidrograma) lista = [];
     total = lista.length * (1 + cfg.variables.length) + meses.length + dias.length * cfg.horas.length;
@@ -363,7 +364,7 @@
     '<label><input id="sr-hidro" type="checkbox" checked> Hidrograma diario (todas las estaciones)</label><br>' +
     '<label><input id="sr-caudal" type="checkbox" checked> Caudal, además del nivel</label><br>' +
     '<label><input id="sr-diaria" type="checkbox" checked> Información Diaria (4 horas por día; es lo más largo)</label><br>' +
-    '<label><input id="sr-mensual" type="checkbox" checked> Información Mensual</label></div>' +
+    '<label><input id="sr-mensual" type="checkbox" checked> Información Mensual</label> <label style="font-size:11px">desde <input id="sr-mdesde" type="month" title="Vacío = desde la misma fecha que lo diario"></label></div>' +
     '<div id="sr-estado" style="margin:8px 0 4px">Listo. Deja esta pestaña abierta mientras trabaja.</div>' +
     '<div style="background:#e3e8f0;border-radius:4px;height:10px;overflow:hidden"><div id="sr-barra" style="background:#0b3c8c;height:10px;width:0"></div></div>' +
     '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
@@ -392,7 +393,7 @@
     const cfg = { desdeFecha: $('sr-desde').value || '2023-01-01', hastaFecha: $('sr-hasta').value || iso(hoyLima()),
                   prueba: $('sr-prueba').checked, hidrograma: $('sr-hidro').checked,
                   variables: $('sr-caudal').checked ? ['NIVEL', 'CAUDAL'] : ['NIVEL'],
-                  infoDiaria: $('sr-diaria').checked, mensual: $('sr-mensual').checked, horas: HORAS };
+                  infoDiaria: $('sr-diaria').checked, mensual: $('sr-mensual').checked, mensualDesde: $('sr-mdesde').value || '', horas: HORAS };
     try {
       await recolectar(cfg);
       const r = await exportar();
@@ -419,8 +420,8 @@
     $('sr-hasta').value = iso(hoyLima());
     if (m) {
       if (m.desdeFecha) $('sr-desde').value = m.desdeFecha;
+      if (m.mensualDesde && m.mensualDesde < (m.desdeFecha || '').slice(0, 7)) $('sr-mdesde').value = m.mensualDesde;
       $('sr-estado').textContent = `Hay un avance guardado (desde ${m.desdeFecha || m.desde}${m.prueba ? ', prueba' : ''}). «Iniciar» sigue donde quedó.`;
-      if (AUTO && !m.prueba) $('sr-iniciar').click();          // actualización diaria: un clic en el favorito y nada más
     }
   }).catch((e) => { $('sr-estado').textContent = '⚠️ No se pudo abrir el almacén del navegador: ' + e; });
 })();

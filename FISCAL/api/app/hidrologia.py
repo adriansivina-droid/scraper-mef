@@ -23,7 +23,7 @@ from sqlalchemy import text
 
 from . import db
 
-INICIO = date(2023, 1, 1)                      # los CSV empiezan aquí, como en el notebook
+INICIO = date(2023, 1, 1)                      # si aún no se sabe desde cuándo se recolectó; si no, vale inicio()
 SERIES = ("datoActual", "datoAnterior", "minimo", "maximo", "promHistorico", "rojo", "naranja", "amarillo")
 ZONALES = {"01": "DZ 1 · Piura", "02": "DZ 2 · Lambayeque", "03": "DZ 3 · Cajamarca", "04": "DZ 4 · Lima",
            "05": "DZ 5 · Ica", "06": "DZ 6 · Arequipa", "07": "DZ 7 · Tacna", "08": "DZ 8 · Loreto",
@@ -136,6 +136,7 @@ def guardar(piezas, dia):
     if malas:
         raise ValueError(f"Pieza no reconocida: {malas[0][:60]}")
     guardadas = viejas = 0
+    meta = next((p.get("valor") for p, c in zip(piezas, claves) if c == "meta"), None)
     with db.motor().begin() as cx:
         previas = {}
         for i in range(0, len(claves), 400):
@@ -155,7 +156,25 @@ def guardar(piezas, dia):
                 cx.execute(text("INSERT INTO senamhi_crudo (clave, datos, huella, dia, actualizado) VALUES (:c, :d, :h, :dia, :a)"), par)
                 previas[clave] = dia
             guardadas += 1
+        # desde cuándo hay datos: la fecha «Desde» más antigua con que se recolectó (las corridas diarias empiezan más tarde)
+        desde = str((meta or {}).get("desdeFecha") or "")
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", desde):
+            previo = cx.execute(text("SELECT datos FROM senamhi_crudo WHERE clave = 'inicio'")).first()
+            previo = json.loads(zlib.decompress(bytes(previo[0]))) if previo else None
+            if previo is None or desde < previo:
+                cx.execute(text("DELETE FROM senamhi_crudo WHERE clave = 'inicio'"))
+                cx.execute(text("INSERT INTO senamhi_crudo (clave, datos, huella, dia, actualizado) VALUES ('inicio', :d, '', :dia, :a)"),
+                           {"d": zlib.compress(json.dumps(desde).encode()), "dia": dia, "a": ahora})
     return {"guardadas": guardadas, "omitidas_por_viejas": viejas}
+
+
+def inicio():
+    """Primer día de los CSV y del control: la fecha «Desde» más antigua con que se recolectó (por defecto, 01/01/2023)."""
+    d = _leer("inicio")
+    try:
+        return date.fromisoformat(d) if d else INICIO
+    except (TypeError, ValueError):
+        return INICIO
 
 
 def piezas_de_archivo(crudo):
@@ -279,6 +298,7 @@ def armar(carpeta):
     meta_info = {str(k): v for k, v in (_leer("infoMeta", {}) or {}).items()}
     nombre_est = {str(e.get("codEstacion")): e.get("nomEstacion", "") for e in estaciones}
     hoy_txt = _dia_txt(meta.get("hoy", ""))
+    INI = inicio()
 
     # 1. Información Mensual (antes que el diario: el control la cruza)
     f, w = _escritor(carpeta / ARCHIVOS["mensual"], COLS["mensual"])
@@ -333,7 +353,7 @@ def armar(carpeta):
             wl.writerow([cod, nombre_est.get(cod, ""), var, g.get("opcion", ""), g.get("fh", ""), _dmy(ini), len(filas),
                          f"DEVOLVIO OTRO AÑO ({_dmy(ini)})" if estado == "DEVOLVIO OTRO AÑO" and ini else estado, _dia_txt(dia)])
             for fila in filas:
-                if fila[0] < INICIO:
+                if fila[0] < INI:
                     continue
                 previa = elegidas.get(fila[0])
                 if previa is None or (previa[1] != "ACTUAL" and fila[1] == "ACTUAL"):
@@ -362,7 +382,7 @@ def armar(carpeta):
         saltos_abs = [abs(b - a) for a, b in zip(valores, valores[1:])]
         lim = _cuantil(saltos_abs, 0.9) if len(saltos_abs) > 10 else 0
         saltos = sum(1 for s in saltos_abs if s > 20 * lim) if lim > 0 else 0
-        llega = fechas[0] <= INICIO + timedelta(days=31)
+        llega = fechas[0] <= INI + timedelta(days=31)
         cruces = [abs((s / n) / mensual[(cod, u, a, m)] - 1) * 100 for (u, a, m), (s, n) in meses.items()
                   if n >= 25 and mensual.get((cod, u, a, m))]
         fila_c.update({"PRIMERA_FECHA": _dmy(fechas[0]), "ULTIMA_FECHA": _dmy(fechas[-1]), "DIAS_CON_DATO": len(fechas),
@@ -557,10 +577,10 @@ def estaciones_de(departamento):
                                    "anterior": serie("datoAnterior"), "promedio": serie("promHistorico"), "rojo": serie("rojo"),
                                    "naranja": serie("naranja"), "amarillo": serie("amarillo")}
                     break
-    lista = []
+    lista, ah_min = [], año_hidrologico(inicio())
     for e in out.values():
         for v in e["variables"].values():
-            v["años"] = sorted(a for a in v["años"] if a >= año_hidrologico(INICIO))
+            v["años"] = sorted(a for a in v["años"] if a >= ah_min)
             if v["ultimo"]:
                 v["ultimo"].pop("_y")
         lista.append(e)
@@ -597,8 +617,10 @@ def serie(codigo, variable, año):
 
     toma = lambda m: [m.get((d.month, d.day)) for d in dias]   # noqa: E731
     fuente = propio or sig or ant
-    actual = por_dia(propio, "datoActual") or por_dia(sig, "datoAnterior")
-    anterior = por_dia(propio, "datoAnterior") or por_dia(ant, "datoActual")
+    # SENAMHI recorta el «actual» de cada consulta al día de hoy: el año completo viene como «anterior» de la consulta del año
+    # siguiente. Se unen las dos fuentes y, en un mismo día, vale el «actual» de la consulta propia
+    actual = {**por_dia(sig, "datoAnterior"), **por_dia(propio, "datoActual")}
+    anterior = {**por_dia(ant, "datoActual"), **por_dia(propio, "datoAnterior")}
     ref = propio or sig
     return {"codigo": codigo, "variable": variable, "año": año, "estacion": fuente.get("nomEstacion", ""), "rio": fuente.get("nomRio", ""),
             "unidad": fuente.get("unidad", ""), "desde": dias[0].isoformat(), "dias": len(dias),
@@ -612,8 +634,8 @@ def rango(codigo, variable, desde, hasta):
     «anterior» es el mismo día un año antes, como en el gráfico de SENAMHI."""
     if hasta < desde:
         desde, hasta = hasta, desde
-    if (hasta - desde).days > 5 * 366:
-        raise ValueError("El rango puede ser de hasta 5 años.")
+    if (hasta - desde).days > 10 * 366:
+        raise ValueError("El rango puede ser de hasta 10 años.")
     claves = ("actual", "anterior", "promedio", "minimo", "maximo", "rojo", "naranja", "amarillo")
     out = {k: [] for k in claves}
     base = None
@@ -632,3 +654,28 @@ def rango(codigo, variable, desde, hasta):
         return None
     return {"codigo": codigo, "variable": variable, "estacion": base["estacion"], "rio": base["rio"], "unidad": base["unidad"],
             "desde": desde.isoformat(), "hasta": hasta.isoformat(), "dias": len(out["actual"]), **out}
+
+
+def anios(codigo, variable):
+    """Todos los años hidrológicos de una estación sobre el mismo eje (1 de setiembre a 31 de agosto, con 29 de febrero), para
+    compararlos. {años: {año: [valor por día]}, promedio y umbrales del año más reciente}. None si no hay datos."""
+    disponibles = set()
+    for clave, g, _ in _piezas(f"graf:{codigo}:{variable}:"):
+        if g.get("estado") == "OK" and (g.get("data") or {}).get("fechaHora"):
+            y = int(clave.rsplit(":", 1)[1])
+            disponibles.update({y, y - 1})
+    series = {y: s for y in sorted(disponibles) if (s := serie(codigo, variable, y)) and any(v is not None for v in s["actual"])}
+    if not series:
+        return None
+    base = date(2023, 9, 1)                                   # eje de referencia: setiembre 2023 a agosto 2024 (tiene 29 de febrero)
+    dias = [base + timedelta(days=i) for i in range(366)]
+    clave_dia = lambda d: (d.month, d.day)                    # noqa: E731
+
+    def sobre_el_eje(s, k):
+        por = {clave_dia(date.fromisoformat(s["desde"]) + timedelta(days=i)): v for i, v in enumerate(s[k])}
+        return [por.get(clave_dia(d)) for d in dias]
+
+    ultimo = series[max(series)]
+    return {"codigo": codigo, "variable": variable, "estacion": ultimo["estacion"], "rio": ultimo["rio"], "unidad": ultimo["unidad"],
+            "desde": base.isoformat(), "dias": 366, "años": {str(y): sobre_el_eje(s, "actual") for y, s in series.items()},
+            **{k: sobre_el_eje(ultimo, k) for k in ("promedio", "rojo", "naranja", "amarillo")}}

@@ -7,19 +7,19 @@ import secrets
 import shutil
 import tempfile
 import unicodedata
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 import pandas as pd
 import requests
-from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import almacen, archivos, bcrp_excel, carga, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, hidrologia, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
+from . import almacen, archivos, bcrp_excel, carga, compartir, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, hidrologia, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -44,14 +44,28 @@ _RE_PERIODO = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 MAX_CARGA_MB = 200
 
 
-def acceso(cred: HTTPBasicCredentials | None = Depends(_basic)):
-    """Usuario y contraseña del equipo (variables APP_USUARIO y APP_CLAVE). Sin APP_CLAVE no se pide nada (uso local)."""
+def acceso(request: Request, cred: HTTPBasicCredentials | None = Depends(_basic)):
+    """Usuario y contraseña del equipo (variables APP_USUARIO y APP_CLAVE) o, para un tercero, la cookie de un enlace de acceso
+    (compartir.py), que solo deja pedir lo que se le dio. Sin APP_CLAVE no se pide nada (uso local)."""
+    request.state.invitado = None
     clave = os.environ.get("APP_CLAVE")
     if not clave:
         return
     usuario = os.environ.get("APP_USUARIO", "fiscal")
-    if cred is None or not (secrets.compare_digest(cred.username, usuario) and secrets.compare_digest(cred.password, clave)):
-        raise HTTPException(401, "Usuario o contraseña incorrectos.", headers={"WWW-Authenticate": 'Basic realm="Departamento de estudios BCRP-IQT"'})
+    if cred is not None and secrets.compare_digest(cred.username, usuario) and secrets.compare_digest(cred.password, clave):
+        return
+    entrada = request.url.path == "/" and request.query_params.get("t")
+    token = request.cookies.get(compartir.COOKIE) or entrada
+    inv = compartir.validar(token, entrada=bool(entrada and not request.cookies.get(compartir.COOKIE))) if token else None
+    if inv:
+        permitido, motivo = compartir.permitido(inv["permisos"], request.method, request.url.path, request.query_params)
+        if not permitido:
+            raise HTTPException(403, motivo)
+        request.state.invitado = inv
+        return
+    if entrada:
+        raise HTTPException(403, "Este enlace venció o fue revocado. Pide uno nuevo al Departamento de Estudios Económicos.")
+    raise HTTPException(401, "Usuario o contraseña incorrectos.", headers={"WWW-Authenticate": 'Basic realm="Departamento de estudios BCRP-IQT"'})
 
 
 def _lista(valor, validos, nombre):
@@ -129,7 +143,15 @@ def salud():
 
 
 @app.get("/", include_in_schema=False, dependencies=[Depends(acceso)])
-def inicio():
+def inicio(request: Request):
+    token = request.query_params.get("t")
+    if token and getattr(request.state, "invitado", None):          # primer ingreso por el enlace: se guarda la cookie y se limpia la dirección
+        inv = request.state.invitado
+        resp = RedirectResponse("/", status_code=303)
+        vence = datetime.fromisoformat(inv["vence"])
+        resp.set_cookie(compartir.COOKIE, token, httponly=True, samesite="lax", secure=request.headers.get("x-forwarded-proto", request.url.scheme) == "https",
+                        max_age=max(60, int((vence - datetime.now(timezone.utc)).total_seconds())))
+        return resp
     # la hoja de estilos lleva su fecha de modificación: tras cada despliegue el navegador baja la nueva y no mezcla la
     # página nueva con estilos viejos guardados en caché
     html = (ESTATICOS / "index.html").read_text(encoding="utf-8")
@@ -137,6 +159,43 @@ def inicio():
         version = int((ESTATICOS / archivo).stat().st_mtime)
         html = html.replace(f'{atributo}="/static/{archivo}"', f'{atributo}="/static/{archivo}?v={version}"')
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/v1/acceso/yo", dependencies=[Depends(acceso)])
+def acceso_yo(request: Request):
+    """Quién entra: el equipo (todo) o un invitado (con sus permisos). La página oculta lo que no se le dio."""
+    inv = getattr(request.state, "invitado", None)
+    if inv is None:
+        return {"equipo": True}
+    return {"equipo": False, "nombre": inv["nombre"], "vence": inv["vence"], "permisos": inv["permisos"]}
+
+
+@app.get("/v1/compartir", dependencies=[Depends(acceso)])
+def compartir_listar():
+    """Las invitaciones (enlaces de acceso) y lo que se puede compartir. Solo el equipo."""
+    return {"invitaciones": compartir.listar(),
+            "sectores": {"lor": compartir.SECTORES_REGION, "smn": compartir.SECTORES_REGION, "uca": compartir.SECTORES_REGION, "tres": compartir.SECTORES_PERU},
+            "existen": {t: sorted(v) for t, v in compartir.EXISTEN.items()}, "pestañas": compartir.PESTAÑAS}
+
+
+@app.post("/v1/compartir", dependencies=[Depends(acceso)])
+def compartir_crear(request: Request, cuerpo: dict = Body(...)):
+    """Crea una invitación: {nombre, dias, permisos: {lor: [sectores], smn: [...], uca: [...], tres: [...]}}. El enlace solo se muestra ahora."""
+    try:
+        ident, token = compartir.crear(cuerpo.get("nombre"), cuerpo.get("dias", 30), cuerpo.get("permisos"))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(422, str(e))
+    base = str(request.base_url).rstrip("/")
+    if request.headers.get("x-forwarded-proto") == "https":
+        base = base.replace("http://", "https://", 1)
+    return {"id": ident, "enlace": f"{base}/?t={token}"}
+
+
+@app.delete("/v1/compartir/{ident}", dependencies=[Depends(acceso)])
+def compartir_revocar(ident: str):
+    if not compartir.revocar(ident):
+        raise HTTPException(404, "No hay esa invitación.")
+    return {"revocada": ident}
 
 
 @app.get("/v1/catalogo", dependencies=[Depends(acceso)])
@@ -351,6 +410,15 @@ def hidrologia_serie(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"
     return s
 
 
+@app.get("/v1/hidrologia/anios", dependencies=[Depends(acceso)])
+def hidrologia_anios(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"), variable: str = Query("NIVEL", pattern="^(NIVEL|CAUDAL)$")):
+    """Todos los años hidrológicos de la estación sobre el mismo eje (setiembre a agosto), para compararlos."""
+    s = hidrologia.anios(estacion, variable)
+    if s is None:
+        raise HTTPException(404, "No hay datos de esa estación y variable.")
+    return s
+
+
 @app.get("/v1/hidrologia/rango", dependencies=[Depends(acceso)])
 def hidrologia_rango(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"), variable: str = Query("NIVEL", pattern="^(NIVEL|CAUDAL)$"),
                      desde: date = Query(...), hasta: date = Query(...)):
@@ -362,6 +430,19 @@ def hidrologia_rango(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"
     if s is None:
         raise HTTPException(404, "No hay datos de esa estación y variable entre esas fechas.")
     return s
+
+
+@app.get("/v1/hidrologia/reporte", dependencies=[Depends(acceso)])
+def hidrologia_reporte(formato: str = Query("pptx", pattern="^(pptx|xlsx)$")):
+    """Reporte de situación hídrica de la zona Oriente (Loreto, San Martín, Ucayali): el PowerPoint, o el Excel con sus datos y gráficos."""
+    from . import reporte_hidrico
+    D = reporte_hidrico.datos()
+    if D is None:
+        raise HTTPException(404, "Todavía no hay datos de SENAMHI en la página: súbelos en «Actualizar».")
+    nombre = f"Reporte situación hídrica - Oriente - {D['fecha']:%Y-%m-%d}"
+    if formato == "xlsx":
+        return Response(reporte_hidrico.excel(D), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=_adjunto(nombre + ".xlsx"))
+    return Response(reporte_hidrico.powerpoint(D), media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation", headers=_adjunto(nombre + ".pptx"))
 
 
 @app.get("/v1/hidrologia/descargar", dependencies=[Depends(acceso)])

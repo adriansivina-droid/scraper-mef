@@ -473,6 +473,10 @@ Sección «V. Hidrología» de cada región: nivel y caudal diario de los ríos,
 - **Descargar datos:** los CSV del scraper (serie diaria, Información Diaria, Información Mensual, estaciones y control), de la región o de todo el país, en CSV o Excel, o todo en un zip.
 - **Actualizar:** SENAMHI no responde a servidores, así que la recolección corre en el navegador (favorito «Recolector SENAMHI», `HIDROLOGIA/senamhi_navegador.js`) y aquí se sube el `SENAMHI_crudo_….json`. Solo viaja lo que cambió.
 
+**Reporte de situación hídrica · Zona Oriente** (Perú → Ríos del Perú → Descargar datos, o `GET /v1/hidrologia/reporte?formato=pptx|xlsx`): con el formato del reporte de la Sucursal Piura, armado con los datos del día (`app/reporte_hidrico.py`). El PowerPoint tiene portada, situación de los ríos del Oriente (tabla con alerta), hidrogramas de Loreto (2 láminas), San Martín y Ucayali, nivel diario del mes por año y caudales; sus gráficos son de PowerPoint (editables). El Excel tiene una hoja por gráfico, con los datos en columnas (un año hidrológico por columna) y el gráfico de Excel que los usa, la hoja «Resumen» con fórmulas (último dato, variaciones y alerta) y la «Tabla diaria».
+
+**Compartir con terceros** (Perú → Administración → Compartir la página; `app/compartir.py`): enlaces con permisos por sector y pestaña y vencimiento; el servidor niega todo lo que no se dio.
+
 Todo el país: grupo **Perú** → Hidrología → «Ríos del Perú (SENAMHI)», con el mapa de las estaciones (coordenadas de `listaMonitoreo` de SENAMHI; copia en `app/senamhi_ubicacion.json`), la tabla, el hidrograma y las descargas nacionales.
 
 Endpoints: `GET /v1/hidrologia`, `GET /v1/hidrologia/estaciones?departamento=16|22|25|todos`, `GET /v1/hidrologia/serie?estacion=&variable=&anio=`, `GET /v1/hidrologia/rango?estacion=&variable=&desde=&hasta=`, `GET /v1/hidrologia/descargar?archivo=&departamento=&formato=`, `GET /v1/hidrologia/crudo/indice` y `POST /v1/hidrologia/crudo`. Los datos van en la tabla `senamhi_crudo` (piezas comprimidas, unos 11 MB). Detalle en `HIDROLOGIA/senamhi_rios.md`, sección 7.
