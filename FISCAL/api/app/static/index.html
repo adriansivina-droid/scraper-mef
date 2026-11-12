@@ -1792,7 +1792,7 @@
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
-    if (s.cuadros === "hidrologia") panel = `<div id="hidrologia" data-tab="${t}"></div>`;
+    if (s.cuadros === "hidrologia") panel = `<div id="hidrologia" data-pestana="${t}"></div>`;
     else if (t === "Datos" && id === "empleo") panel = `<div class="caja"><h3>Empleo · ${esc(r.nombre)}</h3><p>Todos los meses disponibles del MTPE (desde enero 2016). Para varias regiones o grupos, usa ${irComun("empleo-long", "Empleo · LONG por región")}.</p>${cajaLong(r.nombre)}</div>`;
     else if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : s.actualizar === "empleo" ? irComun("empleo-long", "Empleo · LONG por región") + " (el Excel tal como lo da el scraper, de una, varias o todas las regiones)" : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
       : `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(s.t.toLowerCase())} en la página.</b><span>Fuente: ${esc(s.fuente)}. Entrará como: ${esc(s.entra.toLowerCase())}.</span></div>`;
@@ -2014,7 +2014,7 @@
     if ($("archivos-fiscal")) archivosFiscales(REG[grupo], $("archivos-fiscal"));
     if ($("bcrp")) cuadrosBCRP($("bcrp").dataset.sector, REG[grupo], $("bcrp"));
     if ($("anexos-bcrp")) anexosBCRP(REG[grupo], $("anexos-bcrp"));
-    if ($("hidrologia")) { HIDRO.alActualizar = () => { if (!ESTADO.hidrologia) { ESTADO.hidrologia = true; pintarIndice(); const c = document.querySelector("#sector .ficha .chip"); if (c) { c.className = "chip ok"; c.textContent = ETIQ.ok; } } }; HIDRO.pintar(REG[grupo], $("hidrologia"), $("hidrologia").dataset.tab); }
+    if ($("hidrologia")) { HIDRO.alActualizar = () => { if (!ESTADO.hidrologia) { ESTADO.hidrologia = true; pintarIndice(); const c = document.querySelector("#sector .ficha .chip"); if (c) { c.className = "chip ok"; c.textContent = ETIQ.ok; } } }; HIDRO.pintar(REG[grupo], $("hidrologia"), $("hidrologia").dataset.pestana); }
     if ($("resumen-ejec")) resumenEjecutivo(REG[grupo], $("resumen-ejec"));
     if ($("drae-graf")) graficosDRAE(REG[grupo], $("drae-graf"));
     if ($("contraste")) contrasteMEF($("contraste").dataset.sector, REG[grupo], $("contraste"));
