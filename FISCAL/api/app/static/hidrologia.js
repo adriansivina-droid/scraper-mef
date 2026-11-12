@@ -318,6 +318,25 @@
     div.innerHTML = "";
     const m = L.map(div, { scrollWheelZoom: false, zoomSnap: 0.5 }).setView([-9.2, -75], 5);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 13, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Estaciones: SENAMHI' }).addTo(m);
+    // pantalla completa: el mapa ocupa toda la pantalla (Esc o el mismo botón para salir); si el navegador no lo
+    // permite (iPhone), el recuadro se agranda a toda la ventana
+    const Pantalla = L.Control.extend({ options: { position: "topright" }, onAdd() {
+      const b = L.DomUtil.create("button", "hid-full");
+      b.type = "button"; b.title = "Ver en pantalla completa"; b.setAttribute("aria-label", "Ver en pantalla completa");
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      L.DomEvent.disableClickPropagation(b);
+      L.DomEvent.on(b, "click", () => {
+        const activo = document.fullscreenElement === div || div.classList.contains("pantalla");
+        if (activo) { if (document.fullscreenElement) document.exitFullscreen(); else { div.classList.remove("pantalla"); document.body.classList.remove("sin-scroll"); m.invalidateSize(); } return; }
+        if (div.requestFullscreen) div.requestFullscreen().catch(() => { div.classList.add("pantalla"); document.body.classList.add("sin-scroll"); m.invalidateSize(); });
+        else { div.classList.add("pantalla"); document.body.classList.add("sin-scroll"); m.invalidateSize(); }
+      });
+      return b;
+    } });
+    new Pantalla().addTo(m);
+    const alCambiar = () => { const activo = document.fullscreenElement === div; div.classList.toggle("completa", activo); m.scrollWheelZoom[activo ? "enable" : "disable"](); setTimeout(() => m.invalidateSize(), 60); };
+    document.addEventListener("fullscreenchange", alCambiar);
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && div.classList.contains("pantalla")) { div.classList.remove("pantalla"); document.body.classList.remove("sin-scroll"); m.invalidateSize(); } });
     const puntos = {};
     const ultimo = (e) => Object.entries(e.variables).map(([v, d]) => d.ultimo ? `<div>${VAR[v]}: <b>${num(d.ultimo.valor)}</b> ${esc(d.unidad)} <small>(${dmy(d.ultimo.fecha)})</small></div>` : "").join("");
     estaciones.filter((e) => e.lat != null).forEach((e) => {

@@ -386,3 +386,8 @@ tr.nueva-region td { border-top: 2px solid var(--hair); }
 .hid-pop { display: flex; flex-direction: column; gap: 3px; font: 13px/1.4 var(--font); min-width: 190px; }
 .hid-pop span { color: var(--mid); font-size: 12px; } .hid-pop small { color: var(--mid); } .hid-pop .btn { margin-top: 6px; align-self: flex-start; }
 @media (max-width: 700px) { .hid-mapa { height: 420px; } }
+.hid-full { width: 34px; height: 34px; display: grid; place-items: center; background: #FFF; color: #333; border: 2px solid rgba(0, 0, 0, .2); border-radius: 4px; cursor: pointer; background-clip: padding-box; }
+.hid-full:hover { background-color: #F4F4F4; }
+.hid-mapa:fullscreen, .hid-mapa.completa { height: 100vh; border-radius: 0; border: 0; }
+.hid-mapa.pantalla { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 9999; border-radius: 0; border: 0; }
+body.sin-scroll { overflow: hidden; }
