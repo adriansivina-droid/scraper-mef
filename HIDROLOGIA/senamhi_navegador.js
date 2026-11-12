@@ -3,8 +3,9 @@
  * SENAMHI corta la conexión a los servidores en la nube (Colab, GitHub…), pero responde al navegador.
  * Este script se ejecuta en la consola del navegador, en la página de SENAMHI, y hace las mismas consultas
  * que la página (lista de estaciones, hidrograma diario, Información Diaria e Información Mensual).
- * Al terminar descarga un archivo «SENAMHI_crudo_AAAA-MM-DD.json», que se sube al notebook
- * HIDROLOGIA/SENAMHI_Rios.ipynb (Colab), donde se arman los CSV, el control y se guarda en Drive.
+ * Al terminar descarga un archivo «SENAMHI_crudo_AAAA-MM-DD.json», que se sube a la página del departamento
+ * (Hidrología → Actualizar), donde se arman los CSV y el gráfico. El mismo archivo sirve en el notebook
+ * HIDROLOGIA/SENAMHI_Rios.ipynb (Colab) si además se quiere la copia en Drive.
  *
  * Uso (detalle en HIDROLOGIA/senamhi_rios.md):
  *   1. Abre https://www.senamhi.gob.pe/?p=monitoreo-hidrologico
@@ -16,8 +17,9 @@
 (() => {
   'use strict';
   if (window.__senamhiRecolector) { window.__senamhiRecolector.mostrar(); return; }
+  const AUTO = !!window.__senamhiAuto;      // cargado desde el favorito: si hay avance guardado, empieza solo
 
-  const VERSION = 2;
+  const VERSION = 3;
   const B = location.origin;
   const U = {
     estaciones: B + '/mapas/mapa-monitoreohidro/include/ajaxEstaciones.php',
@@ -389,7 +391,7 @@
       await recolectar(cfg);
       const r = await exportar();
       $('sr-estado').textContent = `✅ Terminado. Se descargó ${r.nombre} (${r.mb} MB)` +
-        (fallos ? ` · ${fallos} consultas sin respuesta: pulsa «Iniciar» otra vez para reintentarlas.` : '. Súbelo al notebook de Colab.');
+        (fallos ? ` · ${fallos} consultas sin respuesta: pulsa «Iniciar» otra vez para reintentarlas.` : '. Súbelo en la página: Hidrología → Actualizar.');
     } catch (e) {
       $('sr-estado').textContent = '⚠️ ' + (e && e.message ? e.message : e) + '. Lo ya descargado quedó guardado: pulsa «Iniciar» para seguir.';
     }
@@ -412,6 +414,7 @@
     if (m) {
       if (m.desdeFecha) $('sr-desde').value = m.desdeFecha;
       $('sr-estado').textContent = `Hay un avance guardado (desde ${m.desdeFecha || m.desde}${m.prueba ? ', prueba' : ''}). «Iniciar» sigue donde quedó.`;
+      if (AUTO && !m.prueba) $('sr-iniciar').click();          // actualización diaria: un clic en el favorito y nada más
     }
   }).catch((e) => { $('sr-estado').textContent = '⚠️ No se pudo abrir el almacén del navegador: ' + e; });
 })();

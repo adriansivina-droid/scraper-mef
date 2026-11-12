@@ -15,11 +15,11 @@ import pandas as pd
 import requests
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import almacen, archivos, bcrp_excel, carga, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
+from . import almacen, archivos, bcrp_excel, carga, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, hidrologia, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -133,7 +133,7 @@ def inicio():
     # la hoja de estilos lleva su fecha de modificación: tras cada despliegue el navegador baja la nueva y no mezcla la
     # página nueva con estilos viejos guardados en caché
     html = (ESTATICOS / "index.html").read_text(encoding="utf-8")
-    for archivo, atributo in (("estilo.css", "href"), ("bcrp.js", "src"), ("drae.js", "src")):
+    for archivo, atributo in (("estilo.css", "href"), ("bcrp.js", "src"), ("drae.js", "src"), ("hidrologia.js", "src")):
         version = int((ESTATICOS / archivo).stat().st_mtime)
         html = html.replace(f'{atributo}="/static/{archivo}"', f'{atributo}="/static/{archivo}?v={version}"')
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
@@ -153,7 +153,7 @@ def catalogo():
 
 @app.get("/v1/estado", dependencies=[Depends(acceso)])
 def estado():
-    return {"bases": db.disponibilidad(), "ultima_carga": db.ultima_carga()}
+    return {"bases": db.disponibilidad(), "ultima_carga": db.ultima_carga(), "hidrologia": hidrologia.hay_datos()}
 
 
 @app.get("/v1/estado/espacio", dependencies=[Depends(acceso)])
@@ -306,6 +306,70 @@ def hidro_archivo(id: str = Query(..., max_length=80), formato: str = Query("ori
                         headers=_adjunto(nombre[:-4] + ".xlsx"))
     tipo = "text/csv; charset=utf-8" if nombre.lower().endswith(".csv") else "application/octet-stream"
     return Response(contenido, media_type=tipo, headers=_adjunto(nombre))
+
+
+# ── Hidrología: nivel y caudal de los ríos (SENAMHI) ──
+@app.get("/v1/hidrologia", dependencies=[Depends(acceso)])
+def hidrologia_estado():
+    """Qué hay guardado: día de la última recolección, última fecha con dato, filas y estaciones."""
+    return hidrologia.estado()
+
+
+@app.get("/v1/hidrologia/crudo/indice", dependencies=[Depends(acceso)])
+def hidrologia_indice():
+    """{pieza: huella} de lo ya guardado: la página lo compara con el archivo del navegador y sube solo lo que cambió."""
+    return {"piezas": hidrologia.indice()}
+
+
+@app.post("/v1/hidrologia/crudo", dependencies=[Depends(acceso)])
+def hidrologia_subir(cuerpo: dict = Body(...)):
+    """Guarda un lote de piezas del archivo «SENAMHI_crudo_….json» (la página lo parte y lo manda por lotes)."""
+    piezas = cuerpo.get("piezas")
+    if not isinstance(piezas, list) or len(piezas) > 5000 or not all(isinstance(p, dict) for p in piezas):
+        raise HTTPException(422, "Se espera una lista de piezas (hasta 5 000 por envío).")
+    try:
+        return hidrologia.guardar(piezas, str(cuerpo.get("dia", "")))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/v1/hidrologia/estaciones", dependencies=[Depends(acceso)])
+def hidrologia_estaciones(departamento: str = Query(..., pattern="^(16|22|25)$")):
+    """Estaciones del departamento con datos, sus variables, años hidrológicos y el último dato."""
+    if not hidrologia.hay_datos():
+        return {"estaciones": [], "resumen": {"hay": False}}
+    return {"estaciones": hidrologia.estaciones_de(departamento), "resumen": hidrologia.estado()}
+
+
+@app.get("/v1/hidrologia/serie", dependencies=[Depends(acceso)])
+def hidrologia_serie(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"), variable: str = Query("NIVEL", pattern="^(NIVEL|CAUDAL)$"),
+                     anio: int = Query(..., ge=2000, le=2100)):
+    """El hidrograma de un año hidrológico (setiembre a agosto), como el gráfico de SENAMHI."""
+    s = hidrologia.serie(estacion, variable, anio)
+    if s is None:
+        raise HTTPException(404, "No hay datos de esa estación, variable y año.")
+    return s
+
+
+@app.get("/v1/hidrologia/descargar", dependencies=[Depends(acceso)])
+def hidrologia_descargar(archivo: str = Query("diario", pattern="^(diario|info-diaria|mensual|estaciones|control|control-info|control-mensual|log|todo)$"),
+                         departamento: str = Query("", pattern="^(16|22|25)?$"), formato: str = Query("csv", pattern="^(csv|xlsx)$")):
+    """Los CSV del scraper (los mismos que arma el notebook), de todo el país o de un departamento; en CSV o en Excel."""
+    if not hidrologia.hay_datos():
+        raise HTTPException(404, "Todavía no hay datos de SENAMHI en la página: súbelos en «Actualizar».")
+    if archivo == "todo":
+        sufijo = "_" + hidrologia.DEPTOS[departamento].replace(" ", "_") if departamento else ""
+        return Response(hidrologia.paquete(departamento), media_type="application/zip", headers=_adjunto(f"SENAMHI_rios{sufijo}.zip"))
+    nombre, ruta = hidrologia.filtrar(archivo, departamento)
+    if formato == "csv":
+        return FileResponse(ruta, media_type="text/csv; charset=utf-8", headers=_adjunto(nombre))
+    df = pd.read_csv(ruta, encoding="utf-8-sig", dtype={"COD_ESTACION": str})
+    if len(df) > 150_000:
+        raise HTTPException(422, f"{nombre} tiene {len(df):,} filas: es mucho para armar el Excel aquí. Bájalo en CSV, o elige un departamento.")
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False, sheet_name="Datos")
+    return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers=_adjunto(nombre[:-4] + ".xlsx"))
 
 
 @app.get("/v1/mef", dependencies=[Depends(acceso)])
