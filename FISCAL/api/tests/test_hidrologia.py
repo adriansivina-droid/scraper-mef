@@ -142,3 +142,20 @@ def test_rango_de_fechas(cliente):
     assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2026-09-04&hasta=2026-09-01").json()["actual"] == [122.5, 122.4, None, 122.0]
     assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2015-01-01&hasta=2026-09-01").status_code == 422
     assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2023-01-01&hasta=2023-02-01").status_code == 404
+
+
+def test_todo_el_pais_con_coordenadas(cliente):
+    subir(cliente, crudo())
+    e = {x["codigo"]: x for x in cliente.get("/v1/hidrologia/estaciones?departamento=todos").json()["estaciones"]}
+    assert set(e) == {"240001", "999"}
+    # coordenadas de la copia del mapa de SENAMHI (09/11/2026); el departamento sale de la Información Diaria; «999» no está en el mapa
+    assert e["240001"]["departamento"] == "LORETO" and e["240001"]["lat"] == -3.8891 and e["240001"]["zonal"] == "08" and e["240001"]["color"] is None
+    assert e["999"]["lat"] is None and e["999"]["departamento"] == ""
+    # con la lista del mapa que trae el recolector v4, llegan las coordenadas y el color de alerta del día
+    c = crudo("2026-11-13")
+    c["monitoreo"] = [{"codZonal": "08", "nomZonal": "#FFA500-DIRECCION ZONAL 8", "codEstacion": "240001", "latitud": -3.79, "longitud": -73.35}]
+    subir(cliente, c)
+    x = next(x for x in cliente.get("/v1/hidrologia/estaciones?departamento=todos").json()["estaciones"] if x["codigo"] == "240001")
+    assert (x["lat"], x["lon"], x["color"], x["direccion_zonal"]) == (-3.79, -73.35, "#FFA500", "DZ 8 · Loreto")
+    f = filas(cliente.get("/v1/hidrologia/descargar?archivo=estaciones"))
+    assert next(r for r in f if r["COD_ESTACION"] == "240001")["LATITUD"] == "-3.79"
