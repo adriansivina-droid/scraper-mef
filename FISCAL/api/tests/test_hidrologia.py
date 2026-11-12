@@ -129,3 +129,16 @@ def test_actualizacion_diaria_y_archivo_viejo(cliente):
     assert r["omitidas_por_viejas"] == 10 and r["guardadas"] == 1
     assert cliente.get("/v1/hidrologia").json()["ultima_fecha"] == "2026-09-05"
     assert cliente.post("/v1/hidrologia/crudo", json={"dia": "2026-11-13", "piezas": [{"clave": "otra:cosa", "valor": 1}]}).status_code == 422
+
+
+def test_rango_de_fechas(cliente):
+    subir(cliente, crudo())
+    # cruza dos años hidrológicos: del 2/9/2025 (2025-2026) al 3/9/2026 (2026-2027)
+    s = cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2025-09-02&hasta=2026-09-03").json()
+    assert s["desde"] == "2025-09-02" and s["hasta"] == "2026-09-03" and s["dias"] == 367
+    assert s["actual"][:3] == [124.1, 124.2, 124.3] and s["actual"][-3:] == [122.5, 122.4, None]
+    assert s["anterior"][-3] == 124.0 and s["rojo"][-1] == 122.06
+    # fechas al revés: se ordenan; más de 5 años o sin datos: aviso
+    assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2026-09-04&hasta=2026-09-01").json()["actual"] == [122.5, 122.4, None, 122.0]
+    assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2015-01-01&hasta=2026-09-01").status_code == 422
+    assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2023-01-01&hasta=2023-02-01").status_code == 404

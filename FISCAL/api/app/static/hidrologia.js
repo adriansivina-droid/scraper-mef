@@ -51,7 +51,15 @@
     let rejilla = "";
     for (let v = Math.ceil(lo / paso) * paso; v <= hi; v += paso) rejilla += `<line x1="${izq}" x2="${W - der}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="#CCD3DF" stroke-dasharray="2 4"/><text x="${izq - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${num(v, dec)}</text>`;
     let meses = "";
-    for (let i = 0; i < n; i++) { const d = new Date(x0.getTime() + i * 864e5); if (d.getUTCDate() === 1) meses += `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${H - aba}" y2="${H - aba + 5}" stroke="#8A8FA3"/><text x="${(X(i) + (W - izq - der) / 24).toFixed(1)}" y="${H - aba + 18}" text-anchor="middle">${MES[d.getUTCMonth()]}${d.getUTCMonth() === 0 || i === 0 ? " " + d.getUTCFullYear() : ""}</text>`; }
+    const marca = (i, t) => `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${H - aba}" y2="${H - aba + 5}" stroke="#8A8FA3"/><text x="${X(i).toFixed(1)}" y="${H - aba + 18}" text-anchor="middle">${t}</text>`;
+    if (n <= 75) {                                            // tramo corto: una marca por semana
+      const cada = n <= 21 ? 2 : 7;
+      for (let i = 0; i < n; i += cada) { const d = new Date(x0.getTime() + i * 864e5); meses += marca(i, `${d.getUTCDate()} ${MES[d.getUTCMonth()]}${i === 0 || d.getUTCDate() <= cada && d.getUTCMonth() === 0 ? " " + d.getUTCFullYear() : ""}`); }
+    } else {                                                  // tramo largo: el 1 de cada mes (o cada 2, 3 o 6 meses)
+      const nm = n / 30.4, cada = nm <= 14 ? 1 : nm <= 28 ? 2 : nm <= 42 ? 3 : 6;
+      let primero = true;
+      for (let i = 0; i < n; i++) { const d = new Date(x0.getTime() + i * 864e5); if (d.getUTCDate() === 1 && d.getUTCMonth() % cada === 0) { meses += marca(i, `${MES[d.getUTCMonth()]}${d.getUTCMonth() === 0 || primero ? " " + d.getUTCFullYear() : ""}`); primero = false; } }
+    }
     // banda entre el mínimo y el máximo del día
     let banda = "";
     const tramos = []; let t = null;
@@ -68,7 +76,7 @@
     const rotulos = etiquetas.map((e) => `<text x="${W - der + 6}" y="${(e.y + 4).toFixed(1)}" fill="${COLOR[e.k]}" font-weight="600">${e.k[0].toUpperCase() + e.k.slice(1)} ${num(e.v, dec + 1)}</text>`).join("");
     const iUlt = s.actual.reduce((a, v, i) => v != null ? i : a, -1);
     const punto = iUlt >= 0 ? `<circle cx="${X(iUlt).toFixed(1)}" cy="${Y(s.actual[iUlt]).toFixed(1)}" r="4" fill="${COLOR.actual}" stroke="#FEFEFE" stroke-width="1.5"/>` : "";
-    const a = s.año, ley = [["actual", `${a}-${a + 1}`, ""], ["anterior", `${a - 1}-${a}`, ""], ["promedio", "Promedio histórico", "5 4"]]
+    const a = s.año, et = nombres(s), ley = [["actual", et.actual, ""], ["anterior", et.anterior, ""], ["promedio", "Promedio histórico", "5 4"]]
       .filter(([k]) => s[k].some((v) => v != null));
     let lx = izq;
     const leyenda = ley.map(([k, t, guion]) => { const g = `<line x1="${lx}" x2="${lx + 26}" y1="${arr - 16}" y2="${arr - 16}" stroke="${COLOR[k]}" stroke-width="${k === "actual" ? 3 : 2}" ${guion ? `stroke-dasharray="${guion}"` : ""}/><text x="${lx + 32}" y="${arr - 12}" fill="#181818">${esc(t)}</text>`; lx += 44 + t.length * 6.6; return g; }).join("") +
@@ -76,10 +84,16 @@
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Barlow, 'Segoe UI', Arial, sans-serif" font-size="12" fill="#5A5A6E" role="img" aria-label="Hidrograma de ${esc(s.estacion)}">
       <rect width="${W}" height="${H}" fill="#FEFEFE"/>
       <text x="${izq}" y="20" font-size="15" font-weight="700" fill="#111149">${esc(s.rio)} · estación ${esc(titulo(s.estacion))}</text>
-      <text x="${W - 12}" y="20" text-anchor="end">${VAR[s.variable]} diario (${esc(s.unidad)}) · año hidrológico ${a}-${a + 1} · Fuente: SENAMHI</text>
+      <text x="${W - 12}" y="20" text-anchor="end">${VAR[s.variable]} diario (${esc(s.unidad)}) · ${esc(et.periodo)} · Fuente: SENAMHI</text>
       ${leyenda}${rejilla}${meses}<line x1="${izq}" x2="${W - der}" y1="${H - aba}" y2="${H - aba}" stroke="#8A8FA3"/>
       ${banda}${umbrales}${linea("promedio", 'stroke-width="1.8" stroke-dasharray="5 4"')}${linea("anterior", 'stroke-width="2"')}${linea("actual", 'stroke-width="3"')}${punto}${rotulos}</svg>`;
     return { svg, W, izq, der, n, x0, dec };
+  }
+
+  // nombres de las series: por año hidrológico o por rango de fechas
+  function nombres(s) {
+    if (s.año != null) return { actual: `${s.año}-${s.año + 1}`, anterior: `${s.año - 1}-${s.año}`, periodo: `año hidrológico ${s.año}-${s.año + 1}`, archivo: `${s.año}-${s.año + 1}` };
+    return { actual: `${dmy(s.desde)} – ${dmy(s.hasta)}`, anterior: "Un año antes", periodo: `del ${dmy(s.desde)} al ${dmy(s.hasta)}`, archivo: `${s.desde}_a_${s.hasta}` };
   }
 
   // ── pestaña «Gráfico» ──
@@ -105,7 +119,11 @@
         <p class="nota">La diferencia en color es cuánto está el río por encima (+) o por debajo (−) de esa referencia. Los umbrales los fija SENAMHI para cada estación: en unas avisan de nivel bajo (vaciante) y en otras de crecida.${dudosas ? ` * SENAMHI no indica el departamento de esa estación: se incluye por pertenecer a la dirección zonal que atiende a ${esc(r.nombre)}.` : ""}</p></div>
       <div class="caja"><h3>Hidrograma</h3>
         <div class="fila"><label class="campo">Estación<select id="hid-est">${j.estaciones.map((e) => `<option value="${esc(e.codigo)}">${esc(titulo(e.rio))} · ${esc(titulo(e.estacion))}</option>`).join("")}</select></label>
-          <label class="campo">Variable<select id="hid-var"></select></label><label class="campo">Año hidrológico (set–ago)<select id="hid-anio"></select></label></div>
+          <label class="campo">Variable<select id="hid-var"></select></label>
+          <label class="campo">Ver<select id="hid-modo"><option value="anio">Un año hidrológico (set–ago)</option><option value="rango">Rango de fechas</option></select></label>
+          <label class="campo" id="hid-c-anio">Año hidrológico<select id="hid-anio"></select></label>
+          <label class="campo" id="hid-c-desde" hidden>Desde<input type="date" id="hid-desde"></label><label class="campo" id="hid-c-hasta" hidden>Hasta<input type="date" id="hid-hasta-f"></label>
+          <div class="fila hid-atajos" id="hid-atajos" hidden>${[["30", "30 días"], ["90", "90 días"], ["365", "1 año"], ["todo", "Desde 2023"]].map(([k, t]) => `<button class="btn sec chico" type="button" data-atajo="${k}">${t}</button>`).join("")}</div></div>
         <div id="hid-graf"></div></div>`;
     const $ = (id) => caja.querySelector("#" + id), est = () => j.estaciones.find((e) => e.codigo === $("hid-est").value);
     function opciones() {
@@ -115,21 +133,35 @@
       const años = e.variables[e0.v].años.slice().reverse();
       if (!años.includes(e0.a)) e0.a = años[0];
       $("hid-anio").innerHTML = años.map((a) => `<option value="${a}"${a === e0.a ? " selected" : ""}>${a}-${a + 1}</option>`).join("");
+      // rango: entre el 1/9 del primer año con datos (no antes de 2023) y el último dato
+      const ult = (e.variables[e0.v].ultimo || {}).fecha || new Date().toISOString().slice(0, 10);
+      const min = `${Math.max(2023, Math.min(...años))}-${Math.min(...años) >= 2023 ? "09-01" : "01-01"}`;
+      ["hid-desde", "hid-hasta-f"].forEach((id) => { $(id).min = min; $(id).max = ult; });
+      if (!e0.hasta || e0.hasta > ult) e0.hasta = ult;
+      if (!e0.desde || e0.desde < min || e0.desde > e0.hasta) e0.desde = restar(e0.hasta, 90) < min ? min : restar(e0.hasta, 90);
+      $("hid-desde").value = e0.desde; $("hid-hasta-f").value = e0.hasta;
+      const rango = e0.modo === "rango";
+      $("hid-modo").value = rango ? "rango" : "anio";
+      $("hid-c-anio").hidden = rango; $("hid-c-desde").hidden = $("hid-c-hasta").hidden = $("hid-atajos").hidden = !rango;
     }
+    const restar = (iso, dias) => new Date(Date.parse(iso + "T00:00:00Z") - dias * 864e5).toISOString().slice(0, 10);
+    let turno = 0;                                            // si se cambia la elección antes de que llegue la respuesta, la vieja se descarta
     async function dibujar() {
-      const e = est(), g = $("hid-graf");
+      const e = est(), g = $("hid-graf"), mio = ++turno;
       e0.c = e.codigo;
       g.innerHTML = '<div class="loading"><span class="spin"></span>Dibujando…</div>';
       let s;
-      try { s = await api(`/v1/hidrologia/serie?estacion=${encodeURIComponent(e.codigo)}&variable=${e0.v}&anio=${e0.a}`); }
-      catch (er) { g.innerHTML = `<div class="err-box"><b>No se pudo leer la serie</b><span>${esc(er.message)}</span></div>`; return; }
+      const url = e0.modo === "rango" ? `/v1/hidrologia/rango?estacion=${encodeURIComponent(e.codigo)}&variable=${e0.v}&desde=${e0.desde}&hasta=${e0.hasta}`
+        : `/v1/hidrologia/serie?estacion=${encodeURIComponent(e.codigo)}&variable=${e0.v}&anio=${e0.a}`;
+      try { s = await api(url); if (mio !== turno) return; }
+      catch (er) { if (mio !== turno) return; g.innerHTML = `<div class="err-box"><b>No se pudo leer la serie</b><span>${esc(er.message)}</span></div>`; return; }
       const h = hidrograma(s);
-      if (!h) { g.innerHTML = '<div class="vacio-caja"><b>Sin datos en ese año.</b></div>'; return; }
-      const nombre = `SENAMHI_${s.estacion}_${VAR[s.variable]}_${s.año}-${s.año + 1}`;
+      if (!h) { g.innerHTML = `<div class="vacio-caja"><b>Sin datos ${e0.modo === "rango" ? "entre esas fechas" : "en ese año"}.</b></div>`; return; }
+      const et = nombres(s), nombre = `SENAMHI_${s.estacion}_${VAR[s.variable]}_${et.archivo}`;
       g.innerHTML = `<div class="scroll"><div class="hid-lienzo">${h.svg}<i class="hid-guia" hidden></i><div class="hid-tip" hidden></div></div></div>
         <div class="fila"><button class="btn" type="button" data-a="copiar">Copiar</button><button class="btn sec" type="button" data-a="png">PNG</button><button class="btn sec" type="button" data-a="svg">SVG</button>
           <button class="btn sec" type="button" data-a="csv">Datos del gráfico (CSV)</button><span class="nota" data-msj></span></div>
-        <p class="nota">Cada línea es un año hidrológico, del 1 de setiembre al 31 de agosto. El promedio histórico y los umbrales son los que publica SENAMHI para la estación.</p>`;
+        <p class="nota">${e0.modo === "rango" ? "La línea oscura es la serie del rango elegido; la verde, los mismos días un año antes." : "Cada línea es un año hidrológico, del 1 de setiembre al 31 de agosto."} El promedio histórico y los umbrales son los que publica SENAMHI para la estación.</p>`;
       const lienzo = g.querySelector(".hid-lienzo"), guia = g.querySelector(".hid-guia"), tip = g.querySelector(".hid-tip"), msj = g.querySelector("[data-msj]");
       const decir = (t, ok) => { msj.textContent = t; msj.style.color = ok ? "" : "var(--error)"; };
       lienzo.addEventListener("pointermove", (ev) => {
@@ -138,7 +170,7 @@
         if (i < 0 || i >= h.n) { guia.hidden = tip.hidden = true; return; }
         const d = new Date(h.x0.getTime() + i * 864e5), px = (h.izq + (h.W - h.izq - h.der) * i / (h.n - 1)) * k;
         const fila = (t, v, c) => v == null ? "" : `<div><i style="background:${c}"></i>${t}<b>${num(v, h.dec + 1)}</b></div>`;
-        tip.innerHTML = `<b>${d.getUTCDate()} ${MES[d.getUTCMonth()]}</b>${fila(`${s.año}-${s.año + 1}`, s.actual[i], COLOR.actual)}${fila(`${s.año - 1}-${s.año}`, s.anterior[i], COLOR.anterior)}${fila("Promedio histórico", s.promedio[i], COLOR.promedio)}${s.minimo[i] != null ? `<div><i></i>Mín. y máx.<b>${num(s.minimo[i], h.dec + 1)} – ${num(s.maximo[i], h.dec + 1)}</b></div>` : ""}`;
+        tip.innerHTML = `<b>${d.getUTCDate()} ${MES[d.getUTCMonth()]} ${d.getUTCFullYear()}</b>${fila(e0.modo === "rango" ? "Valor" : et.actual, s.actual[i], COLOR.actual)}${fila(et.anterior, s.anterior[i], COLOR.anterior)}${fila("Promedio histórico", s.promedio[i], COLOR.promedio)}${s.minimo[i] != null ? `<div><i></i>Mín. y máx.<b>${num(s.minimo[i], h.dec + 1)} – ${num(s.maximo[i], h.dec + 1)}</b></div>` : ""}`;
         guia.hidden = tip.hidden = false;
         guia.style.left = px + "px";
         tip.style.left = Math.min(Math.max(px + 12, 0), caj.width - 190) + "px";
@@ -149,7 +181,7 @@
       g.querySelector('[data-a="png"]').addEventListener("click", async () => { try { await B.descargarPng(h.svg, nombre); } catch (er) { decir(er.message, false); } });
       g.querySelector('[data-a="svg"]').addEventListener("click", () => B.descargar(h.svg, nombre));
       g.querySelector('[data-a="csv"]').addEventListener("click", () => {
-        const cols = [["actual", `${s.año}-${s.año + 1}`], ["anterior", `${s.año - 1}-${s.año}`], ["promedio", "PROMEDIO_HISTORICO"], ["minimo", "MINIMO"], ["maximo", "MAXIMO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]];
+        const cols = [["actual", e0.modo === "rango" ? "VALOR" : et.actual], ["anterior", e0.modo === "rango" ? "UN_AÑO_ANTES" : et.anterior], ["promedio", "PROMEDIO_HISTORICO"], ["minimo", "MINIMO"], ["maximo", "MAXIMO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]];
         const lineas = [["FECHA", ...cols.map((c) => c[1])].join(",")];
         for (let i = 0; i < s.dias; i++) { const d = new Date(h.x0.getTime() + i * 864e5); lineas.push([dmy(d.toISOString().slice(0, 10)), ...cols.map(([k]) => s[k][i] ?? "")].join(",")); }
         const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + lineas.join("\n")], { type: "text/csv" })); a.download = nombre.replace(/\s+/g, "_") + ".csv";
@@ -161,6 +193,12 @@
     $("hid-est").addEventListener("change", () => { opciones(); dibujar(); });
     $("hid-var").addEventListener("change", () => { e0.v = $("hid-var").value; opciones(); dibujar(); });
     $("hid-anio").addEventListener("change", () => { e0.a = +$("hid-anio").value; dibujar(); });
+    $("hid-modo").addEventListener("change", () => { e0.modo = $("hid-modo").value; opciones(); dibujar(); });
+    const fechas = () => { const d = $("hid-desde").value, h = $("hid-hasta-f").value; if (!d || !h) return; [e0.desde, e0.hasta] = d <= h ? [d, h] : [h, d]; opciones(); dibujar(); };
+    $("hid-desde").addEventListener("change", fechas); $("hid-hasta-f").addEventListener("change", fechas);
+    caja.querySelectorAll("[data-atajo]").forEach((b) => b.addEventListener("click", () => {
+      const k = b.dataset.atajo; e0.hasta = $("hid-hasta-f").max; e0.desde = k === "todo" ? $("hid-desde").min : restar(e0.hasta, +k - 1);
+      if (e0.desde < $("hid-desde").min) e0.desde = $("hid-desde").min; opciones(); dibujar(); }));
     caja.querySelectorAll("[data-fila]").forEach((tr) => { const ir = () => { const f = filas[+tr.dataset.fila]; $("hid-est").value = f.e.codigo; e0.v = f.v; e0.a = null; opciones(); dibujar(); $("hid-graf").scrollIntoView({ behavior: "smooth", block: "center" }); };
       tr.addEventListener("click", ir); tr.addEventListener("keydown", (ev) => { if (ev.key === "Enter") ir(); }); });
   }

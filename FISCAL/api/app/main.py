@@ -351,6 +351,19 @@ def hidrologia_serie(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"
     return s
 
 
+@app.get("/v1/hidrologia/rango", dependencies=[Depends(acceso)])
+def hidrologia_rango(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"), variable: str = Query("NIVEL", pattern="^(NIVEL|CAUDAL)$"),
+                     desde: date = Query(...), hasta: date = Query(...)):
+    """La serie continua entre dos fechas, con el promedio histórico, el mínimo y máximo, los umbrales y el año anterior."""
+    try:
+        s = hidrologia.rango(estacion, variable, desde, hasta)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    if s is None:
+        raise HTTPException(404, "No hay datos de esa estación y variable entre esas fechas.")
+    return s
+
+
 @app.get("/v1/hidrologia/descargar", dependencies=[Depends(acceso)])
 def hidrologia_descargar(archivo: str = Query("diario", pattern="^(diario|info-diaria|mensual|estaciones|control|control-info|control-mensual|log|todo)$"),
                          departamento: str = Query("", pattern="^(16|22|25)?$"), formato: str = Query("csv", pattern="^(csv|xlsx)$")):

@@ -473,7 +473,7 @@ Sección «V. Hidrología» de cada región: nivel y caudal diario de los ríos,
 - **Descargar datos:** los CSV del scraper (serie diaria, Información Diaria, Información Mensual, estaciones y control), de la región o de todo el país, en CSV o Excel, o todo en un zip.
 - **Actualizar:** SENAMHI no responde a servidores, así que la recolección corre en el navegador (favorito «Recolector SENAMHI», `HIDROLOGIA/senamhi_navegador.js`) y aquí se sube el `SENAMHI_crudo_….json`. Solo viaja lo que cambió.
 
-Endpoints: `GET /v1/hidrologia`, `GET /v1/hidrologia/estaciones?departamento=`, `GET /v1/hidrologia/serie?estacion=&variable=&anio=`, `GET /v1/hidrologia/descargar?archivo=&departamento=&formato=`, `GET /v1/hidrologia/crudo/indice` y `POST /v1/hidrologia/crudo`. Los datos van en la tabla `senamhi_crudo` (piezas comprimidas, unos 11 MB). Detalle en `HIDROLOGIA/senamhi_rios.md`, sección 7.
+Endpoints: `GET /v1/hidrologia`, `GET /v1/hidrologia/estaciones?departamento=`, `GET /v1/hidrologia/serie?estacion=&variable=&anio=`, `GET /v1/hidrologia/rango?estacion=&variable=&desde=&hasta=`, `GET /v1/hidrologia/descargar?archivo=&departamento=&formato=`, `GET /v1/hidrologia/crudo/indice` y `POST /v1/hidrologia/crudo`. Los datos van en la tabla `senamhi_crudo` (piezas comprimidas, unos 11 MB). Detalle en `HIDROLOGIA/senamhi_rios.md`, sección 7.
 
 ## Anexos y contraste con la síntesis
 

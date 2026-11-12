@@ -574,3 +574,30 @@ def serie(codigo, variable, año):
             "actual": toma(actual), "anterior": toma(anterior), "promedio": toma(por_dia(ref, "promHistorico")),
             "minimo": toma(por_dia(propio, "minimo")), "maximo": toma(por_dia(propio, "maximo")),
             "rojo": toma(por_dia(ref, "rojo")), "naranja": toma(por_dia(ref, "naranja")), "amarillo": toma(por_dia(ref, "amarillo"))}
+
+
+def rango(codigo, variable, desde, hasta):
+    """La serie continua entre dos fechas (hasta 5 años): se une el hidrograma de cada año hidrológico que toca el tramo.
+    «anterior» es el mismo día un año antes, como en el gráfico de SENAMHI."""
+    if hasta < desde:
+        desde, hasta = hasta, desde
+    if (hasta - desde).days > 5 * 366:
+        raise ValueError("El rango puede ser de hasta 5 años.")
+    claves = ("actual", "anterior", "promedio", "minimo", "maximo", "rojo", "naranja", "amarillo")
+    out = {k: [] for k in claves}
+    base = None
+    for y in range(año_hidrologico(desde), año_hidrologico(hasta) + 1):
+        s = serie(codigo, variable, y)
+        inicio = date(y, 9, 1)
+        n = (date(y + 1, 9, 1) - inicio).days
+        for i in range(n):
+            d = inicio + timedelta(days=i)
+            if desde <= d <= hasta:
+                for k in claves:
+                    out[k].append(s[k][i] if s else None)
+        if s and base is None:
+            base = s
+    if base is None or not any(v is not None for v in out["actual"]):
+        return None
+    return {"codigo": codigo, "variable": variable, "estacion": base["estacion"], "rio": base["rio"], "unidad": base["unidad"],
+            "desde": desde.isoformat(), "hasta": hasta.isoformat(), "dias": len(out["actual"]), **out}
