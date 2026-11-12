@@ -391,3 +391,4 @@ tr.nueva-region td { border-top: 2px solid var(--hair); }
 .hid-mapa:fullscreen, .hid-mapa.completa { height: 100vh; border-radius: 0; border: 0; }
 .hid-mapa.pantalla { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 9999; border-radius: 0; border: 0; }
 body.sin-scroll { overflow: hidden; }
+#hidrologia-peru .caja, #hidrologia .caja { scroll-margin-top: 84px; }
