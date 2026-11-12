@@ -113,3 +113,13 @@ def test_crear_pide_datos_y_limpia_permisos(sitio):
     assert sitio.post("/v1/compartir", json={"nombre": "X", "permisos": {"smn": ["hidro", "pesca"]}}).status_code == 200
     assert compartir.listar()[0]["permisos"] == {"smn": ["pesca"]}
     assert "huella" not in str(sitio.get("/v1/compartir").json())
+
+
+def test_salir_del_acceso_de_invitado(sitio):
+    g = entrar(invitar(sitio, {"lor": ["pesca"]})["enlace"])
+    assert g.get("/v1/acceso/yo").json()["equipo"] is False
+    r = g.get("/salir")
+    assert r.status_code == 303 and compartir.COOKIE in r.headers["set-cookie"] and "Max-Age=0" in r.headers["set-cookie"]
+    g.cookies.clear()                                            # el navegador borra la cookie vencida
+    r = g.get("/")
+    assert r.status_code == 401 and "Basic" in r.headers["www-authenticate"]       # vuelve a pedir usuario y clave

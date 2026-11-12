@@ -1881,7 +1881,7 @@
         msj.textContent = "";
         $("cmp-res").innerHTML = `<div class="ok-box"><b>Enlace creado para ${esc($("cmp-nombre").value)}</b><span>Cópialo ahora y envíalo: <b>no se vuelve a mostrar</b>.</span>
           <div class="fila"><input type="text" class="cmp-enlace" id="cmp-enlace" readonly value="${esc(r.enlace)}"><button class="btn" type="button" id="cmp-copiar">Copiar enlace</button></div>
-          <span class="nota">Para ver lo que verá esa persona, ábrelo en una ventana privada (Ctrl+Mayús+N).</span><button class="btn sec chico" type="button" id="cmp-listo">Listo, actualizar la lista</button></div>`;
+          <span class="nota">Para ver lo que verá esa persona, ábrelo en una <b>ventana privada</b> (Ctrl+Mayús+N). Si lo abres en tu navegador de siempre, entrarás como ese invitado; para volver a tu acceso completo, pulsa «Salir» arriba a la derecha.</span><button class="btn sec chico" type="button" id="cmp-listo">Listo, actualizar la lista</button></div>`;
         $("cmp-enlace").addEventListener("focus", (ev) => ev.target.select());
         $("cmp-copiar").addEventListener("click", async (ev) => { try { await navigator.clipboard.writeText(r.enlace); ev.target.textContent = "Copiado ✓"; } catch (e) { $("cmp-enlace").focus(); } });
         $("cmp-listo").addEventListener("click", () => cajaCompartir(caja));
@@ -2099,7 +2099,7 @@
         restringir(acceso);
         if (!Object.keys(GRUPOS).length) throw new Error("Tu acceso no incluye ninguna sección.");
         HIDRO.invitado = true;
-        document.querySelector(".ayuda").outerHTML = `<span class="invitado" title="Acceso compartido por el Departamento de Estudios Económicos">Acceso de ${esc(acceso.nombre)} · vence el ${new Date(acceso.vence).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}</span>`;
+        document.querySelector(".ayuda").outerHTML = `<span class="invitado" title="Acceso compartido por el Departamento de Estudios Económicos">Acceso de ${esc(acceso.nombre)} · vence el ${new Date(acceso.vence).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}</span><a class="ayuda" href="/salir" title="Salir del acceso de invitado; la página volverá a pedir usuario y clave">Salir</a>`;
       }
     }
     catch (e) { $("sector").innerHTML = `<div class="cuerpo"><div class="err-box"><b>No se pudo conectar con el API</b><span>${esc(e.message)}</span></div></div>`; return; }

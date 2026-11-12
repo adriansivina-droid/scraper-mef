@@ -161,6 +161,14 @@ def inicio(request: Request):
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/salir", include_in_schema=False)
+def salir():
+    """Quita la cookie de invitado de este navegador: la próxima vez la página vuelve a pedir usuario y clave."""
+    resp = RedirectResponse("/", status_code=303)
+    resp.delete_cookie(compartir.COOKIE)
+    return resp
+
+
 @app.get("/v1/acceso/yo", dependencies=[Depends(acceso)])
 def acceso_yo(request: Request):
     """Quién entra: el equipo (todo) o un invitado (con sus permisos). La página oculta lo que no se le dio."""
