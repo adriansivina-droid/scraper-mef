@@ -1,6 +1,6 @@
 # Nivel y caudal de los ríos · SENAMHI · Contexto del proyecto
 
-Documento de traspaso para retomar el proyecto sin perder contexto. Última actualización: **10/11/2026**.
+Documento de traspaso para retomar el proyecto sin perder contexto. Última actualización: **12/11/2026**.
 
 ---
 
@@ -19,8 +19,8 @@ Si `DRIVE_FOLDER_ID` y `DRIVE_FOLDER_CONTROL_ID` están vacíos (Bloque 3, punto
 
 | Uso | ID |
 |---|---|
-| DATA | *(pendiente: primera corrida)* |
-| CONTROL | *(pendiente: primera corrida)* |
+| DATA | `10JyiTexl7Ip7FneQNFDXJFNGxaf3epqQ` |
+| CONTROL | `1Lg28Y32pca7nDZy5ru5Pzbd-butalEfb` |
 
 ## 3. Fuente
 
@@ -63,6 +63,10 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
 No es un fallo del código: es un bloqueo de red de SENAMHI. Por eso **la descarga la hace el navegador** y Colab solo procesa (sección 4). La actualización automática diaria con GitHub Actions, como en HIDROCARBUROS, **no es posible** mientras dure ese bloqueo.
 
 ## 4. Cómo se ejecuta (dos pasos)
+
+**Rutina diaria (desde el 12/11/2026): favorito + página.** En la página del departamento, sección **Hidrología → Actualizar**, está el botón «Recolector SENAMHI» para arrastrar a la barra de favoritos. Cada día: clic en el favorito (lleva a SENAMHI), clic otra vez (carga el recolector y, si hay avance guardado, empieza solo; ~5 minutos) y arrastrar el `SENAMHI_crudo_….json` descargado al recuadro de esa misma pestaña. La página compara con lo que ya tiene y sube solo las piezas nuevas o cambiadas. El notebook de Colab (Paso B) queda como opción para tener además la copia en Drive.
+
+No hay que cambiar las fechas del panel: con «Desde 01/01/2023» el recolector solo pide lo nuevo (el año hidrológico en curso de todas las estaciones, los 3 últimos meses de la Información Mensual, y la Información Diaria de hoy, de ayer y de los días que falten).
 
 ### Paso A · Recolector en el navegador (`HIDROLOGIA/senamhi_navegador.js`)
 
@@ -133,7 +137,17 @@ El detalle de cada columna está en **`HIDROLOGIA/docs/Diccionario_SENAMHI_rios.
 ## 6. Pendiente
 
 - [x] Prueba rápida real (10/11/2026): funcionó de punta a punta. **SENAMHI sí acepta fechas pasadas** (nivel desde 2023 en las 3 estaciones) y el caudal sale en 2 de las 3. Información Diaria: 64 estaciones con dato a las 06:00, 12:00 y 18:00, y 30 a las 00:00.
-- [ ] Corrida completa desde 01/01/2023 y revisión del control.
-- [ ] Llevar los datos a la página. La base usa 211,9 MB de 512 MB (10/11/2026) y los CSV comprimidos de SENAMHI pesarían unos 15–20 MB, así que caben. Se hará cuando la corrida completa esté revisada.
-- [ ] Anotar los IDs de DATA y CONTROL (sección 2).
-- [ ] Cargar los CSV en la página (almacén), como en HIDROCARBUROS. La actualización diaria no puede ser automática mientras SENAMHI bloquee a los servidores en la nube: hay que repetir los pasos A y B.
+- [x] Corrida completa desde 01/01/2023 (12/11/2026): 316 753 filas diarias de 138 estaciones, 327 381 de Información Diaria (74 estaciones) y 2 622 mensuales. Control: nivel 124 OK y 14 a revisar; caudal 88 OK, 19 a revisar y 31 sin datos (estaciones sin caudal). Los «REVISAR (saltos)» son cambios bruscos de un día a otro; los datos se guardan como los publica SENAMHI.
+- [x] Llevar los datos a la página (12/11/2026): sección **Hidrología** de cada región (sección 7).
+- [x] IDs de DATA y CONTROL anotados (sección 2).
+- [ ] Opcional: recolección sin intervención, con un script de Python y el Programador de tareas de Windows en una PC de la oficina (SENAMHI solo bloquea a los servidores en la nube). Hay que probar primero que SENAMHI responde a Python desde esa red.
+
+## 7. En la página (FISCAL/api)
+
+- **Dónde:** índice de cada región → «V. Hidrología» (Anexos pasa a ser VI). Pestañas: **Gráfico** (situación de los ríos de la región y el hidrograma como el de SENAMHI: año hidrológico, año anterior, promedio histórico, mínimo y máximo del día y umbrales), **Descargar datos** (los mismos CSV del notebook, de la región o de todo el país, en CSV o Excel) y **Actualizar**.
+- **Qué guarda:** las piezas del archivo del navegador tal cual, comprimidas, en la tabla `senamhi_crudo` (una fila por hidrograma `graf:<estación>:<variable>:<año hidrológico>`, por consulta de Información Diaria `inf:<fecha>:<hora>` y por mes `men:<AAAA-MM>`). La corrida completa ocupa unos 11 MB; guardar las filas ocuparía unas 10 veces más.
+- **Cómo arma los CSV:** `app/hidrologia.py` aplica las mismas reglas que el notebook (comprobado: con el mismo archivo salen los mismos CSV, fila por fila). Se arman al primer pedido tras cada actualización y quedan en disco hasta la siguiente.
+- **Subida:** la página parte el JSON en el navegador, pide `GET /v1/hidrologia/crudo/indice` (pieza → huella) y manda por lotes a `POST /v1/hidrologia/crudo` solo lo que cambió. Una pieza no se reemplaza por otra recolectada en un día anterior.
+- **Departamento de una estación:** el que da SENAMHI en la Información Diaria o Mensual; las estaciones sin departamento se muestran en la región de su dirección zonal (DZ 8 Loreto, DZ 9 San Martín, DZ 10 Ucayali) con un asterisco.
+- **Umbrales:** si el rojo es menor que el amarillo son de nivel bajo (vaciante), como en el Nanay o el Amazonas; si es mayor, de crecida.
+- Pruebas: `FISCAL/api/tests/test_hidrologia.py`.

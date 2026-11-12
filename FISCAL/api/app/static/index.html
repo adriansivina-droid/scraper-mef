@@ -35,6 +35,7 @@
 
 <script src="/static/bcrp.js"></script>
 <script src="/static/drae.js"></script>
+<script src="/static/hidrologia.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -85,6 +86,8 @@
       lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos", "Contraste", "Archivos"] },
     drae: { t: "Gráficos DRAE", fuente: "Las SERIES del departamento (Excel con los gráficos)", entra: "Subiendo las SERIES en «Actualizar»", estado: "ok", cuadros: "drae", actualizar: "series",
       lead: "Los gráficos de las SERIES del departamento (los del DRAE), con sus datos y la paleta del Seminario de Periodistas: listos para copiar o descargar en SVG o PNG." },
+    hidrologia: { t: "Hidrología", fuente: "SENAMHI, Monitoreo Hidrológico (nivel y caudal de los ríos)", entra: "Recolector en el navegador (SENAMHI no responde a servidores) y subir el archivo en «Actualizar»", cuadros: "hidrologia",
+      lead: "Nivel y caudal diario de los ríos de la región: el hidrograma de SENAMHI (año hidrológico, año anterior, promedio histórico y umbrales de alerta) y la descarga de todos los datos del scraper." },
     anexos: { t: "Anexos", fuente: "Todos los sectores", entra: "Se generan solos con los datos de cada sector", bases: (r) => ["gasto-dev-generica", "inv-dev-funcion", "empleo", "hidro-produccion", "expo-estad", r.pesca],
       lead: "Cuadros estadísticos del final del informe, uno por sector, con el formato de la síntesis: listos para copiar o descargar.", cuadros: "anexos" },
   };
@@ -92,9 +95,9 @@
   const V = "IV. Ejecución del presupuesto de gastos del Gobierno General";
   const comunes = [cap("II. Aspectos laborales", ["empleo"]), cap(V, ["gasto", "inversion"])];
   const GRUPOS = {
-    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
-    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
-    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "anexos", num: "V" }, { id: "drae" }] },
+    lor: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo", "impo"]), comunes[1], { id: "hidrologia", num: "V" }, { id: "anexos", num: "VI" }, { id: "drae" }] },
+    smn: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "hidrologia", num: "V" }, { id: "anexos", num: "VI" }, { id: "drae" }] },
+    uca: { indice: [{ id: "resumen" }, cap("I. Actividad productiva", ["pesca", "hidro", "manu"]), comunes[0], cap("III. Sector externo", ["expo"]), comunes[1], { id: "hidrologia", num: "V" }, { id: "anexos", num: "VI" }, { id: "drae" }] },
     tres: { comun: true, indice: [{ id: "panorama" }, { id: "guia" }, cap("Empleo", ["empleo-total", "empleo-sectores", "empleo-long"]), cap("MEF", ["mef-archivos", "bases-mef"]), cap("Comparar regiones", ["bases"]), cap("Actualización", ["act-mef", "act-empleo", "act-hidro", "act-archivos"]), cap("Administración", ["estado", "parametros"])] },
   };
   const C = { panorama: "Panorama de las tres regiones", guia: "Guía de uso", "mef-archivos": "MEF · 3 archivos", "bases-mef": "MEF · 25 departamentos", "empleo-total": "Empleo · total por región", "empleo-sectores": "Empleo · por sectores", "empleo-long": "Empleo · LONG por región", bases: "Bases comparativas", "act-mef": "Scraper del MEF",
@@ -109,6 +112,7 @@
   const nombre = (sid) => GRUPOS[grupo].comun ? C[sid] : S[sid].t;
   function estadoDe(sid, r) {
     const s = S[sid];
+    if (sid === "hidrologia") return ESTADO.hidrologia ? "ok" : "vacio";
     if (!s.bases) return s.estado;
     return s.bases(r).some((b) => ESTADO.bases[b] && ESTADO.bases[b].departamentos.includes(r.cod)) ? "ok" : "vacio";
   }
@@ -1782,13 +1786,14 @@
     const s = S[id], r = REG[grupo], bases = s.bases ? s.bases(r) : null, est = estadoDe(id, r);
     // primero lo del informe (cuadros, gráficos, mapa, revisiones); al final, los datos y la actualización
     const DE_DATOS = ["Archivos", "Base mensual"], extra = s.extra || [];
-    const tabs = s.cuadros === "anexos" ? [ANEXOS_TAB] : s.cuadros === "resumen" ? [RESUMEN_TAB] : s.cuadros === "drae" ? [DRAE_TAB, "Actualizar"] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
+    const tabs = s.cuadros === "hidrologia" ? HIDRO.TABS : s.cuadros === "anexos" ? [ANEXOS_TAB] : s.cuadros === "resumen" ? [RESUMEN_TAB] : s.cuadros === "drae" ? [DRAE_TAB, "Actualizar"] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
       ...extra.filter((x) => !DE_DATOS.includes(x)), "Datos", ...extra.filter((x) => DE_DATOS.includes(x)), ...(s.sinActualizar ? [] : ["Actualizar"])];
-    const t = s.cuadros === "anexos" ? ANEXOS_TAB : s.cuadros === "resumen" ? RESUMEN_TAB : s.cuadros === "drae" ? (pestana[grupo + id] || DRAE_TAB) : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
+    const t = s.cuadros === "hidrologia" ? (HIDRO.TABS.includes(pestana[grupo + id]) ? pestana[grupo + id] : HIDRO.TABS[0]) : s.cuadros === "anexos" ? ANEXOS_TAB : s.cuadros === "resumen" ? RESUMEN_TAB : s.cuadros === "drae" ? (pestana[grupo + id] || DRAE_TAB) : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
-    if (t === "Datos" && id === "empleo") panel = `<div class="caja"><h3>Empleo · ${esc(r.nombre)}</h3><p>Todos los meses disponibles del MTPE (desde enero 2016). Para varias regiones o grupos, usa ${irComun("empleo-long", "Empleo · LONG por región")}.</p>${cajaLong(r.nombre)}</div>`;
+    if (s.cuadros === "hidrologia") panel = `<div id="hidrologia" data-tab="${t}"></div>`;
+    else if (t === "Datos" && id === "empleo") panel = `<div class="caja"><h3>Empleo · ${esc(r.nombre)}</h3><p>Todos los meses disponibles del MTPE (desde enero 2016). Para varias regiones o grupos, usa ${irComun("empleo-long", "Empleo · LONG por región")}.</p>${cajaLong(r.nombre)}</div>`;
     else if (t === "Datos") panel = bases ? `<div class="caja"><h3>${esc(s.t)} · ${esc(r.nombre)}</h3><p>Solo los datos de ${esc(r.nombre)}. Para varias regiones juntas, usa ${s.actualizar === "mef" ? irComun("bases-mef", "MEF · 25 departamentos") : s.actualizar === "empleo" ? irComun("empleo-long", "Empleo · LONG por región") + " (el Excel tal como lo da el scraper, de una, varias o todas las regiones)" : irComun("bases", "Bases comparativas")}.</p>${panelBases(`p-${grupo}-${id}`, bases, { deptos: () => [r.cod], marcar: bases.length === 1 ? 1 : 2 })}</div>`
       : `<div class="vacio-caja"><b>Todavía no hay datos de ${esc(s.t.toLowerCase())} en la página.</b><span>Fuente: ${esc(s.fuente)}. Entrará como: ${esc(s.entra.toLowerCase())}.</span></div>`;
     else if (t === "Mapa") panel = `<div class="caja mapa-caja"><div class="fila" style="justify-content:space-between;align-items:center">
@@ -1823,7 +1828,7 @@
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
     return `<div><div class="ruta"><b>${esc(r.nombre)}</b>${capitulo ? `<span>›</span><span>${esc(capitulo.titulo)}</span>` : ""}</div><h1>${esc(s.t)}</h1><p class="lead">${esc(s.lead)}</p></div>
       <div class="ficha compacta"><div><small>Estado</small><span class="chip ${est}">${ETIQ[est]}</span></div><div><small>Fuente</small><b>${esc(s.fuente)}</b></div>
-        <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div>${s.cuadros === "drae" ? '<div><small>Qué hay</small><b>Los gráficos de las SERIES, sin duplicados ni versiones viejas</b></div>' : `<div><small>Datos hasta</small><b>${hasta ? esc(etqMes(hasta)) : "Sin datos todavía"}</b></div>`}</div>
+        <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div>${s.cuadros === "drae" ? '<div><small>Qué hay</small><b>Los gráficos de las SERIES, sin duplicados ni versiones viejas</b></div>' : `<div><small>Datos hasta</small><b${s.cuadros === "hidrologia" ? ' id="hid-hasta"' : ""}>${s.cuadros === "hidrologia" ? "…" : hasta ? esc(etqMes(hasta)) : "Sin datos todavía"}</b></div>`}</div>
       <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}"${["Datos", "Actualizar", ...DE_DATOS].includes(x) ? ` class="de-datos${x === tabs.find((y) => ["Datos", "Actualizar", ...DE_DATOS].includes(y)) ? " primero" : ""}"` : ""}>${esc(x)}${(x === "Cuadros" && Array.isArray(s.cuadros)) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
       <div class="panel" role="tabpanel">${panel}</div>`;
   }
@@ -2009,6 +2014,7 @@
     if ($("archivos-fiscal")) archivosFiscales(REG[grupo], $("archivos-fiscal"));
     if ($("bcrp")) cuadrosBCRP($("bcrp").dataset.sector, REG[grupo], $("bcrp"));
     if ($("anexos-bcrp")) anexosBCRP(REG[grupo], $("anexos-bcrp"));
+    if ($("hidrologia")) { HIDRO.alActualizar = () => { if (!ESTADO.hidrologia) { ESTADO.hidrologia = true; pintarIndice(); const c = document.querySelector("#sector .ficha .chip"); if (c) { c.className = "chip ok"; c.textContent = ETIQ.ok; } } }; HIDRO.pintar(REG[grupo], $("hidrologia"), $("hidrologia").dataset.tab); }
     if ($("resumen-ejec")) resumenEjecutivo(REG[grupo], $("resumen-ejec"));
     if ($("drae-graf")) graficosDRAE(REG[grupo], $("drae-graf"));
     if ($("contraste")) contrasteMEF($("contraste").dataset.sector, REG[grupo], $("contraste"));
