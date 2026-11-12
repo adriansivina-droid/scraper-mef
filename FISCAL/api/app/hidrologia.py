@@ -451,6 +451,14 @@ def armar(carpeta):
             "por_departamento": por_depto}
 
 
+def _dia_recoleccion():
+    """El día en que se recolectó lo guardado (fecha de referencia para saber si un dato es reciente)."""
+    try:
+        return date.fromisoformat((_leer("meta", {}) or {}).get("hoy"))
+    except (TypeError, ValueError):
+        return datetime.now(timezone(timedelta(hours=-5))).date()
+
+
 # ── lo armado, en disco (se rehace solo cuando cambian los datos) ────────────
 _armado = {"version": None, "carpeta": None, "resumen": None}
 
@@ -487,6 +495,116 @@ def estado():
 
 def _zonales():
     return {**{c: u["zonal"] for c, u in ubicacion().items() if u["zonal"]}, **{str(k): str(v) for k, v in (_leer("zonales", {}) or {}).items()}}
+
+
+# ── alertas: doble control ───────────────────────────────────────────────────
+# Una alerta solo se da por «confirmada» si coinciden dos fuentes independientes: la que calcula la página con los umbrales y
+# el dato del día, y el color que SENAMHI pinta en su propio mapa. Además se controla que el dato sea reciente, que los umbrales
+# sean coherentes y que el valor no sea un salto brusco. Lo que no pasa los controles se muestra como «a verificar», no como alerta.
+COLOR_A_NIVEL = {"#FF0000": "roja", "#FFA500": "naranja", "#FFFF00": "amarilla", "#FFFFFF": "normal"}
+SEVERIDAD = {"normal": 0, "amarilla": 1, "naranja": 2, "roja": 3}
+DIAS_FRESCO = 2                                    # un dato más viejo que esto (respecto del día de la recolección) no dispara alertas
+
+
+def _tipo_umbral(rojo, naranja, amarillo, promedio):
+    """(baja, inferido, problema): «baja» si los umbrales son de nivel bajo (rojo < naranja < amarillo); False si son de crecida
+    (rojo > naranja > amarillo); «inferido» si solo hay umbral rojo y el tipo sale de compararlo con el promedio."""
+    otros = [x for x in (naranja, amarillo) if x is not None]
+    if not otros:
+        if promedio is None or promedio == rojo:
+            return None, True, "solo hay umbral rojo y no se puede saber si es de nivel bajo o de crecida"
+        return rojo < promedio, True, ""
+    serie = [rojo] + [x for x in (naranja, amarillo) if x is not None]
+    if all(a <= b for a, b in zip(serie, serie[1:])) and len(set(serie)) > 1:
+        return True, False, ""
+    if all(a >= b for a, b in zip(serie, serie[1:])) and len(set(serie)) > 1:
+        return False, False, ""
+    return None, False, f"los umbrales no son coherentes (rojo {rojo:g}, naranja {naranja if naranja is not None else '—'}, amarillo {amarillo if amarillo is not None else '—'})"
+
+
+def _salto_brusco(historia):
+    """¿El último valor se aleja del anterior mucho más de lo habitual en la propia serie (últimos 90 días)?"""
+    if len(historia) < 12:
+        return False
+    difs = [abs(b - a) for a, b in zip(historia, historia[1:])]
+    ultimo, resto = difs[-1], sorted(difs[:-1])
+    q90 = resto[int(0.9 * (len(resto) - 1))]
+    rango = max(historia) - min(historia)
+    return ultimo > max(5 * q90, 0.1 * rango) if rango > 0 else False
+
+
+def evaluar_alerta(u, hoy, color_senamhi, historia):
+    """Evalúa la alerta de una variable de una estación con el doble control.
+    u: último dato {fecha, valor, rojo, naranja, amarillo, promedio}; hoy: día de la recolección; color_senamhi: el color de la
+    estación en el mapa de SENAMHI («#RRGGBB») o None si no se tiene; historia: últimos valores diarios (el último es el dato).
+    Devuelve {estado, nivel, baja, calculada, senamhi, motivos}; «nivel» es lo que se pinta (roja, naranja, amarilla, normal o None).
+    Estados: confirmada · senamhi (solo SENAMHI marca alerta) · sin_confirmar · a_verificar · normal · sin_umbral · sin_dato."""
+    motivos = []
+    f = date.fromisoformat(u["fecha"])
+    edad = (hoy - f).days
+    senamhi = COLOR_A_NIVEL.get(str(color_senamhi or "").upper())
+    fresco = edad <= DIAS_FRESCO
+    calculada, baja, problema, inferido = None, None, "", False
+    if not fresco:
+        motivos.append(f"el último dato es del {f:%d/%m/%Y}, hace {edad} días: no se usa para dar alertas")
+    if u.get("rojo") is not None and u.get("valor") is not None:
+        baja, inferido, problema = _tipo_umbral(u["rojo"], u.get("naranja"), u.get("amarillo"), u.get("promedio"))
+        if problema:
+            motivos.append(problema[0].upper() + problema[1:])
+        if baja is not None:
+            pasa = (lambda t: t is not None and u["valor"] <= t) if baja else (lambda t: t is not None and u["valor"] >= t)
+            calculada = "roja" if pasa(u["rojo"]) else "naranja" if pasa(u.get("naranja")) else "amarilla" if pasa(u.get("amarillo")) else "normal"
+            if inferido:
+                motivos.append("solo hay umbral rojo: el tipo (nivel bajo o crecida) se dedujo del promedio histórico")
+    en_alerta = calculada not in (None, "normal")
+    controles = fresco and not problema and not inferido and not (u.get("rojo") is not None and baja is None)
+    if en_alerta and _salto_brusco(historia):
+        controles = False
+        motivos.append("el valor cambió bruscamente respecto del día anterior (más de 5 veces lo habitual): puede ser un dato errado")
+    if en_alerta and len(historia) >= 2 and calculada != "normal":
+        prev, t = historia[-2], u["rojo"] if calculada == "roja" else u.get("naranja") if calculada == "naranja" else u.get("amarillo")
+        sostenida = (prev <= t) if baja else (prev >= t)
+        motivos.append("el día anterior ya estaba en esa condición" if sostenida else "es el primer día en esa condición")
+    # decisión
+    if not fresco:                                  # sin dato reciente la página no alerta; si SENAMHI marca alerta, se muestra la de SENAMHI
+        if senamhi not in (None, "normal"):
+            estado, nivel = "senamhi", senamhi
+            motivos.insert(0, f"el mapa de SENAMHI marca {senamhi}")
+        else:
+            estado, nivel = "sin_dato", None
+    elif senamhi is not None:
+        if en_alerta and senamhi == calculada:
+            estado, nivel = "confirmada", calculada
+            motivos.insert(0, "la página y el mapa de SENAMHI coinciden")
+        elif en_alerta and senamhi != calculada:
+            estado, nivel = "a_verificar", None
+            motivos.insert(0, f"según los umbrales sería {calculada}, pero el mapa de SENAMHI marca {'sin alerta' if senamhi == 'normal' else senamhi}")
+        elif not en_alerta and senamhi != "normal":
+            estado, nivel = "senamhi", senamhi
+            motivos.insert(0, f"el mapa de SENAMHI marca {senamhi}; la página, con sus umbrales, {'no ve alerta' if calculada == 'normal' else 'no puede calcularla'}")
+        elif calculada is None:
+            estado, nivel = "sin_umbral", None
+        else:
+            estado, nivel = ("normal" if fresco else "sin_dato"), "normal" if fresco else None
+    else:
+        if not en_alerta:
+            estado = "sin_umbral" if calculada is None else ("normal" if fresco else "sin_dato")
+            nivel = "normal" if estado == "normal" else None
+        elif controles:
+            estado, nivel = "sin_confirmar", calculada
+            motivos.insert(0, "calculada con los umbrales; falta el color de SENAMHI para confirmarla (corre el recolector)")
+        else:
+            estado, nivel = "a_verificar", None
+    if estado == "sin_dato" and not motivos:
+        motivos.append("sin dato reciente")
+    return {"estado": estado, "nivel": nivel, "baja": baja, "calculada": calculada, "senamhi": senamhi, "motivos": motivos}
+
+
+def texto_alerta(a):
+    n = (a["nivel"] or a["calculada"] or "").capitalize()
+    tipo = "" if a["baja"] is None else " · nivel bajo" if a["baja"] else " · crecida"
+    return {"confirmada": f"{n}{tipo} · confirmada", "senamhi": f"Según SENAMHI: {n}", "sin_confirmar": f"{n}{tipo} · sin confirmar",
+            "a_verificar": "A verificar", "normal": "Sin alerta", "sin_umbral": "Sin umbral", "sin_dato": "Sin dato reciente"}[a["estado"]]
 
 
 def _codigos(departamento):
@@ -575,14 +693,26 @@ def estaciones_de(departamento):
                     serie = lambda k: num((c.get(k) or [None] * len(actual))[i])   # noqa: E731
                     v["ultimo"] = {"_y": y, "fecha": _fecha_ms(c["fechaHora"][i]).isoformat(), "valor": num(actual[i]),
                                    "anterior": serie("datoAnterior"), "promedio": serie("promHistorico"), "rojo": serie("rojo"),
-                                   "naranja": serie("naranja"), "amarillo": serie("amarillo")}
+                                   "naranja": serie("naranja"), "amarillo": serie("amarillo"),
+                                   "_hist": [x for x in (num(t) for t in actual[:i + 1]) if x is not None][-90:]}
                     break
     lista, ah_min = [], año_hidrologico(inicio())
+    hoy = _dia_recoleccion()
     for e in out.values():
         for v in e["variables"].values():
             v["años"] = sorted(a for a in v["años"] if a >= ah_min)
             if v["ultimo"]:
                 v["ultimo"].pop("_y")
+                a = evaluar_alerta(v["ultimo"], hoy, e["color"], v["ultimo"].pop("_hist"))
+                a["texto"] = texto_alerta(a)
+                v["ultimo"]["alerta"] = a
+        # la alerta de la estación: la variable con la alerta más firme (confirmada > sin confirmar > a verificar) y, a igual firmeza, la más grave
+        firmeza = {"confirmada": 4, "senamhi": 4, "sin_confirmar": 3, "a_verificar": 2, "normal": 1, "sin_umbral": 0, "sin_dato": 0}
+        cand = [(firmeza[v["ultimo"]["alerta"]["estado"]], SEVERIDAD.get(v["ultimo"]["alerta"]["nivel"] or v["ultimo"]["alerta"]["calculada"] or "", 0), var)
+                for var, v in e["variables"].items() if v.get("ultimo")]
+        if cand:
+            var = max(cand)[2]
+            e["alerta"] = {**e["variables"][var]["ultimo"]["alerta"], "variable": var}
         lista.append(e)
     lista.sort(key=lambda e: (e["rio"], e["estacion"]))
     _catalogo[departamento] = lista

@@ -475,7 +475,9 @@ Sección «V. Hidrología» de cada región: nivel y caudal diario de los ríos,
 
 **Reporte de situación hídrica · Zona Oriente** (Perú → Ríos del Perú → Descargar datos, o `GET /v1/hidrologia/reporte?formato=pptx|xlsx`): con el formato del reporte de la Sucursal Piura, armado con los datos del día (`app/reporte_hidrico.py`). El PowerPoint tiene portada, situación de los ríos del Oriente (tabla con alerta), hidrogramas de Loreto (2 láminas), San Martín y Ucayali, nivel diario del mes por año y caudales; sus gráficos son de PowerPoint (editables). El Excel tiene una hoja por gráfico, con los datos en columnas (un año hidrológico por columna) y el gráfico de Excel que los usa, la hoja «Resumen» con fórmulas (último dato, variaciones y alerta) y la «Tabla diaria».
 
-**Compartir con terceros** (Perú → Administración → Compartir la página; `app/compartir.py`): enlaces con permisos por sector y pestaña y vencimiento; el servidor niega todo lo que no se dio.
+**Alertas con doble control:** el color de alerta de cada estación solo se pinta si la alerta está *confirmada* (la página la calcula con los umbrales y el mapa de SENAMHI coincide, con dato de los últimos 2 días, umbrales coherentes y sin saltos raros); si no, se marca «sin confirmar», «a verificar» o «sin dato reciente» y se explica el motivo. Ver `HIDROLOGIA/senamhi_rios.md`.
+
+**Compartir con terceros** (Perú → Administración → Compartir la página; `app/compartir.py`): enlaces con permisos por sector y pestaña y vencimiento; el servidor niega todo lo que no se dio. Un enlace vigente manda sobre el usuario y la clave que el navegador tenga guardados; «Salir» (arriba a la derecha) vuelve al acceso del equipo.
 
 Todo el país: grupo **Perú** → Hidrología → «Ríos del Perú (SENAMHI)», con el mapa de las estaciones (coordenadas de `listaMonitoreo` de SENAMHI; copia en `app/senamhi_ubicacion.json`), la tabla, el hidrograma y las descargas nacionales.
 

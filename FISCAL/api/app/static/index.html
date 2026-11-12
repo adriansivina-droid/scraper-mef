@@ -2095,7 +2095,10 @@
     try {
       const [acceso, c, e] = await Promise.all([api("/v1/acceso/yo"), api("/v1/catalogo"), api("/v1/estado")]);
       CAT = c; ESTADO = e;
-      if (!acceso.equipo) {
+      if (acceso.equipo) {
+        const ay = document.querySelector(".ayuda");
+        if (ay) ay.insertAdjacentHTML("beforebegin", '<span class="invitado" title="Entraste con el usuario y la clave del equipo: ves todo">Acceso del equipo</span>');
+      } else {
         restringir(acceso);
         if (!Object.keys(GRUPOS).length) throw new Error("Tu acceso no incluye ninguna sección.");
         HIDRO.invitado = true;

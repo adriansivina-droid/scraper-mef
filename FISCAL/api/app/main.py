@@ -52,16 +52,18 @@ def acceso(request: Request, cred: HTTPBasicCredentials | None = Depends(_basic)
     if not clave:
         return
     usuario = os.environ.get("APP_USUARIO", "fiscal")
-    if cred is not None and secrets.compare_digest(cred.username, usuario) and secrets.compare_digest(cred.password, clave):
-        return
     entrada = request.url.path == "/" and request.query_params.get("t")
     token = request.cookies.get(compartir.COOKIE) or entrada
     inv = compartir.validar(token, entrada=bool(entrada and not request.cookies.get(compartir.COOKIE))) if token else None
+    # un enlace de invitado vigente manda sobre el usuario y la clave: el navegador envía las credenciales guardadas o recordadas
+    # en esa computadora (por ejemplo, las del equipo) y, si ganaran ellas, el enlace mostraría toda la página en lugar de lo compartido
     if inv:
         permitido, motivo = compartir.permitido(inv["permisos"], request.method, request.url.path, request.query_params)
         if not permitido:
             raise HTTPException(403, motivo)
         request.state.invitado = inv
+        return
+    if cred is not None and secrets.compare_digest(cred.username, usuario) and secrets.compare_digest(cred.password, clave):
         return
     if entrada:
         raise HTTPException(403, "Este enlace venció o fue revocado. Pide uno nuevo al Departamento de Estudios Económicos.")

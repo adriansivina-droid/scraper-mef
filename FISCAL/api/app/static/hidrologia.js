@@ -23,16 +23,17 @@
     return j;
   }
 
-  // ── alerta: los umbrales de SENAMHI son de nivel bajo (vaciante) si el rojo queda debajo del amarillo; si no, de crecida ──
+  // ── alerta: la calcula el servidor con un doble control (hidrologia.evaluar_alerta) y aquí solo se presenta ──
+  // estados: confirmada (la página y el mapa de SENAMHI coinciden) · senamhi (solo SENAMHI marca alerta) · sin_confirmar (calculada,
+  // falta el color de SENAMHI) · a_verificar (no pasó los controles) · normal · sin_umbral · sin_dato (dato viejo)
+  const CLASE = { confirmada: "", senamhi: "", sin_confirmar: " hid-sinconf", a_verificar: " hid-verificar", normal: "", sin_umbral: "", sin_dato: " hid-sindato" };
   function alerta(u) {
-    if (!u || u.valor == null || u.rojo == null) return null;
-    const otro = u.amarillo != null ? u.amarillo : u.naranja != null ? u.naranja : u.promedio;
-    const baja = otro != null ? u.rojo < otro : false;
-    const pasa = (t) => t != null && (baja ? u.valor <= t : u.valor >= t);
-    const nivel = pasa(u.rojo) ? "rojo" : pasa(u.naranja) ? "naranja" : pasa(u.amarillo) ? "amarillo" : "normal";
-    return { nivel, baja, texto: nivel === "normal" ? "Sin alerta" : `Umbral ${nivel} ${baja ? "por nivel bajo" : "por crecida"}` };
+    const a = u && u.alerta;
+    if (!a || a.estado === "sin_umbral") return null;
+    const nivel = a.nivel === "roja" ? "rojo" : a.nivel === "amarilla" ? "amarillo" : a.nivel || "normal";
+    return { nivel: ["normal", "amarillo", "naranja", "rojo"].includes(nivel) && a.estado !== "a_verificar" && a.estado !== "sin_dato" ? nivel : "neutro", texto: a.texto, estado: a.estado, motivos: a.motivos || [], clase: CLASE[a.estado] || "" };
   }
-  const chip = (a) => a ? `<span class="chip hid-${a.nivel}">${esc(a.texto)}</span>` : '<span class="nota">sin umbrales</span>';
+  const chip = (a) => a ? `<span class="chip hid-${a.nivel}${a.clase}" title="${esc(a.motivos.join(". "))}">${esc(a.texto)}</span>` : '<span class="nota">sin umbrales</span>';
 
   // ── el hidrograma, con el aspecto del de SENAMHI ──
   // series en el orden de la leyenda de SENAMHI; cada una se muestra u oculta con un clic en la leyenda
@@ -183,17 +184,18 @@
     const dudosas = pais ? 0 : j.estaciones.filter((e) => !e.departamento_seguro).length;
     const zonas = [...new Set(j.estaciones.map((e) => e.zonal).filter(Boolean))].sort();
     caja.innerHTML = `${pais ? `<div class="caja"><h3>Red de monitoreo hidrológico de SENAMHI</h3>
-        <p>Las ${j.estaciones.length} estaciones con datos, en el mapa. El color es el de la alerta de SENAMHI. Haz clic en una estación para ver su último dato y su hidrograma.</p>
+        <p>Las ${j.estaciones.length} estaciones con datos, en el mapa. Una alerta se pinta de color solo si <b>está confirmada</b>: la página la calcula con los umbrales de SENAMHI y el mapa de SENAMHI coincide, con un dato de los últimos 2 días y sin saltos raros. Lo demás se marca aparte. Haz clic en una estación para ver su último dato, el motivo de su alerta y su hidrograma.</p>
         <div class="fila"><label class="campo">Dirección zonal<select id="hid-dz"><option value="">Todas</option>${zonas.map((z) => `<option value="${z}">${esc(ZONAS[z] || "DZ " + z)}</option>`).join("")}</select></label>
           <label class="campo">Estación<select id="hid-buscar"></select></label></div>
         <div class="hid-mapa" id="hid-mapa"><div class="loading"><span class="spin"></span>Cargando el mapa…</div></div>
-        <div class="hid-ley">${[["normal", "Sin alerta"], ["amarillo", "Alerta amarilla"], ["naranja", "Alerta naranja"], ["rojo", "Alerta roja"]].map(([k, t]) => `<span><i style="background:${PUNTO[k]}"></i>${t}</span>`).join("")}</div></div>` : ""}
+        <div class="hid-ley">${[["normal", "Sin alerta"], ["amarillo", "Alerta amarilla"], ["naranja", "Alerta naranja"], ["rojo", "Alerta roja"]].map(([k, t]) => `<span><i style="background:${PUNTO[k]}"></i>${t}</span>`).join("")}
+          <span><i class="sinconf"></i>Calculada, sin confirmar con SENAMHI</span><span><i class="verificar"></i>A verificar (no pasó los controles)</span><span><i class="sindato"></i>Sin dato reciente</span></div></div>` : ""}
       <div class="caja"><h3>Situación de los ríos ${pais ? "del Perú" : "de " + esc(r.nombre)}</h3>
         <p>Último dato de cada estación, comparado con el mismo día del año pasado y con el promedio histórico. Haz clic en una fila para ver su gráfico.</p>
         <div class="scroll${pais ? " hid-largo" : ""}"><table class="hid-tabla"><tr>${pais ? "<th>Dirección zonal</th><th>Departamento</th>" : ""}<th>Río</th><th>Estación</th><th>Variable</th><th>Fecha</th><th class="n">Último dato</th><th class="n">Año anterior</th><th class="n">Promedio histórico</th><th>Alerta de SENAMHI</th></tr>
         ${filas.map(({ e, v, d }, k) => { const u = d.ultimo || {}, dif = (b) => b == null || u.valor == null ? "" : ` <small class="${u.valor - b >= 0 ? "sube" : "baja"}">${u.valor - b >= 0 ? "+" : "−"}${num(Math.abs(u.valor - b))}</small>`;
           return `<tr data-fila="${k}" data-zona="${esc(e.zonal)}" tabindex="0">${pais ? `<td>${esc(ZONAS[e.zonal] || "—")}</td><td>${esc(titulo(e.departamento)) || "—"}</td>` : ""}<td>${esc(titulo(e.rio))}</td><td><b>${esc(titulo(e.estacion))}</b>${e.departamento_seguro || pais ? "" : " *"}</td><td>${VAR[v]} <small>(${esc(d.unidad)})</small></td><td>${dmy(u.fecha)}</td><td class="n"><b>${num(u.valor)}</b></td><td class="n">${num(u.anterior)}${dif(u.anterior)}</td><td class="n">${num(u.promedio)}${dif(u.promedio)}</td><td>${chip(alerta(u))}</td></tr>`; }).join("")}</table></div>
-        <p class="nota">La diferencia en color es cuánto está el río por encima (+) o por debajo (−) de esa referencia. Los umbrales los fija SENAMHI para cada estación: en unas avisan de nivel bajo (vaciante) y en otras de crecida.${dudosas ? ` * SENAMHI no indica el departamento de esa estación: se incluye por pertenecer a la dirección zonal que atiende a ${esc(r.nombre)}.` : ""}${pais ? " El departamento lo da SENAMHI solo para las estaciones principales." : ""}</p></div>
+        <p class="nota">La diferencia en color es cuánto está el río por encima (+) o por debajo (−) de esa referencia. Los umbrales los fija SENAMHI para cada estación: en unas avisan de nivel bajo (vaciante) y en otras de crecida. <b>Alerta:</b> «confirmada» = la página y el mapa de SENAMHI coinciden; «sin confirmar» = solo calculada (falta el color de SENAMHI de hoy); «a verificar» = no pasó un control (dato viejo, umbrales incoherentes, salto brusco o SENAMHI no la marca). Pasa el cursor sobre la alerta para ver el motivo.${dudosas ? ` * SENAMHI no indica el departamento de esa estación: se incluye por pertenecer a la dirección zonal que atiende a ${esc(r.nombre)}.` : ""}${pais ? " El departamento lo da SENAMHI solo para las estaciones principales." : ""}</p></div>
       <div class="caja"><h3>Hidrograma</h3>
         <div class="fila"><label class="campo">Estación<select id="hid-est">${j.estaciones.map((e) => `<option value="${esc(e.codigo)}">${esc(titulo(e.rio))} · ${esc(titulo(e.estacion))}</option>`).join("")}</select></label>
           <label class="campo">Variable<select id="hid-var"></select></label>
@@ -354,7 +356,7 @@
   // ── mapa de estaciones (todo el país), como el de SENAMHI ──
   const ZONAS = { "01": "DZ 1 · Piura", "02": "DZ 2 · Lambayeque", "03": "DZ 3 · Cajamarca", "04": "DZ 4 · Lima", "05": "DZ 5 · Ica", "06": "DZ 6 · Arequipa",
     "07": "DZ 7 · Tacna", "08": "DZ 8 · Loreto", "09": "DZ 9 · San Martín", "10": "DZ 10 · Huánuco", "11": "DZ 11 · Junín", "12": "DZ 12 · Cusco", "13": "DZ 13 · Puno" };
-  const PUNTO = { normal: "#FFFFFF", amarillo: "#FFFF00", naranja: "#FFA500", rojo: "#FF0000" };
+  const PUNTO = { normal: "#FFFFFF", amarillo: "#FFFF00", naranja: "#FFA500", rojo: "#FF0000", neutro: "#C8CDD6" };
   let leaflet = null;
   function cargarLeaflet() {
     if (window.L) return Promise.resolve(window.L);
@@ -366,11 +368,16 @@
     });
     return leaflet;
   }
-  // color del punto: el que pinta SENAMHI ese día (si el recolector trajo su mapa) o, si no, el que sale de los umbrales
-  function colorDe(e) {
-    if (e.color && e.color !== "#FFFFFF") return e.color;
-    const v = e.variables.NIVEL || e.variables.CAUDAL, a = alerta(v && v.ultimo);
-    return PUNTO[a ? a.nivel : "normal"];
+  // estilo del punto según el doble control: color pleno solo si la alerta está confirmada (o la marca SENAMHI); «sin confirmar» lleva
+  // un anillo discontinuo y «a verificar» o sin dato reciente van en gris: nunca se pinta una alerta que no pasó los controles
+  function estiloDe(e) {
+    const a = e.alerta, st = a ? a.estado : "sin_umbral";
+    const nivel = a && a.nivel ? { roja: "rojo", amarilla: "amarillo", naranja: "naranja", normal: "normal" }[a.nivel] : null;
+    if (st === "confirmada" || st === "senamhi") return { fillColor: PUNTO[nivel], color: "#333", weight: 1.5, dashArray: null };
+    if (st === "sin_confirmar") return { fillColor: PUNTO[nivel], color: "#7A5B00", weight: 2.5, dashArray: "3 2" };
+    if (st === "a_verificar") return { fillColor: PUNTO.neutro, color: "#C2185B", weight: 2.5, dashArray: "3 2" };
+    if (st === "sin_dato") return { fillColor: "#F5F5F5", color: "#9AA0AA", weight: 1.5, dashArray: "2 3" };
+    return { fillColor: PUNTO.normal, color: "#333", weight: 1.5, dashArray: null };
   }
   async function mapa(caja, estaciones, e0, verHidrograma) {
     const div = caja.querySelector("#hid-mapa"), zona = caja.querySelector("#hid-dz"), buscar = caja.querySelector("#hid-buscar");
@@ -407,9 +414,9 @@
     const puntos = {};
     const ultimo = (e) => Object.entries(e.variables).map(([v, d]) => d.ultimo ? `<div>${VAR[v]}: <b>${num(d.ultimo.valor)}</b> ${esc(d.unidad)} <small>(${dmy(d.ultimo.fecha)})</small></div>` : "").join("");
     estaciones.filter((e) => e.lat != null).forEach((e) => {
-      const p = L.circleMarker([e.lat, e.lon], { radius: 6, weight: 1.5, color: "#333", fillColor: colorDe(e), fillOpacity: 1 });
+      const p = L.circleMarker([e.lat, e.lon], { radius: 6, fillOpacity: 1, ...estiloDe(e) });
       p.bindTooltip(`${titulo(e.estacion)} · ${titulo(e.rio)}`, { direction: "top", offset: [0, -6] });
-      p.bindPopup(`<div class="hid-pop"><b>${esc(titulo(e.estacion))}</b><span>${esc(titulo(e.rio))} · ${esc(ZONAS[e.zonal] || "")}${e.departamento ? " · " + esc(titulo(e.departamento)) : ""}</span>${ultimo(e)}<button class="btn chico" type="button" data-ver="${esc(e.codigo)}">Ver hidrograma</button></div>`);
+      p.bindPopup(`<div class="hid-pop"><b>${esc(titulo(e.estacion))}</b><span>${esc(titulo(e.rio))} · ${esc(ZONAS[e.zonal] || "")}${e.departamento ? " · " + esc(titulo(e.departamento)) : ""}</span>${ultimo(e)}${e.alerta && e.alerta.estado !== "sin_umbral" ? `<div class="hid-al"><b>${esc(e.alerta.texto)}</b>${e.alerta.motivos.length ? `<ul>${e.alerta.motivos.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}</div>` : ""}<button class="btn chico" type="button" data-ver="${esc(e.codigo)}">Ver hidrograma</button></div>`);
       p.on("popupopen", (ev) => { const b = ev.popup.getElement().querySelector("[data-ver]"); if (b) b.onclick = async () => { m.closePopup(); await salir(); verHidrograma(e.codigo); }; });
       puntos[e.codigo] = { p, e };
     });

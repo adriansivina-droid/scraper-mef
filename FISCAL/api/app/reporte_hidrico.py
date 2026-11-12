@@ -41,7 +41,8 @@ CIUDAD = {"240102": "Iquitos", "240001": "Iquitos", "240111": "Mazán", "240103"
 # colores: el año en curso oscuro, los anteriores más claros; promedio verde; umbrales como SENAMHI
 C_AÑOS = ["1F3864", "5B9BD5", "A5A5A5", "C55A11"]
 C_PROM, C_AMA, C_NAR, C_ROJ = "70AD47", "E8C700", "ED7D31", "C00000"
-FILL_ALERTA = {"roja": "FF0000", "naranja": "FFA500", "amarilla": "FFFF00", "normal": "E2EFDA", "sin umbral": "F2F2F2"}
+FILL_ALERTA = {"roja": "FF0000", "naranja": "FFA500", "amarilla": "FFFF00", "normal": "E2EFDA", "sin umbral": "F2F2F2", "sin confirmar": "FCE4D6",
+               "a verificar": "FCE4EC", "sin dato": "F2F2F2"}
 NAVY, GRIS, TX2 = RGBColor(0x1F, 0x38, 0x64), RGBColor(0x59, 0x59, 0x59), RGBColor(0x44, 0x54, 0x6A)
 
 
@@ -121,11 +122,15 @@ def _estacion(e, variable, años_max=3):
         hace7 = series[ah][j] if j >= 0 and ah in series else (series.get(ah - 1) or [None] * 365)[j] if j < 0 else None
     umb = {k: _al_eje(s, k) for k in ("promedio", "rojo", "naranja", "amarillo")}
     ult_umb = {k: next((x for x in reversed(umb[k]) if x is not None), None) for k in ("rojo", "naranja", "amarillo")}
-    nivel, baja = alerta(u.get("valor"), ult_umb["rojo"], ult_umb["naranja"], ult_umb["amarillo"])
+    det = u.get("alerta") or {"estado": "sin_umbral", "nivel": None, "baja": None, "texto": "Sin umbral", "motivos": []}
+    # la alerta sale del doble control de hidrologia.evaluar_alerta: solo «roja», «naranja» y «amarilla» son alertas confirmadas
+    nivel = {"confirmada": det["nivel"], "senamhi": det["nivel"], "normal": "normal", "sin_umbral": "sin umbral", "sin_confirmar": "sin confirmar",
+             "a_verificar": "a verificar", "sin_dato": "sin dato"}[det["estado"]]
+    baja = det["baja"]
     return {"codigo": e["codigo"], "estacion": titulo(e["estacion"]), "rio": rio_corto(e["rio"]), "ciudad": CIUDAD.get(e["codigo"], ""),
             "seguro": e.get("departamento_seguro", True) or e.get("zonal") in ("08", "09"), "variable": variable, "unidad": v.get("unidad", ""), "fecha": f, "ah": ah,
             "valor": u.get("valor"), "hace7": hace7, "anterior": u.get("anterior"), "promedio": u.get("promedio"), **ult_umb,
-            "alerta": nivel, "baja": baja, "años": años, "series": series, "umbrales": umb, "i": i}
+            "alerta": nivel, "alerta_texto": det["texto"], "alerta_det": det, "baja": baja, "años": años, "series": series, "umbrales": umb, "i": i}
 
 
 def _ordenar(depto, estaciones):
@@ -179,24 +184,28 @@ def _frase_estacion(x):
 
 def _alertas(lista):
     al = [x for x in lista if x["alerta"] in NOM_ALERTA]
-    if not al:
-        return ""
-    tx = "; ".join(f"{x['rio']} en {x['estacion']} ({NOM_ALERTA[x['alerta']]}{', nivel bajo' if x['baja'] else ', crecida'})" for x in al)
-    return f" En alerta: {tx}."
+    dudosas = [x for x in lista if x["alerta"] in ("sin confirmar", "a verificar")]
+    tx = f" En alerta: {'; '.join(f'{x['rio']} en {x['estacion']} ({NOM_ALERTA[x['alerta']]}{', nivel bajo' if x['baja'] else ', crecida'})' for x in al)}." if al else ""
+    if dudosas:
+        tx += f" Por confirmar: {', '.join(x['estacion'] for x in dudosas)}."
+    return tx
 
 
 def mensaje_resumen(D):
     todas = [x for l in D["regiones"].values() for x in l]
-    con = [x for x in todas if x["alerta"] != "sin umbral"]
+    con = [x for x in todas if x["alerta"] not in ("sin umbral", "sin dato")]
     al = [x for x in con if x["alerta"] in NOM_ALERTA]
+    dudosas = [x for x in con if x["alerta"] in ("sin confirmar", "a verificar")]
     bajas = sum(1 for x in al if x["baja"])
-    neg = f"Al {fecha_larga(D['fecha'])}, {len(al)} de {len(con)} estaciones con umbral del Oriente presentan alerta"
+    neg = f"Al {fecha_larga(D['fecha'])}, {len(al)} de {len(con)} estaciones con umbral del Oriente presentan alerta confirmada"
     if al:
         neg += f" ({bajas} por nivel bajo y {len(al) - bajas} por crecida)." if bajas and len(al) - bajas else (" por nivel bajo (vaciante)." if bajas else " por crecida.")
     else:
         neg += "."
     rojas = [x for x in al if x["alerta"] == "roja"]
     extra = (" Alerta roja en " + ", ".join(f"el {x['rio']} ({x['estacion']})" for x in rojas) + ".") if rojas else ""
+    if dudosas:
+        extra += f" {len(dudosas)} más {'está' if len(dudosas) == 1 else 'están'} por confirmar ({', '.join(x['estacion'] for x in dudosas[:3])}{'…' if len(dudosas) > 3 else ''}): no se cuentan como alerta."
     return neg, extra
 
 
@@ -335,7 +344,7 @@ def excel(D, ejemplo=False):
             res.write_formula(r, 6, f'=IF(OR(E{fr}="",F{fr}=""),"",E{fr}-F{fr})', f_dif, _dif(x["valor"], x["hace7"]))
             res.write_formula(r, 8, f'=IF(OR(E{fr}="",H{fr}=""),"",E{fr}-H{fr})', f_dif, _dif(x["valor"], x["anterior"]))
             res.write_formula(r, 10, f'=IF(OR(E{fr}="",J{fr}=""),"",E{fr}-J{fr})', f_dif, _dif(x["valor"], x["promedio"]))
-            res.write(r, 12, x["alerta"].capitalize() + ("" if x["alerta"] in ("normal", "sin umbral") else " (bajo)" if x["baja"] else " (crecida)"), F(border=1, bg_color="#" + FILL_ALERTA[x["alerta"]], bold=x["alerta"] == "roja", font_color="#FFFFFF" if x["alerta"] == "roja" else "#000000"))
+            res.write(r, 12, x["alerta_texto"], F(border=1, bg_color="#" + FILL_ALERTA[x["alerta"]], bold=x["alerta"] == "roja", font_color="#FFFFFF" if x["alerta"] == "roja" else "#000000"))
             r += 1
     res.write(r + 1, 0, "Fuente: SENAMHI. Las columnas Nivel, Hace 7 días, Año anterior, Prom. histórico y Umbral rojo toman el dato de la hoja de cada estación; las variaciones se calculan aquí.", f_nota)
     res.write(r + 2, 0, "La alerta es la que corresponde a los umbrales de SENAMHI: en unas estaciones avisan de nivel bajo (vaciante) y en otras de crecida. * Sin departamento en SENAMHI: se incluye por su dirección zonal.", f_nota)
@@ -609,11 +618,11 @@ def powerpoint(D, ejemplo=False):
         for x in D["regiones"][depto][:12 if depto == "16" else 3]:
             filas.append([REGION[depto], x["rio"], x["estacion"] + ("" if x["seguro"] else " *"), coma(x["valor"]), signo(_d(x["valor"], x["hace7"])),
                           signo(_d(x["valor"], x["anterior"])), signo(_d(x["valor"], x["promedio"])), coma(x["rojo"]),
-                          x["alerta"].capitalize() + ("" if x["alerta"] in ("normal", "sin umbral") else " · bajo" if x["baja"] else " · crecida")])
+                          x["alerta_texto"]])
             rell[(len(filas) - 1, 8)] = FILL_ALERTA[x["alerta"]]
     _tabla(sl, 0.55, 1.35, 12.25, filas, anchos=[1.1, 1.3, 1.9, 0.9, 0.95, 0.95, 1.05, 1.0, 1.5], tam=8.5, rellenos=rell, alto_fila=min(0.25, 5.3 / len(filas)))
     _caja(sl, 0.55, 6.72, 12.2, 0.35, [[("Var. 7 días: diferencia con el dato de hace una semana; Var. anual: con el mismo día del año pasado; Dif. vs prom.: con el promedio histórico del día (en metros). "
-                                           "La alerta sigue los umbrales de SENAMHI: en unas estaciones son de nivel bajo (vaciante) y en otras de crecida. * Sin departamento en SENAMHI: se incluye por su dirección zonal.", False)]],
+                                           "Alerta con doble control: «confirmada» solo si coinciden los umbrales de SENAMHI aplicados al dato y el color del mapa de SENAMHI; «sin confirmar» y «a verificar» no se cuentan como alerta. En unas estaciones los umbrales son de nivel bajo (vaciante) y en otras de crecida. * Sin departamento en SENAMHI: se incluye por su dirección zonal.", False)]],
           tam=8, alinear=PP_ALIGN.LEFT)
     _fuente(sl)
 
