@@ -465,6 +465,16 @@ departamento la región en naranja, «Otros» en gris.
 la página): azul marino `#111149`, turquesa `#72D2D5`, naranja `#DD6140`, amarillo `#FFC41D`, dorado `#D59D00`,
 gris azulado `#CCD3DF`, morado `#7030A0`, turquesa claro `#CFF0F1`.
 
+## Hidrología (SENAMHI)
+
+Sección «V. Hidrología» de cada región: nivel y caudal diario de los ríos, del Monitoreo Hidrológico de SENAMHI.
+
+- **Gráfico:** tabla con el último dato de cada estación de la región (contra el año anterior, el promedio histórico y los umbrales de alerta) y el hidrograma como el de SENAMHI. Se copia o se baja en PNG, SVG o CSV.
+- **Descargar datos:** los CSV del scraper (serie diaria, Información Diaria, Información Mensual, estaciones y control), de la región o de todo el país, en CSV o Excel, o todo en un zip.
+- **Actualizar:** SENAMHI no responde a servidores, así que la recolección corre en el navegador (favorito «Recolector SENAMHI», `HIDROLOGIA/senamhi_navegador.js`) y aquí se sube el `SENAMHI_crudo_….json`. Solo viaja lo que cambió.
+
+Endpoints: `GET /v1/hidrologia`, `GET /v1/hidrologia/estaciones?departamento=`, `GET /v1/hidrologia/serie?estacion=&variable=&anio=`, `GET /v1/hidrologia/descargar?archivo=&departamento=&formato=`, `GET /v1/hidrologia/crudo/indice` y `POST /v1/hidrologia/crudo`. Los datos van en la tabla `senamhi_crudo` (piezas comprimidas, unos 11 MB). Detalle en `HIDROLOGIA/senamhi_rios.md`, sección 7.
+
 ## Anexos y contraste con la síntesis
 
 - **Anexos** (último ítem del índice de cada región): todos los anexos de la síntesis en su orden y numeración (junio
