@@ -268,7 +268,7 @@
     }
     if (j.estaciones.some((e) => e.codigo === e0.c)) $("hid-est").value = e0.c;
     opciones(); cargar();
-    const verHidrograma = (cod) => { $("hid-est").value = cod; e0.a = null; opciones(); cargar(); $("hid-graf").scrollIntoView({ behavior: "smooth", block: "center" }); };
+    const verHidrograma = async (cod) => { $("hid-est").value = cod; e0.a = null; opciones(); await cargar(); requestAnimationFrame(() => requestAnimationFrame(() => $("hid-est").closest(".caja").scrollIntoView({ behavior: "smooth", block: "start" }))); };
     if (pais) mapa(caja, j.estaciones, e0, verHidrograma);
     $("hid-est").addEventListener("change", () => { opciones(); cargar(); });
     $("hid-var").addEventListener("change", () => { e0.v = $("hid-var").value; opciones(); cargar(); });
@@ -334,7 +334,13 @@
       return b;
     } });
     new Pantalla().addTo(m);
-    const alCambiar = () => { const activo = document.fullscreenElement === div; div.classList.toggle("completa", activo); m.scrollWheelZoom[activo ? "enable" : "disable"](); setTimeout(() => m.invalidateSize(), 60); };
+    // al entrar o salir, el mapa se vuelve a encuadrar sobre las estaciones visibles
+    const alCambiar = () => { const activo = document.fullscreenElement === div; div.classList.toggle("completa", activo); m.scrollWheelZoom[activo ? "enable" : "disable"](); setTimeout(() => { m.invalidateSize(); encuadrar(); }, 80); };
+    // para ver el hidrograma (que está debajo, en la página) primero se sale de la pantalla completa
+    const salir = () => new Promise((ok) => {
+      if (document.fullscreenElement === div) { document.addEventListener("fullscreenchange", () => setTimeout(ok, 120), { once: true }); document.exitFullscreen(); }
+      else { if (div.classList.contains("pantalla")) { div.classList.remove("pantalla"); document.body.classList.remove("sin-scroll"); m.invalidateSize(); encuadrar(); } ok(); }
+    });
     document.addEventListener("fullscreenchange", alCambiar);
     document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && div.classList.contains("pantalla")) { div.classList.remove("pantalla"); document.body.classList.remove("sin-scroll"); m.invalidateSize(); } });
     const puntos = {};
@@ -343,15 +349,17 @@
       const p = L.circleMarker([e.lat, e.lon], { radius: 6, weight: 1.5, color: "#333", fillColor: colorDe(e), fillOpacity: 1 });
       p.bindTooltip(`${titulo(e.estacion)} · ${titulo(e.rio)}`, { direction: "top", offset: [0, -6] });
       p.bindPopup(`<div class="hid-pop"><b>${esc(titulo(e.estacion))}</b><span>${esc(titulo(e.rio))} · ${esc(ZONAS[e.zonal] || "")}${e.departamento ? " · " + esc(titulo(e.departamento)) : ""}</span>${ultimo(e)}<button class="btn chico" type="button" data-ver="${esc(e.codigo)}">Ver hidrograma</button></div>`);
-      p.on("popupopen", (ev) => { const b = ev.popup.getElement().querySelector("[data-ver]"); if (b) b.onclick = () => { m.closePopup(); verHidrograma(e.codigo); }; });
+      p.on("popupopen", (ev) => { const b = ev.popup.getElement().querySelector("[data-ver]"); if (b) b.onclick = async () => { m.closePopup(); await salir(); verHidrograma(e.codigo); }; });
       puntos[e.codigo] = { p, e };
     });
+    const visibles = () => Object.values(puntos).filter(({ e }) => !zona.value || e.zonal === zona.value);
+    const encuadrar = () => { const vis = visibles(); if (vis.length) m.fitBounds(L.latLngBounds(vis.map(({ e }) => [e.lat, e.lon])).pad(0.15), { maxZoom: 8 }); };
     const filtrar = () => {
-      const z = zona.value, vis = Object.values(puntos).filter(({ e }) => !z || e.zonal === z);
+      const z = zona.value, vis = visibles();
       Object.values(puntos).forEach(({ p, e }) => { if (!z || e.zonal === z) p.addTo(m); else p.remove(); });
       buscar.innerHTML = '<option value="">Seleccione</option>' + vis.map(({ e }) => `<option value="${esc(e.codigo)}">${esc(titulo(e.estacion))} · ${esc(titulo(e.rio))}</option>`).join("");
       caja.querySelectorAll("tr[data-zona]").forEach((tr) => { tr.hidden = !!z && tr.dataset.zona !== z; });
-      if (vis.length) m.fitBounds(L.latLngBounds(vis.map(({ e }) => [e.lat, e.lon])).pad(0.15), { maxZoom: 8 });
+      encuadrar();
       e0.zona = z;
     };
     zona.value = e0.zona || ""; filtrar();
