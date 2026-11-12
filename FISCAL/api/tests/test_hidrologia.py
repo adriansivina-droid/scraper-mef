@@ -103,8 +103,12 @@ def test_grafico_de_la_region(cliente):
     e = cliente.get("/v1/hidrologia/estaciones?departamento=16").json()["estaciones"]
     assert [x["codigo"] for x in e] == ["240001"] and list(e[0]["variables"]) == ["NIVEL"]
     v = e[0]["variables"]["NIVEL"]
-    assert v["años"] == [2025, 2026] and v["ultimo"] == {"fecha": "2026-09-04", "valor": 122.0, "anterior": 124.3, "promedio": 123.0,
-                                                        "rojo": 122.06, "naranja": 123.09, "amarillo": 123.94}
+    assert v["años"] == [2025, 2026]
+    u = v["ultimo"]
+    assert {k: u[k] for k in ("fecha", "valor", "anterior", "promedio", "rojo", "naranja", "amarillo")} == {
+        "fecha": "2026-09-04", "valor": 122.0, "anterior": 124.3, "promedio": 123.0, "rojo": 122.06, "naranja": 123.09, "amarillo": 123.94}
+    # 122,0 está bajo el umbral rojo, pero el dato es de hace 69 días (la recolección es del 12/11): no se da como alerta
+    assert u["alerta"]["estado"] == "sin_dato" and u["alerta"]["calculada"] == "roja" and u["alerta"]["nivel"] is None
     assert cliente.get("/v1/hidrologia/estaciones?departamento=22").json()["estaciones"] == []
     s = cliente.get("/v1/hidrologia/serie?estacion=240001&variable=NIVEL&anio=2026").json()
     assert s["desde"] == "2026-09-01" and s["dias"] == 365 and s["actual"][:4] == [122.5, 122.4, None, 122.0] and s["anterior"][3] == 124.3
@@ -197,7 +201,8 @@ def test_reporte_hidrico_oriente(cliente):
     diapos = [n for n in z.namelist() if n.startswith("ppt/slides/slide")]
     assert len(diapos) >= 6 and any(n.startswith("ppt/charts/") for n in z.namelist())
     texto = z.read("ppt/slides/slide2.xml").decode()
-    assert "Santa María de Nanay" in texto and "Roja · bajo" in texto      # 122,0 m.s.n.m. está bajo el umbral rojo (122,06)
+    # el último dato (122,0, bajo el umbral rojo) es de hace 69 días: la tabla dice «Sin dato reciente» y no lo cuenta como alerta
+    assert "Santa María de Nanay" in texto and "Sin dato reciente" in texto and "Roja" not in texto
     x = cliente.get("/v1/hidrologia/reporte?formato=xlsx")
     assert x.status_code == 200
     import openpyxl
@@ -205,3 +210,78 @@ def test_reporte_hidrico_oriente(cliente):
     assert wb.sheetnames[:2] == ["Índice", "Resumen"] and "Tabla diaria" in wb.sheetnames
     res = wb["Resumen"]
     assert res["C5"].value == "Santa María de Nanay" and str(res["E5"].value).startswith("='LOR Nanay")
+
+
+# ── doble control de las alertas ─────────────────────────────────────────────
+HOY = date(2026, 11, 12)
+
+
+def dato(valor, fecha="2026-11-11", rojo=122.06, naranja=123.09, amarillo=123.94, promedio=123.4):
+    return {"fecha": fecha, "valor": valor, "rojo": rojo, "naranja": naranja, "amarillo": amarillo, "promedio": promedio}
+
+
+PLANA = [123.5 + 0.02 * (i % 3) for i in range(60)]                     # serie tranquila: ningún salto
+
+
+def bajando(final):
+    """Una serie que baja despacio hasta «final» (así llega un río a una alerta por nivel bajo: sin saltos)."""
+    return [final + 1.8 * (59 - i) / 59 for i in range(60)]
+
+
+def evaluar(valor, color, historia=None, **kw):
+    h = list(historia if historia is not None else PLANA)
+    h[-1] = valor
+    return hidrologia.evaluar_alerta(dato(valor, **kw), HOY, color, h)
+
+
+def test_alerta_confirmada_cuando_coinciden_la_pagina_y_senamhi():
+    a = evaluar(121.9, "#FF0000", historia=bajando(121.9))
+    assert (a["estado"], a["nivel"], a["baja"]) == ("confirmada", "roja", True) and "coinciden" in a["motivos"][0]
+    assert evaluar(123.0, "#FFA500")["nivel"] == "naranja" and evaluar(123.5, "#FFFF00")["estado"] == "confirmada"
+
+
+def test_si_senamhi_marca_blanco_no_se_pinta_la_alerta():
+    # el caso de Cañad: la página calcula roja y SENAMHI la tiene en blanco → a verificar, no roja
+    a = evaluar(121.9, "#FFFFFF", historia=bajando(121.9))
+    assert a["estado"] == "a_verificar" and a["nivel"] is None and a["calculada"] == "roja" and "sin alerta" in a["motivos"][0]
+    assert hidrologia.texto_alerta(a) == "A verificar"
+
+
+def test_si_solo_senamhi_marca_alerta_se_muestra_como_de_senamhi():
+    a = evaluar(124.5, "#FFA500")                                         # la página no ve alerta (124,5 > amarillo)
+    assert a["estado"] == "senamhi" and a["nivel"] == "naranja" and hidrologia.texto_alerta(a) == "Según SENAMHI: Naranja"
+
+
+def test_sin_el_color_de_senamhi_la_alerta_queda_sin_confirmar():
+    a = evaluar(121.9, None, historia=bajando(121.9))
+    assert a["estado"] == "sin_confirmar" and a["nivel"] == "roja" and hidrologia.texto_alerta(a).endswith("sin confirmar")
+
+
+def test_un_dato_viejo_no_da_alerta():
+    # la estación dejó de reportar: su último dato (en alerta) es de hace 3 meses
+    a = hidrologia.evaluar_alerta(dato(121.9, fecha="2026-08-10"), HOY, None, PLANA)
+    assert a["estado"] == "sin_dato" and a["nivel"] is None and "hace 94 días" in a["motivos"][0]
+    assert hidrologia.evaluar_alerta(dato(121.9, fecha="2026-08-10"), HOY, "#FFFFFF", PLANA)["estado"] == "sin_dato"        # SENAMHI la ve en blanco
+    a = hidrologia.evaluar_alerta(dato(121.9, fecha="2026-08-10"), HOY, "#FF0000", PLANA)                                   # SENAMHI sí marca roja
+    assert (a["estado"], a["nivel"]) == ("senamhi", "roja")
+    assert hidrologia.evaluar_alerta(dato(121.9, fecha="2026-11-10"), HOY, None, bajando(121.9))["estado"] == "sin_confirmar"       # 2 días: aún vale
+
+
+def test_umbrales_incoherentes_o_incompletos_no_dan_alerta():
+    a = evaluar(121.9, None, rojo=122.06, naranja=120.0, amarillo=123.94)                                       # rojo < naranja > amarillo
+    assert a["estado"] == "sin_umbral" and "no son coherentes" in a["motivos"][0]
+    a = evaluar(121.9, None, naranja=None, amarillo=None, promedio=123.4)                                          # solo rojo: tipo inferido
+    assert a["estado"] == "a_verificar" and any("solo hay umbral rojo" in m for m in a["motivos"])
+    assert evaluar(121.9, None, rojo=None, naranja=None, amarillo=None)["estado"] == "sin_umbral"
+
+
+def test_un_salto_brusco_no_da_alerta():
+    historia = [123.5 + 0.02 * (i % 3) for i in range(59)] + [100.0]                                           # de 123,5 a 100 en un día
+    a = hidrologia.evaluar_alerta(dato(100.0), HOY, None, historia)
+    assert a["estado"] == "a_verificar" and any("bruscamente" in m for m in a["motivos"])
+
+
+def test_umbrales_de_crecida():
+    a = evaluar(131.0, "#FF0000", rojo=130.0, naranja=129.0, amarillo=128.0, historia=[130.5 + 0.01 * (i % 3) for i in range(60)])
+    assert (a["estado"], a["baja"], a["nivel"]) == ("confirmada", False, "roja")
+    assert evaluar(125.0, "#FFFFFF", rojo=130.0, naranja=129.0, amarillo=128.0)["estado"] == "normal"

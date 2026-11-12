@@ -123,3 +123,23 @@ def test_salir_del_acceso_de_invitado(sitio):
     g.cookies.clear()                                            # el navegador borra la cookie vencida
     r = g.get("/")
     assert r.status_code == 401 and "Basic" in r.headers["www-authenticate"]       # vuelve a pedir usuario y clave
+
+
+def test_el_enlace_manda_sobre_las_credenciales_guardadas_en_el_navegador(sitio):
+    """Una computadora con el usuario y la clave del equipo recordados (se envían solas) que abre un enlace de invitado ve
+    solo lo compartido, no toda la página."""
+    inv = invitar(sitio, {"lor": ["pesca"]})
+    token = inv["enlace"].split("t=")[1]
+    navegador = TestClient(app, follow_redirects=False)
+    navegador.auth = EQUIPO                                              # las credenciales viajan en cada petición
+    r = navegador.get(f"/?t={token}")
+    assert r.status_code == 303 and compartir.COOKIE in r.headers["set-cookie"]
+    for url in ("/v1/compartir", "/v1/estado/espacio", "/v1/cuadros/manufactura?departamento=16"):
+        assert navegador.get(url).status_code == 403, url
+    assert navegador.get("/v1/acceso/yo").json()["equipo"] is False
+    assert navegador.get("/v1/cuadros/pesca?departamento=16").status_code != 403
+    # «Salir» borra la cookie y vuelve el acceso completo del equipo
+    navegador.get("/salir")
+    navegador.cookies.clear()
+    assert navegador.get("/v1/acceso/yo").json()["equipo"] is True
+    assert navegador.get("/v1/compartir").status_code == 200

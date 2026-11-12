@@ -406,3 +406,10 @@ body.sin-scroll { overflow: hidden; }
 .cmp-inc { font-size: 12px; color: var(--mid); max-width: 380px; } .cmp-inc b { color: var(--ink); }
 .campo input[type="text"] { border: 1px solid var(--hair); background: var(--paper); border-radius: var(--r-s); padding: 8px 10px; font: inherit; min-width: 240px; }
 .invitado { font-size: 12px; color: var(--mid); border: 1px solid var(--hair); border-radius: 999px; padding: 6px 12px; white-space: nowrap; }
+
+/* ── alertas con doble control ── */
+.chip.hid-neutro { background: #ECEFF3; color: var(--mid); }
+.chip.hid-sinconf { border: 1.5px dashed #7A5B00; } .chip.hid-verificar { background: #FCE4EC; color: #AD1457; border: 1.5px dashed #C2185B; }
+.chip.hid-sindato { background: #F5F5F5; color: #7B8190; border: 1px dashed #B8BEC9; }
+.hid-ley i.sinconf { background: #FFFF00; border: 2px dashed #7A5B00; } .hid-ley i.verificar { background: #C8CDD6; border: 2px dashed #C2185B; } .hid-ley i.sindato { background: #F5F5F5; border: 1.5px dashed #9AA0AA; }
+.hid-al { border-top: 1px solid var(--hair); margin-top: 4px; padding-top: 5px; } .hid-al ul { margin: 3px 0 0; padding-left: 16px; font-size: 11px; color: var(--mid); }
