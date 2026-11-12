@@ -44,8 +44,34 @@
   function serieDe(s, vista) {
     if (!s.comparar) return SERIE;
     const ys = s.claves.filter((k) => vista.marcados.has(k));
-    return [["promedio", "Prom. Histórico", "#2EAA4A", 2], ...ys.map((k) => [k, `${k.slice(1)} - ${+k.slice(1) + 1}`, colorAnio(s, k), k === s.claves[s.claves.length - 1] ? 2.8 : 2]),
+    return [["promedio", "Prom. Histórico", "#2EAA4A", 2], ...ys.map((k) => [k, etqAño(s, k), colorAnio(s, k), k === s.claves[s.claves.length - 1] ? 2.8 : 2]),
       ["rojo", "Rojo", "#E0281E", 1.8], ["naranja", "Naranja", "#F28C00", 1.8], ["amarillo", "Amarillo", "#E8D21A", 1.8]];
+  }
+  const etqAño = (s, k, corto) => s.cal ? k.slice(1) : corto ? `${k.slice(1)}-${String(+k.slice(1) + 1).slice(2)}` : `${k.slice(1)} - ${+k.slice(1) + 1}`;
+  // de la respuesta de /anios (años hidrológicos, eje 1/9–31/8) a años calendario (eje 1/1–31/12): enero–agosto del año Y es el
+  // año hidrológico Y-1; setiembre–diciembre, el Y. El promedio y los umbrales son por día del año, así que se copian igual
+  function alCalendario(A) {
+    const pos = {}, b0 = Date.parse(A.desde + "T00:00:00Z");
+    for (let i = 0; i < A.dias; i++) { const d = new Date(b0 + i * 864e5); pos[(d.getUTCMonth() + 1) + "-" + d.getUTCDate()] = i; }
+    const e0 = Date.UTC(2024, 0, 1), md = [];                 // eje de referencia: 2024 (tiene 29 de febrero)
+    for (let i = 0; i < 366; i++) { const d = new Date(e0 + i * 864e5); md.push([d.getUTCMonth() + 1, d.getUTCDate()]); }
+    const toma = (arr, [m, d]) => (arr ? arr[pos[m + "-" + d]] : null) ?? null;
+    const años = {}, hid = Object.keys(A.años).map(Number);
+    for (const y of [...new Set(hid.flatMap((h) => [h, h + 1]))].sort()) {
+      const v = md.map((x) => toma(x[0] >= 9 ? A.años[y] : A.años[y - 1], x));
+      if (v.some((x) => x != null) && y >= +(A.inicio || "0").slice(0, 4)) años[y] = v;      // desde el año en que empieza la recolección
+    }
+    const fija = (k) => md.map((x) => toma(A[k], x));
+    return { ...A, desde: "2024-01-01", dias: 366, años, promedio: fija("promedio"), rojo: fija("rojo"), naranja: fija("naranja"), amarillo: fija("amarillo") };
+  }
+  // el 29 de febrero solo existe en años bisiestos: en los demás se completa con el promedio del 28/2 y el 1/3 para que la línea no se corte
+  function sin29(S) {
+    const i = Array.from({ length: S.dias }, (_, k) => new Date(Date.parse(S.desde + "T00:00:00Z") + k * 864e5)).findIndex((d) => d.getUTCMonth() === 1 && d.getUTCDate() === 29);
+    if (i <= 0) return;
+    for (const k of [...S.claves, "promedio", "rojo", "naranja", "amarillo"]) {
+      const a = S[k];
+      if (a && a[i] == null && a[i - 1] != null && a[i + 1] != null) a[i] = Math.round((a[i - 1] + a[i + 1]) / 2 * 1e4) / 1e4;
+    }
   }
   const puntoDe = (s, vista) => s.comparar ? [...s.claves].reverse().find((k) => vista.marcados.has(k)) : "actual";   // la serie que lleva el punto del último dato
   const FECHA = (x0, i) => new Date(x0.getTime() + i * 864e5);
@@ -115,7 +141,7 @@
     const linea = (arr, c, op) => { let d = "", ab = false; arr.forEach((v, i) => { if (v == null) { ab = false; return; } d += `${ab ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`; ab = true; }); return d ? `<path d="${d}" fill="none" stroke="${c}" stroke-width="1.2" opacity="${op}"/>` : ""; };
     let marcas = "";
     const nm = n / 30.4, cada = nm <= 14 ? 2 : nm <= 30 ? 4 : 6;
-    for (let i = 0; i < n; i++) { const d = FECHA(x0, i); if (d.getUTCDate() === 1 && (d.getUTCMonth() - 8 + 12) % cada === 0) marcas += `<text x="${X(i).toFixed(1)}" y="${H - 3}" text-anchor="middle">${MES[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}</text>`; }
+    for (let i = 0; i < n; i++) { const d = FECHA(x0, i); if (d.getUTCDate() === 1 && (d.getUTCMonth() - 8 + 12) % cada === 0) marcas += `<text x="${X(i).toFixed(1)}" y="${H - 3}" text-anchor="middle">${MES[d.getUTCMonth()]}${s.comparar ? "" : " " + String(d.getUTCFullYear()).slice(2)}</text>`; }
     const a = X(vista.i0), b = X(vista.i1);
     const asa = (x, k) => `<g data-nav="${k}" style="cursor:ew-resize"><rect x="${x - 6}" y="8" width="12" height="30" fill="transparent"/><rect x="${x - 4}" y="14" width="8" height="18" rx="2" fill="#F2F2F2" stroke="#888"/><line x1="${x - 1}" x2="${x - 1}" y1="18" y2="28" stroke="#888"/><line x1="${x + 1}" x2="${x + 1}" y1="18" y2="28" stroke="#888"/></g>`;
     return { W, izq, ancho, n, svg: `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#777" style="touch-action:none">
@@ -130,9 +156,9 @@
     const fi = (k) => FECHA(new Date(s.desde + "T00:00:00Z"), k).toISOString().slice(0, 10);
     const d = fi(vista ? vista.i0 : 0), h = fi(vista ? vista.i1 : s.dias - 1);
     if (s.comparar) {
-      const ys = s.claves.filter((k) => vista && vista.marcados.has(k)).map((k) => `${k.slice(1)}-${String(+k.slice(1) + 1).slice(2)}`);
+      const ys = s.claves.filter((k) => vista && vista.marcados.has(k)).map((k) => etqAño(s, k, true));
       const recorte = vista && (vista.i0 > 0 || vista.i1 < s.dias - 1) ? ` · del ${tramoTxt(s, vista)}` : "";
-      return { periodo: `Años hidrológicos (set–ago): ${ys.join(", ") || "ninguno"}${recorte}`, archivo: `anios_${ys.join("_")}` };
+      return { periodo: `${s.cal ? "Años" : "Años hidrológicos (set–ago)"}: ${ys.join(", ") || "ninguno"}${recorte}`, archivo: `anios_${ys.join("_")}` };
     }
     if (s.año != null) return { actual: `${s.año} - ${s.año + 1}`, anterior: `${s.año - 1} - ${s.año}`, archivo: `${s.año}-${s.año + 1}`,
       periodo: `Año hidrológico ${s.año}-${s.año + 1}${vista && (vista.i0 > 0 || vista.i1 < s.dias - 1) ? ` · del ${dmy(d)} al ${dmy(h)}` : ""}` };
@@ -171,7 +197,7 @@
       <div class="caja"><h3>Hidrograma</h3>
         <div class="fila"><label class="campo">Estación<select id="hid-est">${j.estaciones.map((e) => `<option value="${esc(e.codigo)}">${esc(titulo(e.rio))} · ${esc(titulo(e.estacion))}</option>`).join("")}</select></label>
           <label class="campo">Variable<select id="hid-var"></select></label>
-          <label class="campo">Ver<select id="hid-modo"><option value="anio">Comparar años hidrológicos (set–ago)</option><option value="rango">Rango de fechas</option></select></label>
+          <label class="campo">Ver<select id="hid-modo"><option value="cal">Comparar años (ene–dic)</option><option value="anio">Comparar años hidrológicos (set–ago, como SENAMHI)</option><option value="rango">Rango de fechas</option></select></label>
           <fieldset class="campo hid-anios" id="hid-c-anio"><legend>Años a comparar</legend><div id="hid-anios"></div></fieldset>
           <label class="campo" id="hid-c-desde" hidden>Desde<input type="date" id="hid-desde"></label><label class="campo" id="hid-c-hasta" hidden>Hasta<input type="date" id="hid-hasta-f"></label>
           <div class="fila hid-atajos" id="hid-atajos">${[["30", "30 días"], ["90", "90 días"], ["365", "1 año"], ["todo", "Todo"]].map(([k, t]) => `<button class="btn sec chico" type="button" data-atajo="${k}">${t}</button>`).join("")}</div></div>
@@ -182,14 +208,10 @@
       const e = est(), vars = Object.keys(e.variables);
       if (!vars.includes(e0.v)) e0.v = vars.includes("NIVEL") ? "NIVEL" : vars[0];
       $("hid-var").innerHTML = vars.map((v) => `<option value="${v}"${v === e0.v ? " selected" : ""}>${VAR[v]} (${esc(e.variables[v].unidad)})</option>`).join("");
-      // casillas: un año hidrológico cada una, con el color de su línea; por defecto el actual y el anterior
-      const años = e.variables[e0.v].años.slice(), claves = años.map((a) => "a" + a), marc = e0.marcados || (e0.marcados = new Set());
-      for (const k of [...marc]) if (!claves.includes(k)) marc.delete(k);
-      if (!marc.size) claves.slice(-2).forEach((k) => marc.add(k));
-      $("hid-anios").innerHTML = años.slice().reverse().map((a) => { const k = "a" + a; return `<label class="hid-chk"><input type="checkbox" data-anio="${k}"${marc.has(k) ? " checked" : ""}><i style="background:${PALETA[(años.length - 1 - años.indexOf(a)) % PALETA.length]}"></i>${a}-${a + 1}</label>`; }).join("") +
-        `<span class="hid-chk-acc"><button type="button" class="btn sec chico" data-todos="1">Todos</button><button type="button" class="btn sec chico" data-todos="2">Últimos 2</button><button type="button" class="btn sec chico" data-todos="0">Ninguno</button></span>`;
+      e0.marcados = e0.marcados || new Set();
+      if (!["cal", "anio", "rango"].includes(e0.modo)) e0.modo = "cal";
       const rango = e0.modo === "rango";
-      $("hid-modo").value = rango ? "rango" : "anio";
+      $("hid-modo").value = e0.modo;
       $("hid-c-anio").hidden = rango; $("hid-c-desde").hidden = $("hid-c-hasta").hidden = !rango;
     }
     // la serie se pide una vez (el año, o todo desde 2023); elegir el tramo solo vuelve a dibujar, sin esperar al servidor
@@ -213,11 +235,16 @@
         if (vista.i1 <= vista.i0) vista = { i0: Math.max(0, S.dias - 90), i1: S.dias - 1 };
         $("hid-desde").min = $("hid-hasta-f").min = S.desde; $("hid-desde").max = $("hid-hasta-f").max = iso(FECHA(new Date(S.desde + "T00:00:00Z"), S.dias - 1));
       } else {                                              // comparar años: cada año es una serie «a2025» sobre el mismo eje
+        if (e0.modo === "cal") { S = alCalendario(S); S.cal = true; }
         S.comparar = true; S.claves = Object.keys(S.años).sort().map((y) => "a" + y);
         S.claves.forEach((k) => { S[k] = S.años[k.slice(1)]; });
+        sin29(S);
         vista = { i0: 0, i1: S.dias - 1, marcados: e0.marcados };
         for (const k of [...e0.marcados]) if (!S.claves.includes(k)) e0.marcados.delete(k);
         if (!e0.marcados.size) S.claves.slice(-2).forEach((k) => e0.marcados.add(k));
+        // casillas: un año cada una, con el color de su línea; por defecto el actual y el anterior
+        $("hid-anios").innerHTML = S.claves.slice().reverse().map((k) => `<label class="hid-chk"><input type="checkbox" data-anio="${k}"${e0.marcados.has(k) ? " checked" : ""}><i style="background:${colorAnio(S, k)}"></i>${etqAño(S, k)}</label>`).join("") +
+          `<span class="hid-chk-acc"><button type="button" class="btn sec chico" data-todos="1">Todos</button><button type="button" class="btn sec chico" data-todos="2">Últimos 2</button><button type="button" class="btn sec chico" data-todos="0">Ninguno</button></span>`;
       }
       vista.marcados = e0.marcados; vista.ocultas = ocultas;
       g.innerHTML = `<div class="scroll"><div class="hid-marco"><div class="hid-lienzo"></div><div class="hid-nav"></div></div></div>
@@ -283,7 +310,7 @@
       g.querySelector('[data-a="svg"]').addEventListener("click", () => B.descargar(h.svg, nombre()));
       g.querySelector('[data-a="csv"]').addEventListener("click", () => {
         const et = nombres(S, vista), x0 = new Date(S.desde + "T00:00:00Z");
-        const cols = S.comparar ? [...S.claves.filter((k) => vista.marcados.has(k)).map((k) => [k, `${k.slice(1)}-${+k.slice(1) + 1}`]), ["promedio", "PROMEDIO_HISTORICO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]]
+        const cols = S.comparar ? [...S.claves.filter((k) => vista.marcados.has(k)).map((k) => [k, etqAño(S, k, true)]), ["promedio", "PROMEDIO_HISTORICO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]]
           : [["actual", "VALOR"], ["anterior", "UN_AÑO_ANTES"], ["promedio", "PROMEDIO_HISTORICO"], ["minimo", "MINIMO"], ["maximo", "MAXIMO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]];
         const lineas = [["FECHA", ...cols.map((c) => c[1])].join(",")];
         for (let i = vista.i0; i <= vista.i1; i++) lineas.push([S.comparar ? iso(FECHA(x0, i)).slice(8) + "/" + iso(FECHA(x0, i)).slice(5, 7) : dmy(iso(FECHA(x0, i))), ...cols.map(([k]) => S[k][i] ?? "")].join(","));
