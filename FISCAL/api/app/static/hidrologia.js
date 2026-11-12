@@ -12,9 +12,9 @@
   const RECOLECTOR = "https://raw.githubusercontent.com/adriansivina-droid/scraper-mef/main/HIDROLOGIA/senamhi_navegador.js";
   const SENAMHI = "https://www.senamhi.gob.pe/?p=monitoreo-hidrologico";
   // favorito: en la página de SENAMHI carga el recolector y lo pone a trabajar; en cualquier otra, lleva a SENAMHI
-  // línea para la consola (F12): carga el recolector y, si hay avance guardado, empieza solo
-  const CONSOLA = `window.__senamhiAuto=1;fetch('${RECOLECTOR}').then(r=>r.text()).then(eval)`;
-  const FAVORITO = `javascript:(function(){if(!/senamhi\\.gob\\.pe$/.test(location.hostname)){location.href='${SENAMHI}';return}window.__senamhiAuto=1;fetch('${RECOLECTOR}').then(function(r){return r.text()}).then(eval)})()`;
+  // línea para la consola (F12): solo carga el recolector y muestra su panel; la descarga empieza cuando se pulsa «Iniciar»
+  const CONSOLA = `fetch('${RECOLECTOR}').then(r=>r.text()).then(eval)`;
+  const FAVORITO = `javascript:(function(){if(!/senamhi\\.gob\\.pe$/.test(location.hostname)){location.href='${SENAMHI}';return}fetch('${RECOLECTOR}').then(function(r){return r.text()}).then(eval)})()`;
 
   async function api(url, opciones) {
     const r = await fetch(url, opciones);
@@ -38,15 +38,24 @@
   // series en el orden de la leyenda de SENAMHI; cada una se muestra u oculta con un clic en la leyenda
   const SERIE = [["promedio", "Prom. Histórico", "#2EAA4A", 2], ["minimo", "Min", "#8B1A1A", 1.2], ["maximo", "Max", "#8C8C8C", 1.2],
     ["anterior", null, "#4FA8EE", 2], ["actual", null, "#1A1AD6", 2.8], ["rojo", "Rojo", "#E0281E", 1.8], ["naranja", "Naranja", "#F28C00", 1.8], ["amarillo", "Amarillo", "#E8D21A", 1.8]];
-  const COLOR = Object.fromEntries(SERIE.map(([k, , c]) => [k, c]));
+  const PALETA = ["#1A1AD6", "#4FA8EE", "#C2185B", "#8E44AD", "#795548", "#00897B", "#546E7A", "#AD1457", "#5D4037"];   // sin verde, amarillo, naranja ni rojo: son del promedio y los umbrales   // del año más reciente al más antiguo
+  const colorAnio = (s, k) => PALETA[(s.claves.length - 1 - s.claves.indexOf(k)) % PALETA.length];
+  // series que se dibujan: al comparar, el promedio, los años marcados (del más antiguo al más reciente) y los umbrales
+  function serieDe(s, vista) {
+    if (!s.comparar) return SERIE;
+    const ys = s.claves.filter((k) => vista.marcados.has(k));
+    return [["promedio", "Prom. Histórico", "#2EAA4A", 2], ...ys.map((k) => [k, `${k.slice(1)} - ${+k.slice(1) + 1}`, colorAnio(s, k), k === s.claves[s.claves.length - 1] ? 2.8 : 2]),
+      ["rojo", "Rojo", "#E0281E", 1.8], ["naranja", "Naranja", "#F28C00", 1.8], ["amarillo", "Amarillo", "#E8D21A", 1.8]];
+  }
+  const puntoDe = (s, vista) => s.comparar ? [...s.claves].reverse().find((k) => vista.marcados.has(k)) : "actual";   // la serie que lleva el punto del último dato
   const FECHA = (x0, i) => new Date(x0.getTime() + i * 864e5);
   const dd = (n) => String(n).padStart(2, "0");
 
   function hidrograma(s, vista) {
     const i0 = vista.i0, i1 = vista.i1, n = i1 - i0 + 1, x0 = FECHA(new Date(s.desde + "T00:00:00Z"), i0), ocultas = vista.ocultas || new Set();
     const W = 920, izq = 74, der = 22, arr = 70, alto = 300, et = nombres(s, vista);
-    const parte = (k) => s[k].slice(i0, i1 + 1);
-    const visibles = SERIE.filter(([k]) => !ocultas.has(k) && parte(k).some((v) => v != null));
+    const parte = (k) => s[k].slice(i0, i1 + 1), SER = serieDe(s, vista), pk = puntoDe(s, vista);
+    const visibles = SER.filter(([k]) => !ocultas.has(k) && parte(k).some((v) => v != null));
     const todos = visibles.flatMap(([k]) => parte(k)).filter((v) => v != null);
     if (!todos.length) return null;
     let lo = Math.min(...todos), hi = Math.max(...todos);
@@ -64,17 +73,17 @@
     const marca = (i, t) => `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${arr + alto}" y2="${arr + alto + 6}" stroke="#9A9A9A"/><text x="${X(i).toFixed(1)}" y="${arr + alto + 20}" text-anchor="middle">${t}</text>`;
     if (n <= 75) {
       const cada = n <= 16 ? 1 : n <= 32 ? 3 : 7;
-      for (let i = 0; i < n; i += cada) { const d = FECHA(x0, i); eje += marca(i, `${dd(d.getUTCDate())} ${MES[d.getUTCMonth()]}${i === 0 ? " " + d.getUTCFullYear() : ""}`); }
+      for (let i = 0; i < n; i += cada) { const d = FECHA(x0, i); eje += marca(i, `${dd(d.getUTCDate())} ${MES[d.getUTCMonth()]}${i === 0 && !s.comparar ? " " + d.getUTCFullYear() : ""}`); }
     } else {
       const nm = n / 30.4, cada = nm <= 8 ? 1 : nm <= 14 ? 2 : nm <= 28 ? 3 : 6;
       let primero = true;
-      for (let i = 0; i < n; i++) { const d = FECHA(x0, i); if (d.getUTCDate() === 1 && (d.getUTCMonth() - 8 + 12) % cada === 0) { eje += marca(i, `01 ${MES[d.getUTCMonth()]}${d.getUTCMonth() === 0 || primero ? " " + d.getUTCFullYear() : ""}`); primero = false; } }
+      for (let i = 0; i < n; i++) { const d = FECHA(x0, i); if (d.getUTCDate() === 1 && (d.getUTCMonth() - 8 + 12) % cada === 0) { eje += marca(i, `01 ${MES[d.getUTCMonth()]}${(d.getUTCMonth() === 0 || primero) && !s.comparar ? " " + d.getUTCFullYear() : ""}`); primero = false; } }
     }
     const trazos = visibles.map(([k, , c, w]) => { const d = camino(parte(k)); return d ? `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"/>` : ""; }).join("");
-    const ult = parte("actual").reduce((a, v, i) => v != null ? i : a, -1);
-    const punto = ult >= 0 && !ocultas.has("actual") ? `<circle cx="${X(ult).toFixed(1)}" cy="${Y(parte("actual")[ult]).toFixed(1)}" r="3.5" fill="${COLOR.actual}" stroke="#FFF" stroke-width="1.5"/>` : "";
+    const ult = pk ? parte(pk).reduce((a, v, i) => v != null ? i : a, -1) : -1;
+    const punto = ult >= 0 && !ocultas.has(pk) ? `<circle cx="${X(ult).toFixed(1)}" cy="${Y(parte(pk)[ult]).toFixed(1)}" r="3.5" fill="${(SER.find((x) => x[0] === pk) || [])[2]}" stroke="#FFF" stroke-width="1.5"/>` : "";
     // leyenda abajo, en filas centradas, como la de SENAMHI
-    const items = SERIE.filter(([k]) => s[k].some((v) => v != null)).map(([k, t, c]) => {
+    const items = SER.filter(([k]) => s[k].some((v) => v != null)).map(([k, t, c]) => {
       const u = ["rojo", "naranja", "amarillo"].includes(k) ? parte(k).filter((v) => v != null).pop() : null;
       return { k, c, t: (t || et[k]) + (u != null ? ` ${num(u, 2)}` : "") };
     });
@@ -100,7 +109,7 @@
   function navegador(s, vista) {
     const W = 920, H = 58, izq = 74, der = 22, n = s.dias, x0 = new Date(s.desde + "T00:00:00Z"), ancho = W - izq - der;
     const X = (i) => izq + ancho * i / Math.max(1, n - 1);
-    const base = s.actual.some((v) => v != null) ? s.actual : s.anterior, otro = s.año != null ? s.anterior : null;
+    const pk = puntoDe(s, vista), base = s.comparar ? (s[pk] || s.promedio) : s.actual.some((v) => v != null) ? s.actual : s.anterior, otro = s.comparar ? null : s.año != null ? s.anterior : null;
     const vals = [...base, ...(otro || [])].filter((v) => v != null);
     const lo = Math.min(...vals), hi = Math.max(...vals), Y = (v) => 6 + 36 * (1 - (v - lo) / (hi - lo || 1));
     const linea = (arr, c, op) => { let d = "", ab = false; arr.forEach((v, i) => { if (v == null) { ab = false; return; } d += `${ab ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`; ab = true; }); return d ? `<path d="${d}" fill="none" stroke="${c}" stroke-width="1.2" opacity="${op}"/>` : ""; };
@@ -110,15 +119,21 @@
     const a = X(vista.i0), b = X(vista.i1);
     const asa = (x, k) => `<g data-nav="${k}" style="cursor:ew-resize"><rect x="${x - 6}" y="8" width="12" height="30" fill="transparent"/><rect x="${x - 4}" y="14" width="8" height="18" rx="2" fill="#F2F2F2" stroke="#888"/><line x1="${x - 1}" x2="${x - 1}" y1="18" y2="28" stroke="#888"/><line x1="${x + 1}" x2="${x + 1}" y1="18" y2="28" stroke="#888"/></g>`;
     return { W, izq, ancho, n, svg: `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#777" style="touch-action:none">
-      <rect x="${izq}" y="4" width="${ancho}" height="40" fill="#F4F6FA" stroke="#CCD3DF"/>${otro ? linea(otro, COLOR.anterior, 0.6) : ""}${linea(base, "#5A6FA8", 1)}
+      <rect x="${izq}" y="4" width="${ancho}" height="40" fill="#F4F6FA" stroke="#CCD3DF"/>${otro ? linea(otro, "#4FA8EE", 0.6) : ""}${linea(base, "#5A6FA8", 1)}
       <rect data-nav="tramo" x="${a}" y="4" width="${Math.max(2, b - a)}" height="40" fill="#6685C2" fill-opacity="0.22" stroke="#6685C2" style="cursor:grab"/>
       ${asa(a, "ini")}${asa(b, "fin")}${marcas}</svg>` };
   }
 
+  const tramoTxt = (s, vista) => { const f = (k) => FECHA(new Date(s.desde + "T00:00:00Z"), k); const t = (d) => `${d.getUTCDate()} ${MES[d.getUTCMonth()]}`; return `${t(f(vista.i0))} al ${t(f(vista.i1))}`; };
   // nombres de las series: por año hidrológico o por rango de fechas
   function nombres(s, vista) {
     const fi = (k) => FECHA(new Date(s.desde + "T00:00:00Z"), k).toISOString().slice(0, 10);
     const d = fi(vista ? vista.i0 : 0), h = fi(vista ? vista.i1 : s.dias - 1);
+    if (s.comparar) {
+      const ys = s.claves.filter((k) => vista && vista.marcados.has(k)).map((k) => `${k.slice(1)}-${String(+k.slice(1) + 1).slice(2)}`);
+      const recorte = vista && (vista.i0 > 0 || vista.i1 < s.dias - 1) ? ` · del ${tramoTxt(s, vista)}` : "";
+      return { periodo: `Años hidrológicos (set–ago): ${ys.join(", ") || "ninguno"}${recorte}`, archivo: `anios_${ys.join("_")}` };
+    }
     if (s.año != null) return { actual: `${s.año} - ${s.año + 1}`, anterior: `${s.año - 1} - ${s.año}`, archivo: `${s.año}-${s.año + 1}`,
       periodo: `Año hidrológico ${s.año}-${s.año + 1}${vista && (vista.i0 > 0 || vista.i1 < s.dias - 1) ? ` · del ${dmy(d)} al ${dmy(h)}` : ""}` };
     return { actual: "Valor diario", anterior: "Un año antes", periodo: `Del ${dmy(d)} al ${dmy(h)}`, archivo: `${d}_a_${h}` };
@@ -133,7 +148,7 @@
     catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo leer</b><span>${esc(e.message)}</span></div>`; return; }
     ponerHasta(j.resumen);
     if (!j.estaciones.length) {
-      caja.innerHTML = `<div class="vacio-caja"><b>${j.resumen.hay ? `SENAMHI no tiene estaciones con datos en ${esc(r.nombre)}.` : "Todavía no hay datos de SENAMHI en la página."}</b><span>${j.resumen.hay ? "Los datos de las demás regiones están en «Descargar datos»." : "Ve a la pestaña «Actualizar»: allí se sube el archivo que deja el recolector."}</span></div>`;
+      caja.innerHTML = `<div class="vacio-caja"><b>${j.resumen.hay ? `SENAMHI no tiene estaciones con datos en ${esc(r.nombre)}.` : "Todavía no hay datos de SENAMHI en la página."}</b><span>${j.resumen.hay ? "Los datos de las demás regiones están en «Descargar datos»." : (HIDRO.invitado ? "Vuelve a consultar más tarde." : "Ve a la pestaña «Actualizar»: allí se sube el archivo que deja el recolector.")}</span></div>`;
       return;
     }
     const e0 = st[r.cod] || (st[r.cod] = {}), pais = r.cod === "todos";
@@ -156,8 +171,8 @@
       <div class="caja"><h3>Hidrograma</h3>
         <div class="fila"><label class="campo">Estación<select id="hid-est">${j.estaciones.map((e) => `<option value="${esc(e.codigo)}">${esc(titulo(e.rio))} · ${esc(titulo(e.estacion))}</option>`).join("")}</select></label>
           <label class="campo">Variable<select id="hid-var"></select></label>
-          <label class="campo">Ver<select id="hid-modo"><option value="anio">Un año hidrológico (set–ago)</option><option value="rango">Rango de fechas (desde 2023)</option></select></label>
-          <label class="campo" id="hid-c-anio">Año hidrológico<select id="hid-anio"></select></label>
+          <label class="campo">Ver<select id="hid-modo"><option value="anio">Comparar años hidrológicos (set–ago)</option><option value="rango">Rango de fechas</option></select></label>
+          <fieldset class="campo hid-anios" id="hid-c-anio"><legend>Años a comparar</legend><div id="hid-anios"></div></fieldset>
           <label class="campo" id="hid-c-desde" hidden>Desde<input type="date" id="hid-desde"></label><label class="campo" id="hid-c-hasta" hidden>Hasta<input type="date" id="hid-hasta-f"></label>
           <div class="fila hid-atajos" id="hid-atajos">${[["30", "30 días"], ["90", "90 días"], ["365", "1 año"], ["todo", "Todo"]].map(([k, t]) => `<button class="btn sec chico" type="button" data-atajo="${k}">${t}</button>`).join("")}</div></div>
         <div id="hid-graf"></div></div>`;
@@ -167,9 +182,12 @@
       const e = est(), vars = Object.keys(e.variables);
       if (!vars.includes(e0.v)) e0.v = vars.includes("NIVEL") ? "NIVEL" : vars[0];
       $("hid-var").innerHTML = vars.map((v) => `<option value="${v}"${v === e0.v ? " selected" : ""}>${VAR[v]} (${esc(e.variables[v].unidad)})</option>`).join("");
-      const años = e.variables[e0.v].años.slice().reverse();
-      if (!años.includes(e0.a)) e0.a = años[0];
-      $("hid-anio").innerHTML = años.map((a) => `<option value="${a}"${a === e0.a ? " selected" : ""}>${a}-${a + 1}</option>`).join("");
+      // casillas: un año hidrológico cada una, con el color de su línea; por defecto el actual y el anterior
+      const años = e.variables[e0.v].años.slice(), claves = años.map((a) => "a" + a), marc = e0.marcados || (e0.marcados = new Set());
+      for (const k of [...marc]) if (!claves.includes(k)) marc.delete(k);
+      if (!marc.size) claves.slice(-2).forEach((k) => marc.add(k));
+      $("hid-anios").innerHTML = años.slice().reverse().map((a) => { const k = "a" + a; return `<label class="hid-chk"><input type="checkbox" data-anio="${k}"${marc.has(k) ? " checked" : ""}><i style="background:${PALETA[(años.length - 1 - años.indexOf(a)) % PALETA.length]}"></i>${a}-${a + 1}</label>`; }).join("") +
+        `<span class="hid-chk-acc"><button type="button" class="btn sec chico" data-todos="1">Todos</button><button type="button" class="btn sec chico" data-todos="2">Últimos 2</button><button type="button" class="btn sec chico" data-todos="0">Ninguno</button></span>`;
       const rango = e0.modo === "rango";
       $("hid-modo").value = rango ? "rango" : "anio";
       $("hid-c-anio").hidden = rango; $("hid-c-desde").hidden = $("hid-c-hasta").hidden = !rango;
@@ -182,9 +200,9 @@
       e0.c = e.codigo;
       g.innerHTML = '<div class="loading"><span class="spin"></span>Dibujando…</div>';
       const v = e.variables[e0.v], ult = (v.ultimo || {}).fecha || iso(new Date());
-      const desde = Math.min(...v.años) >= 2023 ? `${Math.min(...v.años)}-09-01` : "2023-01-01";
+      const desde = `${Math.min(...v.años)}-09-01`;
       const url = e0.modo === "rango" ? `/v1/hidrologia/rango?estacion=${encodeURIComponent(e.codigo)}&variable=${e0.v}&desde=${desde}&hasta=${ult}`
-        : `/v1/hidrologia/serie?estacion=${encodeURIComponent(e.codigo)}&variable=${e0.v}&anio=${e0.a}`;
+        : `/v1/hidrologia/anios?estacion=${encodeURIComponent(e.codigo)}&variable=${e0.v}`;
       try { S = await api(url); if (mio !== turno) return; }
       catch (er) { if (mio !== turno) return; g.innerHTML = `<div class="err-box"><b>No se pudo leer la serie</b><span>${esc(er.message)}</span></div>`; return; }
       // tramo inicial: el año entero, o en rango el que se tenía elegido (si no, los últimos 90 días)
@@ -194,12 +212,18 @@
         vista = { i0: Math.max(0, Math.min(a, S.dias - 2)), i1: Math.min(S.dias - 1, Math.max(b, 1)) };
         if (vista.i1 <= vista.i0) vista = { i0: Math.max(0, S.dias - 90), i1: S.dias - 1 };
         $("hid-desde").min = $("hid-hasta-f").min = S.desde; $("hid-desde").max = $("hid-hasta-f").max = iso(FECHA(new Date(S.desde + "T00:00:00Z"), S.dias - 1));
-      } else vista = { i0: 0, i1: S.dias - 1 };
-      vista.ocultas = ocultas;
+      } else {                                              // comparar años: cada año es una serie «a2025» sobre el mismo eje
+        S.comparar = true; S.claves = Object.keys(S.años).sort().map((y) => "a" + y);
+        S.claves.forEach((k) => { S[k] = S.años[k.slice(1)]; });
+        vista = { i0: 0, i1: S.dias - 1, marcados: e0.marcados };
+        for (const k of [...e0.marcados]) if (!S.claves.includes(k)) e0.marcados.delete(k);
+        if (!e0.marcados.size) S.claves.slice(-2).forEach((k) => e0.marcados.add(k));
+      }
+      vista.marcados = e0.marcados; vista.ocultas = ocultas;
       g.innerHTML = `<div class="scroll"><div class="hid-marco"><div class="hid-lienzo"></div><div class="hid-nav"></div></div></div>
         <div class="fila"><button class="btn" type="button" data-a="copiar">Copiar</button><button class="btn sec" type="button" data-a="png">PNG</button><button class="btn sec" type="button" data-a="svg">SVG</button>
           <button class="btn sec" type="button" data-a="csv">Datos del gráfico (CSV)</button><span class="nota" data-msj></span></div>
-        <p class="nota">Arrastra el recuadro de la barra de abajo para moverte en el tiempo, o estira sus bordes para elegir el tramo. Haz clic en una serie de la leyenda para mostrarla u ocultarla. El promedio histórico y los umbrales son los que publica SENAMHI para la estación.</p>`;
+        <p class="nota">${e0.modo === "rango" ? "" : "Marca arriba los años que quieres comparar. "}Arrastra el recuadro de la barra de abajo para moverte en el tiempo, o estira sus bordes para elegir el tramo. Haz clic en una serie de la leyenda para mostrarla u ocultarla. El promedio histórico y los umbrales son los que publica SENAMHI para la estación.</p>`;
       atar(g);
       pintar();
     }
@@ -227,8 +251,8 @@
         const i = Math.round((x - h.izq) / (h.W - h.izq - h.der) * (h.n - 1));
         if (i < 0 || i >= h.n || y < h.arr || y > h.arr + h.alto) { guia.hidden = tip.hidden = true; return; }
         const d = FECHA(h.x0, i), px = (h.izq + (h.W - h.izq - h.der) * i / Math.max(1, h.n - 1)) * k, et = nombres(S, vista), j2 = h.i0 + i;
-        const orden = ["actual", "anterior", "promedio", "minimo", "maximo", "rojo", "naranja", "amarillo"].map((c) => SERIE.find((x) => x[0] === c));
-        tip.innerHTML = `<b>${dd(d.getUTCDate())} ${MES[d.getUTCMonth()]} ${d.getUTCFullYear()}</b>` + orden.filter(([c]) => !ocultas.has(c) && S[c][j2] != null)
+        const SER = serieDe(S, vista), orden = S.comparar ? [...SER.filter((x) => /^a\d/.test(x[0])).reverse(), ...SER.filter((x) => !/^a\d/.test(x[0]))] : ["actual", "anterior", "promedio", "minimo", "maximo", "rojo", "naranja", "amarillo"].map((c) => SER.find((x) => x[0] === c));
+        tip.innerHTML = `<b>${dd(d.getUTCDate())} ${MES[d.getUTCMonth()]}${S.comparar ? "" : " " + d.getUTCFullYear()}</b>` + orden.filter(([c]) => !ocultas.has(c) && S[c][j2] != null)
           .map(([c, t, col]) => `<div><i style="background:${col}"></i>${esc(t || et[c])}<b>${num(S[c][j2], 2)}</b></div>`).join("");
         guia.hidden = tip.hidden = false;
         guia.style.left = px + "px"; guia.style.top = h.arr * k + "px"; guia.style.height = h.alto * k + "px";
@@ -259,9 +283,10 @@
       g.querySelector('[data-a="svg"]').addEventListener("click", () => B.descargar(h.svg, nombre()));
       g.querySelector('[data-a="csv"]').addEventListener("click", () => {
         const et = nombres(S, vista), x0 = new Date(S.desde + "T00:00:00Z");
-        const cols = [["actual", S.año != null ? et.actual.replace(/ /g, "") : "VALOR"], ["anterior", S.año != null ? et.anterior.replace(/ /g, "") : "UN_AÑO_ANTES"], ["promedio", "PROMEDIO_HISTORICO"], ["minimo", "MINIMO"], ["maximo", "MAXIMO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]];
+        const cols = S.comparar ? [...S.claves.filter((k) => vista.marcados.has(k)).map((k) => [k, `${k.slice(1)}-${+k.slice(1) + 1}`]), ["promedio", "PROMEDIO_HISTORICO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]]
+          : [["actual", "VALOR"], ["anterior", "UN_AÑO_ANTES"], ["promedio", "PROMEDIO_HISTORICO"], ["minimo", "MINIMO"], ["maximo", "MAXIMO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]];
         const lineas = [["FECHA", ...cols.map((c) => c[1])].join(",")];
-        for (let i = vista.i0; i <= vista.i1; i++) lineas.push([dmy(iso(FECHA(x0, i))), ...cols.map(([k]) => S[k][i] ?? "")].join(","));
+        for (let i = vista.i0; i <= vista.i1; i++) lineas.push([S.comparar ? iso(FECHA(x0, i)).slice(8) + "/" + iso(FECHA(x0, i)).slice(5, 7) : dmy(iso(FECHA(x0, i))), ...cols.map(([k]) => S[k][i] ?? "")].join(","));
         const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + lineas.join("\n")], { type: "text/csv" })); a.download = nombre().replace(/\s+/g, "_") + ".csv";
         document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       });
@@ -272,10 +297,19 @@
     if (pais) mapa(caja, j.estaciones, e0, verHidrograma);
     $("hid-est").addEventListener("change", () => { opciones(); cargar(); });
     $("hid-var").addEventListener("change", () => { e0.v = $("hid-var").value; opciones(); cargar(); });
-    $("hid-anio").addEventListener("change", () => { e0.a = +$("hid-anio").value; cargar(); });
+    // casillas de años: marcar o desmarcar solo vuelve a dibujar (los años ya están cargados)
+    $("hid-c-anio").addEventListener("change", (ev) => {
+      const k = ev.target.dataset.anio; if (!k || !S || !S.comparar) return;
+      ev.target.checked ? e0.marcados.add(k) : e0.marcados.delete(k); pintar();
+    });
+    $("hid-c-anio").addEventListener("click", (ev) => {
+      const a = ev.target.closest("[data-todos]"); if (!a || !S || !S.comparar) return;
+      e0.marcados.clear(); (a.dataset.todos === "1" ? S.claves : a.dataset.todos === "2" ? S.claves.slice(-2) : []).forEach((k) => e0.marcados.add(k));
+      caja.querySelectorAll("[data-anio]").forEach((c) => { c.checked = e0.marcados.has(c.dataset.anio); }); pintar();
+    });
     $("hid-modo").addEventListener("change", () => { e0.modo = $("hid-modo").value; opciones(); cargar(); });
     const fechas = () => {
-      if (!S || S.año != null) return;
+      if (!S || S.comparar) return;
       const x = (t) => Math.round((dia(t) - dia(S.desde)) / 864e5), a = $("hid-desde").value, b = $("hid-hasta-f").value;
       if (!a || !b) return;
       const [p, q] = [x(a), x(b)].sort((m, n) => m - n);
@@ -284,7 +318,7 @@
     $("hid-desde").addEventListener("change", fechas); $("hid-hasta-f").addEventListener("change", fechas);
     caja.querySelectorAll("[data-atajo]").forEach((b) => b.addEventListener("click", () => {
       if (!S) return;
-      const k = b.dataset.atajo, fin = S.año != null ? Math.max(1, S.actual.reduce((a, v, i) => v != null ? i : a, S.dias - 1)) : S.dias - 1;
+      const k = b.dataset.atajo, ref = S.comparar ? S[puntoDe(S, vista)] : null, fin = S.comparar ? Math.max(1, (ref || []).reduce((a, v, i) => v != null ? i : a, S.dias - 1)) : S.dias - 1;
       vista.i1 = k === "todo" ? S.dias - 1 : fin; vista.i0 = k === "todo" ? 0 : Math.max(0, vista.i1 - (+k - 1)); pintar(); }));
     caja.querySelectorAll("[data-fila]").forEach((tr) => { const ir = () => { const f = filas[+tr.dataset.fila]; $("hid-est").value = f.e.codigo; e0.v = f.v; e0.a = null; opciones(); cargar(); $("hid-graf").scrollIntoView({ behavior: "smooth", block: "center" }); };
       tr.addEventListener("click", ir); tr.addEventListener("keydown", (ev) => { if (ev.key === "Enter") ir(); }); });
@@ -370,7 +404,7 @@
 
   // Perú: la misma sección con el mapa de todas las estaciones y las descargas de todo el país
   function peru(caja, pestaña) {
-    const tabs = ["Mapa y gráfico", "Descargar datos", "Actualizar"], t = tabs.includes(pestaña) ? pestaña : tabs[0];
+    const tabs = ["Mapa y gráfico", "Descargar datos", ...(HIDRO.invitado ? [] : ["Actualizar"])], t = tabs.includes(pestaña) ? pestaña : tabs[0];
     caja.innerHTML = `<div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-hid-tab="${x}" aria-selected="${x === t}">${x}</button>`).join("")}</div><div id="hid-peru"></div>`;
     caja.querySelectorAll("[data-hid-tab]").forEach((b) => b.addEventListener("click", () => { HIDRO.pestañaPeru = b.dataset.hidTab; peru(caja, b.dataset.hidTab); }));
     const r = { cod: "todos", nombre: "Perú" }, c = caja.querySelector("#hid-peru");
@@ -453,13 +487,13 @@
         <div class="pasos">
           <div><b>1 · Abre SENAMHI</b><span>Abre <a href="${SENAMHI}" target="_blank" rel="noopener">Monitoreo Hidrológico de SENAMHI</a> en una pestaña nueva y espera a que cargue el mapa.</span></div>
           <div><b>2 · Pega el código en la consola</b><span>Este es el código (es el mismo todos los días):</span><textarea class="hid-codigo" id="hid-codigo" readonly rows="4" aria-label="Código para la consola">${esc(CONSOLA)}</textarea><button class="btn" type="button" id="hid-copiar" style="align-self:flex-start">Copiar el código</button>
-            <span>En la pestaña de SENAMHI pulsa <b>F12</b>, entra a <b>Console</b>, pega con <b>Ctrl+V</b> y pulsa <b>Enter</b>. Aparece el panel abajo a la derecha y empieza solo. Tarda unos 5 minutos; deja la pestaña abierta. Si Chrome no deja pegar, escribe <b>allow pasting</b>, Enter, y vuelve a pegar.</span></div>
+            <span>En la pestaña de SENAMHI pulsa <b>F12</b>, entra a <b>Console</b>, pega con <b>Ctrl+V</b> y pulsa <b>Enter</b>. Aparece el panel abajo a la derecha: revisa las fechas y pulsa <b>Iniciar</b> (no empieza solo). La actualización diaria tarda unos 5 minutos; deja la pestaña abierta. Si Chrome no deja pegar, escribe <b>allow pasting</b>, Enter, y vuelve a pegar.</span></div>
           <div><b>3 · Sube aquí el archivo</b><span>Al terminar se descarga <b>SENAMHI_crudo_AAAA-MM-DD.json</b> (carpeta Descargas). Arrástralo al recuadro de abajo. La página compara y sube solo lo nuevo.</span></div></div>
         <label class="zona-subida" for="hid-arch" id="hid-zona"><b>Arrastra aquí SENAMHI_crudo_….json o haz clic para elegirlo</b><span>El archivo trae todo lo recolectado desde 2023 (unos 33 MB); solo viaja lo que cambió</span><input class="solo-lector" type="file" id="hid-arch" accept=".json,application/json"></label>
         <div class="hid-barra" hidden><span></span></div><div id="hid-res" aria-live="polite"></div></div>
       <details class="caja"><summary><b>Preguntas frecuentes</b></summary>
         <p><b>¿Hay algo más rápido que la consola?</b> Puedes probar un favorito: arrastra <a class="hid-fav" href="${esc(FAVORITO)}" title="Arrástrame a la barra de favoritos">Recolector SENAMHI</a> a la barra de favoritos (Ctrl+Mayús+B la muestra) y haz clic en él estando en SENAMHI. En algunos navegadores la página de SENAMHI no deja correr favoritos; si al hacer clic no aparece el panel, usa la consola.</p>
-        <p><b>¿Qué fechas pongo en el panel?</b> Ninguna: deja «Desde 01/01/2023». El recolector recuerda lo que ya bajó y cada día solo pide lo nuevo: el año hidrológico en curso de todas las estaciones (así recoge también las correcciones que SENAMHI hace a días pasados), los 3 últimos meses de la Información Mensual y la Información Diaria de hoy, de ayer y de los días que falten.</p>
+        <p><b>¿Qué fechas pongo en el panel?</b> La primera vez, las de la corrida larga: <b>Desde</b> 01/01/2020 (lo diario: hidrograma e Información Diaria) y, junto a «Información Mensual», <b>desde</b> el mes más antiguo que quieras (por ejemplo 2000-01). Después no cambies nada: el recolector recuerda lo que ya bajó y cada día solo pide lo nuevo (el año hidrológico en curso de todas las estaciones, los 3 últimos meses de la Información Mensual y la Información Diaria de hoy, de ayer y de los días que falten).</p>
         <p><b>¿Y si un día no lo hago?</b> No se pierde nada: al día siguiente recoge también los días que faltaron.</p>
         <p><b>¿Tiene que ser en la misma computadora?</b> Conviene: el avance se guarda en ese navegador. En otra computadora o tras borrar los datos de navegación, la primera vez vuelve a bajar todo (unas 4 horas); lo que ya está en la página no se pierde.</p>
         <p><b>¿Puedo subir un archivo viejo por error?</b> Sí, sin daño: la página no reemplaza una pieza por otra recolectada antes.</p>

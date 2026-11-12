@@ -64,7 +64,7 @@ No es un fallo del código: es un bloqueo de red de SENAMHI. Por eso **la descar
 
 ## 4. Cómo se ejecuta (dos pasos)
 
-**Rutina diaria (desde el 12/11/2026): consola + página.** En la página del departamento, sección **Hidrología → Actualizar**, el botón «Copiar el código» copia una línea para la consola. Cada día: abrir Monitoreo Hidrológico de SENAMHI, F12 → Console, Ctrl+V y Enter (si hay avance guardado, el recolector empieza solo; ~5 minutos), y arrastrar el `SENAMHI_crudo_….json` descargado al recuadro de esa misma pestaña. La página compara con lo que ya tiene y sube solo las piezas nuevas o cambiadas. El favorito «Recolector SENAMHI» (en Preguntas frecuentes) hace lo mismo, pero en el primer uso real (12/11/2026) no funcionó en Chrome sobre la página de SENAMHI; la consola sí. El notebook de Colab (Paso B) queda como opción para tener además la copia en Drive.
+**Rutina diaria (desde el 12/11/2026): consola + página.** En la página del departamento, sección **Hidrología → Actualizar**, el botón «Copiar el código» copia una línea para la consola. Cada día: abrir Monitoreo Hidrológico de SENAMHI, F12 → Console, Ctrl+V y Enter (aparece el panel; se revisan las fechas y se pulsa «Iniciar»: no empieza solo; la actualización diaria tarda ~5 minutos), y arrastrar el `SENAMHI_crudo_….json` descargado al recuadro de esa misma pestaña. La página compara con lo que ya tiene y sube solo las piezas nuevas o cambiadas. El favorito «Recolector SENAMHI» (en Preguntas frecuentes) hace lo mismo, pero en el primer uso real (12/11/2026) no funcionó en Chrome sobre la página de SENAMHI; la consola sí. El notebook de Colab (Paso B) queda como opción para tener además la copia en Drive.
 
 No hay que cambiar las fechas del panel: con «Desde 01/01/2023» el recolector solo pide lo nuevo (el año hidrológico en curso de todas las estaciones, los 3 últimos meses de la Información Mensual, y la Información Diaria de hoy, de ayer y de los días que falten).
 
@@ -92,6 +92,8 @@ Detalles:
 - Hace las mismas consultas que la página y con las mismas reglas que el notebook: el orden de estaciones, el retroceso de 2 en 2 años hidrológicos y el corte si SENAMHI ignora la fecha en las 3 primeras pruebas.
 - El archivo es compacto. Del hidrograma guarda las series sin repetir fechas. De la Información Diaria guarda solo las estaciones con dato.
 - No envía nada a ningún otro sitio.
+
+**Corrida larga desde 2020 (mensual desde antes).** En el panel: «Desde» 01/01/2020 y, junto a «Información Mensual», «desde» el mes más antiguo (por ejemplo 2000-01). El recolector pide el hidrograma hacia atrás de 2 en 2 años hidrológicos hasta 2019-2020, la Información Diaria de cada día desde 2020 (unas 4 400 consultas más que desde 2023, ~2,5 horas adicionales) y la Mensual desde el mes elegido (12 consultas por año). Si SENAMHI no tiene datos tan antiguos, el recolector lo detecta (la consulta devuelve otro año o el mes servido no coincide) y no guarda nada falso. Conviene probar antes con «Prueba rápida» y «Desde» 01/01/2020 (~1 minuto): muestra si hay hidrograma e Información Diaria de esas fechas. La página toma como inicio de los CSV la fecha «Desde» más antigua con que se recolectó (la actualización diaria no la mueve); el notebook procesa la Mensual desde el primer mes que traiga el archivo.
 
 ### Paso B · Notebook de Colab (`HIDROLOGIA/SENAMHI_Rios.ipynb`, 3 bloques)
 

@@ -392,3 +392,17 @@ tr.nueva-region td { border-top: 2px solid var(--hair); }
 .hid-mapa.pantalla { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 9999; border-radius: 0; border: 0; }
 body.sin-scroll { overflow: hidden; }
 #hidrologia-peru .caja, #hidrologia .caja { scroll-margin-top: 84px; }
+.hid-anios { border: 0; padding: 0; margin: 0; min-width: 0; } .hid-anios legend { padding: 0; font-size: 12px; color: var(--mid); margin-bottom: 4px; }
+.hid-anios > div { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.hid-chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.hid-chk i { width: 16px; height: 4px; border-radius: 2px; } .hid-chk-acc { display: inline-flex; gap: 4px; margin-left: 6px; }
+
+/* ── Compartir la página ── */
+.cmp-matriz td.c, .cmp-matriz th.c { text-align: center; } .cmp-matriz label { cursor: pointer; white-space: nowrap; }
+.cmp-matriz input, .cmp-peru input { width: 16px; height: 16px; accent-color: var(--navy); vertical-align: -3px; }
+.cmp-peru { border: 1px solid var(--hair); border-radius: var(--r-s); padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.cmp-peru legend { padding: 0 6px; } .cmp-peru label { cursor: pointer; }
+.cmp-enlace { flex: 1; min-width: 260px; font: 13px var(--mono); padding: 8px; border: 1px solid var(--hair); border-radius: 8px; }
+.cmp-inc { font-size: 12px; color: var(--mid); max-width: 380px; } .cmp-inc b { color: var(--ink); }
+.campo input[type="text"] { border: 1px solid var(--hair); background: var(--paper); border-radius: var(--r-s); padding: 8px 10px; font: inherit; min-width: 240px; }
+.invitado { font-size: 12px; color: var(--mid); border: 1px solid var(--hair); border-radius: 999px; padding: 6px 12px; white-space: nowrap; }

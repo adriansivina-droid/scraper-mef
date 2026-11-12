@@ -140,7 +140,7 @@ def test_rango_de_fechas(cliente):
     assert s["anterior"][-3] == 124.0 and s["rojo"][-1] == 122.06
     # fechas al revés: se ordenan; más de 5 años o sin datos: aviso
     assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2026-09-04&hasta=2026-09-01").json()["actual"] == [122.5, 122.4, None, 122.0]
-    assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2015-01-01&hasta=2026-09-01").status_code == 422
+    assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2010-01-01&hasta=2026-09-01").status_code == 422
     assert cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2023-01-01&hasta=2023-02-01").status_code == 404
 
 
@@ -159,3 +159,28 @@ def test_todo_el_pais_con_coordenadas(cliente):
     assert (x["lat"], x["lon"], x["color"], x["direccion_zonal"]) == (-3.79, -73.35, "#FFA500", "DZ 8 · Loreto")
     f = filas(cliente.get("/v1/hidrologia/descargar?archivo=estaciones"))
     assert next(r for r in f if r["COD_ESTACION"] == "240001")["LATITUD"] == "-3.79"
+
+
+def test_comparar_anios(cliente):
+    subir(cliente, crudo())
+    s = cliente.get("/v1/hidrologia/anios?estacion=240001&variable=NIVEL").json()
+    assert sorted(s["años"]) == ["2025", "2026"] and s["dias"] == 366 and len(s["años"]["2026"]) == 366
+    # el año 2025-2026 sale del «anterior» del hidrograma 2026-2027; los días van sobre el mismo eje (1/9 en la posición 0)
+    assert s["años"]["2025"][:4] == [124.0, 124.1, 124.2, 124.3] and s["años"]["2026"][:4] == [122.5, 122.4, None, 122.0]
+    assert s["rojo"][0] == 122.06 and s["promedio"][0] == 123.0
+    assert cliente.get("/v1/hidrologia/anios?estacion=240001&variable=CAUDAL").status_code == 404
+
+
+def test_inicio_es_la_recoleccion_mas_antigua(cliente):
+    assert hidrologia.inicio() == date(2023, 1, 1)                       # sin nada guardado
+    c = crudo()
+    c["meta"]["desdeFecha"] = "2020-01-01"                                # la corrida larga, desde 2020
+    subir(cliente, c)
+    assert hidrologia.inicio() == date(2020, 1, 1)
+    d = crudo("2026-11-13")
+    d["meta"]["desdeFecha"] = "2026-11-01"                                # la actualización diaria no lo mueve
+    subir(cliente, d)
+    assert hidrologia.inicio() == date(2020, 1, 1)
+    # los años del hidrograma ya no se cortan en 2022: el 2025-2026 sigue y entra el que se tenga desde 2019-2020
+    e = cliente.get("/v1/hidrologia/estaciones?departamento=16").json()["estaciones"]
+    assert e[0]["variables"]["NIVEL"]["años"] == [2025, 2026]
