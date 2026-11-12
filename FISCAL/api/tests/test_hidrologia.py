@@ -184,3 +184,24 @@ def test_inicio_es_la_recoleccion_mas_antigua(cliente):
     # los años del hidrograma ya no se cortan en 2022: el 2025-2026 sigue y entra el que se tenga desde 2019-2020
     e = cliente.get("/v1/hidrologia/estaciones?departamento=16").json()["estaciones"]
     assert e[0]["variables"]["NIVEL"]["años"] == [2025, 2026]
+
+
+def test_reporte_hidrico_oriente(cliente):
+    import io
+    import zipfile
+    assert cliente.get("/v1/hidrologia/reporte").status_code == 404                  # sin datos
+    subir(cliente, crudo())
+    p = cliente.get("/v1/hidrologia/reporte?formato=pptx")
+    assert p.status_code == 200 and "Oriente" in p.headers["content-disposition"]
+    z = zipfile.ZipFile(io.BytesIO(p.content))
+    diapos = [n for n in z.namelist() if n.startswith("ppt/slides/slide")]
+    assert len(diapos) >= 6 and any(n.startswith("ppt/charts/") for n in z.namelist())
+    texto = z.read("ppt/slides/slide2.xml").decode()
+    assert "Santa María de Nanay" in texto and "Roja · bajo" in texto      # 122,0 m.s.n.m. está bajo el umbral rojo (122,06)
+    x = cliente.get("/v1/hidrologia/reporte?formato=xlsx")
+    assert x.status_code == 200
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(x.content))
+    assert wb.sheetnames[:2] == ["Índice", "Resumen"] and "Tabla diaria" in wb.sheetnames
+    res = wb["Resumen"]
+    assert res["C5"].value == "Santa María de Nanay" and str(res["E5"].value).startswith("='LOR Nanay")

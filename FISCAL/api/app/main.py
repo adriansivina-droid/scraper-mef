@@ -432,6 +432,19 @@ def hidrologia_rango(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"
     return s
 
 
+@app.get("/v1/hidrologia/reporte", dependencies=[Depends(acceso)])
+def hidrologia_reporte(formato: str = Query("pptx", pattern="^(pptx|xlsx)$")):
+    """Reporte de situación hídrica de la zona Oriente (Loreto, San Martín, Ucayali): el PowerPoint, o el Excel con sus datos y gráficos."""
+    from . import reporte_hidrico
+    D = reporte_hidrico.datos()
+    if D is None:
+        raise HTTPException(404, "Todavía no hay datos de SENAMHI en la página: súbelos en «Actualizar».")
+    nombre = f"Reporte situación hídrica - Oriente - {D['fecha']:%Y-%m-%d}"
+    if formato == "xlsx":
+        return Response(reporte_hidrico.excel(D), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=_adjunto(nombre + ".xlsx"))
+    return Response(reporte_hidrico.powerpoint(D), media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation", headers=_adjunto(nombre + ".pptx"))
+
+
 @app.get("/v1/hidrologia/descargar", dependencies=[Depends(acceso)])
 def hidrologia_descargar(archivo: str = Query("diario", pattern="^(diario|info-diaria|mensual|estaciones|control|control-info|control-mensual|log|todo)$"),
                          departamento: str = Query("", pattern="^(16|22|25)?$"), formato: str = Query("csv", pattern="^(csv|xlsx)$")):
