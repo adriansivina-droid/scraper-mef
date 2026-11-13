@@ -331,3 +331,20 @@ def test_motivo_no_mide_no_descarta_lo_normal():
     caudal["data"]["unidad"] = "m3/s"
     assert hidrologia.motivo_no_mide({**caudal, "formulario": FORM_SOLO_CAUDAL}) == ""                                          # el caudal sí lo mide
     assert hidrologia.motivo_no_mide(grafica("1", "CAUDAL", 2026, [1.0])) == "la unidad es de nivel, no de caudal"
+
+
+def test_una_estacion_que_mide_ambas_variables_conserva_las_dos(cliente):
+    """Como Puerto Inca: en SENAMHI se pueden elegir «Nivel» y «Caudal»; no se descarta ninguna."""
+    form_ambos = FORM_SOLO_CAUDAL.replace(" disabled", "")
+    c = crudo()
+    c["estaciones"].append({"idEstacion": 4, "codEstacion": "231101", "nomEstacion": "PUERTO INCA", "subEstacion": None, "estado": 1})
+    nivel = {**grafica("231101", "NIVEL", 2026, [4.1, 4.0, 3.9, 3.8]), "formulario": form_ambos, "disp": {"NIVEL": True, "CAUDAL": True}}
+    nivel["data"]["unidad"] = "m"
+    caudal = {**grafica("231101", "CAUDAL", 2026, [900.0, 880.0, 860.0, 850.0]), "formulario": form_ambos, "disp": {"NIVEL": True, "CAUDAL": True}}
+    caudal["data"]["unidad"] = "m3/s"
+    c["graficas"] += [nivel, caudal]
+    subir(cliente, c)
+    est = {e["codigo"]: e for e in cliente.get("/v1/hidrologia/estaciones?departamento=todos").json()["estaciones"]}
+    assert sorted(est["231101"]["variables"]) == ["CAUDAL", "NIVEL"]
+    ctrl = {(f["COD_ESTACION"], f["VARIABLE"]): f["ESTADO"] for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))}
+    assert "NO MIDE" not in ctrl[("231101", "NIVEL")] and "NO MIDE" not in ctrl[("231101", "CAUDAL")]
