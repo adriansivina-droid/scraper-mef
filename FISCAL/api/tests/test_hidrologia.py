@@ -285,3 +285,49 @@ def test_umbrales_de_crecida():
     a = evaluar(131.0, "#FF0000", rojo=130.0, naranja=129.0, amarillo=128.0, historia=[130.5 + 0.01 * (i % 3) for i in range(60)])
     assert (a["estado"], a["baja"], a["nivel"]) == ("confirmada", False, "roja")
     assert evaluar(125.0, "#FFFFFF", rojo=130.0, naranja=129.0, amarillo=128.0)["estado"] == "normal"
+
+
+# ── estaciones que no miden una de las variables (Cañad: solo caudal) ────────
+FORM_SOLO_CAUDAL = ('<form id="f"><input class="form-check-input" type="radio" name="rbtVariable" id="rbtVariableN" value="NIVEL" disabled>'
+                    '<input class="form-check-input" type="radio" name="rbtVariable" id="rbtVariableC" value="CAUDAL" checked></form>')
+
+
+def con_cañad(**extra_nivel):
+    """El crudo de siempre más la estación 47E1C5B4 (Cañad): su NIVEL es lo que SENAMHI devuelve aunque no lo mida; su CAUDAL, el real."""
+    c = crudo()
+    c["estaciones"].append({"idEstacion": 3, "codEstacion": "47E1C5B4", "nomEstacion": "CAÑAD", "subEstacion": None, "estado": 1})
+    nivel = {**grafica("47E1C5B4", "NIVEL", 2026, [1.9, 1.8, 1.7, 1.6]), **extra_nivel}
+    caudal = grafica("47E1C5B4", "CAUDAL", 2026, [0.5, 0.4, 0.4, 0.3])
+    caudal["data"]["unidad"] = "m3/s"
+    c["graficas"] += [nivel, caudal]
+    return c
+
+
+@pytest.mark.parametrize("como", [{"disp": {"NIVEL": False, "CAUDAL": True}}, {"estado": "OK", "formulario": FORM_SOLO_CAUDAL}, "unidad"])
+def test_una_estacion_no_muestra_la_variable_que_no_mide(cliente, como):
+    c = con_cañad(**(como if isinstance(como, dict) else {}))
+    if como == "unidad":                                      # SENAMHI devolvió caudal con el rótulo «NIVEL»
+        c["graficas"][-2]["data"]["unidad"] = "m3/s"
+    subir(cliente, c)
+    est = {e["codigo"]: e for e in cliente.get("/v1/hidrologia/estaciones?departamento=todos").json()["estaciones"]}
+    assert list(est["47E1C5B4"]["variables"]) == ["CAUDAL"] and "NIVEL" in est["240001"]["variables"]
+    # ni en la serie diaria, ni en el hidrograma, ni en los años
+    filas_ = filas(cliente.get("/v1/hidrologia/descargar?archivo=diario"))
+    assert {(f["COD_ESTACION"], f["VARIABLE"]) for f in filas_ if f["COD_ESTACION"] == "47E1C5B4"} == {("47E1C5B4", "CAUDAL")}
+    assert cliente.get("/v1/hidrologia/anios?estacion=47E1C5B4&variable=NIVEL").status_code == 404
+    assert cliente.get("/v1/hidrologia/serie?estacion=47E1C5B4&variable=NIVEL&anio=2026").status_code == 404
+    assert cliente.get("/v1/hidrologia/anios?estacion=47E1C5B4&variable=CAUDAL").status_code == 200
+    # el control lo dice, en vez de dejar un «OK» con datos que no son de esa variable
+    ctrl = {(f["COD_ESTACION"], f["VARIABLE"]): f["ESTADO"] for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))}
+    assert ctrl[("47E1C5B4", "NIVEL")] == "NO MIDE ESTA VARIABLE" and ctrl[("47E1C5B4", "CAUDAL")] != "NO MIDE ESTA VARIABLE"
+    log = [f for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=log")) if f["COD_ESTACION"] == "47E1C5B4" and f["VARIABLE"] == "NIVEL"]
+    assert log and all(f["ESTADO"] == "NO MIDE ESTA VARIABLE" for f in log)
+
+
+def test_motivo_no_mide_no_descarta_lo_normal():
+    assert hidrologia.motivo_no_mide(grafica("1", "NIVEL", 2026, [1.0])) == ""
+    assert hidrologia.motivo_no_mide({**grafica("1", "NIVEL", 2026, [1.0]), "formulario": FORM_SOLO_CAUDAL.replace("disabled", "")}) == ""
+    caudal = grafica("1", "CAUDAL", 2026, [1.0])
+    caudal["data"]["unidad"] = "m3/s"
+    assert hidrologia.motivo_no_mide({**caudal, "formulario": FORM_SOLO_CAUDAL}) == ""                                          # el caudal sí lo mide
+    assert hidrologia.motivo_no_mide(grafica("1", "CAUDAL", 2026, [1.0])) == "la unidad es de nivel, no de caudal"
