@@ -413,3 +413,9 @@ body.sin-scroll { overflow: hidden; }
 .chip.hid-sindato { background: #F5F5F5; color: #7B8190; border: 1px dashed #B8BEC9; }
 .hid-ley i.sinconf { background: #FFFF00; border: 2px dashed #7A5B00; } .hid-ley i.verificar { background: #C8CDD6; border: 2px dashed #C2185B; } .hid-ley i.sindato { background: #F5F5F5; border: 1.5px dashed #9AA0AA; }
 .hid-al { border-top: 1px solid var(--hair); margin-top: 4px; padding-top: 5px; } .hid-al ul { margin: 3px 0 0; padding-left: 16px; font-size: 11px; color: var(--mid); }
+
+/* invitado sin permiso de descarga: se ocultan los botones que bajan datos (el servidor además los niega); quedan Copiar, PNG y SVG */
+body.sin-descargas :is(#manu-xlsx, #emp-xlsx, #hid-xlsx, #ex-xlsx, #et-xlsx, #es-xlsx, #el-bajar, [id$="-x"], [id$="-bajar"], [data-xlsx], [data-arch-bajar],
+  [data-a="csv"], a[href*="formato=xlsx"], a[href*="formato=csv"], a[href*="/v1/hidrologia/descargar"], a[href*="descargar=true"], a[href^="/v1/descargas"]) { display: none !important; }
+.cmp-desc { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--mid); cursor: pointer; max-width: 76ch; } .cmp-desc b { color: var(--ink); }
+.cmp-desc input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--navy); flex: none; }

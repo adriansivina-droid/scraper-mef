@@ -14,7 +14,7 @@ import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from . import db
 
@@ -54,7 +54,9 @@ def _tabla():
         return
     with m.begin() as cx:
         cx.execute(text("CREATE TABLE IF NOT EXISTS invitaciones (id TEXT PRIMARY KEY, huella TEXT UNIQUE, nombre TEXT, creado TEXT, vence TEXT, "
-                        "permisos TEXT, ultimo_acceso TEXT, accesos INTEGER DEFAULT 0, revocada INTEGER DEFAULT 0)"))
+                        "permisos TEXT, ultimo_acceso TEXT, accesos INTEGER DEFAULT 0, revocada INTEGER DEFAULT 0, descargas INTEGER DEFAULT 0)"))
+        if "descargas" not in {c["name"] for c in inspect(cx).get_columns("invitaciones")}:      # tablas creadas antes
+            cx.execute(text("ALTER TABLE invitaciones ADD COLUMN descargas INTEGER DEFAULT 0"))
     _tabla_lista = m
 
 
@@ -77,8 +79,9 @@ def limpiar_permisos(permisos):
     return out
 
 
-def crear(nombre, dias, permisos):
-    """Crea una invitación. Devuelve (id, token): el token solo se ve ahora."""
+def crear(nombre, dias, permisos, descargas=False):
+    """Crea una invitación. Devuelve (id, token): el token solo se ve ahora. «descargas»: si puede bajar los datos (CSV, Excel);
+    sin ese permiso solo ve los cuadros y gráficos en la página y puede copiarlos o bajarlos como imagen."""
     _tabla()
     permisos = limpiar_permisos(permisos)
     if not permisos:
@@ -91,19 +94,20 @@ def crear(nombre, dias, permisos):
     ident = uuid.uuid4().hex[:10]
     ahora = _ahora()
     with db.motor().begin() as cx:
-        cx.execute(text("INSERT INTO invitaciones (id, huella, nombre, creado, vence, permisos, accesos, revocada) VALUES (:i, :h, :n, :c, :v, :p, 0, 0)"),
+        cx.execute(text("INSERT INTO invitaciones (id, huella, nombre, creado, vence, permisos, accesos, revocada, descargas) "
+                        "VALUES (:i, :h, :n, :c, :v, :p, 0, 0, :d)"),
                    {"i": ident, "h": _huella(token), "n": nombre, "c": ahora.isoformat(timespec="seconds"),
-                    "v": (ahora + timedelta(days=dias)).isoformat(timespec="seconds"), "p": json.dumps(permisos)})
+                    "v": (ahora + timedelta(days=dias)).isoformat(timespec="seconds"), "p": json.dumps(permisos), "d": 1 if descargas else 0})
     return ident, token
 
 
 def listar():
     _tabla()
     with db.motor().connect() as cx:
-        filas = cx.execute(text("SELECT id, nombre, creado, vence, permisos, ultimo_acceso, accesos, revocada FROM invitaciones ORDER BY creado DESC")).all()
+        filas = cx.execute(text("SELECT id, nombre, creado, vence, permisos, ultimo_acceso, accesos, revocada, descargas FROM invitaciones ORDER BY creado DESC")).all()
     ahora = _ahora().isoformat(timespec="seconds")
-    return [{"id": i, "nombre": n, "creado": c, "vence": v, "permisos": json.loads(p), "ultimo_acceso": u, "accesos": a or 0,
-             "estado": "revocada" if r else "vencida" if v < ahora else "activa"} for i, n, c, v, p, u, a, r in filas]
+    return [{"id": i, "nombre": n, "creado": c, "vence": v, "permisos": json.loads(p), "ultimo_acceso": u, "accesos": a or 0, "descargas": bool(d),
+             "estado": "revocada" if r else "vencida" if v < ahora else "activa"} for i, n, c, v, p, u, a, r, d in filas]
 
 
 def revocar(ident):
@@ -118,7 +122,7 @@ def validar(token, entrada=False):
         return None
     _tabla()
     with db.motor().connect() as cx:
-        r = cx.execute(text("SELECT id, nombre, vence, permisos, revocada, ultimo_acceso FROM invitaciones WHERE huella = :h"), {"h": _huella(token)}).first()
+        r = cx.execute(text("SELECT id, nombre, vence, permisos, revocada, ultimo_acceso, descargas FROM invitaciones WHERE huella = :h"), {"h": _huella(token)}).first()
     if r is None or r[4] or r[2] < _ahora().isoformat(timespec="seconds"):
         return None
     ahora = _ahora()
@@ -126,7 +130,7 @@ def validar(token, entrada=False):
         with db.motor().begin() as cx:
             cx.execute(text("UPDATE invitaciones SET ultimo_acceso = :u, accesos = COALESCE(accesos, 0) + :n WHERE id = :i"),
                        {"u": ahora.isoformat(timespec="seconds"), "n": 1 if entrada else 0, "i": r[0]})
-    return {"id": r[0], "nombre": r[1], "vence": r[2], "permisos": json.loads(r[3])}
+    return {"id": r[0], "nombre": r[1], "vence": r[2], "permisos": json.loads(r[3]), "descargas": bool(r[6])}
 
 
 # ── qué puede pedir un invitado ──────────────────────────────────────────────
@@ -169,10 +173,22 @@ def _estaciones_permitidas(perm):
     return out
 
 
-def permitido(perm, metodo, ruta, q):
-    """(True, "") si el invitado puede hacer esta petición; si no, (False, motivo). `q` = parámetros de la dirección."""
+RUTAS_DE_DESCARGA = {"/v1/descargas", "/v1/descargas/vista-previa", "/v1/descargas/empleo", "/v1/hidrologia/descargar", "/v1/bcrp/excel"}
+
+
+def es_descarga(metodo, ruta, q):
+    """¿La petición baja datos en un archivo (CSV, Excel) o su vista previa? Las imágenes se arman en el navegador y no pasan por aquí."""
+    return (ruta in RUTAS_DE_DESCARGA or q.get("formato", "json") not in ("json", "") or
+            (ruta == "/v1/hidrocarburos/mapa" and str(q.get("descargar", "")).lower() in ("true", "1")))
+
+
+def permitido(perm, metodo, ruta, q, descargas=False):
+    """(True, "") si el invitado puede hacer esta petición; si no, (False, motivo). `q` = parámetros de la dirección.
+    «descargas»: si la invitación permite bajar los datos (CSV, Excel)."""
     no = (False, "Esa parte de la página no está incluida en el acceso que recibiste.")
     ok = (True, "")
+    if not descargas and es_descarga(metodo, ruta, q):
+        return False, "Tu acceso permite ver los cuadros y gráficos, y bajarlos como imagen, pero no descargar los datos."
     if metodo == "POST":
         return ok if ruta == "/v1/bcrp/excel" else no            # solo arma un Excel con lo que la página ya mostró
     if metodo != "GET":
