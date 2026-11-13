@@ -37,9 +37,11 @@
 
   // ── el hidrograma, con el aspecto del de SENAMHI ──
   // series en el orden de la leyenda de SENAMHI; cada una se muestra u oculta con un clic en la leyenda
-  const SERIE = [["promedio", "Prom. Histórico", "#2EAA4A", 2], ["minimo", "Min", "#8B1A1A", 1.2], ["maximo", "Max", "#8C8C8C", 1.2],
-    ["anterior", null, "#4FA8EE", 2], ["actual", null, "#1A1AD6", 2.8], ["rojo", "Rojo", "#E0281E", 1.8], ["naranja", "Naranja", "#F28C00", 1.8], ["amarillo", "Amarillo", "#E8D21A", 1.8]];
-  const PALETA = ["#1A1AD6", "#4FA8EE", "#C2185B", "#8E44AD", "#795548", "#00897B", "#546E7A", "#AD1457", "#5D4037"];   // sin verde, amarillo, naranja ni rojo: son del promedio y los umbrales   // del año más reciente al más antiguo
+  const SERIE = [["promedio", "Prom. Histórico", "#2EAA4A", 2], ["minimo", "Min", "#772244", 1.2], ["maximo", "Max", "#808080", 1.2],
+    ["anterior", null, "#1AB6F9", 2], ["actual", null, "#1A1AD6", 2.8], ["rojo", "Rojo", "#E0281E", 1.8], ["naranja", "Naranja", "#F28C00", 1.8], ["amarillo", "Amarillo", "#E8D21A", 1.8]];
+  // colores de los años, del más reciente al más antiguo: elegidos para que cualquier par (y con el promedio y los umbrales) se
+  // distinga a simple vista: diferencia de color CIEDE2000 de al menos 22 entre todos (26 con hasta 6 años); por debajo de ~10 se confunden
+  const PALETA = ["#1A1AD6", "#1AB6F9", "#574B19", "#FA42FA", "#226E77", "#772244", "#111111", "#6973D3", "#6D2303"];
   const colorAnio = (s, k) => PALETA[(s.claves.length - 1 - s.claves.indexOf(k)) % PALETA.length];
   // series que se dibujan: al comparar, el promedio, los años marcados (del más antiguo al más reciente) y los umbrales
   function serieDe(s, vista) {
@@ -106,7 +108,8 @@
       let primero = true;
       for (let i = 0; i < n; i++) { const d = FECHA(x0, i); if (d.getUTCDate() === 1 && (d.getUTCMonth() - 8 + 12) % cada === 0) { eje += marca(i, `01 ${MES[d.getUTCMonth()]}${(d.getUTCMonth() === 0 || primero) && !s.comparar ? " " + d.getUTCFullYear() : ""}`); primero = false; } }
     }
-    const trazos = visibles.map(([k, , c, w]) => { const d = camino(parte(k)); return d ? `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"/>` : ""; }).join("");
+    const UMB = ["rojo", "naranja", "amarillo"];                 // los umbrales van con línea discontinua: no se confunden con los años
+    const trazos = visibles.map(([k, , c, w]) => { const d = camino(parte(k)); return d ? `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"${UMB.includes(k) ? ' stroke-dasharray="9 5"' : ""}/>` : ""; }).join("");
     const ult = pk ? parte(pk).reduce((a, v, i) => v != null ? i : a, -1) : -1;
     const punto = ult >= 0 && !ocultas.has(pk) ? `<circle cx="${X(ult).toFixed(1)}" cy="${Y(parte(pk)[ult]).toFixed(1)}" r="3.5" fill="${(SER.find((x) => x[0] === pk) || [])[2]}" stroke="#FFF" stroke-width="1.5"/>` : "";
     // leyenda abajo, en filas centradas, como la de SENAMHI
@@ -118,7 +121,7 @@
     items.forEach((it) => { const w = 34 + it.t.length * 6.9; if (lx + w > ancho && filas[filas.length - 1].length) { filas.push([]); lx = 0; } filas[filas.length - 1].push({ ...it, w }); lx += w; });
     const H = arr + alto + 48 + filas.length * 20 + 14;
     const leyenda = filas.map((f, r) => { const tot = f.reduce((a, it) => a + it.w, 0); let x = izq + (ancho - tot) / 2; const y = arr + alto + 48 + r * 20;
-      return f.map((it) => { const o = ocultas.has(it.k), g = `<g data-serie="${it.k}" style="cursor:pointer" opacity="${o ? 0.35 : 1}"><rect x="${x}" y="${y - 12}" width="${it.w - 6}" height="18" fill="#FFF" fill-opacity="0"/><line x1="${x}" x2="${x + 22}" y1="${y - 3}" y2="${y - 3}" stroke="${it.c}" stroke-width="3"/><text x="${x + 28}" y="${y + 1}" fill="#333" font-weight="600">${esc(it.t)}</text></g>`; x += it.w; return g; }).join(""); }).join("");
+      return f.map((it) => { const o = ocultas.has(it.k), g = `<g data-serie="${it.k}" style="cursor:pointer" opacity="${o ? 0.35 : 1}"><rect x="${x}" y="${y - 12}" width="${it.w - 6}" height="18" fill="#FFF" fill-opacity="0"/><line x1="${x}" x2="${x + 22}" y1="${y - 3}" y2="${y - 3}" stroke="${it.c}" stroke-width="3"${["rojo", "naranja", "amarillo"].includes(it.k) ? ' stroke-dasharray="6 3"' : ""}/><text x="${x + 28}" y="${y + 1}" fill="#333" font-weight="600">${esc(it.t)}</text></g>`; x += it.w; return g; }).join(""); }).join("");
     const Var = VAR[s.variable].toUpperCase();
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#555" role="img" aria-label="Hidrograma de ${esc(s.estacion)}">
       <rect width="${W}" height="${H}" fill="#FFF"/>

@@ -39,7 +39,7 @@ CIUDAD = {"240102": "Iquitos", "240001": "Iquitos", "240111": "Mazán", "240103"
           "230602": "Yurimaguas", "220105": "Loreto", "220107": "Datem del Marañón", "230603": "Lagunas", "251102": "Contamana",
           "240005": "Ramón Castilla", "240504": "Pucallpa", "230715": "Picota"}
 # colores: el año en curso oscuro, los anteriores más claros; promedio verde; umbrales como SENAMHI
-C_AÑOS = ["1F3864", "5B9BD5", "A5A5A5", "C55A11"]
+C_AÑOS = ["1A1AD6", "1AB6F9", "574B19", "FA42FA"]          # años: que ningún par se confunda entre sí ni con el promedio o los umbrales
 C_PROM, C_AMA, C_NAR, C_ROJ = "70AD47", "E8C700", "ED7D31", "C00000"
 FILL_ALERTA = {"roja": "FF0000", "naranja": "FFA500", "amarilla": "FFFF00", "normal": "E2EFDA", "sin umbral": "F2F2F2", "sin confirmar": "FCE4D6",
                "a verificar": "FCE4EC", "sin dato": "F2F2F2"}
