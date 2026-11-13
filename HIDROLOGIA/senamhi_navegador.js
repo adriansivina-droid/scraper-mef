@@ -18,7 +18,7 @@
   'use strict';
   if (window.__senamhiRecolector) { window.__senamhiRecolector.mostrar(); return; }
 
-  const VERSION = 5;
+  const VERSION = 6;
   const B = location.origin;
   const U = {
     mapa: B + '/mapas/mapa-monitoreohidro/mapa-monitoreo.php',
@@ -232,8 +232,6 @@
       hecho++; pintar();
       const fhActual = (ficha.f && ficha.f.fecha_hora) || `${hoyIso} 06:00:00`;
       const opcion = (ficha.f && ficha.f.variable_opcion) || 'N';
-      // qué variables mide la estación según SENAMHI: en su formulario, el botón «Nivel» o «Caudal» sale deshabilitado si no la mide
-      const mide = {};
       for (const v of cfg.variables) {
         let y = AH_HOY;
         while (true) {
@@ -241,13 +239,8 @@
           const fh = actual ? fhActual : `${y + 1}-08-31 06:00:00`;
           const clave = `graf:${cod}:${v}:${actual ? 'actual' : y}`;
           let g = await leer(clave);
-          if (g && g.disp) Object.assign(mide, g.disp);
           if (g && actual && g.estado === 'OK') y = g.y;
-          if (mide[v] === false && (!g || g.estado !== 'NO MIDE')) {        // ya se sabe que no la mide: no se pide
-            g = { dia: hoyIso, cod, variable: v, opcion, y, fh, estado: 'NO MIDE', inicio: null, data: null, disp: { ...mide } };
-            await guardar(clave, g);
-          }
-          if (!g || (actual && g.dia !== hoyIso && g.estado !== 'NO MIDE') || g.estado === 'SIN RESPUESTA') {
+          if (!g || (actual && g.dia !== hoyIso) || g.estado === 'SIN RESPUESTA' || g.estado === 'NO MIDE') {
             const html = await pedir(U.grafica, new URLSearchParams({ rbtVariable: v, fecha_hora: fh, btnTipo: 'D',
                                                                        variable_opcion: opcion, id: cod }));
             const d = varData(html);
@@ -260,11 +253,12 @@
             const conDatos = d && SERIES.slice(0, 2).some((s) => (d[s] || []).some((par) => par[1] !== null && par[1] > -999));
             const otraVar = d && String(d.variable || v).toUpperCase() !== v;
             const disp = html && /rbtVariableN/.test(html) ? { NIVEL: !/id=["']rbtVariableN["'][^>]*\bdisabled/i.test(html), CAUDAL: !/id=["']rbtVariableC["'][^>]*\bdisabled/i.test(html) } : null;
-            if (disp) Object.assign(mide, disp);
-            const noMide = !!disp && disp[v] === false;                      // SENAMHI no deja elegir esa variable: lo que devuelva no es de esa variable
+            // SENAMHI no deja elegir esa variable en su página: lo que devuelve se guarda igual, marcado «no publicado»; la página
+            // lo deja aparte (archivo propio) y no lo usa en el mapa, las alertas ni los gráficos
+            const noPublicado = !!disp && disp[v] === false;
             g = { dia: hoyIso, cod, variable: v, opcion, y, fh,
-                  estado: html === null ? 'SIN RESPUESTA' : noMide ? 'NO MIDE' : (!conDatos || otraVar) ? 'SIN DATOS' : ini === esperado ? 'OK' : 'DEVOLVIO OTRO AÑO',
-                  inicio: ini, data: !noMide && d && ini === esperado && conDatos && !otraVar ? compactar(d) : null, ...(disp ? { disp } : {}) };
+                  estado: html === null ? 'SIN RESPUESTA' : (!conDatos || otraVar) ? 'SIN DATOS' : ini === esperado ? 'OK' : 'DEVOLVIO OTRO AÑO',
+                  inicio: ini, data: d && ini === esperado && conDatos && !otraVar ? compactar(d) : null, ...(disp ? { disp } : {}), ...(noPublicado ? { noPublicado } : {}) };
             // muestra del formulario (para ver qué variable_opcion usa cada estación), solo en unas pocas
             if (html && (opcion !== 'N' || PRUEBA_ESTACIONES.includes(cod)) && actual) {
               const i0 = html.indexOf('<form'), i1 = html.indexOf('</form>');

@@ -455,6 +455,7 @@
     ["info-diaria", "Información Diaria", "Las estaciones principales a las 00:00, 06:00, 12:00 y 18:00, con la anomalía respecto a la normal, la tendencia y el umbral rojo."],
     ["mensual", "Información Mensual", "Valor del mes, mes anterior, anomalía y tendencia de las estaciones principales."],
     ["estaciones", "Estaciones", "Lista de estaciones: dirección zonal, departamento, río, variables con datos y fecha del último dato."],
+    ["no-publicado", "Series no publicadas por SENAMHI", "Lo que SENAMHI devuelve de una variable que no publica en esa estación (en su página el botón está deshabilitado): por ejemplo, el «nivel» de las estaciones que solo publican caudal o el caudal de Bellavista. Probablemente sean lecturas internas sin validar: se guardan aparte y no se usan en el mapa, las alertas, los gráficos ni el reporte."],
     ["control", "Control de la serie diaria", "Por estación y variable: primera y última fecha, días con dato, días faltantes, saltos raros y estado (OK o REVISAR)."]];
   async function descargas(r, caja) {
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Consultando…</div>';
@@ -467,7 +468,7 @@
     caja.innerHTML = `<div class="caja"><h3>Datos del scraper de SENAMHI</h3>
       <p>Son los mismos archivos que arma el notebook de Colab. Hay <b>${num(res.filas_diario, 0)}</b> filas diarias de <b>${res.estaciones_con_datos}</b> estaciones, <b>${num(res.filas_info_diaria, 0)}</b> de Información Diaria y <b>${num(res.filas_mensual, 0)}</b> mensuales; el último dato es del <b>${dmy(res.ultima_fecha)}</b>.</p>
       <div class="scroll"><table><tr><th>Archivo</th><th>Qué trae</th>${pais ? "" : `<th>Solo ${esc(r.nombre)}</th>`}<th>Todo el país</th></tr>
-      ${ARCH.map(([a, t, d]) => `<tr><td><b>${t}</b></td><td>${d}</td>${pais ? "" : `<td class="hid-enl"><a href="${u(a, r.cod, "xlsx")}">Excel</a> · <a href="${u(a, r.cod)}">CSV</a></td>`}<td class="hid-enl"><a href="${u(a)}">CSV</a>${a === "diario" || a === "info-diaria" ? "" : ` · <a href="${u(a, "", "xlsx")}">Excel</a>`}</td></tr>`).join("")}</table></div>
+      ${ARCH.map(([a, t, d]) => `<tr><td><b>${t}</b></td><td>${d}</td>${pais ? "" : `<td class="hid-enl"><a href="${u(a, r.cod, "xlsx")}">Excel</a> · <a href="${u(a, r.cod)}">CSV</a></td>`}<td class="hid-enl"><a href="${u(a)}">CSV</a>${a === "diario" || a === "no-publicado" || a === "info-diaria" ? "" : ` · <a href="${u(a, "", "xlsx")}">Excel</a>`}</td></tr>`).join("")}</table></div>
       <div class="fila">${pais ? "" : `<a class="btn" href="${u("todo", r.cod)}">Todo lo de ${esc(r.nombre)} (.zip)</a>`}<a class="btn${pais ? "" : " sec"}" href="${u("todo")}">Todo el país, con los controles (.zip)</a></div>
       ${pais && !HIDRO.invitado ? `<div class="caja hid-reporte"><h3>Reporte de situación hídrica · Zona Oriente</h3>
         <p>Con el formato del reporte de la Sucursal Piura, armado con los datos de hoy: portada, situación de los ríos del Oriente, hidrogramas de Loreto, San Martín y Ucayali, nivel diario del mes por año y caudales. El Excel trae una hoja por gráfico con sus datos (si cambias un dato, cambia el gráfico) y un resumen con fórmulas.</p>

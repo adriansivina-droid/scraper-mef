@@ -35,13 +35,14 @@ MES_EN = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6, "JUL": 7, 
           "NOV": 11, "DEC": 12}
 _RE_CLAVE = re.compile(r"^(meta|estaciones|zonales|infoMeta|fichas|historiaOk|monitoreo|graf:[^:]{1,40}:(NIVEL|CAUDAL):\d{4}"
                        r"|men:\d{4}-\d{2}|inf:\d{4}-\d{2}-\d{2}:\d{2}:\d{2})$")
-ARCHIVOS = {"diario": "SENAMHI_rios_diario.csv", "info-diaria": "SENAMHI_rios_info_diaria.csv",
+ARCHIVOS = {"diario": "SENAMHI_rios_diario.csv", "no-publicado": "SENAMHI_rios_diario_no_publicado.csv", "info-diaria": "SENAMHI_rios_info_diaria.csv",
             "mensual": "SENAMHI_rios_mensual.csv", "estaciones": "SENAMHI_ESTACIONES.csv",
             "control": "CONTROL SENAMHI rios_diario.csv", "control-info": "CONTROL SENAMHI rios_info_diaria.csv",
             "control-mensual": "CONTROL SENAMHI rios_mensual.csv", "log": "LOG SENAMHI consultas.csv"}
 COLS = {
     "diario": ["COD_ESTACION", "ESTACION", "RIO", "VARIABLE", "UNIDAD", "FECHA", "AÑO", "MES", "DIA", "AÑO_HIDROLOGICO", "VALOR",
                "MINIMO", "MAXIMO", "PROM_HISTORICO", "UMBRAL_ROJO", "UMBRAL_NARANJA", "UMBRAL_AMARILLO", "SERIE", "FECHA_EXTRACCION"],
+    "no-publicado": None,                                   # mismas columnas que «diario» (se completa abajo)
     "info-diaria": ["COD_ESTACION", "ESTACION", "CUERPO_AGUA", "CUENCA", "DEPARTAMENTO", "ZONA", "REGION_HIDROGRAFICA", "COD_ZONAL",
                     "FECHA", "AÑO", "MES", "DIA", "HORA", "UNIDAD", "VALOR", "ANOMALIA", "UNIDAD_ANOMALIA", "TENDENCIA", "UMBRAL_ROJO",
                     "FECHA_EXTRACCION"],
@@ -57,6 +58,10 @@ COLS = {
     "log": ["COD_ESTACION", "ESTACION", "VARIABLE", "VARIABLE_OPCION", "FECHA_HORA_PEDIDA", "INICIO_SERIE", "FILAS", "ESTADO",
             "FECHA_EXTRACCION"],
 }
+
+
+COLS["no-publicado"] = COLS["diario"]
+NO_PUBLICADA = "NO PUBLICADA POR SENAMHI"
 
 
 # ── utilidades ───────────────────────────────────────────────────────────────
@@ -177,10 +182,11 @@ def inicio():
         return INICIO
 
 
-# ── variables que una estación NO mide ───────────────────────────────────────
-# SENAMHI deshabilita en su formulario el botón «Nivel» o «Caudal» de las estaciones que no miden esa variable (por ejemplo, Cañad
-# solo mide caudal). Si se le pide igual, devuelve otra cosa con el rótulo pedido: no es dato de esa variable. Se descarta lo guardado
-# de una estación y variable si alguna de sus piezas lo indica: la bandera «disp» del recolector, el formulario guardado o la unidad.
+# ── variables que SENAMHI no publica en una estación ─────────────────────────
+# SENAMHI deshabilita en su página el botón «Nivel» o «Caudal» de las estaciones donde no publica esa variable (Cañad: solo caudal;
+# Bellavista: solo nivel). Si se le pide igual, devuelve datos: probablemente las lecturas internas con que calcula lo que sí publica,
+# pero sin validar. Se conservan aparte (SENAMHI_rios_diario_no_publicado.csv) y no se usan en el mapa, las alertas, los gráficos ni el
+# reporte. Una estación y variable va aparte si alguna de sus piezas lo indica: la marca del recolector, el formulario o la unidad.
 _RE_DESHABILITADO = {"NIVEL": re.compile(r"id=[\"']rbtVariableN[\"'][^>]*\bdisabled", re.I), "CAUDAL": re.compile(r"id=[\"']rbtVariableC[\"'][^>]*\bdisabled", re.I)}
 _no_mide_cache = {"version": None, "conjunto": frozenset(), "nombres": {}}
 
@@ -188,10 +194,10 @@ _no_mide_cache = {"version": None, "conjunto": frozenset(), "nombres": {}}
 def motivo_no_mide(g):
     """Por qué lo guardado en esta pieza no es de la variable que dice ser (vacío si está bien)."""
     var = g.get("variable")
-    if g.get("estado") == "NO MIDE" or (g.get("disp") or {}).get(var) is False:
-        return "SENAMHI no deja elegir esa variable en la estación"
+    if g.get("estado") == "NO MIDE" or g.get("noPublicado") or (g.get("disp") or {}).get(var) is False:
+        return "SENAMHI no publica esa variable en la estación"
     if var in _RE_DESHABILITADO and _RE_DESHABILITADO[var].search(g.get("formulario") or ""):
-        return "SENAMHI no deja elegir esa variable en la estación"
+        return "SENAMHI no publica esa variable en la estación"
     unidad = str((g.get("data") or {}).get("unidad") or "").lower().replace(" ", "").replace(".", "")
     if var == "NIVEL" and ("m3" in unidad or "m³" in unidad):
         return "la unidad es de caudal, no de nivel"
@@ -201,7 +207,7 @@ def motivo_no_mide(g):
 
 
 def no_mide():
-    """{(estación, variable)} que no se deben usar: alguna de sus piezas muestra que la estación no mide esa variable."""
+    """{(estación, variable)} que SENAMHI no publica: van aparte y no se usan en el mapa, las alertas, los gráficos ni el reporte."""
     v = version()
     if _no_mide_cache["version"] != v:
         conjunto, nombres = set(), {}
@@ -378,23 +384,20 @@ def armar(carpeta):
 
     # 2. Hidrograma diario, estación por estación
     f, w = _escritor(carpeta / ARCHIVOS["diario"], COLS["diario"])
+    fn, wn = _escritor(carpeta / ARCHIVOS["no-publicado"], COLS["no-publicado"])
     fl, wl = _escritor(carpeta / ARCHIVOS["log"], COLS["log"])
-    control, rio, variables, n_dia, ultima = [], {}, {}, 0, None
+    control, rio, variables, n_dia, n_nopub, ultima = [], {}, {}, 0, 0, None
     grupo, clave_g = [], None
 
     NM = no_mide()
     nombre_est = {**nombres_de_hidrogramas(), **{k: v for k, v in nombre_est.items() if v}}
 
     def cerrar(grupo):
-        nonlocal n_dia, ultima
+        nonlocal n_dia, n_nopub, ultima
         if not grupo:
             return
         cod, var = grupo[0][0].split(":")[1:3]
-        if (cod, var) in NM:                                  # la estación no mide esta variable: no entra ningún dato
-            for _, g, dia in grupo:
-                wl.writerow([cod, nombre_est.get(cod, ""), var, g.get("opcion", ""), g.get("fh", ""), "", 0, "NO MIDE ESTA VARIABLE", _dia_txt(dia)])
-            control.append({"COD_ESTACION": cod, "ESTACION": nombre_est.get(cod, ""), "VARIABLE": var, "ESTADO": "NO MIDE ESTA VARIABLE"})
-            return
+        nopub = (cod, var) in NM                              # SENAMHI no la publica: sus filas van al archivo aparte
         elegidas, estados = {}, []
         # prioridad: el dato del año pedido (ACTUAL) sobre el visto desde el año siguiente; a igualdad, lo más reciente
         for clave, g, dia in sorted(grupo, key=lambda t: t[2], reverse=True):
@@ -403,7 +406,7 @@ def armar(carpeta):
             estado = g.get("estado", "")
             estados.append(estado)
             wl.writerow([cod, nombre_est.get(cod, ""), var, g.get("opcion", ""), g.get("fh", ""), _dmy(ini), len(filas),
-                         f"DEVOLVIO OTRO AÑO ({_dmy(ini)})" if estado == "DEVOLVIO OTRO AÑO" and ini else estado, _dia_txt(dia)])
+                         (f"DEVOLVIO OTRO AÑO ({_dmy(ini)})" if estado == "DEVOLVIO OTRO AÑO" and ini else estado) + (f" · {NO_PUBLICADA}" if nopub else ""), _dia_txt(dia)])
             for fila in filas:
                 if fila[0] < INI:
                     continue
@@ -412,7 +415,8 @@ def armar(carpeta):
                     elegidas[fila[0]] = fila + (dia,)
         fila_c = {"COD_ESTACION": cod, "ESTACION": nombre_est.get(cod, ""), "VARIABLE": var}
         if not elegidas:
-            fila_c["ESTADO"] = ("SIN DATOS" if all(e == "SIN DATOS" for e in estados) else
+            fila_c["ESTADO"] = (f"{NO_PUBLICADA} (sin datos guardados)" if nopub else
+                                "SIN DATOS" if all(e == "SIN DATOS" for e in estados) else
                                 "SIN RESPUESTA" if "SIN RESPUESTA" in estados else estados[0] if estados else "SIN DATOS")
             control.append(fila_c)
             return
@@ -420,16 +424,19 @@ def armar(carpeta):
         valores, meses = [], {}
         for d in fechas:
             _, serie, base, v, mn, mx, prom, ro, na, am, dia = elegidas[d]
-            w.writerow(base + [_dmy(d), d.year, d.month, d.day, año_hidrologico(d), v, _v(mn), _v(mx), _v(prom), _v(ro), _v(na), _v(am),
-                               serie, _dia_txt(dia)])
+            (wn if nopub else w).writerow(base + [_dmy(d), d.year, d.month, d.day, año_hidrologico(d), v, _v(mn), _v(mx), _v(prom), _v(ro), _v(na), _v(am),
+                                                  serie, _dia_txt(dia)])
             valores.append(v)
             k = (sin_tildes(base[4]), d.year, d.month)
             s = meses.setdefault(k, [0.0, 0])
             s[0] += v; s[1] += 1
-        n_dia += len(fechas)
         base = elegidas[fechas[-1]][2]
-        rio.setdefault(cod, base[2])
-        variables.setdefault(cod, set()).add(var)
+        if nopub:
+            n_nopub += len(fechas)
+        else:
+            n_dia += len(fechas)
+            rio.setdefault(cod, base[2])
+            variables.setdefault(cod, set()).add(var)
         fila_c["ESTACION"] = fila_c["ESTACION"] or base[1]
         saltos_abs = [abs(b - a) for a, b in zip(valores, valores[1:])]
         lim = _cuantil(saltos_abs, 0.9) if len(saltos_abs) > 10 else 0
@@ -442,7 +449,11 @@ def armar(carpeta):
                        "CRUCE_MENSUAL_DIF_MAX_%": round(max(cruces), 2) if cruces else "",
                        "ESTADO": "REVISAR (saltos)" if saltos else "OK" if llega else
                        f"OK desde {_dmy(fechas[0])} (SENAMHI no trae más atrás)"})
+        if nopub:
+            fila_c["ESTADO"] = f"{NO_PUBLICADA} (aparte)"
         control.append(fila_c)
+        if nopub:
+            return
         if ultima is None or fechas[-1] > ultima:
             ultima = fechas[-1]
 
@@ -453,7 +464,7 @@ def armar(carpeta):
             grupo, clave_g = [], k
         grupo.append((clave, g, dia))
     cerrar(grupo)
-    f.close(); fl.close()
+    f.close(); fn.close(); fl.close()
     f, w = _escritor(carpeta / ARCHIVOS["control"], COLS["control"])
     for c in control:
         w.writerow([_v(c.get(k)) for k in COLS["control"][:-1]] + [hoy_txt])
@@ -498,7 +509,7 @@ def armar(carpeta):
             por_depto[depto or "(sin departamento)"] = por_depto.get(depto or "(sin departamento)", 0) + 1
     f.close()
     return {"recolectado": meta.get("hoy", ""), "ultima_fecha": ultima.isoformat() if ultima else "", "estaciones": len(estaciones),
-            "estaciones_con_datos": len(variables), "filas_diario": n_dia, "filas_info_diaria": n_inf, "estaciones_info_diaria": len(est_inf),
+            "estaciones_con_datos": len(variables), "filas_diario": n_dia, "filas_no_publicadas": n_nopub, "filas_info_diaria": n_inf, "estaciones_info_diaria": len(est_inf),
             "filas_mensual": n_men, "a_revisar": sum(1 for c in control if str(c.get("ESTADO", "")).startswith("REVISAR")),
             "por_departamento": por_depto}
 
