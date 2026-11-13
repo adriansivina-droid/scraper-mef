@@ -109,6 +109,8 @@
   // lo que un invitado puede ver: de cada pestaña, los sectores que se le dieron (el servidor lo hace cumplir; esto solo oculta lo demás)
   const PAGINAS_PERU = { "hidro-peru": ["hidro-peru"], empleo: ["empleo-total", "empleo-sectores", "empleo-long"], mef: ["mef-archivos", "bases-mef"], bases: ["bases"] };
   const TABS_DE_EQUIPO = ["Actualizar", "Archivos", "Base mensual", "Resumen Export", "Resumen Import", "Contraste"];
+  // a un invitado no se le muestra la numeración de los capítulos (I, V…): con capítulos ocultos, los saltos harían pensar que falta algo
+  const sinNumero = (t) => String(t).replace(/^[IVX]+\.\s*/, "");
   function restringir(acceso) {
     INVITADO = acceso;
     const perm = acceso.permisos;
@@ -142,19 +144,19 @@
   function pintarIndice() {
     const g = GRUPOS[grupo], r = REG[grupo];
     $("indice-t").textContent = g.comun ? "Perú · nacional y común" : `Índice · ${r.nombre}`;
-    $("leyenda").hidden = !!g.comun;
-    const dot = (sid) => g.comun ? "" : `<span class="dot ${estadoDe(sid, r)}"></span>`;
+    $("leyenda").hidden = !!g.comun || !!INVITADO;          // al invitado no se le muestra el estado de carga de cada sector
+    const dot = (sid) => g.comun || INVITADO ? "" : `<span class="dot ${estadoDe(sid, r)}"></span>`;
     const corto = (sid) => g.comun ? nombre(sid).replace(/^(Empleo|MEF) · /, (m, x) => "").replace(/^./, (c) => c.toUpperCase()) : nombre(sid);   // dentro de su grupo, sin repetirlo
     const item = (sid) => `<button class="it" data-ir="${grupo}-${sid}" aria-current="${sid === id ? "page" : "false"}">${esc(corto(sid))}${dot(sid)}</button>`;
     $("indice").innerHTML = g.indice.map((e, i) => {
       const sep = e.id === "drae" ? '<div class="sep-t">Herramientas</div>' : "";
-      if (!e.items) return `${sep}<div class="cap"><button class="it solo" data-ir="${grupo}-${e.id}" aria-current="${e.id === id ? "page" : "false"}"><i>${esc(e.num || "")}</i>${esc(nombre(e.id))}${dot(e.id)}</button></div>`;
+      if (!e.items) return `${sep}<div class="cap"><button class="it solo" data-ir="${grupo}-${e.id}" aria-current="${e.id === id ? "page" : "false"}"><i>${INVITADO ? "" : esc(e.num || "")}</i>${esc(nombre(e.id))}${dot(e.id)}</button></div>`;
       const [rom, ...resto] = (CORTO[e.titulo] || e.titulo).split(". "), num = /^[IVX]+$/.test(rom), clave = `${grupo}:${i}`;
       const abierto = !cerrados.has(clave) || e.items.includes(id);
-      return `<div class="cap"><button class="cap-b" type="button" data-cap="${clave}" aria-expanded="${abierto}"><i>${num ? rom : ""}</i>${esc(num ? resto.join(". ") : e.titulo)}<span class="flecha"></span></button>
+      return `<div class="cap"><button class="cap-b" type="button" data-cap="${clave}" aria-expanded="${abierto}"><i>${num && !INVITADO ? rom : ""}</i>${esc(num ? resto.join(". ") : e.titulo)}<span class="flecha"></span></button>
         <div class="cap-items"${abierto ? "" : " hidden"}>${e.items.map(item).join("")}</div></div>`;
     }).join("");
-    $("sel-movil").innerHTML = g.indice.flatMap((e) => e.items ? e.items.map((sid) => [sid, e.titulo.split(".")[0] + " · "]) : [[e.id, ""]])
+    $("sel-movil").innerHTML = g.indice.flatMap((e) => e.items ? e.items.map((sid) => [sid, (INVITADO ? sinNumero(CORTO[e.titulo] || e.titulo) : e.titulo.split(".")[0]) + " · "]) : [[e.id, ""]])
       .map(([sid, p]) => `<option value="${grupo}-${sid}"${sid === id ? " selected" : ""}>${esc(p + nombre(sid))}</option>`).join("");
     document.querySelectorAll("#indice [data-ir]").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.ir; }));
     document.querySelectorAll("#indice [data-cap]").forEach((b) => b.addEventListener("click", () => {
@@ -1842,7 +1844,7 @@
       : s.actualizar === "empleo" ? `<div class="grid2">${cajaScraper("empleo")}${cajaSubida("sub-emp", "El Excel que genera el notebook de EMPLEO en Colab (columnas AÑO, MES, REGIÓN, ACTIVIDAD_ECONOMICA, EMPLEO).")}</div>`
       : `<div class="vacio-caja"><b>Cómo entrará: ${esc(s.entra.toLowerCase())}.</b><span>Cuando se construya, aquí estarán su actualización y la carga del archivo del mes de ${esc(r.nombre)}.</span></div>`;
     else panel = `<div class="vacio-caja"><b>${esc(t)} · ${esc(r.nombre)}</b><span>${t === "Proyectos" ? "Los 5 proyectos que explican la variación de cada función, por nivel de gobierno." : "Los 5 mayores aumentos y caídas en soles por nivel de gobierno, mes y acumulado contra el año anterior."} Hoy lo generan los notebooks de Colab; pasará aquí en la fase 3.</span></div>`;
-    return `<div><div class="ruta"><b>${esc(r.nombre)}</b>${capitulo ? `<span>›</span><span>${esc(capitulo.titulo)}</span>` : ""}</div><h1>${esc(s.t)}</h1><p class="lead">${esc(s.lead)}</p></div>
+    return `<div><div class="ruta"><b>${esc(r.nombre)}</b>${capitulo ? `<span>›</span><span>${esc(INVITADO ? sinNumero(capitulo.titulo) : capitulo.titulo)}</span>` : ""}</div><h1>${esc(s.t)}</h1><p class="lead">${esc(s.lead)}</p></div>
       <div class="ficha compacta"><div><small>Estado</small><span class="chip ${est}">${ETIQ[est]}</span></div><div><small>Fuente</small><b>${esc(s.fuente)}</b></div>
         <div><small>Cómo se actualiza</small><b>${esc(s.entra)}</b></div>${s.cuadros === "drae" ? '<div><small>Qué hay</small><b>Los gráficos de las SERIES, sin duplicados ni versiones viejas</b></div>' : `<div><small>Datos hasta</small><b${s.cuadros === "hidrologia" ? ' id="hid-hasta"' : ""}>${s.cuadros === "hidrologia" ? "…" : hasta ? esc(etqMes(hasta)) : "Sin datos todavía"}</b></div>`}</div>
       <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-tab="${x}" aria-selected="${x === t}"${["Datos", "Actualizar", ...DE_DATOS].includes(x) ? ` class="de-datos${x === tabs.find((y) => ["Datos", "Actualizar", ...DE_DATOS].includes(y)) ? " primero" : ""}"` : ""}>${esc(x)}${(x === "Cuadros" && Array.isArray(s.cuadros)) ? '<span class="pronto">pronto</span>' : ""}</button>`).join("")}</div>
