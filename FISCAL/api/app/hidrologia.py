@@ -182,7 +182,7 @@ def inicio():
 # solo mide caudal). Si se le pide igual, devuelve otra cosa con el rótulo pedido: no es dato de esa variable. Se descarta lo guardado
 # de una estación y variable si alguna de sus piezas lo indica: la bandera «disp» del recolector, el formulario guardado o la unidad.
 _RE_DESHABILITADO = {"NIVEL": re.compile(r"id=[\"']rbtVariableN[\"'][^>]*\bdisabled", re.I), "CAUDAL": re.compile(r"id=[\"']rbtVariableC[\"'][^>]*\bdisabled", re.I)}
-_no_mide_cache = {"version": None, "conjunto": frozenset()}
+_no_mide_cache = {"version": None, "conjunto": frozenset(), "nombres": {}}
 
 
 def motivo_no_mide(g):
@@ -204,9 +204,21 @@ def no_mide():
     """{(estación, variable)} que no se deben usar: alguna de sus piezas muestra que la estación no mide esa variable."""
     v = version()
     if _no_mide_cache["version"] != v:
-        _no_mide_cache.update(version=v, conjunto=frozenset(
-            (clave.split(":")[1], clave.split(":")[2]) for clave, g, _ in _piezas("graf:") if motivo_no_mide(g)))
+        conjunto, nombres = set(), {}
+        for clave, g, _ in _piezas("graf:"):
+            cod, var = clave.split(":")[1:3]
+            if motivo_no_mide(g):
+                conjunto.add((cod, var))
+            nom = (g.get("data") or {}).get("nomEstacion")
+            if nom:
+                nombres.setdefault(cod, nom)                  # el nombre que trae el hidrograma (por si falta en la lista de estaciones)
+        _no_mide_cache.update(version=v, conjunto=frozenset(conjunto), nombres=nombres)
     return _no_mide_cache["conjunto"]
+
+
+def nombres_de_hidrogramas():
+    no_mide()
+    return _no_mide_cache["nombres"]
 
 
 def piezas_de_archivo(crudo):
@@ -371,6 +383,7 @@ def armar(carpeta):
     grupo, clave_g = [], None
 
     NM = no_mide()
+    nombre_est = {**nombres_de_hidrogramas(), **{k: v for k, v in nombre_est.items() if v}}
 
     def cerrar(grupo):
         nonlocal n_dia, ultima
