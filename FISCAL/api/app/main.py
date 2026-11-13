@@ -456,7 +456,7 @@ def hidrologia_reporte(formato: str = Query("pptx", pattern="^(pptx|xlsx)$")):
 
 
 @app.get("/v1/hidrologia/descargar", dependencies=[Depends(acceso)])
-def hidrologia_descargar(archivo: str = Query("diario", pattern="^(diario|info-diaria|mensual|estaciones|control|control-info|control-mensual|log|todo)$"),
+def hidrologia_descargar(archivo: str = Query("diario", pattern="^(diario|no-publicado|info-diaria|mensual|estaciones|control|control-info|control-mensual|log|todo)$"),
                          departamento: str = Query("", pattern="^(16|22|25)?$"), formato: str = Query("csv", pattern="^(csv|xlsx)$")):
     """Los CSV del scraper (los mismos que arma el notebook), de todo el país o de un departamento; en CSV o en Excel."""
     if not hidrologia.hay_datos():

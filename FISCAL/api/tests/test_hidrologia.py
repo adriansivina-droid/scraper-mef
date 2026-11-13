@@ -317,11 +317,17 @@ def test_una_estacion_no_muestra_la_variable_que_no_mide(cliente, como):
     assert cliente.get("/v1/hidrologia/anios?estacion=47E1C5B4&variable=NIVEL").status_code == 404
     assert cliente.get("/v1/hidrologia/serie?estacion=47E1C5B4&variable=NIVEL&anio=2026").status_code == 404
     assert cliente.get("/v1/hidrologia/anios?estacion=47E1C5B4&variable=CAUDAL").status_code == 200
-    # el control lo dice, en vez de dejar un «OK» con datos que no son de esa variable
-    ctrl = {(f["COD_ESTACION"], f["VARIABLE"]): f["ESTADO"] for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))}
-    assert ctrl[("47E1C5B4", "NIVEL")] == "NO MIDE ESTA VARIABLE" and ctrl[("47E1C5B4", "CAUDAL")] != "NO MIDE ESTA VARIABLE"
+    # se conserva aparte, y el control lo dice (con sus fechas), en vez de dejar un «OK» como si SENAMHI lo publicara
+    aparte = filas(cliente.get("/v1/hidrologia/descargar?archivo=no-publicado"))
+    assert [(f["COD_ESTACION"], f["VARIABLE"], f["VALOR"]) for f in aparte] == [("47E1C5B4", "NIVEL", v) for v in ("1.9", "1.8", "1.7", "1.6")]
+    ctrl = {(f["COD_ESTACION"], f["VARIABLE"]): f for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))}
+    assert ctrl[("47E1C5B4", "NIVEL")]["ESTADO"] == "NO PUBLICADA POR SENAMHI (aparte)" and ctrl[("47E1C5B4", "NIVEL")]["DIAS_CON_DATO"] == "4"
+    assert "NO PUBLICADA" not in ctrl[("47E1C5B4", "CAUDAL")]["ESTADO"]
     log = [f for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=log")) if f["COD_ESTACION"] == "47E1C5B4" and f["VARIABLE"] == "NIVEL"]
-    assert log and all(f["ESTADO"] == "NO MIDE ESTA VARIABLE" for f in log)
+    assert log and all(f["ESTADO"].endswith("NO PUBLICADA POR SENAMHI") for f in log)
+    assert cliente.get("/v1/hidrologia").json()["filas_no_publicadas"] == 4
+    z = zipfile.ZipFile(io.BytesIO(cliente.get("/v1/hidrologia/descargar?archivo=todo").content))
+    assert "DATA/SENAMHI_rios_diario_no_publicado.csv" in z.namelist()
 
 
 def test_motivo_no_mide_no_descarta_lo_normal():
@@ -347,7 +353,7 @@ def test_una_estacion_que_mide_ambas_variables_conserva_las_dos(cliente):
     est = {e["codigo"]: e for e in cliente.get("/v1/hidrologia/estaciones?departamento=todos").json()["estaciones"]}
     assert sorted(est["231101"]["variables"]) == ["CAUDAL", "NIVEL"]
     ctrl = {(f["COD_ESTACION"], f["VARIABLE"]): f["ESTADO"] for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))}
-    assert "NO MIDE" not in ctrl[("231101", "NIVEL")] and "NO MIDE" not in ctrl[("231101", "CAUDAL")]
+    assert "NO PUBLICADA" not in ctrl[("231101", "NIVEL")] and "NO PUBLICADA" not in ctrl[("231101", "CAUDAL")]
 
 
 def test_la_fila_no_mide_lleva_el_nombre_aunque_falte_en_la_lista(cliente):
@@ -356,3 +362,7 @@ def test_la_fila_no_mide_lleva_el_nombre_aunque_falte_en_la_lista(cliente):
     subir(cliente, c)
     ctrl = {(f["COD_ESTACION"], f["VARIABLE"]): f["ESTACION"] for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))}
     assert ctrl[("47E1C5B4", "NIVEL")] == "SANTA MARÍA DE NANAY"          # el nombre que trae su hidrograma (en la prueba, el de ejemplo)
+
+
+def test_la_marca_del_recolector_v6_manda_la_serie_aparte():
+    assert hidrologia.motivo_no_mide({**grafica("240111", "CAUDAL", 2026, [3287.6]), "noPublicado": True}) == "SENAMHI no publica esa variable en la estación"
