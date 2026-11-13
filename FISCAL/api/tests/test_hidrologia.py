@@ -348,3 +348,11 @@ def test_una_estacion_que_mide_ambas_variables_conserva_las_dos(cliente):
     assert sorted(est["231101"]["variables"]) == ["CAUDAL", "NIVEL"]
     ctrl = {(f["COD_ESTACION"], f["VARIABLE"]): f["ESTADO"] for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))}
     assert "NO MIDE" not in ctrl[("231101", "NIVEL")] and "NO MIDE" not in ctrl[("231101", "CAUDAL")]
+
+
+def test_la_fila_no_mide_lleva_el_nombre_aunque_falte_en_la_lista(cliente):
+    c = con_cañad(disp={"NIVEL": False, "CAUDAL": True})
+    c["estaciones"] = [e for e in c["estaciones"] if e["codEstacion"] != "47E1C5B4"]          # la lista de SENAMHI no la trae
+    subir(cliente, c)
+    ctrl = {(f["COD_ESTACION"], f["VARIABLE"]): f["ESTACION"] for f in filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))}
+    assert ctrl[("47E1C5B4", "NIVEL")] == "SANTA MARÍA DE NANAY"          # el nombre que trae su hidrograma (en la prueba, el de ejemplo)
