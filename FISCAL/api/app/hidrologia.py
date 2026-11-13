@@ -177,6 +177,38 @@ def inicio():
         return INICIO
 
 
+# ── variables que una estación NO mide ───────────────────────────────────────
+# SENAMHI deshabilita en su formulario el botón «Nivel» o «Caudal» de las estaciones que no miden esa variable (por ejemplo, Cañad
+# solo mide caudal). Si se le pide igual, devuelve otra cosa con el rótulo pedido: no es dato de esa variable. Se descarta lo guardado
+# de una estación y variable si alguna de sus piezas lo indica: la bandera «disp» del recolector, el formulario guardado o la unidad.
+_RE_DESHABILITADO = {"NIVEL": re.compile(r"id=[\"']rbtVariableN[\"'][^>]*\bdisabled", re.I), "CAUDAL": re.compile(r"id=[\"']rbtVariableC[\"'][^>]*\bdisabled", re.I)}
+_no_mide_cache = {"version": None, "conjunto": frozenset()}
+
+
+def motivo_no_mide(g):
+    """Por qué lo guardado en esta pieza no es de la variable que dice ser (vacío si está bien)."""
+    var = g.get("variable")
+    if g.get("estado") == "NO MIDE" or (g.get("disp") or {}).get(var) is False:
+        return "SENAMHI no deja elegir esa variable en la estación"
+    if var in _RE_DESHABILITADO and _RE_DESHABILITADO[var].search(g.get("formulario") or ""):
+        return "SENAMHI no deja elegir esa variable en la estación"
+    unidad = str((g.get("data") or {}).get("unidad") or "").lower().replace(" ", "").replace(".", "")
+    if var == "NIVEL" and ("m3" in unidad or "m³" in unidad):
+        return "la unidad es de caudal, no de nivel"
+    if var == "CAUDAL" and unidad in ("m", "cm", "msnm"):
+        return "la unidad es de nivel, no de caudal"
+    return ""
+
+
+def no_mide():
+    """{(estación, variable)} que no se deben usar: alguna de sus piezas muestra que la estación no mide esa variable."""
+    v = version()
+    if _no_mide_cache["version"] != v:
+        _no_mide_cache.update(version=v, conjunto=frozenset(
+            (clave.split(":")[1], clave.split(":")[2]) for clave, g, _ in _piezas("graf:") if motivo_no_mide(g)))
+    return _no_mide_cache["conjunto"]
+
+
 def piezas_de_archivo(crudo):
     """El archivo «SENAMHI_crudo_….json» del navegador, partido en piezas (lo mismo que hace la página al subirlo)."""
     out = [{"clave": k, "valor": crudo[k]} for k in ("meta", "estaciones", "zonales", "infoMeta", "fichas", "monitoreo") if crudo.get(k)]
@@ -338,11 +370,18 @@ def armar(carpeta):
     control, rio, variables, n_dia, ultima = [], {}, {}, 0, None
     grupo, clave_g = [], None
 
+    NM = no_mide()
+
     def cerrar(grupo):
         nonlocal n_dia, ultima
         if not grupo:
             return
         cod, var = grupo[0][0].split(":")[1:3]
+        if (cod, var) in NM:                                  # la estación no mide esta variable: no entra ningún dato
+            for _, g, dia in grupo:
+                wl.writerow([cod, nombre_est.get(cod, ""), var, g.get("opcion", ""), g.get("fh", ""), "", 0, "NO MIDE ESTA VARIABLE", _dia_txt(dia)])
+            control.append({"COD_ESTACION": cod, "ESTACION": nombre_est.get(cod, ""), "VARIABLE": var, "ESTADO": "NO MIDE ESTA VARIABLE"})
+            return
         elegidas, estados = {}, []
         # prioridad: el dato del año pedido (ACTUAL) sobre el visto desde el año siguiente; a igualdad, lo más reciente
         for clave, g, dia in sorted(grupo, key=lambda t: t[2], reverse=True):
@@ -668,12 +707,12 @@ def estaciones_de(departamento):
     codigos = _codigos(departamento)
     meta_info = {str(k): v for k, v in (_leer("infoMeta", {}) or {}).items()}
     nombres = {str(e.get("codEstacion")): e.get("nomEstacion", "") for e in _leer("estaciones", []) or []}
-    ubic, zonales = ubicacion(), _zonales()
+    ubic, zonales, NM = ubicacion(), _zonales(), no_mide()
     out = {}
     for clave, g, dia in _piezas("graf:"):
         _, cod, var, y = clave.split(":")
         c = g.get("data") or {}
-        if cod not in codigos or g.get("estado") != "OK" or not c.get("fechaHora"):
+        if cod not in codigos or g.get("estado") != "OK" or not c.get("fechaHora") or (cod, var) in NM:
             continue
         e = out.setdefault(cod, {"codigo": cod, "estacion": c.get("nomEstacion") or nombres.get(cod, cod), "rio": c.get("nomRio", ""),
                                  "cuenca": (meta_info.get(cod) or {}).get("nomCuenca", ""), "departamento_seguro": codigos[cod],
@@ -722,6 +761,8 @@ def estaciones_de(departamento):
 def serie(codigo, variable, año):
     """El hidrograma de un año hidrológico (1 de setiembre a 31 de agosto): el año, el anterior, el promedio histórico,
     mínimo y máximo del día y los umbrales. Si ese año no se pidió directamente, se arma con lo que traen los vecinos."""
+    if (codigo, variable) in no_mide():
+        return None
     propio = _leer(f"graf:{codigo}:{variable}:{año}")
     sig = _leer(f"graf:{codigo}:{variable}:{año + 1}")
     ant = _leer(f"graf:{codigo}:{variable}:{año - 1}")
@@ -789,6 +830,8 @@ def rango(codigo, variable, desde, hasta):
 def anios(codigo, variable):
     """Todos los años hidrológicos de una estación sobre el mismo eje (1 de setiembre a 31 de agosto, con 29 de febrero), para
     compararlos. {años: {año: [valor por día]}, promedio y umbrales del año más reciente}. None si no hay datos."""
+    if (codigo, variable) in no_mide():
+        return None
     disponibles = set()
     for clave, g, _ in _piezas(f"graf:{codigo}:{variable}:"):
         if g.get("estado") == "OK" and (g.get("data") or {}).get("fechaHora"):
