@@ -441,7 +441,7 @@
 
   // Perú: la misma sección con el mapa de todas las estaciones y las descargas de todo el país
   function peru(caja, pestaña) {
-    const tabs = ["Mapa y gráfico", "Descargar datos", ...(HIDRO.invitado ? [] : ["Actualizar"])], t = tabs.includes(pestaña) ? pestaña : tabs[0];
+    const tabs = ["Mapa y gráfico", ...(HIDRO.sinDescargas ? [] : ["Descargar datos"]), ...(HIDRO.invitado ? [] : ["Actualizar"])], t = tabs.includes(pestaña) ? pestaña : tabs[0];
     caja.innerHTML = `<div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" type="button" data-hid-tab="${x}" aria-selected="${x === t}">${x}</button>`).join("")}</div><div id="hid-peru"></div>`;
     caja.querySelectorAll("[data-hid-tab]").forEach((b) => b.addEventListener("click", () => { HIDRO.pestañaPeru = b.dataset.hidTab; peru(caja, b.dataset.hidTab); }));
     const r = { cod: "todos", nombre: "Perú" }, c = caja.querySelector("#hid-peru");

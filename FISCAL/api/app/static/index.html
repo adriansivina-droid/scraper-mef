@@ -1805,8 +1805,9 @@
     const DE_DATOS = ["Archivos", "Base mensual"], extra = s.extra || [];
     const tabs0 = s.cuadros === "hidrologia" ? HIDRO.TABS : s.cuadros === "anexos" ? [ANEXOS_TAB] : s.cuadros === "resumen" ? [RESUMEN_TAB] : s.cuadros === "drae" ? [DRAE_TAB, "Actualizar"] : ["Cuadros", ...(typeof s.cuadros === "string" ? [BCRP_TAB] : []), ...(s.mapa ? ["Mapa"] : []),
       ...extra.filter((x) => !DE_DATOS.includes(x)), "Datos", ...extra.filter((x) => DE_DATOS.includes(x)), ...(s.sinActualizar ? [] : ["Actualizar"])];
-    const tabs = INVITADO ? tabs0.filter((x) => !TABS_DE_EQUIPO.includes(x)) : tabs0;
-    const t = s.cuadros === "hidrologia" ? (HIDRO.TABS.includes(pestana[grupo + id]) ? pestana[grupo + id] : HIDRO.TABS[0]) : s.cuadros === "anexos" ? ANEXOS_TAB : s.cuadros === "resumen" ? RESUMEN_TAB : s.cuadros === "drae" ? (pestana[grupo + id] || DRAE_TAB) : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
+    const tabs = INVITADO ? tabs0.filter((x) => !TABS_DE_EQUIPO.includes(x) && (INVITADO.descargas || !["Datos", "Descargar datos"].includes(x))) : tabs0;
+    const t0 = s.cuadros === "hidrologia" ? (HIDRO.TABS.includes(pestana[grupo + id]) ? pestana[grupo + id] : HIDRO.TABS[0]) : s.cuadros === "anexos" ? ANEXOS_TAB : s.cuadros === "resumen" ? RESUMEN_TAB : s.cuadros === "drae" ? (pestana[grupo + id] || DRAE_TAB) : pestana[grupo + id] || (typeof s.cuadros === "string" ? "Cuadros" : "Datos");
+    const t = tabs.includes(t0) || !INVITADO ? t0 : tabs[0];      // pestaña oculta para el invitado (p. ej. «Datos» sin permiso de descarga)
     const hasta = bases ? bases.map((b) => ESTADO.bases[b].hasta).filter(Boolean).sort().pop() : null;
     const capitulo = GRUPOS[grupo].indice.find((e) => e.items && e.items.includes(id));
     let panel = "";
@@ -1865,10 +1866,11 @@
           <label class="campo">Vale por<select id="cmp-dias">${[[7, "7 días"], [15, "15 días"], [30, "30 días"], [90, "3 meses"], [180, "6 meses"], [365, "1 año"]].map(([d, t]) => `<option value="${d}"${d === 30 ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
         <div class="scroll"><table class="cmp-matriz"><tr><th>Sector</th>${TABS.map((t) => `<th class="c"><label><input type="checkbox" data-col="${t}"> ${esc(nomTab[t])}</label></th>`).join("")}</tr>
           ${j.sectores.lor.map(([k, n]) => `<tr><td><label><input type="checkbox" data-fil="${k}"> ${esc(n)}</label></td>${TABS.map((t) => `<td class="c">${existe(t, k) ? `<input type="checkbox" data-t="${t}" data-k="${k}" aria-label="${esc(n)} · ${esc(nomTab[t])}">` : '<span class="nota">—</span>'}</td>`).join("")}</tr>`).join("")}</table></div>
+        <label class="cmp-desc"><input type="checkbox" id="cmp-descargas"> <span><b>Permitir descargar los datos</b> (CSV y Excel). Sin esto, puede ver los cuadros, gráficos y mapas en la página y copiarlos o bajarlos como imagen (PNG o SVG), pero no bajar los datos.</span></label>
         <fieldset class="cmp-peru"><legend><b>Pestaña Perú</b> (nacional)</legend>${j.sectores.tres.map(([k, n]) => `<label><input type="checkbox" data-t="tres" data-k="${k}"> ${esc(n)}</label>`).join("")}</fieldset>
         <div class="fila"><button class="btn" type="button" id="cmp-crear">Crear enlace</button><span class="nota" id="cmp-msj"></span></div><div id="cmp-res"></div></div>
-      <div class="caja"><h3>Enlaces creados</h3>${j.invitaciones.length ? `<div class="scroll"><table><tr><th>Para quién</th><th>Qué incluye</th><th>Creado</th><th>Vence</th><th class="n">Ingresos</th><th>Último uso</th><th>Estado</th><th></th></tr>
-        ${j.invitaciones.map((x) => `<tr><td><b>${esc(x.nombre)}</b></td><td class="cmp-inc">${resumen(x.permisos)}</td><td>${fecha(x.creado)}</td><td>${fecha(x.vence)}</td><td class="n">${x.accesos}</td><td>${fecha(x.ultimo_acceso)}</td>
+      <div class="caja"><h3>Enlaces creados</h3>${j.invitaciones.length ? `<div class="scroll"><table><tr><th>Para quién</th><th>Qué incluye</th><th>Descarga datos</th><th>Creado</th><th>Vence</th><th class="n">Ingresos</th><th>Último uso</th><th>Estado</th><th></th></tr>
+        ${j.invitaciones.map((x) => `<tr><td><b>${esc(x.nombre)}</b></td><td class="cmp-inc">${resumen(x.permisos)}</td><td>${x.descargas ? "Sí" : "No (solo imágenes)"}</td><td>${fecha(x.creado)}</td><td>${fecha(x.vence)}</td><td class="n">${x.accesos}</td><td>${fecha(x.ultimo_acceso)}</td>
           <td><span class="chip ${x.estado === "activa" ? "ok" : "falta"}">${x.estado}</span></td><td>${x.estado === "activa" ? `<button class="btn sec chico" type="button" data-revocar="${esc(x.id)}">Revocar</button>` : ""}</td></tr>`).join("")}</table></div>`
         : '<p class="nota">Todavía no hay enlaces.</p>'}<p class="nota">Un enlace revocado deja de funcionar al instante, también para quien ya entró. Si se pierde un enlace, revócalo y crea otro: por seguridad, la página no guarda los enlaces, solo una huella que permite reconocerlos.</p></div>`;
     const marcas = (sel) => [...caja.querySelectorAll(sel)];
@@ -1879,7 +1881,7 @@
       marcas("[data-t][data-k]:checked").forEach((x) => { (permisos[x.dataset.t] = permisos[x.dataset.t] || []).push(x.dataset.k); });
       const msj = $("cmp-msj"); msj.textContent = "Creando…";
       try {
-        const r = await api("/v1/compartir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: $("cmp-nombre").value, dias: +$("cmp-dias").value, permisos }) });
+        const r = await api("/v1/compartir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: $("cmp-nombre").value, dias: +$("cmp-dias").value, permisos, descargas: $("cmp-descargas").checked }) });
         msj.textContent = "";
         $("cmp-res").innerHTML = `<div class="ok-box"><b>Enlace creado para ${esc($("cmp-nombre").value)}</b><span>Cópialo ahora y envíalo: <b>no se vuelve a mostrar</b>.</span>
           <div class="fila"><input type="text" class="cmp-enlace" id="cmp-enlace" readonly value="${esc(r.enlace)}"><button class="btn" type="button" id="cmp-copiar">Copiar enlace</button></div>
@@ -2104,6 +2106,7 @@
         restringir(acceso);
         if (!Object.keys(GRUPOS).length) throw new Error("Tu acceso no incluye ninguna sección.");
         HIDRO.invitado = true;
+        if (!acceso.descargas) { document.body.classList.add("sin-descargas"); HIDRO.sinDescargas = true; }      // ve y baja imágenes, no datos
         document.querySelector(".ayuda").outerHTML = `<span class="invitado" title="Acceso compartido por el Departamento de Estudios Económicos">Acceso de ${esc(acceso.nombre)} · vence el ${new Date(acceso.vence).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}</span><a class="ayuda" href="/salir" title="Salir del acceso de invitado; la página volverá a pedir usuario y clave">Salir</a>`;
       }
     }

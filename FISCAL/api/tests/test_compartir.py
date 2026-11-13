@@ -21,8 +21,8 @@ def sitio(tmp_path, monkeypatch):
     db.reiniciar_motor()
 
 
-def invitar(equipo, permisos, dias=30, nombre="Gerencia"):
-    r = equipo.post("/v1/compartir", json={"nombre": nombre, "dias": dias, "permisos": permisos})
+def invitar(equipo, permisos, dias=30, nombre="Gerencia", descargas=True):
+    r = equipo.post("/v1/compartir", json={"nombre": nombre, "dias": dias, "permisos": permisos, "descargas": descargas})
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -143,3 +143,41 @@ def test_el_enlace_manda_sobre_las_credenciales_guardadas_en_el_navegador(sitio)
     navegador.cookies.clear()
     assert navegador.get("/v1/acceso/yo").json()["equipo"] is True
     assert navegador.get("/v1/compartir").status_code == 200
+
+
+def test_sin_permiso_de_descarga_ve_pero_no_baja_datos(sitio):
+    subir(sitio, crudo())
+    g = entrar(invitar(sitio, {"lor": ["pesca", "hidrologia", "hidro"]}, descargas=False)["enlace"])
+    assert g.get("/v1/acceso/yo").json()["descargas"] is False
+    # ve los cuadros, los gráficos y el mapa (lo que arma la página y se copia o baja como imagen)
+    for url in ("/v1/cuadros/pesca?departamento=16", "/v1/hidrologia/estaciones?departamento=16", "/v1/hidrocarburos/mapa",
+                "/v1/hidrologia/serie?estacion=240001&variable=NIVEL&anio=2026"):
+        assert g.get(url).status_code not in (401, 403), url
+    # no baja archivos de datos (CSV, Excel), ni su vista previa
+    for url in ("/v1/cuadros/pesca?departamento=16&formato=xlsx", "/v1/hidrologia/descargar?archivo=diario&departamento=16",
+                "/v1/descargas/vista-previa?base=pesca-loreto&departamento=16&desde=2026-01&hasta=2026-02",
+                "/v1/descargas?base=pesca-loreto&departamento=16&desde=2026-01&hasta=2026-02&formato=csv", "/v1/hidrocarburos/mapa?descargar=true"):
+        r = g.get(url)
+        assert r.status_code == 403 and "no descargar los datos" in r.json()["detail"], url
+    assert g.post("/v1/bcrp/excel", json={}).status_code == 403
+    # con el permiso, sí
+    c = entrar(invitar(sitio, {"lor": ["pesca"]}, descargas=True)["enlace"])
+    assert c.get("/v1/cuadros/pesca?departamento=16&formato=xlsx").status_code != 403
+    assert {x["descargas"] for x in sitio.get("/v1/compartir").json()["invitaciones"]} == {True, False}
+
+
+def test_un_enlace_nuevo_funciona_en_una_ventana_con_un_enlace_revocado(sitio):
+    """Incógnito: la ventana conserva la cookie de un enlace anterior ya revocado; el enlace nuevo de la dirección debe mandar."""
+    viejo = invitar(sitio, {"lor": ["pesca"]})
+    ventana = entrar(viejo["enlace"])
+    sitio.delete(f"/v1/compartir/{viejo['id']}")
+    nuevo = invitar(sitio, {"smn": ["empleo"]}, nombre="Otro")
+    r = ventana.get(nuevo["enlace"].replace("http://testserver", ""))
+    assert r.status_code == 303 and compartir.COOKIE in r.headers["set-cookie"]
+    assert ventana.get("/v1/acceso/yo").json()["nombre"] == "Otro"
+
+
+def test_enlace_vencido_muestra_una_pagina_legible(sitio):
+    r = TestClient(app).get("/?t=inventada")
+    assert r.status_code == 403 and "text/html" in r.headers["content-type"] and "Este enlace ya no es válido" in r.text
+    assert TestClient(app).get("/v1/estado").headers["content-type"].startswith("application/json")        # lo demás, igual

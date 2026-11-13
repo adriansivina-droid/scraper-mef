@@ -14,6 +14,7 @@ from urllib.parse import quote
 import pandas as pd
 import requests
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -44,6 +45,18 @@ _RE_PERIODO = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 MAX_CARGA_MB = 200
 
 
+@app.exception_handler(HTTPException)
+async def _error_legible(request: Request, exc: HTTPException):
+    """En la portada (un enlace vencido o revocado) se muestra una página legible; en lo demás, el JSON de siempre."""
+    if request.url.path == "/" and exc.status_code == 403:
+        return HTMLResponse(
+            "<!doctype html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>Enlace no válido</title></head><body style='font-family:system-ui,sans-serif;max-width:560px;margin:12vh auto;padding:0 20px;color:#181818'>"
+            "<h1 style='color:#111149;font-size:22px'>Este enlace ya no es válido</h1>"
+            f"<p style='color:#5A5A9E;line-height:1.5'>{exc.detail}</p></body></html>", status_code=403)
+    return await http_exception_handler(request, exc)
+
+
 def acceso(request: Request, cred: HTTPBasicCredentials | None = Depends(_basic)):
     """Usuario y contraseña del equipo (variables APP_USUARIO y APP_CLAVE) o, para un tercero, la cookie de un enlace de acceso
     (compartir.py), que solo deja pedir lo que se le dio. Sin APP_CLAVE no se pide nada (uso local)."""
@@ -53,12 +66,13 @@ def acceso(request: Request, cred: HTTPBasicCredentials | None = Depends(_basic)
         return
     usuario = os.environ.get("APP_USUARIO", "fiscal")
     entrada = request.url.path == "/" and request.query_params.get("t")
-    token = request.cookies.get(compartir.COOKIE) or entrada
-    inv = compartir.validar(token, entrada=bool(entrada and not request.cookies.get(compartir.COOKIE))) if token else None
+    # el enlace de la dirección manda sobre la cookie: la ventana puede tener la de un enlace anterior ya revocado o vencido
+    token = entrada or request.cookies.get(compartir.COOKIE)
+    inv = compartir.validar(token, entrada=bool(entrada)) if token else None
     # un enlace de invitado vigente manda sobre el usuario y la clave: el navegador envía las credenciales guardadas o recordadas
     # en esa computadora (por ejemplo, las del equipo) y, si ganaran ellas, el enlace mostraría toda la página en lugar de lo compartido
     if inv:
-        permitido, motivo = compartir.permitido(inv["permisos"], request.method, request.url.path, request.query_params)
+        permitido, motivo = compartir.permitido(inv["permisos"], request.method, request.url.path, request.query_params, inv.get("descargas", False))
         if not permitido:
             raise HTTPException(403, motivo)
         request.state.invitado = inv
@@ -177,7 +191,7 @@ def acceso_yo(request: Request):
     inv = getattr(request.state, "invitado", None)
     if inv is None:
         return {"equipo": True}
-    return {"equipo": False, "nombre": inv["nombre"], "vence": inv["vence"], "permisos": inv["permisos"]}
+    return {"equipo": False, "nombre": inv["nombre"], "vence": inv["vence"], "permisos": inv["permisos"], "descargas": inv.get("descargas", False)}
 
 
 @app.get("/v1/compartir", dependencies=[Depends(acceso)])
@@ -192,7 +206,7 @@ def compartir_listar():
 def compartir_crear(request: Request, cuerpo: dict = Body(...)):
     """Crea una invitación: {nombre, dias, permisos: {lor: [sectores], smn: [...], uca: [...], tres: [...]}}. El enlace solo se muestra ahora."""
     try:
-        ident, token = compartir.crear(cuerpo.get("nombre"), cuerpo.get("dias", 30), cuerpo.get("permisos"))
+        ident, token = compartir.crear(cuerpo.get("nombre"), cuerpo.get("dias", 30), cuerpo.get("permisos"), bool(cuerpo.get("descargas")))
     except (ValueError, TypeError) as e:
         raise HTTPException(422, str(e))
     base = str(request.base_url).rstrip("/")
