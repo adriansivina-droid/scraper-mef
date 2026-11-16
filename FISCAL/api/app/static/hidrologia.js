@@ -19,8 +19,19 @@
   async function api(url, opciones) {
     const r = await fetch(url, opciones);
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : `El servidor respondió ${r.status}.`);
+    if (!r.ok) { const e = new Error(typeof j.detail === "string" ? j.detail : `El servidor respondió ${r.status}.`); e.status = r.status; throw e; }
     return j;
+  }
+  // Si el servidor se reinicia a mitad (Render responde 502, 503 o 504), espera y reintenta: lo ya guardado no se pierde.
+  async function conReintentos(fn, avisar, que) {
+    const esperas = [10, 20, 40, 60, 90];
+    for (let k = 0; ; k++) {
+      try { return await fn(); }
+      catch (e) {
+        if (![502, 503, 504].includes(e.status) && !(e instanceof TypeError) || k >= esperas.length) throw e;
+        for (let s = esperas[k]; s > 0; s--) { avisar(`El servidor no respondió (${que}). Reintento ${k + 1} de ${esperas.length} en ${s} s…`); await new Promise((ok) => setTimeout(ok, 1000)); }
+      }
+    }
   }
 
   // ── alerta: la calcula el servidor con un doble control (hidrologia.evaluar_alerta) y aquí solo se presenta ──
@@ -514,13 +525,15 @@
     for (let i = 0; i < cola.length;) {
       const lote = []; let peso = 0;
       while (i < cola.length && lote.length < 600 && (peso + cola[i].peso < 900000 || !lote.length)) { peso += cola[i].peso; lote.push(cola[i++]); }
-      const r = await api("/v1/hidrologia/crudo", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dia, piezas: lote.map(({ clave, valor, huella }) => ({ clave, valor, huella })) }) });
+      const cuerpo = JSON.stringify({ dia, piezas: lote.map(({ clave, valor, huella }) => ({ clave, valor, huella })) });
+      const r = await conReintentos(() => api("/v1/hidrologia/crudo", { method: "POST", headers: { "Content-Type": "application/json" }, body: cuerpo }),
+        (t) => avisar(t, hecho / total), "subiendo");
       guardadas += r.guardadas; viejas += r.omitidas_por_viejas; hecho += peso;
       avisar(`Subiendo lo nuevo: ${Math.round(100 * hecho / total)} %`, hecho / total);
     }
     avisar("Armando los archivos y el resumen…", 1);
-    return { dia, piezas: piezas.length, nuevas: nuevas.length, guardadas, viejas, mb: total / 1048576, resumen: await api("/v1/hidrologia") };
+    return { dia, piezas: piezas.length, nuevas: nuevas.length, guardadas, viejas, mb: total / 1048576,
+             resumen: await conReintentos(() => api("/v1/hidrologia"), (t) => avisar(t, 1), "armando los archivos") };
   }
   async function actualizar(r, caja) {
     caja.innerHTML = `<div class="caja"><h3>Actualizar los datos de SENAMHI</h3>

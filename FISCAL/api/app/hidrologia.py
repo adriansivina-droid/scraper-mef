@@ -337,6 +337,36 @@ def _departamento(cod, meta_info, zonales):
     return sin_tildes((meta_info.get(cod) or {}).get("nomDepa") or "")
 
 
+class _Ordenador:
+    """Junta filas y las devuelve ordenadas por una clave usando una base SQLite temporal en disco, no la memoria.
+    Con varios años de Información Diaria hay millones de filas: en una lista de Python pasaban los 512 MB del servidor."""
+
+    def __init__(self, carpeta):
+        import sqlite3
+        self.ruta = os.path.join(str(carpeta), "_orden.sqlite")
+        self.cx = sqlite3.connect(self.ruta)
+        self.cx.execute("PRAGMA journal_mode=OFF"); self.cx.execute("PRAGMA synchronous=OFF")
+        self.cx.execute("CREATE TABLE t (k1 TEXT, k2 TEXT, k3 TEXT, fila TEXT)")
+        self.buf, self.n = [], 0
+
+    def agregar(self, k1, k2, k3, fila):
+        self.buf.append((str(k1), str(k2), str(k3), json.dumps(fila, ensure_ascii=False, default=str)))
+        self.n += 1
+        if len(self.buf) >= 20000:
+            self.cx.executemany("INSERT INTO t VALUES (?, ?, ?, ?)", self.buf); self.buf = []
+
+    def ordenadas(self):
+        if self.buf:
+            self.cx.executemany("INSERT INTO t VALUES (?, ?, ?, ?)", self.buf); self.buf = []
+        for k1, fila in self.cx.execute("SELECT k1, fila FROM t ORDER BY k1, k2, k3"):
+            yield k1, json.loads(fila)
+
+    def cerrar(self):
+        self.cx.close()
+        if os.path.exists(self.ruta):
+            os.remove(self.ruta)
+
+
 def armar(carpeta):
     """Escribe en «carpeta» todos los CSV y devuelve el resumen (filas, estaciones, fechas, estaciones por departamento)."""
     carpeta = Path(carpeta)
@@ -353,7 +383,7 @@ def armar(carpeta):
     # 1. Información Mensual (antes que el diario: el control la cruza)
     f, w = _escritor(carpeta / ARCHIVOS["mensual"], COLS["mensual"])
     fc, wc = _escritor(carpeta / ARCHIVOS["control-mensual"], COLS["control-mensual"])
-    mensual, filas_m, n_men = {}, [], 0                       # {(cod, unidad, año, mes): valor}
+    mensual, filas_m, n_men = {}, _Ordenador(carpeta), 0                       # {(cod, unidad, año, mes): valor}
     for clave, contenido, dia in _piezas("men:"):
         a, m = int(clave[4:8]), int(clave[9:11])
         servido, filas = (None, None), []
@@ -369,17 +399,18 @@ def armar(carpeta):
         for x in filas:
             cod = str(x.get("codEsta", ""))
             valor = num(x.get("dato"))
-            filas_m.append((cod, a, m, [a, m, f"01/{m:02d}/{a}", cod, x.get("nomEsta", ""), x.get("cuerpoAgua", ""), x.get("nomDepa", ""),
+            filas_m.agregar(cod, f"{a:04d}", f"{m:02d}", [a, m, f"01/{m:02d}/{a}", cod, x.get("nomEsta", ""), x.get("cuerpoAgua", ""), x.get("nomDepa", ""),
                                         x.get("nomSector", ""), x.get("uniHidrografica", ""), x.get("codZonal", ""), x.get("unidad", ""),
                                         _v(valor), _v(num(x.get("datoAnt"))), _v(num(x.get("datAnomalia"))), x.get("uniAnomalia", ""),
-                                        x.get("tendencia") or "", _v(num(x.get("umbralRojo"))), _dia_txt(dia)]))
+                                        x.get("tendencia") or "", _v(num(x.get("umbralRojo"))), _dia_txt(dia)])
             if valor:
                 mensual[(cod, sin_tildes(x.get("unidad", "")), a, m)] = valor
             if cod not in meta_info and x.get("nomDepa"):
                 meta_info[cod] = {"nomDepa": x.get("nomDepa"), "cuerpoAgua": x.get("cuerpoAgua")}
-    for _, _, _, fila in sorted(filas_m, key=lambda t: t[:3]):
+    for _, fila in filas_m.ordenadas():
         w.writerow(fila)
         n_men += 1
+    filas_m.cerrar()
     f.close(); fc.close()
 
     # 2. Hidrograma diario, estación por estación
@@ -473,7 +504,7 @@ def armar(carpeta):
     # 3. Información Diaria
     f, w = _escritor(carpeta / ARCHIVOS["info-diaria"], COLS["info-diaria"])
     fc, wc = _escritor(carpeta / ARCHIVOS["control-info"], COLS["control-info"])
-    filas_i, n_inf, est_inf = [], 0, set()
+    filas_i, n_inf, est_inf = _Ordenador(carpeta), 0, set()
     for clave, (n, filas), dia in _piezas("inf:"):
         d, hora = date(int(clave[4:8]), int(clave[9:11]), int(clave[12:14])), clave[15:]
         wc.writerow([_dmy(d), hora, n, len(filas), "OK", _dia_txt(dia)])
@@ -482,16 +513,15 @@ def armar(carpeta):
             if v is None:
                 continue
             m = meta_info.get(str(cod)) or {}
-            filas_i.append((str(cod), d, hora, [str(cod), m.get("nomEsta", ""), m.get("cuerpoAgua", ""), m.get("nomCuenca", ""),
+            filas_i.agregar(str(cod), d.isoformat(), hora, [str(cod), m.get("nomEsta", ""), m.get("cuerpoAgua", ""), m.get("nomCuenca", ""),
                                                 m.get("nomDepa", ""), m.get("nomSector", ""), m.get("uniHidrografica", ""),
                                                 m.get("codZonal", ""), _dmy(d), d.year, d.month, d.day, hora, unidad or "", v,
-                                                _v(num(anom)), uni_anom or "", tend or "", _v(num(umbral)), _dia_txt(dia)]))
-    filas_i.sort(key=lambda t: t[:3])
-    for cod, _, _, fila in filas_i:
+                                                _v(num(anom)), uni_anom or "", tend or "", _v(num(umbral)), _dia_txt(dia)])
+    for cod, fila in filas_i.ordenadas():
         w.writerow(fila)
         est_inf.add(cod)
-    n_inf = len(filas_i)
-    del filas_i
+        n_inf += 1
+    filas_i.cerrar()
     f.close(); fc.close()
 
     # 4. Estaciones
