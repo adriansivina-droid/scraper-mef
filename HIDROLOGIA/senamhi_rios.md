@@ -175,4 +175,6 @@ La página los **marca, no los borra**:
 
 ## Promedio histórico
 
-Es la curva que publica SENAMHI en cada hidrograma (`promHistorico`, columna `PROM_HISTORICO`): el nivel o caudal típico de cada día del año. Es **la misma curva todos los años**. SENAMHI no dice de qué años la calcula. No sale de los datos de la página (empiezan en 2023): en las estaciones revisadas (Nanay, Tamshiyacu, Borja, Picota) se parece al promedio de 2023–2025 (correlación de 0,75 a 0,96) pero no coincide (diferencia media de 1 m en nivel). Para saber el periodo exacto habría que preguntárselo a SENAMHI.
+Es la curva que publica SENAMHI en cada hidrograma (`promHistorico`, columna `PROM_HISTORICO`): el nivel o caudal típico de cada día del año. Es **la misma curva todos los años**. SENAMHI no dice de qué años la calcula, y la página no lo puede saber.
+
+Una comprobación hecha el 16/11/2026, cuando la página solo tenía datos desde 2023: en Nanay, Tamshiyacu, Borja y Picota la curva se parecía al promedio de 2023–2025 (correlación de 0,75 a 0,96) pero no coincidía (diferencia media de 1 m en nivel). Con datos desde 2020 habría que repetirla: si coincide con el promedio de 2020–2025, o de otro tramo, sería una pista del periodo. Para saberlo con seguridad, hay que preguntárselo a SENAMHI.
