@@ -275,11 +275,16 @@ def test_contraste_con_lo_publicado_por_el_mef(cliente):  # noqa: F811
         COD_GENERICA="5-21", DEV_REF_ANUAL=9 * (200 + 50 + 777 + 999) * M * 1.2, DEV_SUMA_MESES=0, ESTADO="PARCIAL")]))
     r = cliente.post("/v1/cargas", files=[("archivos", ("output.zip", zip_de(s), "application/zip"))]).json()
     assert any("Controles del MEF" in a for a in r["avisos"])
-    c = {(f["nivel"], f["anio"]): f for f in cliente.get("/v1/contraste/ejecucion?departamento=16&sector=gasto").json()["contraste"]}
-    gn = c[("Gobierno Nacional", 2025)]
-    assert gn["estado"] == "coincide" and gn["mef"] == gn["pagina"] == total_gn_2025 and gn["meses"] == "01 a 12"
-    assert c[("Gobiernos Regionales", 2025)]["estado"] == "revisar"
-    assert c[("Gobiernos Regionales", 2026)]["estado"] in ("mes en curso", "revisar")
+    c = {(f["clave"], f["anio"]): f for f in cliente.get("/v1/contraste/ejecucion?departamento=16&sector=gasto").json()["contraste"]}
+    g25 = c[("Generica", 2025)]                                          # GN + GR del MEF contra los tres niveles de la página
+    assert g25["bloque"] == "Gasto por genérica" and g25["meses"] == "01 a 12" and g25["estado"] == "revisar"
+    personal = next(i for i in g25["items"] if i["codigo"] == "5-21")
+    assert personal["nombre"] == "Personal y obligaciones sociales" and personal["mef"] == total_gn_2025 + 1_000_000
+    assert personal["pagina"] == 12 * (100 + 200 + 300) * M
+    bys = next(i for i in g25["items"] if i["codigo"] == "5-23")
+    assert bys["mef"] == 0 and bys["pagina"] == 12 * 150 * M and bys["estado"] == "revisar"
+    assert c[("Generica", 2026)]["estado"] in ("mes en curso", "revisar")
+    assert "PIM" not in str(cliente.get("/v1/contraste/ejecucion?departamento=16&sector=inversion").json())
     assert cliente.get("/v1/contraste/ejecucion?departamento=16&sector=inversion").json()["contraste"] == []
 
 
