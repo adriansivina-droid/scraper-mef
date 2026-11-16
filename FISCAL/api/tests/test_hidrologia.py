@@ -366,3 +366,59 @@ def test_la_fila_no_mide_lleva_el_nombre_aunque_falte_en_la_lista(cliente):
 
 def test_la_marca_del_recolector_v6_manda_la_serie_aparte():
     assert hidrologia.motivo_no_mide({**grafica("240111", "CAUDAL", 2026, [3287.6]), "noPublicado": True}) == "SENAMHI no publica esa variable en la estación"
+
+
+# ── datos dudosos: picos aislados que un río no puede hacer ──────────────────
+def _serie_nanay(dias=400, pico=None):
+    import math
+    v = [125 + 2 * math.sin(i / 40) + (0.05 if i % 2 else -0.05) for i in range(dias)]
+    for i, x in (pico or {}).items():
+        v[i] = x
+    return v
+
+
+def test_el_pico_del_nanay_es_un_dato_dudoso():
+    v = _serie_nanay(pico={200: 136.99})
+    assert [i for i, m in enumerate(hidrologia.datos_dudosos(v)) if m] == [200]
+    # un pico de dos días también
+    v = _serie_nanay(pico={200: 140.0, 201: 140.5})
+    assert [i for i, m in enumerate(hidrologia.datos_dudosos(v)) if m] == [200, 201]
+
+
+def test_lo_normal_no_es_dato_dudoso():
+    assert not any(hidrologia.datos_dudosos(_serie_nanay()))
+    # una subida fuerte pero posible, y que no vuelve (cambio de nivel), tampoco
+    assert not any(hidrologia.datos_dudosos(_serie_nanay(pico={200: 127.5})))
+    assert not any(hidrologia.datos_dudosos([100.0] * 200 + [130.0] * 200))
+    # una serie muy corta no permite saber qué es normal
+    assert not any(hidrologia.datos_dudosos([1.0, 1.0, 50.0, 1.0, 1.0]))
+    # los huecos no se rellenan: sin el día de antes o de después no se marca
+    v = _serie_nanay(pico={200: 136.99}); v[199] = None
+    assert not hidrologia.datos_dudosos(v)[200]
+
+
+def test_el_dato_dudoso_va_marcado_en_el_csv_y_fuera_de_la_linea(cliente):
+    valores = _serie_nanay(dias=365, pico={170: 136.99})
+    valores = [round(x, 2) for x in valores]
+    c = crudo(valores=valores)
+    c["graficas"][0] = grafica("240001", "NIVEL", 2026, valores, dia="2026-11-12")
+    c["meta"]["desdeFecha"] = "2026-09-01"
+    subir(cliente, c)
+    r = cliente.get("/v1/hidrologia/descargar?archivo=diario")
+    f = filas(r)
+    marcadas = [x for x in f if x["DATO_DUDOSO"] == "SI"]
+    assert len(marcadas) == 1 and marcadas[0]["VALOR"].startswith("136.99") and len(f) >= 360     # el dato se conserva en el CSV
+    ctl = filas(cliente.get("/v1/hidrologia/descargar?archivo=control"))
+    assert [x["DATOS_DUDOSOS"] for x in ctl if x["COD_ESTACION"] == "240001" and x["VARIABLE"] == "NIVEL"] == ["1"]
+    s = cliente.get("/v1/hidrologia/serie?estacion=240001&variable=NIVEL&anio=2026").json()
+    assert s["actual"][170] is None and s["dudosos"]["actual"]["170"] == 136.99               # sale de la línea y se devuelve aparte
+    assert s["actual"][169] is not None and s["actual"][171] is not None
+    a = cliente.get("/v1/hidrologia/anios?estacion=240001&variable=NIVEL").json()
+    assert list(a["dudosos"]) == ["2026"] and 136.99 in a["dudosos"]["2026"].values()
+    rg = cliente.get("/v1/hidrologia/rango?estacion=240001&variable=NIVEL&desde=2026-09-01&hasta=2027-02-28").json()
+    assert list(rg["dudosos"]["actual"].values()) == [136.99] and rg["actual"][int(next(iter(rg["dudosos"]["actual"])))] is None
+
+
+def test_el_caudal_no_se_revisa():
+    # las crecidas relámpago de un día en ríos de montaña son reales: el caudal no se marca
+    assert "CAUDAL" not in hidrologia.VARIABLES_DUDOSAS

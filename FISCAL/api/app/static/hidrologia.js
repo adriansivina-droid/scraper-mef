@@ -76,7 +76,9 @@
       if (v.some((x) => x != null) && y >= +(A.inicio || "0").slice(0, 4)) años[y] = v;      // desde el año en que empieza la recolección
     }
     const fija = (k) => md.map((x) => toma(A[k], x));
-    return { ...A, desde: "2024-01-01", dias: 366, años, promedio: fija("promedio"), rojo: fija("rojo"), naranja: fija("naranja"), amarillo: fija("amarillo") };
+    const dudosos = {};                                       // datos dudosos: misma conversión (posición en el eje de setiembre → posición en el año calendario)
+    for (const y of Object.keys(años)) md.forEach((x, i) => { const v = ((A.dudosos || {})[x[0] >= 9 ? +y : +y - 1] || {})[pos[x[0] + "-" + x[1]]]; if (v != null) (dudosos[y] = dudosos[y] || {})[i] = v; });
+    return { ...A, desde: "2024-01-01", dias: 366, dudosos, años, promedio: fija("promedio"), rojo: fija("rojo"), naranja: fija("naranja"), amarillo: fija("amarillo") };
   }
   // el 29 de febrero solo existe en años bisiestos: en los demás se completa con el promedio del 28/2 y el 1/3 para que la línea no se corte
   function sin29(S) {
@@ -121,6 +123,13 @@
     }
     const UMB = ["rojo", "naranja", "amarillo"];                 // los umbrales van con línea discontinua: no se confunden con los años
     const trazos = visibles.map(([k, , c, w]) => { const d = camino(parte(k)); return d ? `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"${UMB.includes(k) ? ' stroke-dasharray="9 5"' : ""}/>` : ""; }).join("");
+    // datos dudosos (picos imposibles): no van en la línea; se muestran aparte, con un aro (o un triángulo en el borde si quedan fuera de escala)
+    const dudas = visibles.flatMap(([k, t, c]) => Object.entries((s.dud || {})[k] || {}).map(([j, v]) => ({ k, c, v, i: +j - i0, t: t || et[k] }))).filter((p) => p.i >= 0 && p.i < n);
+    const aros = dudas.map((p) => { const x = X(p.i).toFixed(1), y = Y(p.v);
+      return y < arr + 6 ? `<path d="M${x},${arr + 4}l-6,10h12z" fill="${p.c}" stroke="#FFF"/>` : y > arr + alto - 6 ? `<path d="M${x},${arr + alto - 4}l-6,-10h12z" fill="${p.c}" stroke="#FFF"/>`
+        : `<circle cx="${x}" cy="${y.toFixed(1)}" r="4.5" fill="#FFF" stroke="${p.c}" stroke-width="2"/>`; }).join("");
+    const fechaDe = (i) => { const d = FECHA(x0, i); return `${dd(d.getUTCDate())} ${MES[d.getUTCMonth()]}${s.comparar ? "" : " " + d.getUTCFullYear()}`; };
+    const notaDudas = dudas.length ? `Dato dudoso, fuera de la línea: ${dudas.slice(0, 3).map((p) => `${fechaDe(p.i)}${s.comparar ? " (" + p.t + ")" : ""} = ${num(p.v, 2)}`).join(" · ")}${dudas.length > 3 ? ` · y ${dudas.length - 3} más` : ""}` : "";
     const ult = pk ? parte(pk).reduce((a, v, i) => v != null ? i : a, -1) : -1;
     const punto = ult >= 0 && !ocultas.has(pk) ? `<circle cx="${X(ult).toFixed(1)}" cy="${Y(parte(pk)[ult]).toFixed(1)}" r="3.5" fill="${(SER.find((x) => x[0] === pk) || [])[2]}" stroke="#FFF" stroke-width="1.5"/>` : "";
     // leyenda abajo, en filas centradas, como la de SENAMHI
@@ -130,7 +139,7 @@
     });
     const filas = [[]]; let lx = 0;
     items.forEach((it) => { const w = 34 + it.t.length * 6.9; if (lx + w > ancho && filas[filas.length - 1].length) { filas.push([]); lx = 0; } filas[filas.length - 1].push({ ...it, w }); lx += w; });
-    const H = arr + alto + 48 + filas.length * 20 + 14;
+    const H = arr + alto + 48 + filas.length * 20 + 14 + (dudas.length ? 18 : 0);
     const leyenda = filas.map((f, r) => { const tot = f.reduce((a, it) => a + it.w, 0); let x = izq + (ancho - tot) / 2; const y = arr + alto + 48 + r * 20;
       return f.map((it) => { const o = ocultas.has(it.k), g = `<g data-serie="${it.k}" style="cursor:pointer" opacity="${o ? 0.35 : 1}"><rect x="${x}" y="${y - 12}" width="${it.w - 6}" height="18" fill="#FFF" fill-opacity="0"/><line x1="${x}" x2="${x + 22}" y1="${y - 3}" y2="${y - 3}" stroke="${it.c}" stroke-width="3"${["rojo", "naranja", "amarillo"].includes(it.k) ? ' stroke-dasharray="6 3"' : ""}/><text x="${x + 28}" y="${y + 1}" fill="#333" font-weight="600">${esc(it.t)}</text></g>`; x += it.w; return g; }).join(""); }).join("");
     const Var = VAR[s.variable].toUpperCase();
@@ -140,7 +149,8 @@
       <text x="${W / 2}" y="47" text-anchor="middle" font-size="12" fill="#666">ESTACIÓN ${esc(String(s.estacion || "").toUpperCase())}</text>
       <text transform="translate(18 ${arr + alto / 2}) rotate(-90)" text-anchor="middle" fill="#333">${Var} (${esc(s.unidad)})</text>
       ${rejilla}<line x1="${izq}" x2="${W - der}" y1="${arr + alto}" y2="${arr + alto}" stroke="#9A9A9A"/>${eje}
-      ${trazos}${punto}${leyenda}
+      ${trazos}${aros}${punto}${leyenda}
+      ${notaDudas ? `<text x="${izq}" y="${H - 28}" font-size="11" fill="#B03A2E">${esc(notaDudas)}</text>` : ""}
       <text x="${izq}" y="${H - 10}" font-size="11" fill="#777">${esc(et.periodo)}</text>
       <text x="${W - der}" y="${H - 10}" text-anchor="end" font-size="11" fill="#777">Fuente: SENAMHI</text></svg>`;
     return { svg, W, H, izq, der, arr, alto, n, x0, dec, i0 };
@@ -254,6 +264,7 @@
         if (e0.modo === "cal") { S = alCalendario(S); S.cal = true; }
         S.comparar = true; S.claves = Object.keys(S.años).sort().map((y) => "a" + y);
         S.claves.forEach((k) => { S[k] = S.años[k.slice(1)]; });
+        S.dud = {}; S.claves.forEach((k) => { S.dud[k] = (S.dudosos || {})[k.slice(1)] || {}; });
         sin29(S);
         vista = { i0: 0, i1: S.dias - 1, marcados: e0.marcados };
         for (const k of [...e0.marcados]) if (!S.claves.includes(k)) e0.marcados.delete(k);
@@ -262,11 +273,12 @@
         $("hid-anios").innerHTML = S.claves.slice().reverse().map((k) => `<label class="hid-chk"><input type="checkbox" data-anio="${k}"${e0.marcados.has(k) ? " checked" : ""}><i style="background:${colorAnio(S, k)}"></i>${etqAño(S, k)}</label>`).join("") +
           `<span class="hid-chk-acc"><button type="button" class="btn sec chico" data-todos="1">Todos</button><button type="button" class="btn sec chico" data-todos="2">Últimos 2</button><button type="button" class="btn sec chico" data-todos="0">Ninguno</button></span>`;
       }
+      if (!S.comparar) S.dud = S.dudosos || {};
       vista.marcados = e0.marcados; vista.ocultas = ocultas;
       g.innerHTML = `<div class="scroll"><div class="hid-marco"><div class="hid-lienzo"></div><div class="hid-nav"></div></div></div>
         <div class="fila"><button class="btn" type="button" data-a="copiar">Copiar</button><button class="btn sec" type="button" data-a="png">PNG</button><button class="btn sec" type="button" data-a="svg">SVG</button>
           <button class="btn sec" type="button" data-a="csv">Datos del gráfico (CSV)</button><span class="nota" data-msj></span></div>
-        <p class="nota">${e0.modo === "rango" ? "" : "Marca arriba los años que quieres comparar. "}Arrastra el recuadro de la barra de abajo para moverte en el tiempo, o estira sus bordes para elegir el tramo. Haz clic en una serie de la leyenda para mostrarla u ocultarla. El promedio histórico y los umbrales son los que publica SENAMHI para la estación.</p>`;
+        <p class="nota">${e0.modo === "rango" ? "" : "Marca arriba los años que quieres comparar. "}Arrastra el recuadro de la barra de abajo para moverte en el tiempo, o estira sus bordes para elegir el tramo. Haz clic en una serie de la leyenda para mostrarla u ocultarla. Los umbrales son los que publica SENAMHI para la estación. El <b>promedio histórico</b> también es de SENAMHI: el nivel (o caudal) típico de cada día del año en esa estación. Es la misma curva todos los años, por eso se ve más suave que cualquier año real. SENAMHI no dice de qué años la calcula: no sale de los datos de esta página (que empiezan en 2023) y, en las estaciones revisadas, se parece al promedio de 2023–2025 pero no coincide con él. Un aro suelto es un <b>dato dudoso</b>: un pico de uno o dos días que sube y vuelve al nivel de antes, imposible en un río (por ejemplo, 12 m en un día). Se muestra aparte de la línea, pero sigue en los archivos con la marca DATO_DUDOSO.</p>`;
       atar(g);
       pintar();
     }
@@ -296,7 +308,9 @@
         const d = FECHA(h.x0, i), px = (h.izq + (h.W - h.izq - h.der) * i / Math.max(1, h.n - 1)) * k, et = nombres(S, vista), j2 = h.i0 + i;
         const SER = serieDe(S, vista), orden = S.comparar ? [...SER.filter((x) => /^a\d/.test(x[0])).reverse(), ...SER.filter((x) => !/^a\d/.test(x[0]))] : ["actual", "anterior", "promedio", "minimo", "maximo", "rojo", "naranja", "amarillo"].map((c) => SER.find((x) => x[0] === c));
         tip.innerHTML = `<b>${dd(d.getUTCDate())} ${MES[d.getUTCMonth()]}${S.comparar ? "" : " " + d.getUTCFullYear()}</b>` + orden.filter(([c]) => !ocultas.has(c) && S[c][j2] != null)
-          .map(([c, t, col]) => `<div><i style="background:${col}"></i>${esc(t || et[c])}<b>${num(S[c][j2], 2)}</b></div>`).join("");
+          .map(([c, t, col]) => `<div><i style="background:${col}"></i>${esc(t || et[c])}<b>${num(S[c][j2], 2)}</b></div>`).join("")
+          + orden.filter(([c]) => c && !ocultas.has(c) && ((S.dud || {})[c] || {})[j2] != null)
+            .map(([c, t, col]) => `<div class="hid-dudoso"><i style="background:${col}"></i>${esc(t || et[c])} · dato dudoso<b>${num(S.dud[c][j2], 2)}</b></div>`).join("");
         guia.hidden = tip.hidden = false;
         guia.style.left = px + "px"; guia.style.top = h.arr * k + "px"; guia.style.height = h.alto * k + "px";
         tip.style.left = (px + 200 > caj.width ? px - 192 : px + 12) + "px"; tip.style.top = (h.arr + 8) * k + "px";
@@ -328,8 +342,11 @@
         const et = nombres(S, vista), x0 = new Date(S.desde + "T00:00:00Z");
         const cols = S.comparar ? [...S.claves.filter((k) => vista.marcados.has(k)).map((k) => [k, etqAño(S, k, true)]), ["promedio", "PROMEDIO_HISTORICO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]]
           : [["actual", "VALOR"], ["anterior", "UN_AÑO_ANTES"], ["promedio", "PROMEDIO_HISTORICO"], ["minimo", "MINIMO"], ["maximo", "MAXIMO"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]];
-        const lineas = [["FECHA", ...cols.map((c) => c[1])].join(",")];
-        for (let i = vista.i0; i <= vista.i1; i++) lineas.push([S.comparar ? iso(FECHA(x0, i)).slice(8) + "/" + iso(FECHA(x0, i)).slice(5, 7) : dmy(iso(FECHA(x0, i))), ...cols.map(([k]) => S[k][i] ?? "")].join(","));
+        const lineas = [["FECHA", ...cols.map((c) => c[1]), "DATO_DUDOSO"].join(",")];
+        for (let i = vista.i0; i <= vista.i1; i++) {
+          const dud = cols.filter(([k]) => ((S.dud || {})[k] || {})[i] != null).map((c) => c[1]);     // los datos dudosos se conservan en el archivo y se señalan
+          lineas.push([S.comparar ? iso(FECHA(x0, i)).slice(8) + "/" + iso(FECHA(x0, i)).slice(5, 7) : dmy(iso(FECHA(x0, i))), ...cols.map(([k]) => S[k][i] ?? ((S.dud || {})[k] || {})[i] ?? ""), dud.length ? "SI: " + dud.join(" / ") : ""].join(","));
+        }
         const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + lineas.join("\n")], { type: "text/csv" })); a.download = nombre().replace(/\s+/g, "_") + ".csv";
         document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       });
