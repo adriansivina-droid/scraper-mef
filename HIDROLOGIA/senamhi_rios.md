@@ -117,7 +117,7 @@ Detalles:
 
 | Archivo | Contenido |
 |---|---|
-| `SENAMHI_rios_diario.csv` | Una fila por estación, variable y día. Columnas: `COD_ESTACION, ESTACION, RIO, VARIABLE, UNIDAD, FECHA (dd/mm/aaaa), AÑO, MES, DIA, AÑO_HIDROLOGICO, VALOR, MINIMO, MAXIMO, PROM_HISTORICO, UMBRAL_ROJO/NARANJA/AMARILLO, SERIE (ACTUAL/ANTERIOR), FECHA_EXTRACCION`. Se acumula: cada corrida reemplaza los días que vuelve a leer |
+| `SENAMHI_rios_diario.csv` | Una fila por estación, variable y día. Columnas: `COD_ESTACION, ESTACION, RIO, VARIABLE, UNIDAD, FECHA (dd/mm/aaaa), AÑO, MES, DIA, AÑO_HIDROLOGICO, VALOR, MINIMO, MAXIMO, PROM_HISTORICO, UMBRAL_ROJO/NARANJA/AMARILLO, SERIE (ACTUAL/ANTERIOR), FECHA_EXTRACCION, DATO_DUDOSO`. Se acumula: cada corrida reemplaza los días que vuelve a leer. `DATO_DUDOSO` = `SI` en los picos aislados de 1 o 2 días que un río no puede hacer (solo en nivel; ver abajo). El dato **no se borra**: queda en el archivo y solo se señala |
 | `SENAMHI_rios_info_diaria.csv` | Una fila por estación, día y hora con dato (sin `-999`): `COD_ESTACION, ESTACION, CUERPO_AGUA, CUENCA, DEPARTAMENTO, ZONA, REGION_HIDROGRAFICA, COD_ZONAL, FECHA, AÑO, MES, DIA, HORA, UNIDAD, VALOR, ANOMALIA, UNIDAD_ANOMALIA, TENDENCIA, UMBRAL_ROJO, FECHA_EXTRACCION` |
 | `SENAMHI_rios_mensual.csv` | Una fila por estación y mes: valor del mes, mes anterior, anomalía, tendencia, umbral rojo, departamento, cuerpo de agua y región hidrográfica |
 | `SENAMHI_ESTACIONES.csv` | Las 143 estaciones, con la dirección zonal (`COD_ZONAL`, `DIRECCION_ZONAL`), la última fecha y hora, `variable_opcion`, río, departamento cuando lo hay, y coordenadas si el WFS del GeoServer responde |
@@ -158,3 +158,21 @@ El detalle de cada columna está en **`HIDROLOGIA/docs/Diccionario_SENAMHI_rios.
 - **Variables que SENAMHI no publica** (13/11/2026). SENAMHI deshabilita en su página el botón «Nivel» o «Caudal» de las estaciones donde no publica esa variable (Cañad solo publica caudal; Bellavista, solo nivel), pero si se le pide igual devuelve datos: en la primera corrida completa salió «nivel» en las 138 estaciones. Probablemente son lecturas internas (por ejemplo, el nivel con que calcula el caudal) sin validar. Se **conservan aparte**: el recolector (v6) lee esos botones en cada respuesta y marca la pieza `noPublicado`; la página las escribe en `SENAMHI_rios_diario_no_publicado.csv` (mismas columnas que la serie diaria) y no las usa en el mapa, las alertas, los hidrogramas ni el reporte (aplicar los umbrales a ese «nivel» oculto fue lo que dio la falsa alerta de Cañad). El control las marca «NO PUBLICADA POR SENAMHI (aparte)», con sus fechas y días con dato. También van aparte si lo indica el formulario guardado o una unidad que no corresponde (m³/s en un nivel). En el control del 13/11/2026: 79 estaciones solo publican caudal, 32 solo nivel y 33 ambas.
 - **Alertas con doble control** (`hidrologia.evaluar_alerta`, 12/11/2026). Una alerta solo se da por **confirmada** si coinciden dos fuentes independientes: la que calcula la página (dato del día contra los umbrales de la estación) y el **color que SENAMHI pinta en su propio mapa** (la lista `listaMonitoreo`, que el recolector v4 guarda como pieza `monitoreo`). Además se controla que el dato sea de los últimos 2 días respecto de la recolección, que los umbrales sean coherentes (rojo < naranja < amarillo, o al revés) y que el valor no sea un salto brusco. Estados: *confirmada* (coinciden), *según SENAMHI* (solo SENAMHI marca alerta), *sin confirmar* (calculada; falta el color de SENAMHI), *a verificar* (no pasó un control o SENAMHI no la marca), *sin dato reciente*. Solo las confirmadas (y las de SENAMHI) se pintan de color y se cuentan en el reporte; las demás se marcan aparte y el motivo se ve en el popup del mapa y al pasar el cursor por la alerta en la tabla. Causa de falsas alertas antes de este control: una estación que dejó de reportar conserva su último dato (el recolector acepta su último año con datos) y, si estaba bajo el umbral, seguía en alerta aunque el dato fuera de hace meses.
 - Pruebas: `FISCAL/api/tests/test_hidrologia.py`.
+
+## Datos dudosos (picos imposibles)
+
+SENAMHI publica a veces valores que un río no puede tener. Ejemplo: el nivel del Nanay en Santa María de Nanay el 24/02/2020 fue 124,3 · **137,0** · 124,7 m.s.n.m (subir y bajar 12,7 m en dos días). Se comprobó que viene así en los datos de SENAMHI; la página no lo produce.
+
+La página los **marca, no los borra**:
+
+- En los CSV, la columna `DATO_DUDOSO` dice `SI`; el archivo de control (`CONTROL SENAMHI rios_diario.csv`) cuenta cuántos tiene cada estación en `DATOS_DUDOSOS`.
+- En el hidrograma, el dato sale de la línea y se muestra como un aro suelto (o un triángulo en el borde si queda fuera de escala), con una nota debajo del gráfico y en el cursor. El eje se ajusta al resto de la serie.
+- En el CSV que baja el gráfico, el valor se conserva y la columna `DATO_DUDOSO` lo señala.
+
+**Regla** (`hidrologia.datos_dudosos`): un tramo de 1 o 2 días es dudoso si el día de antes y el de después coinciden entre sí, el tramo queda por encima (o por debajo) de ambos en más de un umbral, y ese umbral es grande para la estación: 8 veces el cambio diario habitual (percentil 90) y 1,5 veces el rango normal (percentil 5 a 95). Un cambio de nivel que se mantiene, o un día sin el vecino, no se marca.
+
+**Solo se revisa el nivel.** El caudal de los ríos de montaña tiene crecidas relámpago de un día que sí son reales (al probar la regla con caudales salían decenas de falsos positivos).
+
+## Promedio histórico
+
+Es la curva que publica SENAMHI en cada hidrograma (`promHistorico`, columna `PROM_HISTORICO`): el nivel o caudal típico de cada día del año. Es **la misma curva todos los años**. SENAMHI no dice de qué años la calcula. No sale de los datos de la página (empiezan en 2023): en las estaciones revisadas (Nanay, Tamshiyacu, Borja, Picota) se parece al promedio de 2023–2025 (correlación de 0,75 a 0,96) pero no coincide (diferencia media de 1 m en nivel). Para saber el periodo exacto habría que preguntárselo a SENAMHI.

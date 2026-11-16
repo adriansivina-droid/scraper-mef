@@ -419,3 +419,4 @@ body.sin-descargas :is(#manu-xlsx, #emp-xlsx, #hid-xlsx, #ex-xlsx, #et-xlsx, #es
   [data-a="csv"], a[href*="formato=xlsx"], a[href*="formato=csv"], a[href*="/v1/hidrologia/descargar"], a[href*="descargar=true"], a[href^="/v1/descargas"]) { display: none !important; }
 .cmp-desc { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--mid); cursor: pointer; max-width: 76ch; } .cmp-desc b { color: var(--ink); }
 .cmp-desc input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--navy); flex: none; }
+.hid-tip .hid-dudoso { color: #B03A2E; }

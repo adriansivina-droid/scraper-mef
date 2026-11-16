@@ -41,7 +41,7 @@ ARCHIVOS = {"diario": "SENAMHI_rios_diario.csv", "no-publicado": "SENAMHI_rios_d
             "control-mensual": "CONTROL SENAMHI rios_mensual.csv", "log": "LOG SENAMHI consultas.csv"}
 COLS = {
     "diario": ["COD_ESTACION", "ESTACION", "RIO", "VARIABLE", "UNIDAD", "FECHA", "AÑO", "MES", "DIA", "AÑO_HIDROLOGICO", "VALOR",
-               "MINIMO", "MAXIMO", "PROM_HISTORICO", "UMBRAL_ROJO", "UMBRAL_NARANJA", "UMBRAL_AMARILLO", "SERIE", "FECHA_EXTRACCION"],
+               "MINIMO", "MAXIMO", "PROM_HISTORICO", "UMBRAL_ROJO", "UMBRAL_NARANJA", "UMBRAL_AMARILLO", "SERIE", "FECHA_EXTRACCION", "DATO_DUDOSO"],
     "no-publicado": None,                                   # mismas columnas que «diario» (se completa abajo)
     "info-diaria": ["COD_ESTACION", "ESTACION", "CUERPO_AGUA", "CUENCA", "DEPARTAMENTO", "ZONA", "REGION_HIDROGRAFICA", "COD_ZONAL",
                     "FECHA", "AÑO", "MES", "DIA", "HORA", "UNIDAD", "VALOR", "ANOMALIA", "UNIDAD_ANOMALIA", "TENDENCIA", "UMBRAL_ROJO",
@@ -52,7 +52,7 @@ COLS = {
     "estaciones": ["ID_ESTACION", "COD_ESTACION", "ESTACION", "SUB_ESTACION", "ESTADO", "COD_ZONAL", "DIRECCION_ZONAL", "DEPARTAMENTO",
                    "FECHA_HORA_ULTIMA", "VARIABLE_OPCION", "RIO", "VARIABLES_CON_DATOS", "LATITUD", "LONGITUD", "FECHA_EXTRACCION"],
     "control": ["COD_ESTACION", "ESTACION", "VARIABLE", "ESTADO", "PRIMERA_FECHA", "ULTIMA_FECHA", "DIAS_CON_DATO", "DIAS_FALTANTES",
-                "SALTOS_RAROS", "LLEGA_AL_INICIO", "CRUCE_MENSUAL_DIF_MAX_%", "FECHA_EXTRACCION"],
+                "SALTOS_RAROS", "DATOS_DUDOSOS", "LLEGA_AL_INICIO", "CRUCE_MENSUAL_DIF_MAX_%", "FECHA_EXTRACCION"],
     "control-info": ["FECHA", "HORA", "ESTACIONES", "CON_DATO", "ESTADO", "FECHA_EXTRACCION"],
     "control-mensual": ["AÑO", "MES", "SERVIDO", "ESTACIONES", "ESTADO", "FECHA_EXTRACCION"],
     "log": ["COD_ESTACION", "ESTACION", "VARIABLE", "VARIABLE_OPCION", "FECHA_HORA_PEDIDA", "INICIO_SERIE", "FILAS", "ESTADO",
@@ -337,6 +337,52 @@ def _departamento(cod, meta_info, zonales):
     return sin_tildes((meta_info.get(cod) or {}).get("nomDepa") or "")
 
 
+# ── datos dudosos: picos aislados que un río no puede hacer ───────────────────
+# Ejemplo real: el nivel del Nanay el 24/02/2020 fue 124,3 · 137,0 · 124,7 (subir y bajar 12,7 m en dos días). SENAMHI lo publica así y la
+# página lo conserva en los CSV, pero lo marca (columna DATO_DUDOSO) y en el gráfico lo saca de la línea y lo muestra aparte.
+# Solo se revisa el NIVEL: el caudal de los ríos de montaña tiene crecidas relámpago de un día que sí son reales.
+VARIABLES_DUDOSAS = ("NIVEL",)
+_estado_dud = {"d": {}}                                 # {(estación, variable): {fecha: valor}} de la última vez que se armaron los CSV
+
+
+def _cuantil_(xs, q):
+    xs = sorted(xs)
+    return xs[int(q * (len(xs) - 1))] if xs else 0.0
+
+
+def datos_dudosos(valores, tramo_max=2):
+    """Marca los datos DUDOSOS de una serie diaria (lista con None donde falta el día): picos aislados de 1 o 2 días que se salen
+    de golpe y vuelven al nivel de antes. No se borra nada: solo se señalan. Un tramo se marca si (a) el día de antes y el de después
+    coinciden entre sí (si no, es un cambio de nivel y no un pico), (b) todo el tramo queda por encima (o por debajo) de ambos en más
+    de un umbral, y (c) el umbral es grande para esa estación: 8 veces el cambio diario habitual (percentil 90) y 1,5 veces el rango
+    normal de la serie (percentil 5 a 95). Devuelve una lista de True/False del mismo largo."""
+    n = len(valores)
+    marcas = [False] * n
+    cambios = [abs(b - a) for a, b in zip(valores, valores[1:]) if a is not None and b is not None]
+    if len(cambios) < 30:                                # una serie muy corta no permite saber qué es normal
+        return marcas
+    ordenados = sorted(v for v in valores if v is not None)
+    rango = ordenados[int(0.95 * (len(ordenados) - 1))] - ordenados[int(0.05 * (len(ordenados) - 1))]
+    umbral = max(8 * _cuantil_(cambios, 0.9), 1.5 * rango, 1e-9)
+    for largo in range(1, tramo_max + 1):
+        for i in range(1, n - largo):
+            ant, sig, tramo = valores[i - 1], valores[i + largo], valores[i:i + largo]
+            if ant is None or sig is None or any(v is None for v in tramo) or any(marcas[i:i + largo]):
+                continue
+            if abs(sig - ant) > umbral / 4:
+                continue
+            if min(tramo) - max(ant, sig) > umbral or min(ant, sig) - max(tramo) > umbral:
+                for j in range(i, i + largo):
+                    marcas[j] = True
+    return marcas
+
+
+def _marcados(codigo, variable):
+    """{fecha: valor} de los datos dudosos de la estación (de la última vez que se armaron los CSV)."""
+    preparado()
+    return _estado_dud["d"].get((str(codigo), variable)) or {}
+
+
 class _Ordenador:
     """Junta filas y las devuelve ordenadas por una clave usando una base SQLite temporal en disco, no la memoria.
     Con varios años de Información Diaria hay millones de filas: en una lista de Python pasaban los 512 MB del servidor."""
@@ -418,6 +464,7 @@ def armar(carpeta):
     fn, wn = _escritor(carpeta / ARCHIVOS["no-publicado"], COLS["no-publicado"])
     fl, wl = _escritor(carpeta / ARCHIVOS["log"], COLS["log"])
     control, rio, variables, n_dia, n_nopub, ultima = [], {}, {}, 0, 0, None
+    dudosos_nuevos = {}
     grupo, clave_g = [], None
 
     NM = no_mide()
@@ -453,10 +500,19 @@ def armar(carpeta):
             return
         fechas = sorted(elegidas)
         valores, meses = [], {}
+        dud = {}
+        if var in VARIABLES_DUDOSAS and not nopub:
+            denso = [None] * ((fechas[-1] - fechas[0]).days + 1)
+            for d in fechas:
+                denso[(d - fechas[0]).days] = elegidas[d][3]
+            marcas = datos_dudosos(denso)
+            dud = {d: elegidas[d][3] for d in fechas if marcas[(d - fechas[0]).days]}
+            if dud:
+                dudosos_nuevos[(cod, var)] = dud
         for d in fechas:
             _, serie, base, v, mn, mx, prom, ro, na, am, dia = elegidas[d]
             (wn if nopub else w).writerow(base + [_dmy(d), d.year, d.month, d.day, año_hidrologico(d), v, _v(mn), _v(mx), _v(prom), _v(ro), _v(na), _v(am),
-                                                  serie, _dia_txt(dia)])
+                                                  serie, _dia_txt(dia), "SI" if d in dud else ""])
             valores.append(v)
             k = (sin_tildes(base[4]), d.year, d.month)
             s = meses.setdefault(k, [0.0, 0])
@@ -476,7 +532,7 @@ def armar(carpeta):
         cruces = [abs((s / n) / mensual[(cod, u, a, m)] - 1) * 100 for (u, a, m), (s, n) in meses.items()
                   if n >= 25 and mensual.get((cod, u, a, m))]
         fila_c.update({"PRIMERA_FECHA": _dmy(fechas[0]), "ULTIMA_FECHA": _dmy(fechas[-1]), "DIAS_CON_DATO": len(fechas),
-                       "DIAS_FALTANTES": (fechas[-1] - fechas[0]).days + 1 - len(fechas), "SALTOS_RAROS": saltos, "LLEGA_AL_INICIO": llega,
+                       "DIAS_FALTANTES": (fechas[-1] - fechas[0]).days + 1 - len(fechas), "SALTOS_RAROS": saltos, "DATOS_DUDOSOS": len(dud), "LLEGA_AL_INICIO": llega,
                        "CRUCE_MENSUAL_DIF_MAX_%": round(max(cruces), 2) if cruces else "",
                        "ESTADO": "REVISAR (saltos)" if saltos else "OK" if llega else
                        f"OK desde {_dmy(fechas[0])} (SENAMHI no trae más atrás)"})
@@ -496,6 +552,7 @@ def armar(carpeta):
         grupo.append((clave, g, dia))
     cerrar(grupo)
     f.close(); fn.close(); fl.close()
+    _estado_dud["d"] = dudosos_nuevos
     f, w = _escritor(carpeta / ARCHIVOS["control"], COLS["control"])
     for c in control:
         w.writerow([_v(c.get(k)) for k in COLS["control"][:-1]] + [hoy_txt])
@@ -847,11 +904,26 @@ def serie(codigo, variable, año):
     actual = {**por_dia(sig, "datoAnterior"), **por_dia(propio, "datoActual")}
     anterior = {**por_dia(ant, "datoActual"), **por_dia(propio, "datoAnterior")}
     ref = propio or sig
+    # datos dudosos: se sacan de la línea y se devuelven aparte ({posición del día: valor}) para dibujarlos como puntos sueltos
+    marcados, marcas = _marcados(codigo, variable), {"actual": {}, "anterior": {}}
+    cerca = lambda a, b: a is not None and abs(a - b) <= 1e-3 + 1e-6 * abs(b)   # noqa: E731
+    for i, d in enumerate(dias):
+        if d in marcados and cerca(actual.get((d.month, d.day)), marcados[d]):
+            marcas["actual"][str(i)] = marcados[d]
+            actual[(d.month, d.day)] = None
+        try:
+            antes = d.replace(year=d.year - 1)
+        except ValueError:
+            continue
+        if antes in marcados and cerca(anterior.get((d.month, d.day)), marcados[antes]):
+            marcas["anterior"][str(i)] = marcados[antes]
+            anterior[(d.month, d.day)] = None
     return {"codigo": codigo, "variable": variable, "año": año, "estacion": fuente.get("nomEstacion", ""), "rio": fuente.get("nomRio", ""),
             "unidad": fuente.get("unidad", ""), "desde": dias[0].isoformat(), "dias": len(dias),
             "actual": toma(actual), "anterior": toma(anterior), "promedio": toma(por_dia(ref, "promHistorico")),
             "minimo": toma(por_dia(propio, "minimo")), "maximo": toma(por_dia(propio, "maximo")),
-            "rojo": toma(por_dia(ref, "rojo")), "naranja": toma(por_dia(ref, "naranja")), "amarillo": toma(por_dia(ref, "amarillo"))}
+            "rojo": toma(por_dia(ref, "rojo")), "naranja": toma(por_dia(ref, "naranja")), "amarillo": toma(por_dia(ref, "amarillo")),
+            "dudosos": marcas}
 
 
 def rango(codigo, variable, desde, hasta):
@@ -863,6 +935,7 @@ def rango(codigo, variable, desde, hasta):
         raise ValueError("El rango puede ser de hasta 10 años.")
     claves = ("actual", "anterior", "promedio", "minimo", "maximo", "rojo", "naranja", "amarillo")
     out = {k: [] for k in claves}
+    dud = {"actual": {}, "anterior": {}}
     base = None
     for y in range(año_hidrologico(desde), año_hidrologico(hasta) + 1):
         s = serie(codigo, variable, y)
@@ -871,6 +944,9 @@ def rango(codigo, variable, desde, hasta):
         for i in range(n):
             d = inicio + timedelta(days=i)
             if desde <= d <= hasta:
+                for k in ("actual", "anterior"):
+                    if s and str(i) in s["dudosos"][k]:
+                        dud[k][str(len(out[k]))] = s["dudosos"][k][str(i)]
                 for k in claves:
                     out[k].append(s[k][i] if s else None)
         if s and base is None:
@@ -878,7 +954,7 @@ def rango(codigo, variable, desde, hasta):
     if base is None or not any(v is not None for v in out["actual"]):
         return None
     return {"codigo": codigo, "variable": variable, "estacion": base["estacion"], "rio": base["rio"], "unidad": base["unidad"],
-            "desde": desde.isoformat(), "hasta": hasta.isoformat(), "dias": len(out["actual"]), **out}
+            "desde": desde.isoformat(), "hasta": hasta.isoformat(), "dias": len(out["actual"]), "dudosos": dud, **out}
 
 
 def anios(codigo, variable):
@@ -904,7 +980,13 @@ def anios(codigo, variable):
         return [por.get(clave_dia(d)) for d in dias]
 
     ultimo = series[max(series)]
+    dud = {}                                                  # {año: {posición en el eje: valor}} de los datos dudosos de cada año
+    for y, s in series.items():
+        por = {clave_dia(date.fromisoformat(s["desde"]) + timedelta(days=int(i))): v for i, v in s["dudosos"]["actual"].items()}
+        puestos = {str(j): por[clave_dia(d)] for j, d in enumerate(dias) if clave_dia(d) in por}
+        if puestos:
+            dud[str(y)] = puestos
     return {"codigo": codigo, "variable": variable, "estacion": ultimo["estacion"], "rio": ultimo["rio"], "unidad": ultimo["unidad"],
             "desde": base.isoformat(), "dias": 366, "años": {str(y): sobre_el_eje(s, "actual") for y, s in series.items()},
-            "inicio": inicio().isoformat(),
+            "inicio": inicio().isoformat(), "dudosos": dud,
             **{k: sobre_el_eje(ultimo, k) for k in ("promedio", "rojo", "naranja", "amarillo")}}
