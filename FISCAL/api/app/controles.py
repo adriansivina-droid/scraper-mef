@@ -21,11 +21,21 @@ NIVEL_DE_CORTO = {"GobNacional": "E", "GobRegional": "R", "Municipalidad": "M"}
 NIVELES = {"E": "Gobierno Nacional", "R": "Gobiernos Regionales", "M": "Gobiernos Locales"}
 _RE_DEV = re.compile(r"^CONTROL (?:(Generica|Fuente|InvFuente|Deuda) )?(GobNacional|GobRegional|Municipalidad) (\d{4})")
 _RE_PIM = re.compile(r"^CONTROL PIM Funcion(?:\.Municipalidad)? (\d{4})")
-# qué base de la página corresponde a cada bloque del scraper
-BLOQUES = {"Funcion": ("inv-dev-funcion", "DEVENGADO", "Inversión por función"), "InvFuente": ("inv-dev-fuente", "DEVENGADO", "Inversión por fuente"),
-           "Generica": ("gasto-dev-generica", "DEVENGADO", "Gasto por genérica"), "Fuente": ("gasto-dev-fuente", "DEVENGADO", "Gasto por fuente"),
-           "PIM": ("inv-pim-funcion", "PIM", "PIM por función")}
-POR_SECTOR = {"gasto": ["Generica", "Fuente"], "inversion": ["Funcion", "InvFuente", "PIM"]}
+# qué base de la página corresponde a cada bloque del scraper: (base, columna del monto, título, columna del código,
+# columna del nombre, qué es cada fila, descripción para la página)
+BLOQUES = {"Funcion": ("inv-dev-funcion", "DEVENGADO", "Inversión por función", "FUNCION", "FUNCION", "Función",
+                       "Devengado de la inversión (genérica 2.6, adquisición de activos no financieros) de los tres niveles de gobierno, "
+                       "por función: en qué se invierte (transporte, educación, salud…)."),
+           "InvFuente": ("inv-dev-fuente", "DEVENGADO", "Inversión por fuente de financiamiento", "COD_FUENTE", "FUENTE", "Fuente",
+                         "La misma inversión (genérica 2.6), partida por fuente de financiamiento: con qué dinero se paga (recursos "
+                         "ordinarios del Tesoro, recursos determinados como el canon y el FONCOMUN, endeudamiento, donaciones…). "
+                         "Suma lo mismo que la inversión por función."),
+           "Generica": ("gasto-dev-generica", "DEVENGADO", "Gasto por genérica", "COD_GENERICA", "GENERICA", "Genérica",
+                        "Devengado de todas las genéricas de gasto de los tres niveles de gobierno: personal, pensiones, bienes y "
+                        "servicios, donaciones y transferencias, otros gastos, inversión (2.6) y deuda."),
+           "Fuente": ("gasto-dev-fuente", "DEVENGADO", "Gasto por fuente de financiamiento", "COD_FUENTE", "FUENTE", "Fuente",
+                      "Todo el gasto (todas las genéricas), partido por fuente de financiamiento: con qué dinero se paga.")}
+POR_SECTOR = {"gasto": ["Generica", "Fuente"], "inversion": ["Funcion", "InvFuente"]}
 
 
 def _tabla():
@@ -83,35 +93,62 @@ def guardar(partes):
 def _referencias(departamento, bloques):
     _tabla()
     with db.motor().connect() as cx:
-        q = text(f"SELECT bloque, nivel, anio, SUM(ref) AS ref, MAX(fecha) AS fecha FROM mef_controles WHERE depto = :d AND bloque IN "
-                 f"({', '.join(':b' + str(i) for i in range(len(bloques)))}) GROUP BY bloque, nivel, anio")
+        q = text(f"SELECT bloque, anio, codigo, SUM(ref) AS ref, MAX(fecha) AS fecha FROM mef_controles WHERE depto = :d AND bloque IN "
+                 f"({', '.join(':b' + str(i) for i in range(len(bloques)))}) GROUP BY bloque, anio, codigo")
         return pd.read_sql(q, cx, params={"d": departamento, **{f"b{i}": b for i, b in enumerate(bloques)}})
 
 
+def _clave(bloque, codigo):
+    """Código comparable entre el CONTROL y la página: la función por su número («15: TRANSPORTE» -> «15»); la genérica
+    y la fuente tal cual («5-21», «1»)."""
+    c = re.sub(r"\.0$", "", str(codigo or "").strip())
+    return _cod(c) if bloque == "Funcion" else c.split(":")[0].strip()
+
+
+def _nombre(texto):
+    """«15: TRANSPORTE» -> «Transporte»; «5-21: PERSONAL Y OBLIGACIONES SOCIALES» -> «Personal y obligaciones sociales»."""
+    t = re.sub(r"^[\d\-\.\s]+:\s*", "", str(texto or "")).strip()
+    return t[:1].upper() + t[1:].lower() if t else ""
+
+
 def contraste(departamento, sector, hoy=None):
-    """Por bloque, nivel y año: lo publicado por el MEF (vista anual, al día de la corrida) contra lo que tiene la página."""
+    """Por bloque y año: lo publicado por el MEF (vista anual, al día de la corrida) contra lo que tiene la página, con el
+    detalle por función, fuente o genérica (los tres niveles de gobierno sumados)."""
     hoy = hoy or date.today()
     refs = _referencias(departamento, POR_SECTOR[sector])
-    filas, orden = [], {b: i for i, b in enumerate(POR_SECTOR[sector])}
-    for r in sorted(refs.itertuples(), key=lambda r: (orden[r.bloque], -r.anio, "ERM".find(r.nivel))):
-        base, valor, etiqueta = BLOQUES[r.bloque]
-        niveles = [r.nivel] if r.nivel else ["E", "R", "M"]
-        df = db.leer(base, [departamento], niveles, f"{r.anio}-01", f"{r.anio}-12")
-        pagina = float(pd.to_numeric(df[valor], errors="coerce").sum()) if not df.empty else 0.0
-        meses = sorted({int(str(x).split(":")[0]) for x in df["MES"]}) if "MES" in df.columns and not df.empty else []
-        dif = pagina - float(r.ref)
-        tol = max(5.0, 5.0 * max(len(meses), 1))
-        en_curso = r.anio == hoy.year and r.bloque != "PIM"
-        if abs(dif) <= tol:
-            estado = "coincide"
-        elif en_curso and dif < 0:
-            estado = "mes en curso"                       # el MEF ya suma lo devengado en el mes abierto
-        else:
-            estado = "revisar"
-        filas.append({"bloque": etiqueta, "nivel": NIVELES.get(r.nivel, "Tres niveles"), "anio": int(r.anio), "mef": round(float(r.ref), 2),
-                      "pagina": round(pagina, 2), "dif": round(dif, 2), "estado": estado, "fecha": r.fecha,
-                      "meses": f"{meses[0]:02d} a {meses[-1]:02d}" if meses else "sin datos"})
-    return filas
+    salida = []
+    for bloque in POR_SECTOR[sector]:
+        base, valor, titulo, col_cod, col_nom, que, descripcion = BLOQUES[bloque]
+        rb = refs[refs["bloque"] == bloque]
+        for anio in sorted({int(a) for a in rb["anio"]}, reverse=True):
+            ra = rb[rb["anio"] == anio]
+            ref = ra.assign(_c=[_clave(bloque, c) for c in ra["codigo"]]).groupby("_c")["ref"].sum()
+            df = db.leer(base, [departamento], ["E", "R", "M"], f"{anio}-01", f"{anio}-12")
+            if not df.empty and col_cod in df.columns:
+                df = df.assign(_c=[_clave(bloque, c) for c in df[col_cod]], _v=pd.to_numeric(df[valor], errors="coerce").fillna(0))
+                pagina = df.groupby("_c")["_v"].sum()
+                nombres = {c: _nombre(n) for c, n in zip(df["_c"], df[col_nom] if col_nom in df.columns else df[col_cod])}
+            else:
+                pagina, nombres = pd.Series(dtype=float), {}
+            meses = sorted({int(str(x).split(":")[0]) for x in df["MES"]}) if "MES" in df.columns and not df.empty else []
+            en_curso = anio == hoy.year
+            tol = max(5.0, 5.0 * max(len(meses), 1))
+
+            def estado(d, t):
+                return "coincide" if abs(d) <= t else ("mes en curso" if en_curso and d < 0 else "revisar")
+            items = []
+            for c in sorted(set(ref.index) | set(pagina.index), key=lambda c: (-float(pagina.get(c, ref.get(c, 0.0))), c)):
+                m_, p_ = float(ref.get(c, 0.0)), float(pagina.get(c, 0.0))
+                if not m_ and not p_:
+                    continue
+                nombre = nombres.get(c) or (FUNCIONES.get(int(c), "") if bloque == "Funcion" and c.isdigit() else "")
+                items.append({"codigo": c, "nombre": nombre, "mef": round(m_, 2), "pagina": round(p_, 2), "dif": round(p_ - m_, 2),
+                              "estado": estado(p_ - m_, max(3.0, 3.0 * max(len(meses), 1)))})
+            mef, pag = float(ref.sum()), float(pagina.sum())
+            salida.append({"bloque": titulo, "clave": bloque, "que": que, "descripcion": descripcion, "anio": anio,
+                           "meses": f"{meses[0]:02d} a {meses[-1]:02d}" if meses else "sin datos", "mef": round(mef, 2), "pagina": round(pag, 2),
+                           "dif": round(pag - mef, 2), "estado": estado(pag - mef, tol), "fecha": ra["fecha"].max(), "items": items})
+    return salida
 
 
 # ── Control de los tres archivos de los 25 departamentos («MEF · 3 archivos») ──

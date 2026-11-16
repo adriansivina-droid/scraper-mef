@@ -1492,12 +1492,18 @@
       const chip = { coincide: '<span class="chip ok">coincide</span>', "mes en curso": '<span class="chip vacio">mes en curso</span>', revisar: '<span class="chip error">revisar</span>' };
       const sol = (v) => v == null ? "" : Math.round(v).toLocaleString("es-PE");
       const bloques = [...new Set(x.map((f) => f.bloque))];
+      const dif = (f) => `<td class="n ${f.estado === "revisar" ? "baja" : ""}">${f.dif > 0 ? "+" : ""}${sol(f.dif)}</td>`;
+      // por año: el total (los tres niveles) y, al abrirlo, cada función, fuente o genérica
+      const anio = (f, abierto) => `<details class="funcion"${abierto ? " open" : ""}><summary><b>${f.anio}</b> ${chip[f.estado]}
+          <small>meses en la página: ${esc(f.meses)} · MEF S/ ${sol(f.mef)} · página S/ ${sol(f.pagina)} · diferencia ${f.dif > 0 ? "+" : ""}${sol(f.dif)}${f.fecha ? ` · consultado ${esc(fecha(f.fecha))}` : ""}</small></summary>
+        <div class="scroll"><table><tr><th>${esc(f.que)}</th><th class="n">Publicado por el MEF (S/)</th><th class="n">En la página (S/)</th><th class="n">Diferencia (S/)</th><th>Estado</th></tr>
+          ${f.items.map((i) => `<tr><td>${esc(i.codigo)}${i.nombre ? ": " + esc(i.nombre) : ""}</td><td class="n">${sol(i.mef)}</td><td class="n">${sol(i.pagina)}</td>${dif(i)}<td>${chip[i.estado]}</td></tr>`).join("")}
+          <tr class="total"><td>Total</td><td class="n">${sol(f.mef)}</td><td class="n">${sol(f.pagina)}</td>${dif(f)}<td>${chip[f.estado]}</td></tr></table></div></details>`;
       caja.innerHTML = `<p class="lead">En cada corrida, el scraper del MEF consulta también la <b>vista anual de Consulta Amigable</b> (lo que publica el MEF para todo el año) y la guarda en sus CSV de CONTROL.
-          Aquí se compara con lo que la página tiene guardado para ese año, por nivel de gobierno. <b>Coincide</b>: la diferencia no pasa de S/ 5 por mes.
+          Aquí se compara con lo que la página tiene guardado para ese año, con los tres niveles de gobierno sumados; abre un año para ver cada función, fuente o genérica. <b>Coincide</b>: la diferencia no pasa de S/ 5 por mes (S/ 3 por mes en cada fila).
           <b>Mes en curso</b>: del año actual, el MEF ya suma lo devengado en el mes abierto, que la página trae cuando se cierra. <b>Revisar</b>: falta o sobra algo.</p>
-        ${x.length ? bloques.map((b) => `<div class="caja"><h3>${esc(b)}</h3><div class="scroll"><table><tr><th>Año</th><th>Nivel</th><th>Meses en la página</th><th class="n">Publicado por el MEF (S/)</th><th class="n">En la página (S/)</th><th class="n">Diferencia (S/)</th><th>Estado</th><th>Consultado</th></tr>
-            ${x.filter((f) => f.bloque === b).map((f) => `<tr><td>${f.anio}</td><td>${esc(f.nivel)}</td><td>${esc(f.meses)}</td><td class="n">${sol(f.mef)}</td><td class="n">${sol(f.pagina)}</td>
-              <td class="n ${f.estado === "revisar" ? "baja" : ""}">${f.dif > 0 ? "+" : ""}${sol(f.dif)}</td><td>${chip[f.estado]}</td><td>${f.fecha ? esc(fecha(f.fecha)) : ""}</td></tr>`).join("")}</table></div></div>`).join("")
+        ${x.length ? bloques.map((b) => { const fs = x.filter((f) => f.bloque === b);
+            return `<div class="caja"><h3>${esc(b)}</h3><p class="nota">${esc(fs[0].descripcion)}</p>${fs.map((f, i) => anio(f, i === 0)).join("")}</div>`; }).join("")
           : '<div class="vacio-caja"><b>Todavía no hay controles del MEF guardados.</b><span>Se guardan solos en la próxima corrida del scraper del MEF (sus CSV de CONTROL), o subiendo esos CSV en «Subir archivos».</span></div>'}
         <p class="nota">Si algo sale en «revisar», vuelve a correr el scraper para ese año: reemplaza los meses y vuelve a consultar la vista anual.</p>`;
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo comparar</b><span>${esc(e.message)}</span></div>`; }
