@@ -481,9 +481,11 @@ def hidrologia_descargar(archivo: str = Query("diario", pattern="^(diario|no-pub
     nombre, ruta = hidrologia.filtrar(archivo, departamento)
     if formato == "csv":
         return FileResponse(ruta, media_type="text/csv; charset=utf-8", headers=_adjunto(nombre))
+    with open(ruta, "rb") as fh:                                   # se cuentan las filas antes de cargar nada en memoria
+        n_filas = max(0, sum(1 for _ in fh) - 1)
+    if n_filas > 150_000:
+        raise HTTPException(422, f"{nombre} tiene {n_filas:,} filas: es mucho para armar el Excel aquí. Bájalo en CSV, o elige un departamento.")
     df = pd.read_csv(ruta, encoding="utf-8-sig", dtype={"COD_ESTACION": str})
-    if len(df) > 150_000:
-        raise HTTPException(422, f"{nombre} tiene {len(df):,} filas: es mucho para armar el Excel aquí. Bájalo en CSV, o elige un departamento.")
     buf = io.BytesIO()
     df.to_excel(buf, index=False, sheet_name="Datos")
     return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
