@@ -36,6 +36,7 @@ PRODUCTOS = {"PETROLEO": ("Petróleo", "miles de barriles", 1000, "miles de barr
              "LGN": ("Líquidos de gas natural", "miles de barriles", 1000, "miles de barriles diarios"),
              "CONDENSADO": ("Condensado", "miles de barriles", 1000, "miles de barriles diarios"),
              "GAS NATURAL": ("Gas natural", "millones de pies cúbicos", 1000, "millones de pies cúbicos diarios")}
+ANEXO_ORDEN = ["LGN", "PETROLEO", "CONDENSADO", "GAS NATURAL"]
 MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"]
 MESES_CORTOS = ["Ene.", "Feb.", "Mar.", "Abr.", "May.", "Jun.", "Jul.", "Ago.", "Set.", "Oct.", "Nov.", "Dic."]
 FUENTE = "Fuente: PERUPETRO, producción fiscalizada y canon petrolero. Elaboración: BCRP, Sucursal Iquitos. Departamento de Estudios Económicos."
@@ -221,9 +222,24 @@ def cuadros(prod, canon, periodo=None):
                     grafico["serie"].append({"periodo": etiqueta(parcial["P"], True), "valor": round(float(x["VOLUMEN"].sum()) / div / parcial["dias"], 2),
                                              "var": None, "parcial": True})
                     grafico["serie"] = grafico["serie"][-25:]
+    # anexo de la síntesis: 13 meses por lote, en el orden de la síntesis (líquidos de GN, petróleo, condensado, gas). Van
+    # también los productos y lotes que produjeron en los últimos tres años aunque ahora estén en cero (como Lote 31-C LGN)
+    for k in ANEXO_ORDEN:
+        if k not in set(prod["PRODUCTO"]):
+            continue
+        nombre, unidad, div, _ = PRODUCTOS[k]
+        t = prod[prod["PRODUCTO"] == k].pivot_table(index="P", columns="LOTE_C", values="VOLUMEN", aggfunc="sum").fillna(0) / div
+        periodos = [q for q in t.index if q <= p]
+        tres = [q for q in periodos if q > p - 300]
+        lotes = sorted([l for l in t.columns if float(t.loc[tres, l].abs().sum()) > 0],
+                       key=lambda l: (-float(t.loc[periodos[-13:], l].sum()), l))
+        if not lotes:
+            continue
+        meses13 = [((p // 100 * 12 + p % 100 - 1 - j) // 12) * 100 + (p // 100 * 12 + p % 100 - 1 - j) % 12 + 1 for j in range(12, -1, -1)]
+        val = lambda q, l: round(float(t.at[q, l]), 3) if q in t.index else 0.0
         anexo.append({"producto": nombre, "unidad": unidad, "lotes": lotes,
-                      "filas": [{"periodo": etiqueta(q, True), **{l: round(float(t.at[q, l]), 3) for l in lotes},
-                                 "Total": round(float(t.loc[q].sum()), 3)} for q in periodos[-13:]]})
+                      "filas": [{"periodo": etiqueta(q, True), **{l: val(q, l) for l in lotes},
+                                 "Total": round(float(t.loc[q].sum()), 3) if q in t.index else 0.0} for q in meses13]})
     return {"periodo": f"{a}-{m:02d}", "ultimo": f"{ultimo // 100}-{ultimo % 100:02d}", "titulo_mes": MESES[m - 1],
             "anio": a, "bloques": bloques, "grafico": grafico, "anexo": anexo, "canon": _canon(canon),
             "de_diaria": [etiqueta(q, True) for q in de_diaria if q <= p],

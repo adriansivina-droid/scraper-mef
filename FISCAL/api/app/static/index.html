@@ -1077,15 +1077,20 @@
     if (c.anexo.length) {
       const base = c.anexo[0].filas, columnas = base.map((f) => ({ etq: MES_MAY(f.periodo), anio: +f.periodo.split(" ")[1] }));
       const filasA = [];
-      c.anexo.forEach((bl, k) => {
-        if (!uno) filasA.push({ nombre: `${bl.producto.toUpperCase()} ${k + 1}/`, tipo: "grupo" });
+      // varios productos (como en la síntesis de Ucayali): un grupo por producto con su llamada por unidad
+      // (1/ miles de barriles, 2/ millones de pies cúbicos), sin total
+      const varios = c.anexo.length > 1, unidades = [...new Set(c.anexo.map((bl) => bl.unidad))];
+      const NOMBRE_ANX = { "Líquidos de gas natural": "LÍQUIDOS DE GN", "Petróleo": "PETRÓLEO CRUDO" };
+      c.anexo.forEach((bl) => {
+        if (varios) filasA.push({ nombre: `${NOMBRE_ANX[bl.producto] || bl.producto.toUpperCase()} ${unidades.indexOf(bl.unidad) + 1}/`, tipo: "grupo" });
         else filasA.push({ nombre: "Lotes", tipo: "grupo" });
-        bl.lotes.forEach((l) => filasA.push({ nombre: l.startsWith("Lote") ? l : `Lote ${l}`, tipo: "item", valores: bl.filas.map((f) => f[l]) }));
-        if (uno) filasA.push({ nombre: "TOTAL", tipo: "total", valores: bl.filas.map((f) => f.Total) });
+        const suf = varios && bl.producto === "Líquidos de gas natural" ? " (LGN)" : "";
+        bl.lotes.forEach((l) => filasA.push({ nombre: (l.startsWith("Lote") ? l : `Lote ${l}`) + suf, tipo: "item", valores: bl.filas.map((f) => f[l]) }));
+        if (!varios) filasA.push({ nombre: "TOTAL", tipo: "total", valores: bl.filas.map((f) => f.Total) });
       });
-      const titA = uno ? `${R}: PRODUCCIÓN DE ${c.anexo[0].producto.toUpperCase()}${c.anexo[0].producto === "Petróleo" ? " CRUDO" : ""}` : `${R}: PRODUCCIÓN DE HIDROCARBUROS`;
-      items.push({ clave: "a0", tipo: "ANEXO", num: (N.a || [])[0], nombre: titA, svg: (n) => B.anexo({ numero: n, titulo: titA, unidad: uno ? `(${c.anexo[0].unidad.charAt(0).toUpperCase()}${c.anexo[0].unidad.slice(1)})` : "",
-        columnas, dec: 0, filas: filasA, notas: [...(uno ? [] : c.anexo.map((bl, k) => `${k + 1}/ ${bl.unidad.charAt(0).toUpperCase()}${bl.unidad.slice(1)}.`)), "Fuente: PERUPETRO."] }) });
+      const titA = !varios ? `${R}: PRODUCCIÓN DE ${c.anexo[0].producto.toUpperCase()}${c.anexo[0].producto === "Petróleo" ? " CRUDO" : ""}` : `${R}: PRODUCCIÓN DE HIDROCARBUROS`;
+      items.push({ clave: "a0", tipo: "ANEXO", num: (N.a || [])[0], nombre: titA, svg: (n) => B.anexo({ numero: n, titulo: titA, unidad: !varios ? `(${c.anexo[0].unidad.charAt(0).toUpperCase()}${c.anexo[0].unidad.slice(1)})` : "",
+        columnas, dec: 0, filas: filasA, notas: [...(varios ? unidades.map((u, k) => `${k + 1}/ ${u.charAt(0).toUpperCase()}${u.slice(1)}.`) : []), "Fuente: PERUPETRO."] }) });
     }
     return items;
   }
@@ -1107,6 +1112,15 @@
       if (pts.length) items.push({ clave: cl, tipo: "GRÁFICO", num: N[cl], nombre: `${R}: IVF ${nom}`, svg: (n) => B.barras({ numero: n, titulo: `${R}: IVF ${nom}`,
         unidad: "(Var. % real respecto a similar periodo del año anterior)", puntos: pts.map((x) => ({ periodo: x.periodo, valor: x[`var_${k}`] })), notas: ["Fuente: DIREPRO y Empresas."] }) });
     });
+    // anexos de la síntesis: el índice y su variación % por rama CIIU, 13 meses con el total Ene.-Dic. del año anterior
+    if (c.anexo && c.anexo.filas.length) {
+      const nomR = R.toLowerCase().replace(/(^|\s)\S/g, (x) => x.toUpperCase()), titA = `${R}: PRODUCCIÓN MANUFACTURERA`;
+      const notasA = ["1/ Cifras preliminares.", `Fuente: Dirección Regional de la Producción de ${nomR} - Encuesta BCRP a empresas industriales.`];
+      [["indice", "(Índice de volumen físico: año 2007 = 100)"], ["var", "(Variación porcentual)"]].forEach(([campo, unidad], k) =>
+        items.push({ clave: `a${k}`, tipo: "ANEXO", num: (N.a || [])[k], nombre: `${titA} ${k ? "(variación %)" : "(índice)"}`, svg: (n) => B.anexo({ numero: n, titulo: titA, llamada: "1/",
+          unidad, rotulo: "C I I U", dec: 1, columnas: c.anexo.columnas.map((x) => ({ etq: x.etq, anio: x.anio, total: !!x.total })),
+          filas: c.anexo.filas.map((f) => ({ nombre: f.nombre, tipo: f.tipo, valores: f[campo] })), notas: notasA }) }));
+    }
     return items;
   }
 
@@ -1268,9 +1282,9 @@
   // ── Anexos: los de la síntesis de cada región, en su orden (junio 2026). [sector, n° de anexo del sector] o [sector, título] si aún no hay datos
   const ANEXOS_TAB = "Anexos BCRP";
   const ANEXOS_SINTESIS = {
-    lor: [["agro"], ["hidro", 0], ["manu1"], ["manu2"], ["empleo", 0], ["expo", 0], ["impo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
-    smn: [["agro"], ["manu1"], ["manu2"], ["expo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
-    uca: [["agro"], ["pesca", 0], ["hidro", 0], ["manu1"], ["manu2"], ["expo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+    lor: [["agro"], ["hidro", 0], ["manu", 0], ["manu", 1], ["empleo", 0], ["expo", 0], ["impo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+    smn: [["agro"], ["manu", 0], ["manu", 1], ["expo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
+    uca: [["agro"], ["pesca", 0], ["hidro", 0], ["manu", 0], ["manu", 1], ["expo", 0], ["gasto", 0], ["gasto", 1], ["gasto", 2], ["inversion", 0], ["inversion", 1], ["inversion", 2], ["credito"], ["depositos"], ["morosidad"]],
   };
   async function anexosBCRP(r, caja) {
     const clave = `anx-${grupo}`, st = estadoEjec(clave), R = r.nombre.toUpperCase(), lista = ANEXOS_SINTESIS[grupo] || [];

@@ -246,7 +246,45 @@ def cuadros(depto, df, periodo=None):
             punto[k] = v
             punto[f"var_{k}"] = _var(ind(q - 100, cs), v) if q - 100 in I.index else None
         serie.append(punto)
-    return {"periodo": f"{a}-{m:02d}", "ultimo": f"{ultimo // 100}-{ultimo % 100:02d}", "anio": a, "comparar": a - 1, "mes": m,
+    # anexos de la síntesis: el índice y su variación % de los 13 meses que terminan en p, con el total Ene.-Dic. del año
+    # anterior después de su diciembre (ramas «CIIU - nombre», grupos y TOTAL)
+    def promedio_anual(anio, cs):
+        vals = [ind(q, cs) for q in range(anio * 100 + 1, anio * 100 + 13) if q in I.index]
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    def var0(b, x):
+        return 0.0 if (b or 0) == 0 and (x or 0) == 0 else _var(b, x)
+    meses13 = [q for q in ((p // 100 * 12 + p % 100 - 1 - k) for k in range(12, -1, -1))]
+    meses13 = [(q // 12) * 100 + q % 12 + 1 for q in meses13]
+    columnas = []
+    for q in meses13:
+        columnas.append({"p": q, "etq": CORTOS[q % 100 - 1], "anio": q // 100})
+        if q % 100 == 12 and q // 100 == a - 1:
+            columnas.append({"total": True, "etq": "Ene.-Dic.", "anio": a - 1})
+    def valores(cs):
+        idx, var = [], []
+        for c in columnas:
+            if c.get("total"):
+                x, b = promedio_anual(c["anio"], cs), promedio_anual(c["anio"] - 1, cs)
+            else:
+                x, b = ind(c["p"], cs), ind(c["p"] - 100, cs)
+            idx.append(None if x is None else round(x, 3))
+            var.append(None if x is None or b is None else (None if var0(b, x) is None else round(var0(b, x), 3)))
+        return idx, var
+    anexo_filas = []
+    for g, cs in grupos.items():
+        if not cs:
+            continue
+        i_, v_ = valores(cs)
+        anexo_filas.append({"nombre": g, "tipo": "grupo", "indice": i_, "var": v_})
+        for c in cs:
+            i_, v_ = valores([c])
+            anexo_filas.append({"nombre": f"{c} - {nombre[c]}", "tipo": "item", "indice": i_, "var": v_})
+    i_, v_ = valores(todas)
+    anexo_filas.append({"nombre": "TOTAL", "tipo": "total", "indice": i_, "var": v_})
+    anexo = {"columnas": [{k: v for k, v in c.items() if k != "p"} for c in columnas], "filas": anexo_filas}
+    return {"periodo": f"{a}-{m:02d}", "ultimo": f"{ultimo // 100}-{ultimo % 100:02d}", "anio": a, "comparar": a - 1, "mes": m, "anexo": anexo,
             "titulo_mes": MESES[m - 1], "acumulado": "Enero" if m == 1 else f"Enero - {MESES[m - 1]}",
             "meses": [f"{int(q) // 100}-{int(q) % 100:02d}" for q in periodos], "departamento": DEPARTAMENTOS[depto],
             "cuadro": filas, "serie": serie, "serie_25": serie[-25:],
