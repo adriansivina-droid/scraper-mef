@@ -1,0 +1,62 @@
+# Mide la velocidad de la página publicada (solo lectura): cuánto tarda y cuánto pesa cada consulta que hacen las
+# pestañas, dos veces seguidas (la primera puede incluir el arranque o la caché fría). Sirve para encontrar lo lento.
+#   · a mano: Actions → «API · medir velocidad» → Run workflow (opcional: otras rutas separadas por espacios)
+# Usa los secretos ESTUDIOS_API_URL, ESTUDIOS_API_USUARIO y ESTUDIOS_API_CLAVE.
+name: API · medir velocidad
+
+on:
+  workflow_dispatch:
+    inputs:
+      rutas:
+        description: "Rutas GET extra (separadas por espacios); vacío = las de siempre"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Medir
+        env:
+          URL: ${{ secrets.ESTUDIOS_API_URL }}
+          USUARIO: ${{ secrets.ESTUDIOS_API_USUARIO }}
+          CLAVE: ${{ secrets.ESTUDIOS_API_CLAVE }}
+          RUTAS: ${{ inputs.rutas }}
+        run: |
+          python3 - <<'PY'
+          import base64, gzip, os, re, time, urllib.request
+          url, auth = os.environ["URL"].rstrip("/"), base64.b64encode(f"{os.environ['USUARIO']}:{os.environ['CLAVE']}".encode()).decode()
+          rutas = os.environ.get("RUTAS", "").split() or [
+              "/salud", "/", "/v1/acceso/yo", "/v1/catalogo", "/v1/estado", "/v1/ipc", "/v1/mef", "/v1/fiscal/archivos",
+              "/v1/cuadros/ejecucion?departamento=16&sector=gasto", "/v1/cuadros/ejecucion?departamento=16&sector=inversion",
+              "/v1/cuadros/ejecucion?departamento=16&sector=gasto&anexos=true", "/v1/cuadros/ejecucion?departamento=16&sector=inversion&anexos=true",
+              "/v1/variaciones?departamento=16", "/v1/proyectos?departamento=16",
+              "/v1/contraste/ejecucion?departamento=16&sector=gasto", "/v1/contraste/ejecucion?departamento=16&sector=inversion",
+              "/v1/cuadros/manufactura?departamento=16", "/v1/cuadros/pesca?departamento=16", "/v1/cuadros/hidrocarburos?departamento=16",
+              "/v1/cuadros/empleo?departamento=16", "/v1/cuadros/exportaciones?departamento=16", "/v1/cuadros/exportaciones?departamento=16&flujo=impo",
+              "/v1/empleo", "/v1/drae", "/v1/hidrologia", "/v1/hidrocarburos/almacen", "/v1/hidrocarburos/archivos",
+              "/v1/exportaciones/resumen", "/v1/importaciones/resumen", "/v1/compartir"]
+          print(f"{'ruta':78s} {'1ª (s)':>7} {'2ª (s)':>7} {'KB gzip':>8} {'KB':>8}  estado")
+          total = 0.0
+          for r in rutas:
+              tiempos, est, kb, kbz = [], "", 0, 0
+              for _ in range(2):
+                  req = urllib.request.Request(url + r, headers={"Authorization": "Basic " + auth, "Accept-Encoding": "gzip"})
+                  t0 = time.perf_counter()
+                  try:
+                      with urllib.request.urlopen(req, timeout=180) as resp:
+                          crudo = resp.read(); est = resp.status
+                          kbz = len(crudo) / 1024
+                          kb = len(gzip.decompress(crudo) if resp.headers.get("Content-Encoding") == "gzip" else crudo) / 1024
+                  except Exception as e:
+                      est = re.sub(r"\s+", " ", str(e))[:40]
+                  tiempos.append(time.perf_counter() - t0)
+              total += tiempos[1]
+              lento = " ◀ LENTO" if min(tiempos) > 1.5 else ""
+              print(f"{r[:78]:78s} {tiempos[0]:7.2f} {tiempos[1]:7.2f} {kbz:8.1f} {kb:8.1f}  {est}{lento}")
+          print(f"\nSuma de la 2ª pasada: {total:.1f} s")
+          PY
