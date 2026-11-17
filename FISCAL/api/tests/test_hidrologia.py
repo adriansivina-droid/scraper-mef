@@ -428,3 +428,37 @@ def test_el_dato_dudoso_va_marcado_en_el_csv_y_fuera_de_la_linea(cliente):
 def test_el_caudal_no_se_revisa():
     # las crecidas relámpago de un día en ríos de montaña son reales: el caudal no se marca
     assert "CAUDAL" not in hidrologia.VARIABLES_DUDOSAS
+
+
+def horaria(cod, var, desde_h, valores, dia="2026-11-17", rojo=900.0):
+    """Un hidrograma horario como lo guarda el recolector v7: horas desde «desde_h» (ms) y la serie «dato» con los umbrales."""
+    t = [desde_h + i * 3_600_000 for i in range(len(valores))]
+    return {"dia": dia, "cod": cod, "variable": var, "fh": f"{dia} 09:00:00", "estado": "OK",
+            "data": {"codEstacion": cod, "nomEstacion": "CABO INGA", "nomRio": "RÍO TUMBES", "variable": var, "unidad": "m3/s", "t": t,
+                     "series": {"dato": list(valores), "rojo": [rojo] * len(valores), "naranja": [750.0] * len(valores)}}}
+
+
+def test_hidrograma_horario_se_suma_en_cada_actualizacion(cliente):
+    h0 = ms(date(2026, 11, 15))
+    c = crudo("2026-11-17")
+    c["horarias"] = [horaria("240001", "NIVEL", h0, [100.0, 110.0, None, 130.0])]
+    subir(cliente, c)
+    j = cliente.get("/v1/hidrologia/estaciones?departamento=todos").json()
+    assert j["horario"] == ["240001:NIVEL"]
+    s = cliente.get("/v1/hidrologia/horario?estacion=240001&variable=NIVEL").json()
+    assert s["valor"] == [100.0, 110.0, None, 130.0] and s["t"][0] == h0 and s["rojo"][0] == 900.0 and s["estacion"] == "CABO INGA"
+    # la siguiente actualización trae horas que se solapan: se suman (por hora manda lo nuevo) y no se pierde lo anterior
+    c = crudo("2026-11-18")
+    c["horarias"] = [horaria("240001", "NIVEL", h0 + 3 * 3_600_000, [131.0, 140.0], dia="2026-11-18")]
+    subir(cliente, c)
+    s = cliente.get("/v1/hidrologia/horario?estacion=240001&variable=NIVEL").json()
+    assert s["valor"] == [100.0, 110.0, None, 131.0, 140.0] and len(s["t"]) == 5
+    assert cliente.get("/v1/hidrologia/horario?estacion=240001&variable=CAUDAL").status_code == 404
+
+
+def test_horario_guarda_solo_los_ultimos_dias():
+    viejo = horaria("1", "NIVEL", 0, [1.0, 2.0])
+    nuevo = horaria("1", "NIVEL", (hidrologia.DIAS_HORARIO + 5) * 86_400_000, [3.0])
+    u = hidrologia.unir_horario(viejo, nuevo)
+    assert u["data"]["series"]["dato"] == [3.0]
+    assert hidrologia.unir_horario(viejo, {"estado": "SIN DATOS", "data": None}) is viejo

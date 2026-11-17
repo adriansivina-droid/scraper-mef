@@ -2,7 +2,7 @@
  *
  * SENAMHI corta la conexión a los servidores en la nube (Colab, GitHub…), pero responde al navegador.
  * Este script se ejecuta en la consola del navegador, en la página de SENAMHI, y hace las mismas consultas
- * que la página (lista de estaciones, hidrograma diario, Información Diaria e Información Mensual).
+ * que la página (lista de estaciones, hidrograma diario y horario, Información Diaria e Información Mensual).
  * Al terminar descarga un archivo «SENAMHI_crudo_AAAA-MM-DD.json», que se sube a la página del departamento
  * (Hidrología → Actualizar), donde se arman los CSV y el gráfico. El mismo archivo sirve en el notebook
  * HIDROLOGIA/SENAMHI_Rios.ipynb (Colab) si además se quiere la copia en Drive.
@@ -18,7 +18,7 @@
   'use strict';
   if (window.__senamhiRecolector) { window.__senamhiRecolector.mostrar(); return; }
 
-  const VERSION = 6;
+  const VERSION = 7;
   const B = location.origin;
   const U = {
     mapa: B + '/mapas/mapa-monitoreohidro/mapa-monitoreo.php',
@@ -131,6 +131,22 @@
     return out;
   }
 
+  // hidrograma «Horario» (btnTipo=H): los últimos días, dato por hora. Se guarda cada serie de pares [ms, valor] que traiga
+  // (el dato y los umbrales), sobre una sola lista de horas
+  function compactarHorario(d) {
+    const series = {};
+    for (const [k, v] of Object.entries(d || {})) {
+      if (Array.isArray(v) && v.length && v.every((p) => Array.isArray(p) && p.length >= 2 && Number.isFinite(Number(p[0])))) series[k] = v;
+    }
+    const t = [...new Set(Object.values(series).flatMap((v) => v.map((p) => Number(p[0]))))].sort((a, b) => a - b);
+    const out = { codEstacion: d.codEstacion, nomEstacion: d.nomEstacion, nomRio: d.nomRio, variable: d.variable, unidad: d.unidad, t, series: {} };
+    for (const [k, v] of Object.entries(series)) {
+      const m = new Map(v.map((p) => [Number(p[0]), p[1] === null || p[1] === undefined || Number(p[1]) <= -999 ? null : Number(p[1])]));
+      out.series[k] = t.map((x) => (m.has(x) ? m.get(x) : null));
+    }
+    return out;
+  }
+
   async function fichaEstacion(cod, coord) {
     const base = `${GEO}/wms?service=WMS&request=GetFeatureInfo&version=1.1.1&layers=g_dbphisis%3Aestaciones_monitoreo` +
       `&styles=&format=image%2Fpng&transparent=true&cql_filter=id%20IN%20('estaciones_monitoreo.${cod}')` +
@@ -214,7 +230,7 @@
       for (let a = M_DESDE.getFullYear(), m = M_DESDE.getMonth() + 1; a < HASTA.getFullYear() || (a === HASTA.getFullYear() && m <= HASTA.getMonth() + 1); m === 12 ? (a++, m = 1) : m++) meses.push([a, m]);
     }
     if (!cfg.hidrograma) lista = [];
-    total = lista.length * (1 + cfg.variables.length) + meses.length + dias.length * cfg.horas.length;
+    total = lista.length * (1 + cfg.variables.length * (cfg.horario ? 2 : 1)) + meses.length + dias.length * cfg.horas.length;
     hecho = 0;
 
     // 2. hidrograma diario por estación (mismo orden y mismas reglas que el notebook)
@@ -282,6 +298,21 @@
         }
         hecho++; pintar();
       }
+      // hidrograma horario de la misma estación: solo de las variables que SENAMHI publica en ella; se vuelve a pedir si cambió la hora
+      if (cfg.horario) {
+        for (const v of cfg.variables) {
+          const gd = await leer(`graf:${cod}:${v}:actual`), clave = `hor:${cod}:${v}`;
+          let g = await leer(clave);
+          if (gd && gd.estado === 'OK' && !gd.noPublicado && (!g || g.fh !== fhActual || g.estado === 'SIN RESPUESTA')) {
+            const html = await pedir(U.grafica, new URLSearchParams({ rbtVariable: v, fecha_hora: fhActual, btnTipo: 'H', variable_opcion: opcion, id: cod }));
+            const d = varData(html), c = d ? compactarHorario(d) : null;
+            const ok = c && c.t.length && Object.values(c.series).some((x) => x.some((y) => y !== null)) && String(d.variable || v).toUpperCase() === v;
+            g = { dia: hoyIso, cod, variable: v, fh: fhActual, estado: html === null ? 'SIN RESPUESTA' : ok ? 'OK' : 'SIN DATOS', data: ok ? c : null };
+            await guardar(clave, g);
+          }
+          hecho++; pintar();
+        }
+      }
     }
 
     // 3. Información Mensual
@@ -337,10 +368,11 @@
     const t = await todo();
     const out = { version: VERSION, generado: new Date().toISOString(), meta: t.meta || {}, estaciones: t.estaciones || [],
                   wfs: t.wfs || null, zonales: t.zonales || null, monitoreo: t.monitoreo || null, historiaOk: t.historiaOk === undefined ? null : t.historiaOk,
-                  fichas: {}, graficas: [], mensual: {}, infoMeta: t.infoMeta || {}, infoDiaria: {} };
+                  fichas: {}, graficas: [], horarias: [], mensual: {}, infoMeta: t.infoMeta || {}, infoDiaria: {} };
     for (const k in t) {
       if (k.startsWith('ficha:')) out.fichas[k.slice(6)] = t[k].f;
       else if (k.startsWith('graf:')) out.graficas.push(t[k]);
+      else if (k.startsWith('hor:')) { if (t[k].estado === 'OK') out.horarias.push(t[k]); }
       else if (k.startsWith('men:')) out.mensual[k.slice(4)] = t[k];
       else if (k.startsWith('inf:')) out.infoDiaria[k.slice(4, 14) + ' ' + k.slice(15)] = t[k];
     }
@@ -367,6 +399,7 @@
     '<label><input id="sr-prueba" type="checkbox"> Prueba rápida (3 estaciones y 2 días, ~1 min)</label><br>' +
     '<label><input id="sr-hidro" type="checkbox" checked> Hidrograma diario (todas las estaciones)</label><br>' +
     '<label><input id="sr-caudal" type="checkbox" checked> Caudal, además del nivel</label><br>' +
+    '<label><input id="sr-horario" type="checkbox" checked> Hidrograma horario (últimos días, dato por hora)</label><br>' +
     '<label><input id="sr-diaria" type="checkbox" checked> Información Diaria (4 horas por día; es lo más largo)</label><br>' +
     '<label><input id="sr-mensual" type="checkbox" checked> Información Mensual</label> <label style="font-size:11px">desde <input id="sr-mdesde" type="month" title="Vacío = desde la misma fecha que lo diario"></label></div>' +
     '<div id="sr-estado" style="margin:8px 0 4px">Listo. Deja esta pestaña abierta mientras trabaja.</div>' +
@@ -395,7 +428,7 @@
     corriendo = true; detenido = false; pausado = false; fallos = 0; t0 = Date.now();
     $('sr-iniciar').disabled = true; $('sr-pausa').disabled = false;
     const cfg = { desdeFecha: $('sr-desde').value || '2023-01-01', hastaFecha: $('sr-hasta').value || iso(hoyLima()),
-                  prueba: $('sr-prueba').checked, hidrograma: $('sr-hidro').checked,
+                  prueba: $('sr-prueba').checked, hidrograma: $('sr-hidro').checked, horario: $('sr-horario').checked,
                   variables: $('sr-caudal').checked ? ['NIVEL', 'CAUDAL'] : ['NIVEL'],
                   infoDiaria: $('sr-diaria').checked, mensual: $('sr-mensual').checked, mensualDesde: $('sr-mdesde').value || '', horas: HORAS };
     try {

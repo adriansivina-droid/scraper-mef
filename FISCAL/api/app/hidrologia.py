@@ -33,7 +33,7 @@ DEPTOS = {"16": "LORETO", "22": "SAN MARTIN", "25": "UCAYALI"}
 ZONAL_DE = {"16": "08", "22": "09", "25": "10"}  # dirección zonal que atiende a cada departamento (si SENAMHI no da el departamento)
 MES_EN = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6, "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10,
           "NOV": 11, "DEC": 12}
-_RE_CLAVE = re.compile(r"^(meta|estaciones|zonales|infoMeta|fichas|historiaOk|monitoreo|graf:[^:]{1,40}:(NIVEL|CAUDAL):\d{4}"
+_RE_CLAVE = re.compile(r"^(meta|estaciones|zonales|infoMeta|fichas|historiaOk|monitoreo|graf:[^:]{1,40}:(NIVEL|CAUDAL):\d{4}|hor:[^:]{1,40}:(NIVEL|CAUDAL)"
                        r"|men:\d{4}-\d{2}|inf:\d{4}-\d{2}-\d{2}:\d{2}:\d{2})$")
 ARCHIVOS = {"diario": "SENAMHI_rios_diario.csv", "no-publicado": "SENAMHI_rios_diario_no_publicado.csv", "info-diaria": "SENAMHI_rios_info_diaria.csv",
             "mensual": "SENAMHI_rios_mensual.csv", "estaciones": "SENAMHI_ESTACIONES.csv",
@@ -150,11 +150,14 @@ def guardar(piezas, dia):
             previas.update({c: d for c, d in cx.execute(text(f"SELECT clave, dia FROM senamhi_crudo WHERE clave IN ({marcas})"),
                                                         {f"c{k}": c for k, c in enumerate(lote)}).all()})
         for p, clave in zip(piezas, claves):
-            if clave in previas and (previas[clave] or "") > dia:
+            if clave.startswith("hor:"):                  # el horario trae pocos días: se suma a lo ya guardado (no lo reemplaza)
+                previo = cx.execute(text("SELECT datos FROM senamhi_crudo WHERE clave = :c"), {"c": clave}).first() if clave in previas else None
+                p = {**p, "valor": unir_horario(json.loads(zlib.decompress(bytes(previo[0]))) if previo else None, p.get("valor"))}
+            elif clave in previas and (previas[clave] or "") > dia:
                 viejas += 1
                 continue
             datos = zlib.compress(json.dumps(p.get("valor"), ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6)
-            par = {"c": clave, "d": datos, "h": str(p.get("huella", ""))[:40], "dia": dia, "a": ahora}
+            par = {"c": clave, "d": datos, "h": str(p.get("huella", ""))[:40], "dia": max(dia, previas.get(clave) or ""), "a": ahora}
             if clave in previas:
                 cx.execute(text("UPDATE senamhi_crudo SET datos = :d, huella = :h, dia = :dia, actualizado = :a WHERE clave = :c"), par)
             else:
@@ -171,6 +174,66 @@ def guardar(piezas, dia):
                 cx.execute(text("INSERT INTO senamhi_crudo (clave, datos, huella, dia, actualizado) VALUES ('inicio', :d, '', :dia, :a)"),
                            {"d": zlib.compress(json.dumps(desde).encode()), "dia": dia, "a": ahora})
     return {"guardadas": guardadas, "omitidas_por_viejas": viejas}
+
+
+# ── hidrograma horario ───────────────────────────────────────────────────────
+# SENAMHI da por hora solo los últimos ~3 días (btnTipo=H). Cada archivo del recolector (v7 en adelante) trae esos días y la
+# página los va sumando, así que la historia horaria crece con cada actualización. Se guardan los últimos DIAS_HORARIO días.
+DIAS_HORARIO = 120
+_UMBRALES_H = ("rojo", "naranja", "amarillo")
+
+
+def _serie_principal(series):
+    """El nombre de la serie con el dato (las demás son umbrales o referencias)."""
+    for k in ("dato", "datoActual", "datoHorario", "datos", "valor"):
+        if k in series:
+            return k
+    resto = [k for k in series if k not in _UMBRALES_H and k not in ("promHistorico", "minimo", "maximo", "datoAnterior")]
+    return resto[0] if resto else None
+
+
+def unir_horario(previo, nuevo):
+    """Une dos piezas «hor:» (lo ya guardado y lo que llega): por hora manda lo más nuevo. Recorta a los últimos DIAS_HORARIO días."""
+    ok = lambda g: bool(g) and g.get("estado") == "OK" and bool((g.get("data") or {}).get("t"))   # noqa: E731
+    if not ok(nuevo):
+        return previo if ok(previo) else nuevo
+    por_hora, nombres = {}, set()
+    for g in ([previo] if ok(previo) else []) + [nuevo]:
+        d = g["data"]
+        nombres.update(d.get("series") or {})
+        for i, t in enumerate(d["t"]):
+            fila = por_hora.setdefault(int(t), {})
+            for k, v in (d.get("series") or {}).items():
+                if i < len(v) and v[i] is not None:
+                    fila[k] = v[i]
+    tope = max(por_hora) - DIAS_HORARIO * 86_400_000
+    t = sorted(x for x in por_hora if x >= tope)
+    data = {**{k: v for k, v in nuevo["data"].items() if k not in ("t", "series")},
+            "t": t, "series": {k: [por_hora[x].get(k) for x in t] for k in sorted(nombres)}}
+    return {**nuevo, "data": data}
+
+
+def con_horario():
+    """[«código:VARIABLE»] de las estaciones con hidrograma horario guardado."""
+    _tabla()
+    with db.motor().connect() as cx:
+        return sorted(c[4:] for (c,) in cx.execute(text("SELECT clave FROM senamhi_crudo WHERE clave LIKE 'hor:%'")).all())
+
+
+def horario(codigo, variable):
+    """El hidrograma horario de una estación: {t: [ms], valor: [...], rojo, naranja, amarillo, unidad, …}. None si no hay."""
+    if (codigo, variable) in no_mide():
+        return None
+    g = _leer(f"hor:{codigo}:{variable}")
+    d = (g or {}).get("data") or {}
+    series = d.get("series") or {}
+    k = _serie_principal(series)
+    if not k or not d.get("t") or not any(v is not None for v in series[k]):
+        return None
+    nombres = {str(e.get("codEstacion")): e.get("nomEstacion", "") for e in _leer("estaciones", []) or []}
+    return {"codigo": codigo, "variable": variable, "estacion": d.get("nomEstacion") or nombres.get(codigo, codigo), "rio": d.get("nomRio", ""),
+            "unidad": d.get("unidad", ""), "t": d["t"], "valor": [num(v) for v in series[k]], "consultado": g.get("fh", ""),
+            **{u: [num(v) for v in series[u]] for u in _UMBRALES_H if u in series}}
 
 
 def inicio():
@@ -232,6 +295,8 @@ def piezas_de_archivo(crudo):
     out = [{"clave": k, "valor": crudo[k]} for k in ("meta", "estaciones", "zonales", "infoMeta", "fichas", "monitoreo") if crudo.get(k)]
     for g in crudo.get("graficas") or []:
         out.append({"clave": f"graf:{g['cod']}:{g['variable']}:{g['y']}", "valor": g})
+    for g in crudo.get("horarias") or []:
+        out.append({"clave": f"hor:{g['cod']}:{g['variable']}", "valor": g})
     out += [{"clave": f"men:{k}", "valor": v} for k, v in (crudo.get("mensual") or {}).items()]
     out += [{"clave": f"inf:{k[:10]}:{k[11:]}", "valor": v} for k, v in (crudo.get("infoDiaria") or {}).items()]
     return out
@@ -264,7 +329,8 @@ def version():
     """Cambia cada vez que se guarda algo: sirve para saber si lo armado en disco sigue vigente."""
     _tabla()
     with db.motor().connect() as cx:
-        n, a = cx.execute(text("SELECT COUNT(*), MAX(actualizado) FROM senamhi_crudo")).first()
+        # el horario no entra en los CSV: si solo cambió eso, no hace falta volver a armarlos
+        n, a = cx.execute(text("SELECT COUNT(*), MAX(actualizado) FROM senamhi_crudo WHERE clave NOT LIKE 'hor:%'")).first()
     return f"{n}-{a or ''}"
 
 

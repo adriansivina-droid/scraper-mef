@@ -421,7 +421,7 @@ def hidrologia_estaciones(departamento: str = Query(..., pattern="^(16|22|25|tod
     """Estaciones del departamento con datos, sus variables, años hidrológicos y el último dato."""
     if not hidrologia.hay_datos():
         return {"estaciones": [], "resumen": {"hay": False}}
-    return {"estaciones": hidrologia.estaciones_de(departamento), "resumen": hidrologia.estado()}
+    return {"estaciones": hidrologia.estaciones_de(departamento), "resumen": hidrologia.estado(), "horario": hidrologia.con_horario()}
 
 
 @app.get("/v1/hidrologia/serie", dependencies=[Depends(acceso)])
@@ -453,6 +453,15 @@ def hidrologia_rango(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"
         raise HTTPException(422, str(e))
     if s is None:
         raise HTTPException(404, "No hay datos de esa estación y variable entre esas fechas.")
+    return s
+
+
+@app.get("/v1/hidrologia/horario", dependencies=[Depends(acceso)])
+def hidrologia_horario(estacion: str = Query(..., max_length=40, pattern="^[^:]+$"), variable: str = Query("NIVEL", pattern="^(NIVEL|CAUDAL)$")):
+    """El hidrograma horario (dato por hora) de los últimos días que se han ido recolectando, como el botón «Horario» de SENAMHI."""
+    s = hidrologia.horario(estacion, variable)
+    if s is None:
+        raise HTTPException(404, "Todavía no hay datos horarios de esa estación: se recogen con el recolector desde la versión 7.")
     return s
 
 

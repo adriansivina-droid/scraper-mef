@@ -156,6 +156,52 @@
     return { svg, W, H, izq, der, arr, alto, n, x0, dec, i0 };
   }
 
+  // hidrograma horario (como el botón «Horario» de SENAMHI): eje de horas, el dato por hora y los umbrales
+  const hhmm = (d) => `${dd(d.getUTCHours())}:${dd(d.getUTCMinutes())}`;
+  function hidrogramaHora(s, desde) {
+    const idx = s.t.map((t, i) => i).filter((i) => s.t[i] >= desde), ocultas = s.ocultas || new Set();
+    const W = 920, izq = 74, der = 22, arr = 70, alto = 300;
+    const SER = [["valor", "Dato horario", "#1F2BCF", 2.2], ["rojo", "Rojo", "#E0281E", 1.8], ["naranja", "Naranja", "#F28C00", 1.8], ["amarillo", "Amarillo", "#E8D21A", 1.8]]
+      .filter(([k]) => s[k] && idx.some((i) => s[k][i] != null));
+    const vis = SER.filter(([k]) => !ocultas.has(k));
+    const todos = vis.flatMap(([k]) => idx.map((i) => s[k][i])).filter((v) => v != null);
+    if (!todos.length || !idx.length) return null;
+    let lo = Math.min(...todos), hi = Math.max(...todos);
+    const margen = (hi - lo || Math.abs(hi) || 1) * 0.05; lo -= margen; hi += margen;
+    const paso = (() => { const b = (hi - lo) / 8, p = 10 ** Math.floor(Math.log10(b)), f = b / p; return (f < 1.5 ? 1 : f < 2.25 ? 2 : f < 3.5 ? 2.5 : f < 7.5 ? 5 : 10) * p; })();
+    const dec = Math.max(0, Math.min(3, -Math.floor(Math.log10(paso) + 1e-9) + (paso / 10 ** Math.floor(Math.log10(paso)) === 2.5 ? 1 : 0)));
+    lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso;
+    const t0 = s.t[idx[0]], t1 = Math.max(s.t[idx[idx.length - 1]], t0 + 36e5), ancho = W - izq - der;
+    const X = (t) => izq + ancho * (t - t0) / (t1 - t0), Y = (v) => arr + alto * (1 - (v - lo) / (hi - lo));
+    // la línea se corta si faltan más de 3 horas seguidas
+    const camino = (k) => { let d = "", prev = null; idx.forEach((i) => { const v = s[k][i]; if (v == null) { prev = null; return; } d += `${prev != null && s.t[i] - prev <= 3 * 36e5 ? "L" : "M"}${X(s.t[i]).toFixed(1)},${Y(v).toFixed(1)}`; prev = s.t[i]; }); return d; };
+    let rejilla = "";
+    for (let v = lo; v <= hi + paso / 2; v += paso) rejilla += `<line x1="${izq}" x2="${W - der}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="#E3E3E3"/><text x="${izq - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${num(v, dec)}</text>`;
+    const horas = (t1 - t0) / 36e5, cada = horas <= 36 ? 3 : horas <= 96 ? 12 : horas <= 240 ? 24 : horas <= 24 * 45 ? 24 * 7 : 24 * 14;
+    let eje = "";
+    for (let t = Math.ceil(t0 / (cada * 36e5)) * cada * 36e5; t <= t1; t += cada * 36e5) {
+      const d = new Date(t), x = X(t).toFixed(1), dia = d.getUTCHours() === 0;
+      eje += `<line x1="${x}" x2="${x}" y1="${arr + alto}" y2="${arr + alto + 6}" stroke="#9A9A9A"/><text x="${x}" y="${arr + alto + 20}" text-anchor="middle"${dia ? ' font-weight="600"' : ""}>${dia || cada >= 24 ? `${dd(d.getUTCDate())} ${MES[d.getUTCMonth()]}` : hhmm(d)}</text>`;
+    }
+    const UMB = ["rojo", "naranja", "amarillo"];
+    const trazos = vis.map(([k, , c, w]) => `<path d="${camino(k)}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"${UMB.includes(k) ? ' stroke-dasharray="9 5"' : ""}/>`).join("");
+    const puntos = !ocultas.has("valor") && idx.length <= 240 ? idx.filter((i) => s.valor[i] != null).map((i) => `<circle cx="${X(s.t[i]).toFixed(1)}" cy="${Y(s.valor[i]).toFixed(1)}" r="2.6" fill="#1F2BCF"/>`).join("") : "";
+    const items = SER.map(([k, t, c]) => ({ k, c, t: t + (UMB.includes(k) ? ` ${num(idx.map((i) => s[k][i]).filter((v) => v != null).pop(), 2)}` : "") }));
+    let lx = 0; const ws = items.map((it) => 34 + it.t.length * 6.9), tot = ws.reduce((a, b) => a + b, 0); lx = izq + (ancho - tot) / 2;
+    const yL = arr + alto + 48, H = yL + 34;
+    const leyenda = items.map((it, n) => { const x = lx; lx += ws[n]; return `<g data-serie="${it.k}" style="cursor:pointer" opacity="${ocultas.has(it.k) ? 0.35 : 1}"><rect x="${x}" y="${yL - 12}" width="${ws[n] - 6}" height="18" fill="#FFF" fill-opacity="0"/><line x1="${x}" x2="${x + 22}" y1="${yL - 3}" y2="${yL - 3}" stroke="${it.c}" stroke-width="3"${UMB.includes(it.k) ? ' stroke-dasharray="6 3"' : ""}/><text x="${x + 28}" y="${yL + 1}" fill="#333" font-weight="600">${esc(it.t)}</text></g>`; }).join("");
+    const Var = VAR[s.variable].toUpperCase(), f = (t) => { const d = new Date(t); return `${dd(d.getUTCDate())}/${dd(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${hhmm(d)}`; };
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#555" role="img" aria-label="Hidrograma horario de ${esc(s.estacion)}">
+      <rect width="${W}" height="${H}" fill="#FFF"/>
+      <text x="${W / 2}" y="26" text-anchor="middle" font-size="17" font-weight="600" fill="#333">HIDROGRAMA DE ${Var} DEL ${esc(String(s.rio || "").toUpperCase())}</text>
+      <text x="${W / 2}" y="47" text-anchor="middle" font-size="12" fill="#666">ESTACIÓN ${esc(String(s.estacion || "").toUpperCase())} · DATO HORARIO</text>
+      <text transform="translate(18 ${arr + alto / 2}) rotate(-90)" text-anchor="middle" fill="#333">${Var} (${esc(s.unidad)})</text>
+      ${rejilla}<line x1="${izq}" x2="${W - der}" y1="${arr + alto}" y2="${arr + alto}" stroke="#9A9A9A"/>${eje}${trazos}${puntos}${leyenda}
+      <text x="${izq}" y="${H - 6}" font-size="11" fill="#777">Del ${f(t0)} al ${f(s.t[idx[idx.length - 1]])} (hora de SENAMHI)</text>
+      <text x="${W - der}" y="${H - 6}" text-anchor="end" font-size="11" fill="#777">Fuente: SENAMHI</text></svg>`;
+    return { svg, W, H, izq, der, arr, alto, idx, X, t0, t1, f, SER };
+  }
+
   // barra de navegación (como la de SENAMHI): toda la serie en pequeño y el tramo visible, que se arrastra o se estira
   function navegador(s, vista) {
     const W = 920, H = 58, izq = 74, der = 22, n = s.dias, x0 = new Date(s.desde + "T00:00:00Z"), ancho = W - izq - der;
@@ -223,7 +269,7 @@
       <div class="caja"><h3>Hidrograma</h3>
         <div class="fila"><label class="campo">Estación<select id="hid-est">${j.estaciones.map((e) => `<option value="${esc(e.codigo)}">${esc(titulo(e.rio))} · ${esc(titulo(e.estacion))}</option>`).join("")}</select></label>
           <label class="campo">Variable<select id="hid-var"></select></label>
-          <label class="campo">Ver<select id="hid-modo"><option value="cal">Comparar años (ene–dic)</option><option value="anio">Comparar años hidrológicos (set–ago, como SENAMHI)</option><option value="rango">Rango de fechas</option></select></label>
+          <label class="campo">Ver<select id="hid-modo"><option value="cal">Comparar años (ene–dic)</option><option value="anio">Comparar años hidrológicos (set–ago, como SENAMHI)</option><option value="rango">Rango de fechas</option><option value="hora">Horario (dato por hora, como SENAMHI)</option></select></label>
           <fieldset class="campo hid-anios" id="hid-c-anio"><legend>Años a comparar</legend><div id="hid-anios"></div></fieldset>
           <label class="campo" id="hid-c-desde" hidden>Desde<input type="date" id="hid-desde"></label><label class="campo" id="hid-c-hasta" hidden>Hasta<input type="date" id="hid-hasta-f"></label>
           <div class="fila hid-atajos" id="hid-atajos">${[["30", "30 días"], ["90", "90 días"], ["365", "1 año"], ["todo", "Todo"]].map(([k, t]) => `<button class="btn sec chico" type="button" data-atajo="${k}">${t}</button>`).join("")}</div></div>
@@ -235,10 +281,11 @@
       if (!vars.includes(e0.v)) e0.v = vars.includes("NIVEL") ? "NIVEL" : vars[0];
       $("hid-var").innerHTML = vars.map((v) => `<option value="${v}"${v === e0.v ? " selected" : ""}>${VAR[v]} (${esc(e.variables[v].unidad)})</option>`).join("");
       e0.marcados = e0.marcados || new Set();
-      if (!["cal", "anio", "rango"].includes(e0.modo)) e0.modo = "cal";
-      const rango = e0.modo === "rango";
+      if (!["cal", "anio", "rango", "hora"].includes(e0.modo)) e0.modo = "cal";
+      const rango = e0.modo === "rango", hora = e0.modo === "hora";
       $("hid-modo").value = e0.modo;
-      $("hid-c-anio").hidden = rango; $("hid-c-desde").hidden = $("hid-c-hasta").hidden = !rango;
+      $("hid-c-anio").hidden = rango || hora; $("hid-c-desde").hidden = $("hid-c-hasta").hidden = !rango;
+      $("hid-atajos").hidden = hora;
     }
     // la serie se pide una vez (el año, o todo desde 2023); elegir el tramo solo vuelve a dibujar, sin esperar al servidor
     let turno = 0, S = null, vista = null, h = null;
@@ -247,6 +294,7 @@
       const e = est(), g = $("hid-graf"), mio = ++turno;
       e0.c = e.codigo;
       g.innerHTML = '<div class="loading"><span class="spin"></span>Dibujando…</div>';
+      if (e0.modo === "hora") return cargarHora(e, g, mio);
       const v = e.variables[e0.v], ult = (v.ultimo || {}).fecha || iso(new Date());
       const desde = `${Math.min(...v.años)}-09-01`;
       const url = e0.modo === "rango" ? `/v1/hidrologia/rango?estacion=${encodeURIComponent(e.codigo)}&variable=${e0.v}&desde=${desde}&hasta=${ult}`
@@ -282,6 +330,60 @@
       atar(g);
       pintar();
     }
+    // ── vista horaria ──
+    const conHora = new Set(j.horario || []);
+    async function cargarHora(e, g, mio) {
+      S = null;                                             // la vista horaria no usa la serie diaria
+      if (!conHora.has(`${e.codigo}:${e0.v}`)) {
+        g.innerHTML = `<div class="vacio-caja"><b>Todavía no hay datos horarios de esta estación (${esc(VAR[e0.v].toLowerCase())}).</b><span>Se recogen con el recolector desde la versión 7: córrelo en SENAMHI y sube el archivo en «Actualizar». SENAMHI da por hora solo los últimos 3 días; la página los va sumando en cada actualización.</span></div>`;
+        return;
+      }
+      let HS;
+      try { HS = await api(`/v1/hidrologia/horario?estacion=${encodeURIComponent(e.codigo)}&variable=${e0.v}`); if (mio !== turno) return; }
+      catch (er) { if (mio !== turno) return; g.innerHTML = `<div class="err-box"><b>No se pudo leer el horario</b><span>${esc(er.message)}</span></div>`; return; }
+      HS.ocultas = ocultas;
+      const fin = HS.t[HS.t.length - 1], dias = Math.ceil((fin - HS.t[0]) / 864e5);
+      const OPC = [["3", "3 días"], ["7", "7 días"], ["30", "30 días"], ["todo", `Todo (${dias} días)`]].filter(([k], n, a) => k === "todo" || +k < dias);
+      if (!OPC.some(([k]) => k === e0.horas)) e0.horas = OPC.length > 1 ? OPC[0][0] : "todo";
+      g.innerHTML = `<div class="fila hid-atajos">${OPC.map(([k, t]) => `<button class="btn sec chico${k === e0.horas ? " activo" : ""}" type="button" data-horas="${k}">${t}</button>`).join("")}</div>
+        <div class="scroll"><div class="hid-marco"><div class="hid-lienzo"></div></div></div>
+        <div class="fila"><button class="btn" type="button" data-a="copiar">Copiar</button><button class="btn sec" type="button" data-a="png">PNG</button><button class="btn sec" type="button" data-a="svg">SVG</button>
+          <button class="btn sec" type="button" data-a="csv">Datos del gráfico (CSV)</button><span class="nota" data-msj></span></div>
+        <p class="nota">El dato por hora es el mismo del botón «Horario» del hidrograma de SENAMHI, con la hora tal como la da SENAMHI. SENAMHI muestra solo los últimos 3 días; la página guarda lo que trae cada actualización y así junta más días (hasta 120). Si entre dos actualizaciones pasan más de 3 días, queda un hueco. Es información en tiempo casi real, sujeta a revisión: el valor diario puede cambiar después. Haz clic en una serie de la leyenda para mostrarla u ocultarla.</p>`;
+      const lienzo = g.querySelector(".hid-lienzo"), msj = g.querySelector("[data-msj]");
+      let hh = null;
+      const dibujar = () => {
+        hh = hidrogramaHora(HS, e0.horas === "todo" ? -Infinity : fin - (+e0.horas) * 864e5);
+        lienzo.innerHTML = hh ? `${hh.svg}<i class="hid-guia" hidden></i><div class="hid-tip" hidden></div>` : '<div class="vacio-caja"><b>Sin datos en ese tramo.</b></div>';
+      };
+      dibujar();
+      g.querySelectorAll("[data-horas]").forEach((b) => b.addEventListener("click", () => { e0.horas = b.dataset.horas; g.querySelectorAll("[data-horas]").forEach((x) => x.classList.toggle("activo", x === b)); dibujar(); }));
+      lienzo.addEventListener("click", (ev) => { const k = ev.target.closest("[data-serie]"); if (!k) return; const c = k.dataset.serie; ocultas.has(c) ? ocultas.delete(c) : ocultas.add(c); dibujar(); });
+      lienzo.addEventListener("pointermove", (ev) => {
+        const guia = lienzo.querySelector(".hid-guia"), tip = lienzo.querySelector(".hid-tip");
+        if (!hh || !guia) return;
+        const caj = lienzo.getBoundingClientRect(), k = caj.width / hh.W, x = (ev.clientX - caj.left) / k, y = (ev.clientY - caj.top) / k;
+        if (x < hh.izq || x > hh.W - hh.der || y < hh.arr || y > hh.arr + hh.alto) { guia.hidden = tip.hidden = true; return; }
+        const t = hh.t0 + (x - hh.izq) / (hh.W - hh.izq - hh.der) * (hh.t1 - hh.t0);
+        const i = hh.idx.reduce((a, b) => Math.abs(HS.t[b] - t) < Math.abs(HS.t[a] - t) ? b : a, hh.idx[0]), px = hh.X(HS.t[i]) * k;
+        tip.innerHTML = `<b>${hh.f(HS.t[i])}</b>` + hh.SER.filter(([c]) => !ocultas.has(c) && HS[c][i] != null).map(([c, tt, col]) => `<div><i style="background:${col}"></i>${esc(tt)}<b>${num(HS[c][i], 2)}</b></div>`).join("");
+        guia.hidden = tip.hidden = false;
+        guia.style.left = px + "px"; guia.style.top = hh.arr * k + "px"; guia.style.height = hh.alto * k + "px";
+        tip.style.left = (px + 200 > caj.width ? px - 192 : px + 12) + "px"; tip.style.top = (hh.arr + 8) * k + "px";
+      });
+      lienzo.addEventListener("pointerleave", () => { const a = lienzo.querySelector(".hid-guia"), b = lienzo.querySelector(".hid-tip"); if (a) a.hidden = b.hidden = true; });
+      const B = window.BCRP, nombre = () => `SENAMHI_${HS.estacion}_${VAR[HS.variable]}_horario`;
+      const decir = (t, ok) => { msj.textContent = t; msj.style.color = ok ? "" : "var(--error)"; };
+      g.querySelector('[data-a="copiar"]').addEventListener("click", async () => { try { await B.copiar(hh.svg); decir("Copiado: pégalo en Word o PowerPoint con Ctrl+V.", true); } catch (er) { decir(er.message, false); } });
+      g.querySelector('[data-a="png"]').addEventListener("click", async () => { try { await B.descargarPng(hh.svg, nombre()); } catch (er) { decir(er.message, false); } });
+      g.querySelector('[data-a="svg"]').addEventListener("click", () => B.descargar(hh.svg, nombre()));
+      g.querySelector('[data-a="csv"]').addEventListener("click", () => {
+        const cols = [["valor", "VALOR"], ["rojo", "UMBRAL_ROJO"], ["naranja", "UMBRAL_NARANJA"], ["amarillo", "UMBRAL_AMARILLO"]].filter(([k]) => HS[k]);
+        const lineas = [["FECHA_HORA", ...cols.map((c) => c[1])].join(","), ...hh.idx.map((i) => [hh.f(HS.t[i]), ...cols.map(([k]) => HS[k][i] ?? "")].join(","))];
+        const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + lineas.join("\n")], { type: "text/csv" })); a.download = nombre().replace(/\s+/g, "_") + ".csv";
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      });
+    }
     let pendiente = false;
     function pintar() {                                     // dibuja el tramo elegido (a lo sumo una vez por cuadro de animación)
       if (pendiente) return;
@@ -289,6 +391,7 @@
       requestAnimationFrame(() => {
         pendiente = false;
         const g = $("hid-graf"), lienzo = g.querySelector(".hid-lienzo");
+        if (!S || !vista || !lienzo || !g.querySelector(".hid-nav")) return;          // se cambió a la vista horaria mientras tanto
         h = hidrograma(S, vista);
         lienzo.innerHTML = h ? `${h.svg}<i class="hid-guia" hidden></i><div class="hid-tip" hidden></div>` : '<div class="vacio-caja"><b>Sin datos en ese tramo.</b></div>';
         g.querySelector(".hid-nav").innerHTML = navegador(S, vista).svg;
@@ -519,6 +622,7 @@
     const out = [], pon = (clave, valor, base) => { const texto = JSON.stringify(valor); out.push({ clave, valor, huella: huella(base === undefined ? texto : JSON.stringify(base)), peso: texto.length }); };
     ["meta", "estaciones", "zonales", "infoMeta", "fichas", "monitoreo"].forEach((k) => { if (crudo[k] && Object.keys(crudo[k]).length) pon(k, crudo[k]); });
     (crudo.graficas || []).forEach((g) => pon(`graf:${g.cod}:${g.variable}:${g.y}`, g, [g.estado, g.data]));   // la huella no mira el día de la consulta
+    (crudo.horarias || []).forEach((g) => pon(`hor:${g.cod}:${g.variable}`, g, [g.data]));
     Object.entries(crudo.mensual || {}).forEach(([k, v]) => pon(`men:${k}`, v));
     Object.entries(crudo.infoDiaria || {}).forEach(([k, v]) => pon(`inf:${k.slice(0, 10)}:${k.slice(11)}`, v));
     return out;

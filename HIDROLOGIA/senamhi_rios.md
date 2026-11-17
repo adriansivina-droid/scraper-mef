@@ -44,7 +44,7 @@ Los endpoints salen de la HAR del navegador del 09/11/2026:
 - `rojo`, `naranja`, `amarillo`: umbrales de alerta.
 - `var dataCSV` repite lo mismo, por fila.
 
-**Hidrograma «Horario» (`btnTipo=H`).** Trae los últimos ~3 días en `dato`. No se usa, porque se eligió la serie diaria.
+**Hidrograma «Horario» (`btnTipo=H`).** Trae los últimos ~3 días, dato por hora. Desde la versión 7 el recolector lo pide para cada estación y variable que SENAMHI publica (con la `fecha_hora` de la ficha de la estación) y guarda cada serie de pares `[ms, valor]` que venga (el dato y los umbrales) sobre una sola lista de horas: pieza `hor:<código>:<NIVEL|CAUDAL>`, en `horarias` del archivo. La página **suma** cada archivo a lo ya guardado (por hora manda lo más nuevo) y conserva los últimos 120 días, así que la historia horaria crece con cada actualización; si entre dos actualizaciones pasan más de 3 días, queda un hueco. Se ve en Hidrograma → Ver → «Horario» (`/v1/hidrologia/horario`), con atajos de 3, 7 y 30 días, y su CSV. No entra en los CSV diarios ni en las alertas, que siguen con la serie diaria.
 
 **Caudal.** En Santa María de Nanay (240001) y Bellavista (240111), el botón «Caudal» sale deshabilitado (`variable_opcion = "N"`, solo nivel). Falta ver una estación que tenga caudal en el hidrograma, para confirmar qué `variable_opcion` usa.
 
