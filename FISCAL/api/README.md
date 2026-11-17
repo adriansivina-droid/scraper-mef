@@ -10,7 +10,7 @@ descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 |---|---|---|
 | 1 | Página, descarga de las 7 bases del MEF (Excel, CSV o JSON), estado de la base de datos y carga de los archivos que genera el scraper de Colab | **lista** |
 | Pesca | Las 3 bases de pesca, cargadas con los Excel mensuales de las DIREPRO (o los LONG de los notebooks de `PESCA/`) | **lista** |
-| 2 | El scraper del MEF corre solo (GitHub Actions, días 2 y 21) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
+| 2 | El scraper del MEF corre solo (GitHub Actions, día 2 de cada mes) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
 | Empleo | Base de empleo del MTPE (scraper en GitHub Actions, días 2 y 21, o botón «Actualizar empleo»), con el cuadro, el gráfico y el anexo de la síntesis por región | **lista** |
 | Hidrocarburos | Producción por lote y canon de PERUPETRO, que guarda en la página el flujo diario de `HIDROCARBUROS/`, con el cuadro, el gráfico, el anexo por lote y el canon de la síntesis | **lista** |
 | 3 | Ejecución del presupuesto: cuadros de gasto corriente e inversión (var. % real con el IPC de Lima, avance del PIM, comparación entre años), variaciones alarmantes y proyectos (GitHub Actions tras el scraper) | **lista** |
@@ -135,7 +135,7 @@ el `Dockerfile` sirve en cualquier servicio que corra contenedores.
 periodo) y carga `Scrapeo/output` en la base de datos con la misma lógica que subir el `.zip`. Si cambias el scraper
 en el notebook, el servidor usa el cambio.
 
-- **Solo:** los días 2 y 21 de cada mes a las 6:00 a. m.: año en curso hasta el último mes cerrado (el MEF sigue
+- **Solo:** el día 2 de cada mes a las 6:00 a. m.: año en curso hasta el último mes cerrado (el MEF sigue
   ajustando los meses anteriores, por eso se vuelve a bajar todo el año).
 - **A mano:** botón «Actualizar desde el MEF» en «Actualizar base de datos» (eliges el periodo; vacío = año en curso),
   o en GitHub: Actions → «Fiscal · scraper del MEF» → Run workflow. La prueba rápida (un mes, solo Loreto) no carga
@@ -187,7 +187,7 @@ Municipalidad tienen cada uno su botón **Descargar Excel** (departamentos y per
 desde el MEF**, que lanza `.github/workflows/fiscal_archivos.yml`: el mismo notebook, pero solo con el bloque de ese
 archivo (`scraper_servidor.py --archivo dev-municipalidad|pim-funcion|pim-municipalidad --departamentos TODOS|16,22`).
 Reemplaza solo esa base (y, en el devengado municipal, el nivel M de DEV Función de esos departamentos); lo demás de la
-base fiscal no se toca. PIM es anual: basta el año. El scraper completo (días 2 y 21) los sigue trayendo igual.
+base fiscal no se toca. PIM es anual: basta el año. El scraper completo (día 2 de cada mes) los sigue trayendo igual.
 Endpoints: `GET /v1/mef/archivos`, `POST /v1/mef/archivos/actualizar?archivo=…&desde=…&hasta=…&departamentos=…`.
 
 ## Todo en la página (sin Drive)

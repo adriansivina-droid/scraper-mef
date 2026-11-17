@@ -80,9 +80,9 @@
     impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["impo-estad"], sinActualizar: true,
       lead: "Importaciones por la aduana de Iquitos según uso o destino económico (FOB): Cuadro N° 16 y anexo. En «Base mensual» se clasifica la base del mes (CUODE) y arma el ESTAD; «Resumen Import» trae los datos destacados y el borrador de la síntesis.",
       cuadros: "importaciones", extra: ["Resumen Import", "Base mensual"] },
-    gasto: { t: "Gasto corriente no financiero", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => GASTO, actualizar: "mef",
+    gasto: { t: "Gasto corriente no financiero", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF el día 2 de cada mes, o con el botón", bases: () => GASTO, actualizar: "mef",
       lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion", extra: ["Contraste", "Archivos"] },
-    inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF los días 2 y 21, o con el botón", bases: () => INV, actualizar: "mef",
+    inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF el día 2 de cada mes, o con el botón", bases: () => INV, actualizar: "mef",
       lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos", "Contraste", "Archivos"] },
     drae: { t: "Gráficos DRAE", fuente: "Las SERIES del departamento (Excel con los gráficos)", entra: "Subiendo las SERIES en «Actualizar»", estado: "ok", cuadros: "drae", actualizar: "series",
       lead: "Los gráficos de las SERIES del departamento (los del DRAE), con sus datos y la paleta del Seminario de Periodistas: listos para copiar o descargar en SVG o PNG." },
@@ -1614,7 +1614,7 @@
   function cajaScraper(cual) {
     const mef = cual === "mef";
     return `<div class="caja" id="scr-${cual}"><h3>${mef ? "Scraper del MEF" : "Scraper de empleo (MTPE)"}</h3>
-      <p>${mef ? "Baja de Consulta Amigable las 7 bases del MEF (detalle municipal y PIM de los 25 departamentos; lo demás, Loreto, San Martín y Ucayali) y las carga aquí. Corre solo los días 2 y 21 de cada mes, a las 6:00 a. m."
+      <p>${mef ? "Baja de Consulta Amigable las 7 bases del MEF (detalle municipal y PIM de los 25 departamentos; lo demás, Loreto, San Martín y Ucayali) y las carga aquí. Corre solo el día 2 de cada mes, a las 6:00 a. m."
         : "Baja del tablero de Power BI del MTPE el total de trabajadores formales de cada región, desde enero 2025 (o 2016) hasta el último mes publicado, y lo carga aquí: las 26 regiones toman alrededor de media hora. Con «Por sectores» baja las 7 actividades a una base aparte («Empleo · por sectores»), sin tocar el total. Corre solo los días 2 y 21 de cada mes, a las 7:30 a. m."} Tarda varios minutos: puedes cerrar la página.</p>
       <div class="fila">${mef ? `<label class="campo" for="mef-d">Desde<input type="month" id="mef-d"></label><label class="campo" for="mef-h">Hasta<input type="month" id="mef-h"></label>
           <label class="chk"><input type="checkbox" id="mef-prueba"> Prueba rápida (un mes, solo Loreto, no carga)</label>`
@@ -1690,7 +1690,7 @@
         <div class="deptos">${CAT.departamentos.filter((d) => +d.codigo <= 25).map((d) => `<label for="adep-${d.codigo}"><input type="checkbox" class="adep" id="adep-${d.codigo}" value="${d.codigo}" ${sel.includes(d.codigo) ? "checked" : ""}>${esc(titulo(d.nombre))}</label>`).join("")}</div>
         <p class="nota">Sirven para la descarga y para la actualización: actualizar solo algunos departamentos es más rápido y reemplaza solo esos.</p></div>
       ${ARCH_MEF.map(tarjeta).join("")}
-      <div class="caja"><h3>Últimas corridas</h3>${j.configurado ? "" : '<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render. Mientras tanto, estos archivos llegan con el scraper completo del MEF (días 2 y 21).</span></div>'}<div id="arch-corridas"></div></div>`;
+      <div class="caja"><h3>Últimas corridas</h3>${j.configurado ? "" : '<div class="err-box"><b>Falta conectar GitHub</b><span>Agrega la variable GITHUB_ACCIONES_TOKEN en Render. Mientras tanto, estos archivos llegan con el scraper completo del MEF (día 2 de cada mes).</span></div>'}<div id="arch-corridas"></div></div>`;
     const marcados = () => [...caja.querySelectorAll(".adep")].filter((c) => c.checked).map((c) => c.value);
     caja.querySelectorAll("[data-adeps]").forEach((b) => b.addEventListener("click", () => {
       paneles.archDeps = b.dataset.adeps === "todos" ? deps.slice() : b.dataset.adeps === "lsu" ? LSU.slice() : [];
@@ -1711,7 +1711,7 @@
       const zona = det.querySelector(".loading"), sol = (v) => v == null ? "" : Math.round(v).toLocaleString("es-PE");
       try {
         const x = (await api(`/v1/mef/archivos/control?archivo=${det.dataset.ctl}`)).control;
-        if (!x.length) { zona.outerHTML = '<p class="nota">Todavía no hay controles guardados de este archivo: se guardan en cada corrida del scraper (la de este archivo o la completa de los días 2 y 21).</p>'; return; }
+        if (!x.length) { zona.outerHTML = '<p class="nota">Todavía no hay controles guardados de este archivo: se guardan en cada corrida del scraper (la de este archivo o la completa del día 2 de cada mes).</p>'; return; }
         const n = (e) => x.filter((f) => f.estado === e).length;
         // corrección: DEV Función·Municipalidad vuelve a raspar solo las funciones que no cuadran por más de S/ 200;
         // los PIM, el departamento y año enteros (también los que no tienen control guardado o no tienen datos)
@@ -1939,7 +1939,7 @@
       const hastaDe = (bs) => { const h = bs.map((b) => ESTADO.bases[b] && ESTADO.bases[b].hasta).filter(Boolean).sort().pop(); return h ? esc(etqMes(h)) : '<span class="nota">sin datos</span>'; };
       const pescas = Object.values(REG).map((r) => r.pesca);
       const rutina = [
-        ["Gasto corriente e inversión pública", "MEF, Consulta Amigable", "auto", "Nada: se baja solo los días 2 y 21 de cada mes. Si urge, usa el botón.", [...GASTO, ...INV], "tres-act-mef", "Scraper del MEF"],
+        ["Gasto corriente e inversión pública", "MEF, Consulta Amigable", "auto", "Nada: se baja solo el día 2 de cada mes. Si urge, usa el botón.", [...GASTO, ...INV], "tres-act-mef", "Scraper del MEF"],
         ["Empleo", "MTPE, Planilla Electrónica", "auto", "Nada: se baja solo los días 2 y 21. Si urge, usa el botón.", ["empleo"], "tres-act-empleo", "Scraper de empleo"],
         ["Hidrocarburos", "PERUPETRO", "auto", "Nada: se baja solo todos los días a las 7:00 a. m.", ["hidro-produccion", "hidro-canon"], "tres-act-hidro", "Hidrocarburos"],
         ["Pesca", "DIREPRO de cada región", "mano", "Subir el Excel que envía cada DIREPRO, tal como llega.", pescas, "tres-act-archivos", "Subir archivos"],
