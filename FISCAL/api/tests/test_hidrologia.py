@@ -240,11 +240,17 @@ def test_alerta_confirmada_cuando_coinciden_la_pagina_y_senamhi():
     assert evaluar(123.0, "#FFA500")["nivel"] == "naranja" and evaluar(123.5, "#FFFF00")["estado"] == "confirmada"
 
 
-def test_si_senamhi_marca_blanco_no_se_pinta_la_alerta():
-    # el caso de Cañad: la página calcula roja y SENAMHI la tiene en blanco → a verificar, no roja
+def test_si_senamhi_marca_blanco_se_muestra_como_senamhi():
+    # el caso de Cañad: la página calcula roja y SENAMHI la tiene en blanco → se muestra sin alerta, como en SENAMHI
     a = evaluar(121.9, "#FFFFFF", historia=bajando(121.9))
-    assert a["estado"] == "a_verificar" and a["nivel"] is None and a["calculada"] == "roja" and "sin alerta" in a["motivos"][0]
-    assert hidrologia.texto_alerta(a) == "A verificar"
+    assert a["estado"] == "normal" and a["nivel"] == "normal" and a["calculada"] == "roja" and "sin alerta" in a["motivos"][0]
+    assert hidrologia.texto_alerta(a) == "Sin alerta"
+
+
+def test_si_no_coinciden_manda_el_color_de_senamhi():
+    # la página calcula naranja y SENAMHI marca roja → roja, como en SENAMHI
+    a = evaluar(123.0, "#FF0000", historia=bajando(123.0))
+    assert a["estado"] == "senamhi" and a["nivel"] == "roja" and a["calculada"] == "naranja" and "SENAMHI" in a["motivos"][0]
 
 
 def test_si_solo_senamhi_marca_alerta_se_muestra_como_de_senamhi():
