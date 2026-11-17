@@ -14,6 +14,7 @@
 import io
 from decimal import ROUND_HALF_UP, Decimal
 
+import numpy as np
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
@@ -47,9 +48,28 @@ def _estructura(df):
     return filas, serie
 
 
+_MATRICES = {}          # id(serie) -> (serie, fila de cada ORDEN, años, meses, matriz): el cuadro pide cientos de sumas
+
+
+def _matriz(serie):
+    clave = id(serie)
+    if clave not in _MATRICES or _MATRICES[clave][0] is not serie:
+        if len(_MATRICES) > 8:
+            _MATRICES.clear()
+        anios = np.array([a for a, _ in serie.columns], dtype=int)
+        meses = np.array([m for _, m in serie.columns], dtype=int)
+        _MATRICES[clave] = (serie, {o: k for k, o in enumerate(serie.index)}, anios, meses, serie.to_numpy(dtype=float))
+    return _MATRICES[clave][1:]
+
+
 def _suma(serie, orden, anio, m0, m1):
-    cols = [(a, m) for a, m in serie.columns if a == anio and m0 <= m <= m1]
-    return float(serie.loc[orden, cols].sum()) if cols and orden in serie.index else 0.0
+    """Suma de una fila del ESTAD (ORDEN) en los meses m0..m1 de un año (numpy: con pandas, cada suma tomaba ~3 ms)."""
+    fila, anios, meses, M = _matriz(serie)
+    k = fila.get(orden)
+    if k is None:
+        return 0.0
+    cols = (anios == anio) & (meses >= m0) & (meses <= m1)
+    return float(M[k, cols].sum()) if cols.any() else 0.0
 
 
 def _productos(filas, solo_tipo=None):

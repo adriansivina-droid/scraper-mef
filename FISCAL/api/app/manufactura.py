@@ -193,10 +193,20 @@ def cuadros(depto, df, periodo=None):
     grupos = {PRIMARIA: [c for c in ramas.index if ramas.at[c, "GRUPO"] == PRIMARIA],
               NO_PRIMARIA: [c for c in ramas.index if ramas.at[c, "GRUPO"] == NO_PRIMARIA]}
 
+    # índice de un conjunto de ramas en el periodo q = Σ (ponderación × índice) / Σ ponderación. Se calcula con numpy y se
+    # guarda: el cuadro, la serie y los anexos lo piden miles de veces (con pandas, cada consulta tomaba ~2 ms)
+    fila_de = {int(q): k for k, q in enumerate(I.index)}
+    col_de = {c: k for k, c in enumerate(I.columns)}
+    I_np, w_np, cache = I.to_numpy(dtype=float), w.reindex(I.columns).to_numpy(dtype=float), {}
+
     def ind(q, cs):                                    # índice de un conjunto de ramas en el periodo q
-        if q not in I.index or not cs or not w[cs].sum():
-            return None
-        return float((I.loc[q, cs] * w[cs]).sum() / w[cs].sum())
+        clave = (q, tuple(cs))
+        if clave not in cache:
+            k = fila_de.get(q)
+            cols = [col_de[c] for c in cs]
+            suma_w = float(w_np[cols].sum()) if cols else 0.0
+            cache[clave] = None if k is None or not cols or not suma_w else float(I_np[k, cols] @ w_np[cols] / suma_w)
+        return cache[clave]
 
     def prom(anio, cs):                                 # promedio enero-mes
         qs = [anio * 100 + k for k in range(1, m + 1) if anio * 100 + k in I.index]
