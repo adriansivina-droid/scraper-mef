@@ -650,7 +650,8 @@ def _zonales():
 # ── alertas: doble control ───────────────────────────────────────────────────
 # Una alerta solo se da por «confirmada» si coinciden dos fuentes independientes: la que calcula la página con los umbrales y
 # el dato del día, y el color que SENAMHI pinta en su propio mapa. Además se controla que el dato sea reciente, que los umbrales
-# sean coherentes y que el valor no sea un salto brusco. Lo que no pasa los controles se muestra como «a verificar», no como alerta.
+# sean coherentes y que el valor no sea un salto brusco. Si la página y SENAMHI no coinciden, se muestra lo que marca SENAMHI
+# (con el motivo). Solo cuando falta el color de SENAMHI y no se pasan los controles queda «a verificar».
 COLOR_A_NIVEL = {"#FF0000": "roja", "#FFA500": "naranja", "#FFFF00": "amarilla", "#FFFFFF": "normal"}
 SEVERIDAD = {"normal": 0, "amarilla": 1, "naranja": 2, "roja": 3}
 DIAS_FRESCO = 2                                    # un dato más viejo que esto (respecto del día de la recolección) no dispara alertas
@@ -726,9 +727,10 @@ def evaluar_alerta(u, hoy, color_senamhi, historia):
         if en_alerta and senamhi == calculada:
             estado, nivel = "confirmada", calculada
             motivos.insert(0, "la página y el mapa de SENAMHI coinciden")
-        elif en_alerta and senamhi != calculada:
-            estado, nivel = "a_verificar", None
-            motivos.insert(0, f"según los umbrales sería {calculada}, pero el mapa de SENAMHI marca {'sin alerta' if senamhi == 'normal' else senamhi}")
+        elif en_alerta and senamhi != calculada:     # no coinciden: se muestra lo que marca SENAMHI y se deja el motivo
+            estado, nivel = ("normal", "normal") if senamhi == "normal" else ("senamhi", senamhi)
+            motivos.insert(0, f"se muestra como en el mapa de SENAMHI ({'sin alerta' if senamhi == 'normal' else senamhi}); con los umbrales "
+                              f"la página calcula {calculada}")
         elif not en_alerta and senamhi != "normal":
             estado, nivel = "senamhi", senamhi
             motivos.insert(0, f"el mapa de SENAMHI marca {senamhi}; la página, con sus umbrales, {'no ve alerta' if calculada == 'normal' else 'no puede calcularla'}")
