@@ -234,7 +234,7 @@ def test_flujo_usa_el_almacen_en_vez_de_drive(cliente, tmp_path, monkeypatch):
     import ejecutar_notebooks as en
     for m in [k for k in sys.modules if k.startswith("googleapiclient")]:
         monkeypatch.delitem(sys.modules, m)
-    with pytest.raises(SystemExit, match="migrar desde Drive"):
+    with pytest.raises(SystemExit, match="pasar a GitHub"):
         en.usar_almacen_de_la_pagina()
     almacen, drive = _drive()
     _subir_como_notebook(drive, almacen.CARPETA_CONTROL, "CONTROL PP produccion.csv", b"x", tmp_path)
@@ -370,3 +370,24 @@ def test_exportaciones_por_lote(cliente):
     assert "Sin lote" in [x["nombre"] for x in con["por_lote"]]
     x = cliente.get("/v1/cuadros/hidrocarburos/exportaciones?departamento=16&formato=xlsx")
     assert load_workbook(io.BytesIO(x.content)).sheetnames == ["Exportaciones por lote", "Exportaciones por empresa"]
+
+
+def test_publicar_powerbi(cliente, tmp_path, monkeypatch):
+    """Los CSV para Power BI (HIDROCARBUROS/automatizacion/publicar_powerbi.py) salen de la base, con PERIODO y EMPRESA."""
+    import importlib.util, sys
+    subir(cliente, csvs())
+    db.guardar_documento("mapa-hidrocarburos", "<html>mapa</html>", "2026-11-18T00:00:00Z")
+    ruta = Path(__file__).resolve().parents[3] / "HIDROCARBUROS" / "automatizacion" / "publicar_powerbi.py"
+    spec = importlib.util.spec_from_file_location("publicar_powerbi", ruta)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    salida = tmp_path / "powerbi"
+    monkeypatch.setattr(sys, "argv", ["publicar_powerbi.py", str(salida)])
+    m.main()
+    prod = pd.read_csv(salida / "hidro_produccion.csv", encoding="utf-8-sig")
+    assert {"PERIODO", "EMPRESA", "VOLUMEN", "LOTE"} <= set(prod.columns)
+    lor = prod[(prod["DEPARTAMENTO"] == "LORETO") & (prod["AÑO"] == 2025) & (prod["PRODUCTO"] == "PETROLEO")]
+    assert round(lor["VOLUMEN"].sum() / 1e6, 1) == 7.9                    # como el texto de Loreto 2025
+    assert (salida / "hidro_canon.csv").exists() and (salida / "hidro_lotes_operador.csv").exists()
+    assert (salida / "PP_mapa_lotes_plus.html").read_text(encoding="utf-8") == "<html>mapa</html>"
+    assert "hidro_produccion.csv" in (salida / "LEEME.txt").read_text(encoding="utf-8-sig")

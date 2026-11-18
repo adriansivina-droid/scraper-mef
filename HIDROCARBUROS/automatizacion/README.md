@@ -1,6 +1,6 @@
 # Actualización automática (GitHub Actions)
 
-Corre los notebooks del proyecto **sin abrir Colab**, todos los días, y guarda los resultados en la **página** (almacén de la base, `FISCAL/api/app/almacen.py`), con las mismas carpetas DATA y CONTROL que antes estaban en Drive. Al terminar, la producción, el canon y el mapa quedan cargados en la página. Ya no usa Drive (con `PP_ALMACEN=pagina`; en Colab los notebooks siguen usando Drive).
+Corre los notebooks del proyecto **sin abrir Colab**, todos los días, y publica los resultados en la **Release «hidrocarburos-datos»** del repositorio: el almacén de los notebooks (`almacen.sqlite`, con las mismas carpetas DATA y CONTROL que antes estaban en Drive y luego en la página) y los **CSV que lee Power BI**. Ya no usa Neon ni Drive.
 
 | Cuándo | Modo | Qué corre |
 |---|---|---|
@@ -10,18 +10,28 @@ Corre los notebooks del proyecto **sin abrir Colab**, todos los días, y guarda 
 
 Los notebooks corren con sus **valores por defecto**, como «Ejecutar todo» en Colab. Solo el del MEF se fija en el año anterior y el actual, para no consultar 20 años cada mes y no provocar el bloqueo (HTTP 403).
 
+## Archivos para Power BI (enlace fijo)
+
+`https://github.com/adriansivina-droid/scraper-mef/releases/download/hidrocarburos-datos/<archivo>`
+
+| Archivo | Qué trae |
+|---|---|
+| `hidro_produccion.csv` | Producción fiscalizada por mes, departamento, lote, operador (y empresa homologada) y producto. Los meses que la estadística mensual aún no publica salen de la producción diaria (columna FUENTE). |
+| `hidro_canon.csv` | Canon y sobrecanon petrolero transferido por mes y departamento (millones de soles). |
+| `hidro_lotes_operador.csv` | Qué lotes operó cada empresa cada año (para cruzar con las exportaciones por empresa). |
+| `PP_mapa_lotes_plus.html` | El mapa de lotes (se abre con doble clic). |
+| `LEEME.txt` | Fecha de la última actualización y filas de cada archivo. |
+
+Son datos públicos de PERUPETRO y quedan públicos en el repositorio.
+
 ## Configuración (una sola vez)
 
-1. **Secreto `DATABASE_URL` en GitHub** (el mismo de los demás flujos de la página).
-2. **Copiar lo que había en Drive:** Actions → **«Hidrocarburos · migrar desde Drive»** → Run workflow → `listar` (cuánto
-   pesa) y luego `copiar`. Usa por última vez el secreto `GOOGLE_DRIVE_CREDENCIAL`; después se puede borrar. Mientras el
-   almacén esté vacío, el flujo diario no corre (para no perder los históricos).
-3. **Prueba:** Actions → «Hidrocarburos · actualización» → Run workflow (`diario`), o el botón «Actualizar desde
-   PERUPETRO» de la página (sector hidrocarburos → Actualizar).
+1. **Pasar lo que había en Neon:** Actions → **«Hidrocarburos · pasar a GitHub»** → Run workflow. Copia el almacén de la página a la Release y publica los CSV. Solo lee Neon. Mientras la Release no tenga `almacen.sqlite`, el flujo diario no corre (para no perder los históricos).
+2. **Prueba:** Actions → «Hidrocarburos · actualización» → Run workflow (`diario`).
 
 ## Dónde ver los resultados
 
-- **La página:** sector hidrocarburos (cuadros, mapa) y, en «Actualizar», los archivos de DATA, CONTROL y DATA/MAPA para descargar.
+- **La Release «hidrocarburos-datos»** (GitHub → Releases): los CSV y el mapa, con la fecha de la última corrida.
 - **GitHub, en cada ejecución:**
   - el **resumen** con cada paso y su estado (✅/❌) y los minutos que tomó;
   - el archivo **«Mapa de Hidrocarburos - Perú»**: el mapa Plus en un solo HTML, descargable por 14 días. GitHub lo entrega dentro de un .zip; se descomprime y se abre con doble clic.
@@ -34,16 +44,16 @@ Los notebooks corren con sus **valores por defecto**, como «Ejecutar todo» en 
   - Quita las líneas `!pip`.
   - Cambia `/content/` por una carpeta de trabajo.
 - `requirements.txt`: librerías.
-- `PP_Credencial_Drive.ipynb`: genera la credencial de Drive.
+- `publicar_powerbi.py`: arma los CSV para Power BI desde el almacén.
+- `pasar_a_github.py`: copia una sola vez el almacén de Neon a la Release.
+- `PP_Credencial_Drive.ipynb` y `migrar_drive.py`: de cuando los notebooks usaban Drive (ya no se usan en GitHub).
 - `../../.github/workflows/hidrocarburos_actualizar.yml`: el horario y los pasos.
 
 ## A tener en cuenta
 
-- **La credencial es tuya**, con acceso a tu Drive. Vive solo en los secretos de GitHub, que nadie puede leer, ni siquiera en los registros.
-  - Si la revocas (cuenta de Google → Seguridad → Acceso de terceros) o cambias tu contraseña, hay que generarla de nuevo.
 - **PERUPETRO o el MEF podrían bloquear las direcciones de GitHub**, como el MEF hizo con Colab.
   - Si pasa, el paso sale ❌ con el mensaje del bloqueo.
-  - Los demás pasos siguen, y el mapa se arma con lo que ya hay en Drive.
+  - Los demás pasos siguen, y el mapa se arma con lo que ya hay en el almacén.
 - **Uso:** si el repositorio es privado, GitHub Actions tiene minutos gratis limitados al mes; si es público, no hay límite. Revisa en Settings → Billing cuánto toma cada corrida y, si hace falta, cambia el horario diario a días hábiles.
 - **Condiciones de uso:** antes de dejarlo corriendo a diario, revisa las del portal de PERUPETRO (descarga automática de sus estadísticas).
 
