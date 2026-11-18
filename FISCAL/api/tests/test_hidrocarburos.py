@@ -390,7 +390,7 @@ def test_publicar_powerbi(cliente, tmp_path, monkeypatch):
     assert {"PERIODO", "EMPRESA", "VOLUMEN", "LOTE"} <= set(prod.columns)
     lor = prod[(prod["DEPARTAMENTO"] == "LORETO") & (prod["AÑO"] == 2025) & (prod["PRODUCTO"] == "PETROLEO")]
     assert round(lor["VOLUMEN"].sum() / 1e6, 1) == 7.9                    # como el texto de Loreto 2025
-    assert (salida / "hidro_canon.csv").exists() and (salida / "hidro_lotes_operador.csv").exists()
+    assert (salida / "hidro_canon.csv").exists() and (salida / "hidro_lotes_operador.csv").exists() and (salida / "hidro_lotes_ruc.csv").exists()
     assert (salida / "PP_mapa_lotes_plus.html").read_text(encoding="utf-8") == "<html>mapa</html>"
     assert "hidro_produccion.csv" in (salida / "LEEME.txt").read_text(encoding="utf-8-sig")
     assert set(prod["PARCIAL"]) <= {0, 1}
