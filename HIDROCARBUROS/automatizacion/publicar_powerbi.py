@@ -10,11 +10,14 @@ Deja en la carpeta:
   · hidro_canon.csv        canon y sobrecanon petrolero transferido por mes y departamento (millones de soles)
   · hidro_lotes_operador.csv  qué lotes operó cada operador en cada año
   · hidro_lotes_ruc.csv    el lote de cada RUC exportador de crudo por año (para cruzar con el Excel de exportaciones)
-  · PP_mapa_lotes_plus.html   el mapa de lotes (se abre con doble clic; Power BI no lo muestra)
+  · hidro_lotes_mapa.json  polígonos de los lotes en TopoJSON (Power BI: «Mapa de formas» → mapa personalizado)
+  · hidro_lotes.csv        datos de cada lote (operador, estado, departamento, área, coordenadas)
+  · PP_mapa_lotes_plus.html   el mapa de lotes completo (se abre con doble clic; Power BI no lo muestra)
   · LEEME.txt              qué es cada archivo y cuándo se actualizó
 
 Todos van en UTF-8 con BOM y separados por comas, con PERIODO (primer día del mes) para el eje de tiempo de Power BI.
 """
+import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -71,6 +74,34 @@ def _lotes_por_ruc(prod):
     return pd.DataFrame(filas).sort_values(["RUC", "AÑO"])
 
 
+ATRIBUTOS_LOTE = ["LOTE", "LOTE_MAPA", "OPERADOR_MAPA", "ESTADO_MAPA", "TIPO_CONTRATO", "F_SUSCRIPCION", "DEPARTAMENTO",
+                  "DEPARTAMENTO_DETALLE", "CUENCA", "ZOCALO", "AREA_KM2", "LAT", "LON", "DIST_OLEODUCTO_KM", "DIST_IQUITOS_KM",
+                  "RIO_CERCANO", "ANP_PCT", "ANP_DETALLE"]
+
+
+def _a_topojson(geo, decimales=5):
+    """GeoJSON de polígonos → TopoJSON (lo que pide el «Mapa de formas» de Power BI). Cada anillo es un arco propio
+    (sin arcos compartidos ni cuantización: es válido y basta para 50-60 lotes)."""
+    arcos, geoms = [], []
+    def anillo(r):
+        arcos.append([[round(x, decimales), round(y, decimales)] for x, y, *_ in r])
+        return len(arcos) - 1
+    for f in geo.get("features", []):
+        g, props = f.get("geometry") or {}, {k: v for k, v in (f.get("properties") or {}).items() if k in ATRIBUTOS_LOTE}
+        if g.get("type") == "Polygon":
+            geoms.append({"type": "Polygon", "properties": props, "arcs": [[anillo(r)] for r in g["coordinates"]]})
+        elif g.get("type") == "MultiPolygon":
+            geoms.append({"type": "MultiPolygon", "properties": props, "arcs": [[[anillo(r)] for r in poli] for poli in g["coordinates"]]})
+    return {"type": "Topology", "objects": {"lotes": {"type": "GeometryCollection", "geometries": geoms}}, "arcs": arcos}
+
+
+def _lotes_del_mapa():
+    """El GeoJSON de lotes que deja el notebook del mapa (DATA/MAPA/PP_lotes_indicadores.geojson), o None."""
+    with db.motor().connect() as cx:
+        r = cx.execute(text("SELECT id FROM almacen WHERE nombre = 'PP_lotes_indicadores.geojson' ORDER BY modificado DESC")).first()
+    return None if r is None else json.loads(almacen.leer(r[0]))
+
+
 def main():
     salida = Path(sys.argv[1] if len(sys.argv) > 1 else "powerbi")
     salida.mkdir(parents=True, exist_ok=True)
@@ -118,6 +149,14 @@ def main():
 
     _guardar(lotes_ruc, salida / "hidro_lotes_ruc.csv")
     lineas.append(f"hidro_lotes_ruc.csv  {len(lotes_ruc):,} filas (lote de cada RUC exportador, por año)")
+
+    geo = _lotes_del_mapa()
+    if geo:
+        (salida / "hidro_lotes_mapa.json").write_text(json.dumps(_a_topojson(geo), ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        lotes = pd.DataFrame([f.get("properties") or {} for f in geo["features"]]).reindex(columns=ATRIBUTOS_LOTE)
+        _guardar(lotes.drop_duplicates("LOTE"), salida / "hidro_lotes.csv")
+        lineas.append(f"hidro_lotes_mapa.json  polígonos de {len(geo['features'])} lotes (TopoJSON para el «Mapa de formas»)")
+        lineas.append("hidro_lotes.csv       operador, estado, contrato, departamento, área y coordenadas de cada lote")
 
     mapa = db.documento("mapa-hidrocarburos")
     if mapa:
