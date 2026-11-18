@@ -1,0 +1,2 @@
+# Carpeta de Power BI de Hidrocarburos (aquí quedan hidro_expo_*.csv; los Excel de SUNAT van en CARPETA\ENTRADA).
+CARPETA = 

@@ -377,6 +377,8 @@ def test_publicar_powerbi(cliente, tmp_path, monkeypatch):
     import importlib.util, sys
     subir(cliente, csvs())
     db.guardar_documento("mapa-hidrocarburos", "<html>mapa</html>", "2026-11-18T00:00:00Z")
+    from app import almacen
+    almacen.crear("PP_exportaciones_crudo_empresa.csv", almacen.CARPETA_DATA, "AÑO\n2025\n".encode(), "text/csv")
     ruta = Path(__file__).resolve().parents[3] / "HIDROCARBUROS" / "automatizacion" / "publicar_powerbi.py"
     spec = importlib.util.spec_from_file_location("publicar_powerbi", ruta)
     m = importlib.util.module_from_spec(spec)
@@ -391,3 +393,5 @@ def test_publicar_powerbi(cliente, tmp_path, monkeypatch):
     assert (salida / "hidro_canon.csv").exists() and (salida / "hidro_lotes_operador.csv").exists()
     assert (salida / "PP_mapa_lotes_plus.html").read_text(encoding="utf-8") == "<html>mapa</html>"
     assert "hidro_produccion.csv" in (salida / "LEEME.txt").read_text(encoding="utf-8-sig")
+    assert set(prod["PARCIAL"]) <= {0, 1}
+    assert not any("exportaciones" in a["name"] for a in almacen.hijos(almacen.CARPETA_DATA))   # no va a la Release pública
