@@ -1,0 +1,42 @@
+# Una sola vez: copia el historial de hidrología de la página (tabla «senamhi_crudo» de Neon) a «hidrologia.sqlite»,
+# para seguir actualizando Hidrología en la PC con Power BI (HIDROLOGIA/powerbi/). Solo lee Neon.
+# Se descarga desde la corrida (Artifacts → «Hidrologia - historial para Power BI»), se descomprime y el archivo
+# hidrologia.sqlite se copia a la carpeta de Power BI de Hidrología.
+# Requiere el secreto DATABASE_URL.
+name: Hidrología · respaldo para Power BI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r FISCAL/api/requirements.txt
+
+      - name: Copiar de Neon
+        env:
+          NEON_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/salida"
+          python HIDROLOGIA/powerbi/respaldo_desde_neon.py "$RUNNER_TEMP/salida/hidrologia.sqlite" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar el historial (descargable desde la corrida)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hidrologia - historial para Power BI
+          path: ${{ runner.temp }}/salida/hidrologia.sqlite
+          retention-days: 30

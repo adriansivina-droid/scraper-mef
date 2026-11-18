@@ -14,7 +14,7 @@ Deja en la carpeta:
 Todos van en UTF-8 con BOM y separados por comas, con PERIODO (primer día del mes) para el eje de tiempo de Power BI.
 """
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -41,7 +41,7 @@ def main():
     salida = Path(sys.argv[1] if len(sys.argv) > 1 else "powerbi")
     salida.mkdir(parents=True, exist_ok=True)
     lineas = ["HIDROCARBUROS · ARCHIVOS PARA POWER BI", "=" * 60,
-              f"Actualizado: {datetime.now(timezone.utc).astimezone():%d/%m/%Y %H:%M} (GitHub Actions, flujo «Hidrocarburos · actualización»)", ""]
+              f"Actualizado: {datetime.now(timezone(timedelta(hours=-5))):%d/%m/%Y %H:%M} (hora de Lima; GitHub Actions, flujo «Hidrocarburos · actualización»)", ""]
 
     prod = db.leer_todo("hidro-produccion")
     if prod is None or prod.empty:
