@@ -1,0 +1,5 @@
+# Carpeta donde quedan los CSV que lee Power BI (y el historial hidrologia.sqlite).
+# Cámbiala si quieres otra (por ejemplo, una carpeta de SharePoint o OneDrive sincronizada).
+CARPETA = 
+# Dónde descarga el navegador el SENAMHI_crudo_AAAA-MM-DD.json (vacío = la carpeta Descargas).
+DESCARGAS = 
