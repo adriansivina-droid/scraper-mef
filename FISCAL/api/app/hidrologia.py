@@ -260,6 +260,37 @@ def _piezas(prefijo):
                     yield c, json.loads(zlib.decompress(bytes(filas[c][0]))), filas[c][1] or ""
 
 
+def crudo_completo():
+    """(nombre, ruta de un .zip temporal) con un solo «SENAMHI_crudo_<día>_completo.json»: todo lo guardado, rearmado
+    con la forma del archivo del recolector (sirve para volver a subirlo aquí, a Colab o a la Release de GitHub). Se
+    escribe por partes, sin tener todo en memoria. Quien lo llama borra el archivo."""
+    _tabla()
+    meta = _leer("meta", {}) or {}
+    dia = str(meta.get("hoy") or _dia_recoleccion().isoformat())[:10]
+    nombre = f"SENAMHI_crudo_{dia}_completo.json"
+    fd, ruta = tempfile.mkstemp(prefix="senamhi_crudo_", suffix=".zip")
+    os.close(fd)
+    dump = lambda x: json.dumps(x, ensure_ascii=False, separators=(",", ":"))
+    with zipfile.ZipFile(ruta, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z, z.open(nombre, "w", force_zip64=True) as f:
+        w = lambda t: f.write(t.encode("utf-8"))
+        w('{"generado":' + dump(datetime.now(timezone.utc).isoformat(timespec="seconds")))
+        for k in ("meta", "estaciones", "zonales", "infoMeta", "fichas", "monitoreo", "historiaOk"):
+            v = _leer(k)
+            if v is not None:
+                w("," + dump(k) + ":" + dump(v))
+        w(',"graficas":[')
+        for i, (_, v, _d) in enumerate(_piezas("graf:")):
+            w(("," if i else "") + dump(v))
+        w('],"mensual":{')
+        for i, (c, v, _d) in enumerate(_piezas("men:")):
+            w(("," if i else "") + dump(c[4:]) + ":" + dump(v))
+        w('},"infoDiaria":{')
+        for i, (c, v, _d) in enumerate(_piezas("inf:")):
+            w(("," if i else "") + dump(c[4:14] + " " + c[15:]) + ":" + dump(v))
+        w("}}")
+    return nombre.replace(".json", ".zip"), ruta
+
+
 def version():
     """Cambia cada vez que se guarda algo: sirve para saber si lo armado en disco sigue vigente."""
     _tabla()

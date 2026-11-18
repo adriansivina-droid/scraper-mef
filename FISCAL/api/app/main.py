@@ -19,6 +19,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
+from starlette.background import BackgroundTask
 
 from . import almacen, archivos, bcrp_excel, carga, compartir, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, hidrologia, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
@@ -414,6 +415,15 @@ def hidrologia_subir(cuerpo: dict = Body(...)):
         return hidrologia.guardar(piezas, str(cuerpo.get("dia", "")))
     except ValueError as e:
         raise HTTPException(422, str(e))
+
+
+@app.get("/v1/hidrologia/crudo/descargar", dependencies=[Depends(acceso)])
+def hidrologia_crudo_descargar():
+    """Todo lo guardado como un solo JSON del recolector (comprimido en .zip), para tener la copia o subirlo a otro lado."""
+    if not hidrologia.hay_datos():
+        raise HTTPException(404, "Todavía no hay datos de SENAMHI en la página.")
+    nombre, ruta = hidrologia.crudo_completo()
+    return FileResponse(ruta, media_type="application/zip", headers=_adjunto(nombre), background=BackgroundTask(os.remove, ruta))
 
 
 @app.get("/v1/hidrologia/estaciones", dependencies=[Depends(acceso)])

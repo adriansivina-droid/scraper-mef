@@ -428,3 +428,21 @@ def test_el_dato_dudoso_va_marcado_en_el_csv_y_fuera_de_la_linea(cliente):
 def test_el_caudal_no_se_revisa():
     # las crecidas relámpago de un día en ríos de montaña son reales: el caudal no se marca
     assert "CAUDAL" not in hidrologia.VARIABLES_DUDOSAS
+
+
+def test_descargar_json_completo(cliente, tmp_path):
+    """El JSON rearmado con todo lo guardado se puede volver a subir y da los mismos datos."""
+    import io as _io
+    import zipfile as _zip
+    import json
+    subir(cliente, crudo())
+    r = cliente.get("/v1/hidrologia/crudo/descargar")
+    assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    z = _zip.ZipFile(_io.BytesIO(r.content))
+    (nombre,) = z.namelist()
+    assert nombre == "SENAMHI_crudo_2026-11-12_completo.json"
+    otro = json.loads(z.read(nombre))
+    original = crudo()
+    assert len(otro["graficas"]) == len(original["graficas"]) and otro["meta"] == original["meta"]
+    from app import hidrologia
+    assert sorted(p["clave"] for p in hidrologia.piezas_de_archivo(otro)) == sorted(p["clave"] for p in hidrologia.piezas_de_archivo(original))
