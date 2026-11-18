@@ -17,6 +17,7 @@ Documentos\\Power BI\\Hidrologia. El primer historial (lo que tenía la página)
 """
 import importlib
 import json
+import os
 import shutil
 import sys
 import types
@@ -37,6 +38,9 @@ def configuracion():
                 k, v = linea.split("=", 1)
                 if v.strip():
                     conf[k.strip().upper()] = v.strip().strip('"')
+    for k in ("CARPETA", "DESCARGAS"):                      # en GitHub Actions: HIDRO_CARPETA y HIDRO_DESCARGAS
+        if os.environ.get(f"HIDRO_{k}"):
+            conf[k] = os.environ[f"HIDRO_{k}"]
     return {k: Path(v).expanduser() for k, v in conf.items()}
 
 

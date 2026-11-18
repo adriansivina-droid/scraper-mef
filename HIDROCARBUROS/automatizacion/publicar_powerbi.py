@@ -8,7 +8,8 @@ Deja en la carpeta:
                            conteo: los meses que la estadística mensual aún no publica salen de la producción diaria
                            (columna FUENTE); el mes en curso, incompleto, trae PARCIAL = 1
   · hidro_canon.csv        canon y sobrecanon petrolero transferido por mes y departamento (millones de soles)
-  · hidro_lotes_operador.csv  qué lotes operó cada operador en cada año (para cruzar con las exportaciones por empresa)
+  · hidro_lotes_operador.csv  qué lotes operó cada operador en cada año
+  · hidro_lotes_ruc.csv    el lote de cada RUC exportador de crudo por año (para cruzar con el Excel de exportaciones)
   · PP_mapa_lotes_plus.html   el mapa de lotes (se abre con doble clic; Power BI no lo muestra)
   · LEEME.txt              qué es cada archivo y cuándo se actualizó
 
@@ -55,6 +56,21 @@ def _guardar(df, ruta):
     print(f"  {ruta.name}: {len(df):,} filas")
 
 
+def _lotes_por_ruc(prod):
+    """AÑO, RUC, LOTES, ESTIMADO, SIN_LOTE de los exportadores de crudo conocidos, con la regla de la página (el lote que
+    operaba la empresa ese año; si no produjo, el de hasta dos años antes, ESTIMADO = 1). Power BI lo cruza por RUC y año
+    con el Excel de exportaciones, que no se publica."""
+    anios = range(2000, int(prod["AÑO"].max()) + 1)
+    rucs = {**{r: k[0] for r, k in hidrocarburos.OPERADOR_DE_RUC.items()}, **hidrocarburos.SIN_LOTE_RUC}
+    falsa = pd.DataFrame([{"AÑO": a, "MES": 1, "DEPARTAMENTO": "LORETO", "RUC": r, "EMPRESA": n, "FOB_MM_USD": 1.0}
+                          for r, n in rucs.items() for a in anios])
+    r = hidrocarburos.exportaciones_crudo(falsa, prod, sin_lote=True)
+    filas = [{"AÑO": a["anio"], "RUC": e["ruc"], "LOTES": " y ".join(l.rstrip("*") for l in ls) or "Sin lote",
+              "ESTIMADO": int(any(l.endswith("*") for l in ls)), "SIN_LOTE": int(e["sin_lote"])}
+             for e in r["empresas"] for a, ls in zip(r["anios"], e["lotes_anio"])]
+    return pd.DataFrame(filas).sort_values(["RUC", "AÑO"])
+
+
 def main():
     salida = Path(sys.argv[1] if len(sys.argv) > 1 else "powerbi")
     salida.mkdir(parents=True, exist_ok=True)
@@ -74,6 +90,7 @@ def main():
     prod.insert(prod.columns.get_loc("OPERADOR") + 1, "EMPRESA", emp.map(lambda e: hidrocarburos.nombre_empresa(e) if e else ""))
     # como la página: la estadística mensual primero y la producción diaria solo donde aquella aún no llega (si no, se
     # sumaría dos veces); el mes en curso, incompleto, va aparte con PARCIAL = 1 (solo para gráficos, no para cuadros)
+    lotes_ruc = _lotes_por_ruc(prod)
     unida, parcial, _ = hidrocarburos._unir(prod)
     partes = [unida.assign(PARCIAL=0)]
     if parcial:
@@ -98,6 +115,9 @@ def main():
            .rename(columns={"VOLUMEN": "VOLUMEN_LIQUIDOS_BARRILES"}))
     _guardar(ops.sort_values(["AÑO", "DEPARTAMENTO", "LOTE"]), salida / "hidro_lotes_operador.csv")
     lineas.append(f"hidro_lotes_operador.csv  {len(ops):,} filas")
+
+    _guardar(lotes_ruc, salida / "hidro_lotes_ruc.csv")
+    lineas.append(f"hidro_lotes_ruc.csv  {len(lotes_ruc):,} filas (lote de cada RUC exportador, por año)")
 
     mapa = db.documento("mapa-hidrocarburos")
     if mapa:

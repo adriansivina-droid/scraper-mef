@@ -1,0 +1,60 @@
+# Hidrología (SENAMHI) para Power BI, sin instalar nada en la PC.
+# SENAMHI no responde a servidores: el recolector corre en el navegador y deja «SENAMHI_crudo_AAAA-MM-DD.json». Ese archivo
+# se sube a la Release «hidrologia-datos» (GitHub → Releases → hidrologia-datos → lápiz «Edit» → arrastrar el JSON →
+# «Update release»). Este flujo lo suma al historial (hidrologia.sqlite, en la misma Release), rearma los CSV y los
+# publica con enlace fijo para Power BI:
+#   https://github.com/adriansivina-droid/scraper-mef/releases/download/hidrologia-datos/<archivo>
+# Corre al editar la Release, cada 2 horas de 7 a. m. a 7 p. m. (por si el aviso no llega) y a mano (Run workflow).
+# Si no hay JSON nuevo, termina sin hacer nada (salvo a mano, que rearma igual).
+name: Hidrología · actualización
+
+on:
+  release:
+    types: [edited]
+  schedule:
+    - cron: "20 12-23/2 * * *"      # 7:20 a 18:20 en Lima
+  workflow_dispatch:
+
+concurrency:
+  group: hidrologia-actualizar
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  actualizar:
+    if: github.event_name != 'release' || github.event.release.tag_name == 'hidrologia-datos'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: ¿Hay JSON nuevos?
+        id: hay
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENTO: ${{ github.event_name }}
+        run: |
+          N=$(gh release view hidrologia-datos -R "$GITHUB_REPOSITORY" --json assets -q '[.assets[].name | select(test("^SENAMHI_crudo_.*\\.json$"))] | length')
+          echo "JSON nuevos: $N"
+          if [ "$N" != "0" ] || [ "$EVENTO" = "workflow_dispatch" ]; then echo "si=1" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/checkout@v4
+        if: steps.hay.outputs.si == '1'
+
+      - uses: actions/setup-python@v5
+        if: steps.hay.outputs.si == '1'
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        if: steps.hay.outputs.si == '1'
+        run: pip install -r FISCAL/api/requirements.txt
+
+      - name: Sumar los JSON al historial, armar y publicar los CSV
+        if: steps.hay.outputs.si == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONUNBUFFERED: "1"
+        run: bash HIDROLOGIA/powerbi/publicar_release.sh
