@@ -21,7 +21,7 @@ import os
 import shutil
 import sys
 import types
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -99,7 +99,7 @@ def main():
         if (tmp / nombre).exists():
             shutil.move(str(tmp / nombre), carpeta / sub / nombre)        # reemplaza el anterior
     shutil.rmtree(tmp, ignore_errors=True)
-    lineas = [f"Actualizado: {datetime.now():%d/%m/%Y %H:%M}"] + [f"{k}: {v}" for k, v in resumen.items() if not isinstance(v, (dict, list))]
+    lineas = [f"Actualizado: {datetime.now(timezone(timedelta(hours=-5))):%d/%m/%Y %H:%M} (hora de Lima)"] + [f"{k}: {v}" for k, v in resumen.items() if not isinstance(v, (dict, list))]
     (carpeta / "LEEME.txt").write_text("HIDROLOGÍA (SENAMHI) · ARCHIVOS PARA POWER BI\n" + "\n".join(lineas) + "\n", encoding="utf-8-sig")
     print("\n".join(lineas))
     print("Listo. En Power BI: Inicio → Actualizar.")
