@@ -1,11 +1,11 @@
 # Actualización automática del Proyecto Petróleo (HIDROCARBUROS/): corre los notebooks sin Colab y guarda todo en la
-# página (almacén de la base, FISCAL/api/app/almacen.py, en vez de Drive); al terminar carga la producción, el canon y
-# el mapa en la página.
+# Release «hidrocarburos-datos» del repositorio: el almacén de los notebooks (almacen.sqlite, con DATA y CONTROL) y los
+# CSV que lee Power BI (hidro_produccion.csv, hidro_canon.csv, …), con enlace fijo:
+#   https://github.com/adriansivina-droid/scraper-mef/releases/download/hidrocarburos-datos/<archivo>
+# Ya no usa Neon. Antes, una sola vez: «Hidrocarburos · pasar a GitHub» (copia lo que había en Neon).
 #   · diario (07:00 hora de Lima): producción de PERUPETRO (incluye la diaria, canon y regalías) → mapas
 #   · mensual (el día 5): además, el canon municipal del MEF del año anterior y el actual
-#   · a mano: Actions → «Hidrocarburos · actualización» → Run workflow (eliges diario o mensual), o el botón
-#     «Actualizar desde PERUPETRO» de la página
-# Requiere el secreto DATABASE_URL. Antes, una sola vez: «Hidrocarburos · migrar desde Drive» (copia lo que había en Drive).
+#   · a mano: Actions → «Hidrocarburos · actualización» → Run workflow (eliges diario o mensual)
 name: Hidrocarburos · actualización
 
 on:
@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write                    # para reemplazar los archivos de la Release
 
 jobs:
   actualizar:
@@ -65,14 +65,34 @@ jobs:
           key: hidro-pdf-${{ github.run_id }}
           restore-keys: hidro-pdf-
 
-      - name: Ejecutar notebooks y cargar en la página
+      - name: Bajar el almacén de la Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download hidrocarburos-datos -p almacen.sqlite -D "$RUNNER_TEMP" \
+            || { echo "::error::No hay almacen.sqlite en la Release «hidrocarburos-datos»: corre antes «Hidrocarburos · pasar a GitHub»"; exit 1; }
+          ls -la "$RUNNER_TEMP/almacen.sqlite"
+
+      - name: Ejecutar notebooks y armar las bases
+        id: notebooks
         env:
           PP_TRABAJO: ${{ runner.temp }}/pp
           PP_ALMACEN: pagina
           ALMACEN_LOCAL: ${{ runner.temp }}/almacen_local
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: sqlite:///${{ runner.temp }}/almacen.sqlite
           PYTHONUNBUFFERED: "1"
         run: python HIDROCARBUROS/automatizacion/ejecutar_notebooks.py "${{ steps.modo.outputs.modo }}"
+
+      # aunque un notebook falle, se publica lo que quedó (lo anterior sigue en el almacén)
+      - name: Publicar en la Release (almacén y CSV para Power BI)
+        if: always() && steps.notebooks.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DATABASE_URL: sqlite:///${{ runner.temp }}/almacen.sqlite
+        run: |
+          python HIDROCARBUROS/automatizacion/publicar_powerbi.py "$RUNNER_TEMP/powerbi"
+          gh release upload hidrocarburos-datos "$RUNNER_TEMP/almacen.sqlite" "$RUNNER_TEMP"/powerbi/* --clobber
+          cat "$RUNNER_TEMP/powerbi/LEEME.txt" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Guardar los PDF de PERUPETRO
         if: always()

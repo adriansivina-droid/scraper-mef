@@ -200,15 +200,12 @@ scrapers del MEF, de empleo y de PERUPETRO, los notebooks fiscales). Drive ya no
 - **IPC de Lima:** se trae solo del BCRP (al abrir los cuadros de ejecución si le falta el mes anterior, a lo más una
   vez al día, y antes de cada procesamiento fiscal). Si el BCRP no responde, se sube `IPC.xlsx` en la página.
 - **Notebooks fiscales:** sus Excel quedan en la pestaña «Archivos» (ver Ejecución del presupuesto).
-- **Hidrocarburos:** el flujo `hidrocarburos_actualizar.yml` (07:00 en Lima, o el botón «Actualizar desde PERUPETRO»)
-  corre los notebooks de `HIDROCARBUROS/` y guarda todo (CSV acumulados, PDF de PERUPETRO, Excel de canon, capas y
-  mapa) en el **almacén de la página** (`app/almacen.py`, tabla `almacen`, con las mismas carpetas DATA y CONTROL e IDs
-  que tenía en Drive: los notebooks no cambian). Al terminar carga la producción, el canon y el mapa. Lo que había en
-  Drive se copia una sola vez con «Hidrocarburos · migrar desde Drive» (`hidrocarburos_migrar.yml`: primero `listar`,
-  luego `copiar`); hasta entonces el flujo diario no corre, para no perder los históricos. Los archivos guardados se
-  ven y se descargan en la pestaña «Actualizar» del sector hidrocarburos. Excepción: los PDF anuales de PERUPETRO
-  (DATA/PDF, ~450 MB, públicos) no van a la base para no llenarla: quedan en la caché de GitHub del flujo y, si se
-  pierden, el notebook los vuelve a bajar de PERUPETRO.
+- **Hidrocarburos:** el flujo `hidrocarburos_actualizar.yml` (07:00 en Lima) corre los notebooks de `HIDROCARBUROS/`
+  y ya no guarda en Neon: el almacén de los notebooks (`app/almacen.py`, con las carpetas DATA y CONTROL) va en un SQLite
+  (`almacen.sqlite`) que vive en la Release «hidrocarburos-datos» del repositorio, junto con los CSV que lee Power BI
+  (ver `HIDROCARBUROS/automatizacion/README.md`). Lo que había en Neon se copia una sola vez con «Hidrocarburos · pasar
+  a GitHub» (`hidrocarburos_a_github.yml`). Los PDF anuales de PERUPETRO (~450 MB) quedan en la caché de GitHub del
+  flujo. El sector hidrocarburos de la página muestra lo último que se cargó en Neon hasta que se retire.
 - **Cargar archivos sin abrir la página:** `.github/workflows/cargar_archivos.yml` sube a la página los archivos de la
   carpeta `cargas/` de una rama aparte.
 

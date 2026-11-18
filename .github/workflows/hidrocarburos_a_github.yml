@@ -1,0 +1,63 @@
+# Una sola vez: copia el almacén de hidrocarburos de Neon (DATA y CONTROL de los notebooks) a la Release
+# «hidrocarburos-datos» del repositorio (almacen.sqlite) y publica allí los CSV para Power BI. Después, el flujo
+# «Hidrocarburos · actualización» trabaja solo con la Release y ya no usa Neon.
+# Solo lee Neon (no borra nada). Si la Release ya tiene almacen.sqlite, no hace nada.
+# Requiere el secreto DATABASE_URL (la base de la página).
+name: Hidrocarburos · pasar a GitHub
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: hidrocarburos-actualizar
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  pasar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r FISCAL/api/requirements.txt
+
+      - name: Revisar la Release
+        id: rel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view hidrocarburos-datos --json assets -q '.assets[].name' 2>/dev/null | grep -qx almacen.sqlite; then
+            echo "La Release ya tiene almacen.sqlite: no se copia de nuevo." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "hecho=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Copiar de Neon y armar las bases
+        if: steps.rel.outputs.hecho != '1'
+        env:
+          NEON_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: sqlite:///${{ runner.temp }}/almacen.sqlite
+          PYTHONUNBUFFERED: "1"
+        run: python HIDROCARBUROS/automatizacion/pasar_a_github.py
+
+      - name: Publicar en la Release
+        if: steps.rel.outputs.hecho != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DATABASE_URL: sqlite:///${{ runner.temp }}/almacen.sqlite
+        run: |
+          python HIDROCARBUROS/automatizacion/publicar_powerbi.py "$RUNNER_TEMP/powerbi"
+          gh release view hidrocarburos-datos >/dev/null 2>&1 || gh release create hidrocarburos-datos \
+            --title "Hidrocarburos · datos para Power BI" --latest=false \
+            --notes "Archivos que actualiza todos los días el flujo «Hidrocarburos · actualización» (PERUPETRO). Power BI los lee con el enlace fijo https://github.com/${{ github.repository }}/releases/download/hidrocarburos-datos/<archivo>. almacen.sqlite es el almacén de los notebooks (no se usa en Power BI)."
+          gh release upload hidrocarburos-datos "$RUNNER_TEMP/almacen.sqlite" "$RUNNER_TEMP"/powerbi/* --clobber
+          cat "$RUNNER_TEMP/powerbi/LEEME.txt" >> "$GITHUB_STEP_SUMMARY"
