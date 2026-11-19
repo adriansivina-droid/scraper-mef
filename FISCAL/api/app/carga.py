@@ -193,6 +193,9 @@ def leer_archivos(raiz):
             if sunat_impo.es_base(ruta):                   # base mensual de importaciones (M_AAAAMM.xlsx)
                 de_impo.append((n_archivo, ruta, "base"))
                 continue
+            if sunat_expo.es_depurada(ruta):               # base de exportaciones depurada y clasificada por el usuario
+                de_sunat.append((n_archivo, ruta, "depurada"))
+                continue
             if sunat_expo.es_sunat(ruta):                  # base mensual de SUNAT (X_AAAAMM.xlsx)
                 de_sunat.append((n_archivo, ruta, "sunat"))
                 continue
@@ -351,6 +354,19 @@ def _expo_al_almacen():
         return f"Exportaciones de crudo: no se pudieron copiar a DATA para el mapa ({e})."
 
 
+def _depurada_al_estad(df):
+    """Los meses de una base depurada pasan solos al ESTAD de su región (los cuadros salen de ahí)."""
+    dep = df[df["MOTIVO"] == sunat_expo.DEPURADA]
+    avisos = []
+    for (d, a, m) in sorted({(str(d), int(a), int(m)) for d, a, m in zip(dep["_depto"], dep["_anio"], dep["_mes"])}):
+        try:
+            n = sunat_expo.pasar_al_estad(d, a, m)
+            avisos.append(f"Exportaciones {sunat_expo.NOMBRE[d]} {a}-{m:02d}: pasó al ESTAD ({n} filas); los cuadros ya lo usan.")
+        except ValueError as e:
+            avisos.append(f"Exportaciones {sunat_expo.NOMBRE[d]} {a}-{m:02d}: no pasó al ESTAD ({e})")
+    return avisos
+
+
 def cargar(origen, archivos, excluir=()):
     """archivos: lista de (nombre, bytes) o (nombre, ruta de un archivo en disco, que se mueve). Un .zip se descomprime. Guarda en la base de datos y devuelve el resumen.
     excluir: bases que no se guardan (p. ej. el detalle municipal de una corrida de años anteriores)."""
@@ -395,6 +411,8 @@ def cargar(origen, archivos, excluir=()):
                                      "periodos": sorted({f"{a}" if m == 0 else f"{a}-{m:02d}" for a, m in zip(df["_anio"], df["_mes"])})}
     if "hidro-expo-empresa" in bases:
         resumen["avisos"].append(_expo_al_almacen())
+    if "expo-sunat" in bases:
+        resumen["avisos"] += _depurada_al_estad(bases["expo-sunat"])
     if not bases and not avisos_ipc and not n_ctl and not any("gráficos DRAE guardados" in x for x in resumen["avisos"]):
         resumen["avisos"].append("No se encontró ningún archivo de los scrapers, de pesca, de empleo ni de hidrocarburos en lo que subiste.")
     db.registrar_carga(origen, resumen)

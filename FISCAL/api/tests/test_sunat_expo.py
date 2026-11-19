@@ -240,3 +240,54 @@ def test_unificar_producto(cliente):
     ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
     assert set(ago.loc[["CACAO", "CACAO TOSTADO", "CACAO EN GRANO SECO"], "PRODUCTO"]) == {"Cacao en grano"}
     assert cliente.post("/v1/exportaciones/sunat/unificar", json={"filas": [{"contiene": "ca", "nombre": "x"}]}).status_code == 422
+
+
+def base_depurada(con_titulo=True):
+    """Base depurada por el usuario: las columnas de SUNAT más TIPO, CATEGORIA y PRODUCTO (encabezado no en la fila 1)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "BASE"
+    if con_titulo:
+        ws.append(["Base depurada de exportaciones · agosto 2026"])
+        ws.append([])
+    ws.append(["ruc11", "ano_mes", "fecembar", "pais", "aduana", "partorig", "dcom", "fob", "kilos", "ubigeo_dep",
+               "TIPO", "CATEGORÍA", "PRODUCTO", "RAZON_SOCIAL"])
+    ws.append(["20513842377", "2608", "20260810", "105", "226", "2709000000", "PETROLEO CRUDO", 17033000, 1, "16",
+               "1. PRODUCTOS TRADICIONALES", "1.2. PETRÓLEO Y SUS DERIVADOS", "Barriles de petróleo crudo", "PETROTAL PERU S.R.L."])
+    ws.append(["20100000001", "2608", "20260811", "105", "226", "1801001900", "CACAO SECO", 290400, 1, "16",
+               "No tradicional", "2.4. AGROPECUARIOS", "Cacao en grano", "CACAO LORETO SAC"])
+    ws.append(["20999999999", "2608", "20260812", "105", "226", "4407999000", "MADERA TORNILLO", 9000, 1, "16",
+               "2. PRODUCTOS NO TRADICIONALES", "2.1. MADERAS Y SUS MANUFACTURAS", "Madera tornillo", None])
+    ws.append(["20100000001", "2608", "20260813", "105", "235", "1801001900", "CACAO SECO", 7000, 1, "15",
+               "2. PRODUCTOS NO TRADICIONALES", "2.4. AGROPECUARIOS", "Cacao en grano", None])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_base_depurada_entra_completa_y_pasa_sola_al_estad(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    r = subir(cliente, **{"LOR_202608_depurada.xlsx": base_depurada()})
+    assert any("base depurada 2026-08 a 2026-08" in a for a in r["avisos"])
+    assert any("LORETO 2026-08: pasó al ESTAD" in a for a in r["avisos"])
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert set(ago["ESTADO"]) == {"ok"} and set(ago["MOTIVO"]) == {sunat_expo.DEPURADA}
+    # sin revisión: la empresa nueva entra y la partida que no está en el diccionario usa la clasificación del archivo
+    assert ago.loc["MADERA TORNILLO", "RUBRO_ESTAD"] == "Otros acabados" and ago.loc["MADERA TORNILLO", "EMPRESA"].startswith("20999999999 - (sin")
+    assert ago.loc["CACAO SECO", "RUBRO_ESTAD"] == "Cacao en grano" and ago.loc["CACAO SECO", "PAIS"] == "Brasil"
+    assert ago.loc["PETROLEO CRUDO", "EMPRESA"] == "20513842377 - PETROTAL PERU S.R.L." and ago.loc["PETROLEO CRUDO", "ADUANA"] == "Iquitos"
+    assert len(ago) == 3                                                    # la fila de Lima no se guarda
+    c = cliente.get("/v1/cuadros/exportaciones?departamento=16&periodo=2026-08").json()["cuadros"]
+    assert "2026-08" in c["meses"]
+    s = {f["nombre"]: f for f in c["sintesis"]}
+    assert s["Petróleo crudo y derivados"]["mes_a"] == 17.03 and s["Maderas y sus manufacturas"]["mes_a"] == 0.01
+    # reprocesar (p. ej. al subir diccionarios) no toca la base depurada
+    sunat_expo.reprocesar()
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8")
+    assert len(ago) == 3 and set(ago["ESTADO"]) == {"ok"}
+
+
+def test_base_cruda_avisa_que_hay_que_subir_la_depurada(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    r = subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    assert any("Sube la base depurada" in a for a in r["avisos"]) and not any("pasó al ESTAD" in a for a in r["avisos"])
