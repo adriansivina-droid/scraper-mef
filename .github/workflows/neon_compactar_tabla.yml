@@ -1,0 +1,56 @@
+# Compacta una tabla de Neon con VACUUM FULL: la reescribe sin el espacio que dejaron las filas borradas y lo devuelve.
+# No borra datos. La tabla queda bloqueada mientras dura (segundos para unas decenas de MB). Neon puede tardar un día en
+# mostrar el espacio liberado (guarda el historial de cambios de las últimas horas).
+# Actions → «Neon · compactar una tabla» → Run workflow. Requiere el secreto DATABASE_URL.
+name: Neon · compactar una tabla
+
+on:
+  workflow_dispatch:
+    inputs:
+      tabla:
+        description: "Nombre de la tabla (p. ej. base_expo_sunat)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  compactar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+      - run: pip install -r FISCAL/api/requirements.txt
+      - name: Compactar
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TABLA: ${{ inputs.tabla }}
+        run: |
+          python - <<'PY'
+          import os, re, time
+          from sqlalchemy import create_engine, inspect, text
+          t = os.environ["TABLA"].strip()
+          if not re.fullmatch(r"[a-z0-9_]+", t):
+              raise SystemExit("Nombre de tabla no válido")
+          u = os.environ["DATABASE_URL"]
+          m = create_engine("postgresql+psycopg://" + u.split("://", 1)[1], isolation_level="AUTOCOMMIT")
+          if t not in inspect(m).get_table_names():
+              raise SystemExit(f"No existe la tabla {t}")
+          tam = lambda cx: cx.execute(text(f"SELECT pg_total_relation_size('\"{t}\"'), COUNT(*) FROM \"{t}\"")).first()
+          with m.connect() as cx:
+              a, n = tam(cx)
+              t0 = time.time()
+              cx.execute(text(f'VACUUM (FULL, ANALYZE) "{t}"'))
+              b, n2 = tam(cx)
+          linea = (f"**{t}**: {a / 1e6:.1f} MB → {b / 1e6:.1f} MB (liberados {(a - b) / 1e6:.1f} MB) · "
+                   f"filas {n:,} → {n2:,} · {time.time() - t0:.0f} s")
+          print(linea)
+          if n2 != n:
+              raise SystemExit("El número de filas cambió: revisar")
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(linea + "\n")
+          PY

@@ -34,6 +34,15 @@ def motor():
     return _motor
 
 
+def vaciar(cx, tabla):
+    """Borra todas las filas de una tabla dentro de la transacción «cx». En Postgres con TRUNCATE, que devuelve el espacio
+    al instante: DELETE deja filas muertas y, tras varias reescrituras completas, la tabla ocupaba el doble en Neon."""
+    if cx.dialect.name == "postgresql":
+        cx.execute(text(f'TRUNCATE TABLE "{tabla}"'))
+    else:
+        cx.execute(text(f'DELETE FROM "{tabla}"'))
+
+
 def reiniciar_motor():
     """Para las pruebas: vuelve a leer DATABASE_URL."""
     global _motor
