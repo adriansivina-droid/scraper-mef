@@ -242,7 +242,7 @@ def reprocesar():
     from .catalogo import BASES, INTERNAS
     b = BASES["impo-base"]
     with db.motor().begin() as cx:                    # una sola transacción
-        cx.execute(text(f'DELETE FROM "{b.tabla}"'))
+        db.vaciar(cx, b.tabla)
         df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
     return len(df)
 
