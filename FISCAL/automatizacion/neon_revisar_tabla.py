@@ -22,6 +22,13 @@ def main():
     with m.connect() as cx:
         tot = cx.execute(text(f"SELECT pg_total_relation_size('\"{tabla}\"'), pg_relation_size('\"{tabla}\"'), COUNT(*) FROM \"{tabla}\"")).first()
         out += [f"## {tabla}", "", f"Total: {tot[0] / 1e6:.1f} MB · solo filas: {tot[1] / 1e6:.1f} MB · {tot[2]:,} filas", ""]
+        vivo = cx.execute(text(f'SELECT SUM(pg_column_size(t.*))::bigint FROM "{tabla}" t')).scalar() or 0
+        st = cx.execute(text("SELECT n_live_tup, n_dead_tup, last_vacuum, last_autovacuum, n_tup_del, n_tup_ins "
+                             "FROM pg_stat_user_tables WHERE relname = :t"), {"t": tabla}).first()
+        out += [f"Lo que ocupan las filas vivas: {vivo / 1e6:.1f} MB · espacio sin usar (filas borradas o huecos): "
+                f"{max(tot[1] - vivo, 0) / 1e6:.1f} MB", "",
+                f"Filas muertas sin limpiar: {st[1]:,} · insertadas: {st[5]:,} · borradas: {st[4]:,} · último VACUUM: {st[2] or '-'} "
+                f"· último autovacuum: {st[3] or '-'}", ""]
         partes = ", ".join(f'SUM(pg_column_size("{c}"))::bigint AS "{c}"' for c in cols)
         tam = cx.execute(text(f'SELECT {partes} FROM "{tabla}"')).first()
         suma = sum(x or 0 for x in tam) or 1
