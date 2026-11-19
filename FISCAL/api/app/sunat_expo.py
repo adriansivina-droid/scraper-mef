@@ -642,12 +642,16 @@ def reprocesar(columna=None, valores=None):
     base = db.leer_todo("expo-sunat")
     if base is None or base.empty:
         return 0
+    hay_depurada = bool((base["MOTIVO"] == DEPURADA).any())
     base = base[base["MOTIVO"] != DEPURADA]              # la base depurada no se vuelve a procesar
     if base.empty:
         return 0
     df, _ = procesar(base)
     with db.motor().begin() as cx:
-        cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE "MOTIVO" IS NULL OR "MOTIVO" <> :dep'), {"dep": DEPURADA})
+        if hay_depurada:                                 # se queda la base depurada: solo se borra lo que se reprocesa
+            cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE "MOTIVO" IS NULL OR "MOTIVO" <> :dep'), {"dep": DEPURADA})
+        else:
+            db.vaciar(cx, b.tabla)
         df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
     return len(df)
 

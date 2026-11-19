@@ -1,0 +1,32 @@
+# Solo lectura: cuánto pesa cada columna de una tabla de Neon y cómo se reparten sus filas (departamento, año, estado,
+# archivo de origen). Sirve para decidir qué se puede borrar. Actions → «Neon · revisar una tabla» → Run workflow.
+# Requiere el secreto DATABASE_URL.
+name: Neon · revisar una tabla
+
+on:
+  workflow_dispatch:
+    inputs:
+      tabla:
+        description: "Nombre de la tabla (p. ej. base_expo_sunat)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+      - run: pip install -r FISCAL/api/requirements.txt
+      - name: Revisar
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TABLA: ${{ inputs.tabla }}
+        run: python FISCAL/automatizacion/neon_revisar_tabla.py "$TABLA"
