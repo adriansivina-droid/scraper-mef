@@ -339,6 +339,21 @@ Cuadros (`/v1/cuadros/exportaciones?departamento=16&periodo=AAAA-MM[&flujo=impo]
 
 ### Base mensual (pestañas «Base mensual» y «Resumen Export» de Exportaciones)
 
+**Desde el 19/11/2026: base depurada.** El usuario limpia y clasifica la base del mes en su computadora y sube un
+`.xlsx` con las columnas de SUNAT (`ruc11`, `partorig`, `dcom`, `fob`, `ubigeo_dep`, `ano_mes` o `AÑO` y `MES`,
+`pais`, `aduana`, `kilos`…; el encabezado puede estar en cualquiera de las primeras 15 filas) **más `TIPO`, `CATEGORÍA`
+y `PRODUCTO`** (`sunat_expo.es_depurada` / `leer_depurada`). Todas sus filas quedan **ok** (MOTIVO «Base depurada»): no
+pasan por empresas, reglas, términos, condiciones ni PROD_UNICOS; solo se ubican en las filas del ESTAD (por tipo,
+categoría y producto, con las equivalencias guardadas) y **el mes pasa solo al ESTAD** al subirla
+(`carga._depurada_al_estad`). Reprocesar la base (p. ej. al subir diccionarios) no toca esas filas. La pestaña «Base
+mensual» ya no tiene la revisión: muestra el ESTAD del mes contra el cargado, los productos que van a «Resto» (se
+corrigen en la base local) y un botón para volver a pasar el mes al ESTAD (si el ESTAD de la región se subió después).
+Una base cruda (`X_AAAAMM.xlsx` sin TIPO, CATEGORÍA ni PRODUCTO) se sigue leyendo con el flujo de abajo, pero avisa que
+hay que subir la depurada: sus filas por verificar no entran. Los endpoints de revisión siguen en la API, sin uso en la
+página.
+
+Flujo anterior (hasta el 18/11/2026):
+
 El flujo de ANUAL_PRO (hoja ORIGEN y tablas dinámicas) en la página (`sunat_expo.py`, base `expo-sunat`):
 1. Subir un **ANUAL_PRO_AAAA.xlsx** una vez: carga los diccionarios (UNICOS: PROD_UNICOS, PAISES, EMPRESAS, ADUANA; y
    PARTIDA) y su hoja ORIGEN como base de ese año.

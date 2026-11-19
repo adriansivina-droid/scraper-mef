@@ -15,6 +15,11 @@
      «OTRAS EXPORTACIONES».
   5. El «ESTAD propuesto» de un mes es esa tabla dinámica; se compara con el ESTAD cargado y se puede pasar al ESTAD.
 Subir ANUAL_PRO_AAAA.xlsx carga los diccionarios y además su hoja ORIGEN como base de ese año.
+
+Base depurada (desde el 19/11/2026, la forma de trabajo de la página): el usuario limpia y clasifica la base en su
+computadora y sube un Excel que, además de las columnas de SUNAT, trae TIPO, CATEGORIA y PRODUCTO. Todas sus filas son
+ok (MOTIVO «Base depurada»): no pasan por empresas, reglas ni diccionarios, solo se ubican en las filas del ESTAD, y el
+mes pasa solo al ESTAD al subirla (carga.py).
 """
 import io
 import re
@@ -249,6 +254,143 @@ def leer_crudo(ruta):
     return d[[c for c in CRUDAS if c in d.columns]]
 
 
+# ── Base depurada: limpiada y clasificada por el usuario antes de subirla ──
+DEPURADA = "Base depurada"
+# nombre normalizado de la columna (minúsculas, sin tildes, «_» en vez de espacios) -> campo; gana el primero que exista
+ALIAS_DEPURADA = {
+    "ruc": ["ruc11", "ruc", "ruc_texto"],
+    "partida": ["partorig", "partida", "partida_texto", "subpartida"],
+    "fob": ["fob", "fob_usd", "fob_dolpol", "valor_fob"],
+    "departamento": ["ubigeo_dep", "departamento", "dpto", "region"],
+    "tipo": ["tipo"],
+    "categoria": ["categoria"],
+    "producto": ["producto_corregido", "producto_comun", "nombre_comun", "producto"],
+    "ano_mes": ["ano_mes"],
+    "anio": ["ano", "anio"],
+    "mes": ["mes"],
+    "descripcion": ["dcom", "descripcion", "descripcion_comercial", "desc_com"],
+    "pais": ["pais", "cod_pais", "pais_desc"],
+    "aduana": ["aduana", "cod_aduana", "adua_desc"],
+    "empresa": ["razon_social", "empresa", "exportador"],
+    "fecembar": ["fecembar", "fecha_embarque", "fecha"],
+    "kilos": ["kilos", "peso_neto"],
+    "cantidad": ["qunifis", "cantidad", "unid_fiqty"],
+    "unidad": ["tunifis", "unidad", "unid_fides"],
+}
+OBLIGATORIAS = ["ruc", "partida", "fob", "departamento", "tipo", "categoria", "producto"]
+
+
+def _col(c):
+    return re.sub(r"[^a-z0-9]+", "_", _clave(c)).strip("_")
+
+
+def _encabezado_depurada(ruta):
+    """(hoja, fila del encabezado, {campo: columna}) de la primera hoja que tiene las columnas de una base depurada."""
+    try:
+        wb = load_workbook(ruta, read_only=True)
+    except Exception:
+        return None
+    try:
+        for ws in wb.worksheets:
+            for i, fila in enumerate(ws.iter_rows(max_row=15, values_only=True)):
+                cols = [_col(v) for v in fila]
+                campos = {}
+                for campo, alias in ALIAS_DEPURADA.items():
+                    j = next((cols.index(a) for a in alias if a in cols), None)
+                    if j is not None:
+                        campos[campo] = j
+                if all(c in campos for c in OBLIGATORIAS) and ("ano_mes" in campos or "mes" in campos or "fecembar" in campos):
+                    return ws.title, i, campos
+    finally:
+        wb.close()
+    return None
+
+
+def es_depurada(ruta):
+    return _encabezado_depurada(ruta) is not None
+
+
+def _tipo_digito(tipo):
+    """«2. PRODUCTOS NO TRADICIONALES» / «No tradicional» / «2» -> «2»; vacío -> «»."""
+    t = _clave(tipo)
+    if t[:1] in "123" and t:
+        return t[:1]
+    if "no trad" in t:
+        return "2"
+    if "trad" in t:
+        return "1"
+    if "otr" in t:
+        return "3"
+    return ""
+
+
+def _depto_de(v):
+    t = _clave(v).replace(".0", "")
+    if t.isdigit():
+        return t.zfill(2)
+    return next((k for k, n in NOMBRE.items() if t in (_clave(n), _clave(CORTO[k]))), "")
+
+
+def leer_depurada(ruta):
+    """La base depurada a las columnas de la base (todas las filas ok). -> (df, filas de otros departamentos, avisos)."""
+    hoja, fila, campos = _encabezado_depurada(ruta)
+    raw = pd.read_excel(ruta, sheet_name=hoja, header=fila, dtype=str)
+    cols = list(raw.columns)
+    d = pd.DataFrame({campo: raw[cols[j]] for campo, j in campos.items()})
+    d = d[d["ruc"].notna() & d["fob"].notna() & d["partida"].notna()]
+    d["dep"] = d["departamento"].map(_depto_de)
+    fuera = int((~d["dep"].isin(CORTO)).sum())
+    d = d[d["dep"].isin(CORTO)].copy()
+    sin = lambda c: d[c].astype(str).str.replace(r"\.0$", "", regex=True).str.strip() if c in d else pd.Series("", index=d.index)
+    if "anio" in d and "mes" in d and d["anio"].notna().all():
+        d["_a"], d["_m"] = pd.to_numeric(sin("anio")).astype(int), pd.to_numeric(sin("mes")).astype(int)
+    elif "ano_mes" in d:
+        am = sin("ano_mes").str.zfill(4)
+        d["_a"], d["_m"] = 2000 + am.str[:2].astype(int), am.str[2:4].astype(int)
+    else:
+        f = pd.to_datetime(sin("fecembar"), format="%Y%m%d", errors="coerce").fillna(pd.to_datetime(sin("fecembar"), dayfirst=True, errors="coerce"))
+        d["_a"], d["_m"] = f.dt.year.astype(int), f.dt.month.astype(int)
+    avisos = []
+    paises = leer_tabla("paises").drop_duplicates("COD").set_index("COD")
+    aduanas = leer_tabla("aduanas").drop_duplicates("COD").set_index("COD")["ADUANA"]
+    emp = leer_tabla("empresas").assign(RUC=lambda e: e["RUC"].astype(str)).drop_duplicates("RUC", keep="last").set_index("RUC")["RAZON_SOCIAL"]
+    pais = sin("pais")
+    es_cod = pais.str.fullmatch(r"\d{1,3}")
+    cod_pais = pais.where(~es_cod, pais.str.zfill(3)).where(es_cod, "")
+    nombre_pais = pais.where(~es_cod, cod_pais.map(paises["PAIS"]) if len(paises) else None)
+    adu = sin("aduana")
+    es_cod_a = adu.str.fullmatch(r"\d{1,4}")
+    cod_adu = adu.where(es_cod_a, "").str.lstrip("0")
+    nombre_adu = adu.where(~es_cod_a, cod_adu.map(aduanas) if len(aduanas) else None)
+    ruc = sin("ruc")
+    razon = d["empresa"] if "empresa" in d else ruc.map(emp) if len(emp) else pd.Series(None, index=d.index)
+    out = pd.DataFrame({"AÑO": d["_a"], "MES": d["_m"], "DEPARTAMENTO": d["dep"].map(NOMBRE), "RUC": ruc,
+                        "EMPRESA": ruc + " - " + razon.fillna("(sin razón social)").astype(str),
+                        "PARTIDA": sin("partida").str.replace(r"\D", "", regex=True).str.zfill(10),
+                        "DESCRIPCION": d["descripcion"].fillna("") if "descripcion" in d else "",
+                        "PRODUCTO": d["producto"].fillna("").str.strip(), "TIPO": d["tipo"], "CATEGORIA": d["categoria"],
+                        "COD_PAIS": cod_pais, "PAIS": nombre_pais,
+                        "CONTINENTE": cod_pais.map(paises["CONTINENTE"]) if len(paises) else None,
+                        "COD_ADUANA": cod_adu, "ADUANA": nombre_adu, "FECHA_EMBARQUE": sin("fecembar"),
+                        "KILOS": pd.to_numeric(d.get("kilos"), errors="coerce") if "kilos" in d else None,
+                        "CANTIDAD": pd.to_numeric(d.get("cantidad"), errors="coerce") if "cantidad" in d else None,
+                        "UNIDAD": d["unidad"] if "unidad" in d else None,
+                        "FOB_USD": pd.to_numeric(d["fob"].astype(str).str.replace(",", ""), errors="coerce").fillna(0.0)})
+    out["_depto"] = d["dep"].values
+    out["BORRAR_PARA"], out["ESTADO"], out["MOTIVO"] = "OK", "ok", DEPURADA
+    out["FOB"] = [_r0(v / 1000) for v in out["FOB_USD"]]
+    sin_tipo = int((out["TIPO"].map(_tipo_digito) == "").sum())
+    if sin_tipo:
+        avisos.append(f"{sin_tipo} filas sin TIPO reconocible: van a «OTRAS EXPORTACIONES».")
+    estructuras = {dep: estructura_estad(dep) for dep in CORTO}
+    equivalencias = leer_tabla("equivalencias").to_dict("records")
+    ubic = [ubicar(estructuras[dep], CORTO[dep], _tipo_digito(t), c, p, equivalencias, dsc)
+            for dep, t, c, p, dsc in zip(out["_depto"], out["TIPO"], out["CATEGORIA"], out["PRODUCTO"], out["DESCRIPCION"])]
+    out["TIPO_ESTAD"], out["RUBRO_ESTAD"] = [u[0] for u in ubic], [u[1] for u in ubic]
+    out["_anio"], out["_mes"], out["_nivel"] = out["AÑO"], out["MES"], ""
+    return out[COLUMNAS + ["_anio", "_mes", "_depto", "_nivel"]].reset_index(drop=True), fuera, avisos
+
+
 # ── Del crudo a la base ──
 def estructura_estad(depto):
     """Filas del último ESTAD cargado de la región: [{tipo, grupo, rubro, nivel, orden}]."""
@@ -443,19 +585,25 @@ def leer(archivos):
     """archivos: [(n, ruta, 'sunat'|'anual')] -> ({"expo-sunat": df}, avisos)."""
     partes, avisos = [], []
     for n, ruta, tipo in archivos:
-        if tipo == "anual":
-            avisos += [f"{ruta.name}: {a}" for a in cargar_diccionarios(ruta)]
-            crudo = leer_origen(ruta)
+        if tipo == "depurada":
+            df, fuera, av = leer_depurada(ruta)
+            avisos += [f"{ruta.name}: {a}" for a in av]
         else:
-            crudo = leer_crudo(ruta)
-        df, fuera = procesar(crudo)
+            if tipo == "anual":
+                avisos += [f"{ruta.name}: {a}" for a in cargar_diccionarios(ruta)]
+                crudo = leer_origen(ruta)
+            else:
+                crudo = leer_crudo(ruta)
+                avisos.append(f"{ruta.name}: es la base cruda de SUNAT (sin TIPO, CATEGORIA ni PRODUCTO). La página ya no la "
+                              "revisa: sus filas por verificar no entran a los cuadros. Sube la base depurada.")
+            df, fuera = procesar(crudo)
         if fuera:
             avisos.append(f"{ruta.name}: {fuera} filas de otros departamentos; no se guardaron.")
         if df.empty:
             continue
         cuenta = df.groupby("ESTADO")["FOB"].agg(["count", "sum"])
         per = sorted(set(zip(df["AÑO"], df["MES"])))
-        avisos.append(f"{ruta.name}: base mensual {per[0][0]}-{per[0][1]:02d} a {per[-1][0]}-{per[-1][1]:02d}, " +
+        avisos.append(f"{ruta.name}: {'base depurada' if tipo == 'depurada' else 'base mensual'} {per[0][0]}-{per[0][1]:02d} a {per[-1][0]}-{per[-1][1]:02d}, " +
                       ", ".join(f"{k} {int(v['count'])} filas ({v['sum']:,.0f} mil US$)".replace(",", " ") for k, v in cuenta.iterrows()) + ".")
         partes.append(df.assign(_archivo=n))
     return ({"expo-sunat": pd.concat(partes, ignore_index=True)} if partes else {}), avisos
@@ -481,21 +629,29 @@ def reprocesar(columna=None, valores=None):
                 w, prm = filtro(tr)
                 partes.append(pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE {w}'), cx, params=prm))
         base = pd.concat(partes, ignore_index=True).reindex(columns=b.columnas) if partes else pd.DataFrame(columns=b.columnas)
+        base = base[base["MOTIVO"] != DEPURADA]          # la base depurada no se vuelve a procesar
         if base.empty:
             return 0
         df, _ = procesar(base)
         with db.motor().begin() as cx:
             for tr in trozos:
                 w, prm = filtro(tr)
-                cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE {w}'), prm)
+                cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE {w} AND ("MOTIVO" IS NULL OR "MOTIVO" <> :dep)'), {**prm, "dep": DEPURADA})
             df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
         return len(df)
     base = db.leer_todo("expo-sunat")
     if base is None or base.empty:
         return 0
+    hay_depurada = bool((base["MOTIVO"] == DEPURADA).any())
+    base = base[base["MOTIVO"] != DEPURADA]              # la base depurada no se vuelve a procesar
+    if base.empty:
+        return 0
     df, _ = procesar(base)
     with db.motor().begin() as cx:
-        db.vaciar(cx, b.tabla)
+        if hay_depurada:                                 # se queda la base depurada: solo se borra lo que se reprocesa
+            cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE "MOTIVO" IS NULL OR "MOTIVO" <> :dep'), {"dep": DEPURADA})
+        else:
+            db.vaciar(cx, b.tabla)
         df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
     return len(df)
 
@@ -746,7 +902,7 @@ def revision(depto, periodo=None):
     resto = ok[ok["RUBRO_ESTAD"].fillna("").isin(["Resto"])]
     a_resto = [{"producto": p, "categoria": g["CATEGORIA"].iloc[0], "fob": float(g["FOB"].sum())} for p, g in resto.groupby("PRODUCTO") if g["FOB"].sum() > 0]
     est = estructura_estad(depto)
-    return {"periodo": periodo, "meses": meses, "estados": estados,
+    return {"periodo": periodo, "meses": meses, "estados": estados, "depurada": bool(len(mes)) and bool((mes["MOTIVO"] == DEPURADA).all()),
             "empresas": sorted(empresas, key=lambda x: -x["fob"]), "partidas": sorted(partidas, key=lambda x: -x["fob"]),
             "a_resto": sorted(a_resto, key=lambda x: -x["fob"]),
             "rubros": [f["rubro"] for f in est if f["nivel"] in ("producto", "grupo")] + [f["rubro"] for f in est if f["nivel"] == "tipo" and _clave(f["rubro"]).startswith("otras")],
