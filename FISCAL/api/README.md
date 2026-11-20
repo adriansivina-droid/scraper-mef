@@ -458,27 +458,45 @@ En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
 
 ### ESTAD de gasto e inversión (pestaña «ESTAD» de Gasto e Inversión)
 
-`app/estad_fiscal.py` arma las seis hojas fiscales del ESTAD de cada región (GASTO(S) e INVERSIÓN de G.N., G.R. y G.L.)
-con las bases del MEF de la página, en miles de soles redondeados a la unidad:
+`app/estad_fiscal.py` llena las seis hojas fiscales del ESTAD de cada región (GASTO(S) e INVERSIÓN de G.N., G.R. y G.L.)
+con las bases del MEF de la página.
+
+**De dónde sale cada fila:**
 
 - **Genéricas y deuda:** `gasto-dev-generica`.
 - **Gasto por fuente:** `gasto-dev-fuente`.
 - **Inversión por función:** `inv-dev-funcion`.
 - **Inversión por fuente:** `inv-dev-fuente`.
 
-**Cómo se ubica cada dato:**
+Cada fila se reconoce por su etiqueta (`concepto`), porque cada región ordena y nombra las filas a su manera.
 
-- Cada fila se reconoce por su etiqueta (`concepto`), porque cada región ordena y nombra las filas a su manera.
-- El Excel deja las etiquetas en la misma fila que el ESTAD y los meses en columnas, para copiar y pegar.
-- El orden de filas sale del último ESTAD subido. Lo guarda la carga, en `documentos` (`estad-fiscal-<depto>`), junto con sus últimos 25 meses para comparar. Si no se subió, sale de `app/estad_fiscal_filas.json` (solo etiquetas).
+**Montos:** en miles de soles **con decimales** (soles / 1000). El formato del ESTAD (`#,##0`) muestra solo los miles, y las variaciones reales salen precisas.
+
+**El Excel (`excel`):**
+
+- Al subir el ESTAD, la carga guarda en `documentos`:
+  - sus seis hojas fiscales como plantilla (`estad-fiscal-plantilla-<depto>`, ~0,4 MB), con formato y fórmulas;
+  - el orden de filas y los últimos 25 meses, para comparar (`estad-fiscal-<depto>`).
+- `llenar_plantilla` toma esa plantilla y, para cada mes pedido:
+  - escribe los montos en las filas que se tipean y respeta las que son fórmula (totales);
+  - copia del mes anterior las fórmulas que falten: totales, cuadro en reales y deflactados. La columna fijada con `$` (`$EV$36`) se corre al mes nuevo;
+  - llena el deflactor encadenado con el IPC de Lima de la página: la fila que dividen las fórmulas en reales y la de encima, con la variación % mensual;
+  - deja vacías las fórmulas que dependen de un dato que la página no tiene (índice de precios al por mayor).
+- Después ajusta el libro completo:
+  - mueve al último mes llenado la celda de referencia de las columnas de variación (Var.% y Ene.–mes);
+  - las fórmulas que apuntaban a otra copia del ESTAD (`'[1]GASTOS G.N.'!`) pasan a usar las hojas del mismo libro.
+- Sin plantilla, `excel_simple` entrega un libro con las mismas filas.
 
 **Lo que no se llena:**
 
-- Las hojas de INGRESOS, porque la página no descarga ingresos.
-- El Fondo de Compensación Regional y Privatizaciones, que son rubros dentro de Recursos determinados.
-- La segunda fila de una etiqueta repetida.
+- Las hojas de INGRESOS.
+- El Fondo de Compensación Regional y Privatizaciones (van dentro de Recursos determinados).
+- El índice de precios al por mayor.
 
-**Contraste:** contra los ESTAD de las tres regiones (enero 2025 a julio 2026) coincide el 98,6 % de las celdas a ±1 mil soles. El resto son revisiones posteriores del MEF.
+**Contraste:**
+
+- Contra los ESTAD de 2025–2026 coincide el 98,6 % de las celdas a ±1 mil soles.
+- Setiembre 2026 de Loreto (G.L.) da los mismos totales, el mismo cuadro en reales y el mismo deflactor (1,90) que el ESTAD.
 
 **Ruta:** `GET /v1/ejecucion/estad?departamento=&desde=&hasta=&formato=json|xlsx`.
 
