@@ -1433,14 +1433,14 @@
     const porHoja = e.hojas.map((x) => e.diferencias.filter((d) => d.hoja === x.hoja).length);
     caja.innerHTML = `<div class="caja"><h3>ESTAD de ${esc(r.nombre)}: gasto e inversión por nivel de gobierno</h3>
         <p>Las hojas de gasto e inversión del ESTAD (Gobierno Nacional, Regional y Locales), armadas con los datos del MEF que ya tiene la página: mismas filas y en el mismo orden que el ESTAD, en <b>miles de soles</b>. Aquí se ven los miles; el dato guarda sus decimales (soles / 1000) para que las variaciones reales salgan precisas.</p>
-        <p>${e.origen.subido ? "<b>El Excel es tu ESTAD subido, con sus seis hojas de gasto e inversión llenadas</b>: mismo formato, totales, cuadro en reales (con el deflactor del IPC de Lima), totales del año y variaciones, con sus fórmulas." : "Sube el ESTAD de la región en «Actualizar» y el Excel saldrá con su mismo formato, totales, cuadro en reales y variaciones; por ahora es una versión simple con las mismas filas."}</p>
+        <p><b>El Excel sale entero del scraper del MEF</b>, con el diseño del ESTAD: todos los años que tiene la página (12 meses y su total), las variaciones del último mes y de enero a ese mes y, en las hojas de gasto, el mismo cuadro en términos reales con el deflactor del IPC de Lima. No usa los montos de ningún ESTAD.</p>
         <div class="fila">
           <label class="campo">Desde <input type="month" id="ef-desde" value="${esc(e.desde)}"></label>
           <label class="campo">Hasta <input type="month" id="ef-hasta" value="${esc(e.hasta)}"></label>
           <button class="btn" type="button" id="ef-ver">Ver</button>
-          <a class="btn sec" href="/v1/ejecucion/estad?${new URLSearchParams({ departamento: r.cod, desde: e.desde, hasta: e.hasta, formato: "xlsx" })}">Descargar el Excel (6 hojas)</a></div>
+          <a class="btn sec" href="/v1/ejecucion/estad?${new URLSearchParams({ departamento: r.cod, desde: e.desde, hasta: e.hasta, formato: "xlsx" })}">Descargar el ESTAD (6 hojas, todos los años)</a></div>
         <p class="nota">${e.origen.subido ? `Orden de filas y comparación: el ESTAD subido (${esc(e.origen.archivo || "")}${e.origen.fecha ? `, ${esc(fecha(e.origen.fecha))}` : ""}).`
-          : "Orden de filas: el que viene con la página. Sube el ESTAD de la región en «Actualizar» (el mismo de exportaciones) para comparar con lo cargado."}
+          : "Orden y nombre de las filas: los del ESTAD de la región (vienen con la página)."}
           ${e.diferencias.length ? ` <b>${e.diferencias.length} celdas</b> difieren del ESTAD subido en más de 1 mil soles (en rojo; pasa el mouse para ver el valor del ESTAD): suelen ser meses que el MEF corrigió después.` : e.origen.subido ? " Todo coincide con el ESTAD subido (±1 mil soles)." : ""}
           ${e.sin_fuente.length ? ` Sin datos por fuente en: ${esc(e.sin_fuente.map(etqMes).join(", "))} (la página los tiene desde enero de 2025).` : ""}</p>
         <div class="tabs-mini" role="tablist">${e.hojas.map((x, i) => `<button type="button" class="btn ${i === st.hoja ? "" : "sec"}" data-h="${i}">${esc(x.hoja)}${porHoja[i] ? ` (${porHoja[i]})` : ""}</button>`).join(" ")}</div>
