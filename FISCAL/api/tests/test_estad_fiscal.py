@@ -110,48 +110,36 @@ def test_estad_fiscal_con_el_libro_subido(cliente, tmp_path):
     assert [(d["etiqueta"], d["mes"]) for d in e["diferencias"]] == [("TOTAL DE GASTOS", "2026-02")]
     x = cliente.get("/v1/ejecucion/estad?departamento=16&desde=2026-01&hasta=2026-02&formato=xlsx")
     wb = load_workbook(io.BytesIO(x.content))
-    ws = wb["GASTOS G.R."]                                 # el ESTAD subido, llenado: columnas Dic-25, Ene-26, Feb-26
-    assert ws["A7"].value == "TOTAL DE GASTOS" and ws["C7"].value == 179.6 and ws["D7"].value == 359.2 and ws["B7"].value == 1
-    assert ws["C9"].value == 100 and ws["C9"].number_format == "#,##0"
+    ws = wb["GASTOS G.R."]                         # armado con el scraper: Ene..Dic 2026 en B..M y el total en N
+    assert ws["A1"].value == "CUADRO Nº 21" and ws["A1"].font.bold and ws["A1"].font.name == "Arial"
+    assert ws["B4"].value == 2026 and ws["B5"].value == "Ene." and ws["N4"].value == "Total"
+    assert ws["A7"].value == "TOTAL DE GASTOS" and ws["B7"].value == 179.6 and ws["C7"].value == 359.2
+    assert ws["B7"].number_format == "#,##0" and ws["B7"].font.underline == "single" and ws["N7"].value == "=SUM(B7:M7)"
+    assert ws["D7"].value is None                                  # marzo: aún no hay datos
+    assert ws["B9"].value == 100 and not ws["B9"].font.bold
     assert wb["Diferencias"]["C2"].value == "TOTAL DE GASTOS" and "15.Export" not in wb.sheetnames
 
 
-def libro_con_formulas():
-    """Una hoja como las del ESTAD: total con fórmula, cuadro en reales que divide por el deflactor (fila 14) y un mes
-    nuevo (marzo) con la columna vacía."""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "GASTOS G.R."
-    ws["A1"], ws["A2"], ws["A3"] = "CUADRO Nº 21", "LORETO: GASTOS NO FINANCIEROS DEL GOBIERNO REGIONAL", "(Miles de Soles)"
-    for j, m in enumerate([datetime(2026, 1, 1), datetime(2026, 2, 1), datetime(2026, 3, 1)], 2):
-        ws.cell(5, j, m)
-    ws["A7"], ws["A8"], ws["A9"], ws["A11"] = "TOTAL DE GASTOS", "GASTOS CORRIENTES", "Personal y obligaciones", "Fuente: MEF."
-    for c in "BC":
-        ws[f"{c}7"], ws[f"{c}8"] = f"=+{c}8", f"=SUM({c}9:{c}9)"
-        ws[f"{c}17"] = f"=+{c}7/${c}$14"
-    ws["B9"], ws["C9"] = 100, 200
-    ws["B9"].number_format = ws["C9"].number_format = "#,##0"
-    ws["A13"], ws["B13"], ws["C13"] = "LORETO: EJECUCIÓN DE GASTOS (REALES)", 0.1, 0.2
-    ws["A14"], ws["B14"], ws["C14"] = "(Miles de nuevos soles)", 1.8, 1.8036
-    buf = io.BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
-
-
-def test_plantilla_del_estad_con_formulas_y_deflactor(cliente):
+def test_excel_del_scraper_con_reales_y_variaciones(cliente):
+    """El Excel sale entero del scraper (sin ESTAD subido): todos los años, total por año, variaciones y cuadro en reales."""
     from app import ipc
     datos()
-    ipc.guardar({"2026-02": 100.0, "2026-03": 100.5}, "prueba")
-    _base("gasto-dev-generica", [{"AÑO": 2026, "MES": "03: Marzo", "NIVEL_GOBIERNO": "R: GOBIERNOS REGIONALES", "DEPARTAMENTO": "16: LORETO",
-                                   "COD_GENERICA": "5-2-1", "GENERICA": "5-2-1", "DESGLOSE": "SIN DESGLOSE", "DEVENGADO": 123_456.0}])
-    assert cliente.post("/v1/cargas", files=[("archivos", ("ESTADLO.xlsx", libro_con_formulas(), "application/octet-stream"))]).status_code == 200
-    x = cliente.get("/v1/ejecucion/estad?departamento=16&desde=2026-03&hasta=2026-03&formato=xlsx")
+    ipc.guardar({"2025-12": 99.0, "2026-01": 100.0, "2026-02": 100.5}, "prueba")
+    _base("gasto-dev-generica", [{"AÑO": 2025, "MES": "02: Febrero", "NIVEL_GOBIERNO": "R: GOBIERNOS REGIONALES", "DEPARTAMENTO": "16: LORETO",
+                                   "COD_GENERICA": "5-2-1", "GENERICA": "5-2-1", "DESGLOSE": "SIN DESGLOSE", "DEVENGADO": 50_000.0}])
+    x = cliente.get("/v1/ejecucion/estad?departamento=16&formato=xlsx")
     ws = load_workbook(io.BytesIO(x.content))["GASTOS G.R."]
-    assert ws["D9"].value == 123.456 and ws["D9"].number_format == "#,##0"       # el monto con decimales; se ven los miles
-    assert ws["D7"].value == "=+D8" and ws["D8"].value == "=SUM(D9:D9)"         # las fórmulas del mes anterior, corridas
-    assert ws["D17"].value == "=+D7/$D$14"                                      # el cuadro en reales
-    assert ws["D13"].value == 0.5 and abs(ws["D14"].value - 1.8036 * 1.005) < 1e-12   # deflactor con el IPC de la página
-    assert ws["C9"].value == 200                                                # los meses no pedidos no se tocan
+    # 2025 en B..M (total N), 2026 en O..Z (total AA); variaciones desde AC
+    assert ws["B4"].value == 2025 and ws["O4"].value == 2026 and ws["C9"].value == 50.0 and ws["O9"].value == 100.0
+    assert ws["AC4"].value == "Var.% 2026/2025" and ws["AC5"].value == "Feb." and ws["AD5"].value == "Ene.-Feb."
+    assert ws["AC9"].value == '=IFERROR((P9/C9-1)*100,"")' and ws["AF9"].value == "=SUM(O9:P9)" and ws["AE9"].value == "=SUM(B9:C9)"
+    # cuadro en reales: misma estructura, cada mes dividido por el deflactor (IPC de Lima en base 2009)
+    reales = next(r for r in range(20, ws.max_row + 1) if str(ws.cell(r, 1).value or "").endswith("(REALES)"))
+    r_def = reales + 1
+    assert abs(ws.cell(r_def, 16).value - 100.5 / 100 * 1.56776) < 1e-9                  # P: febrero 2026
+    assert abs(ws.cell(reales, 16).value - 0.5) < 1e-9                                   # var. % del IPC
+    fila_total_real = next(r for r in range(r_def + 1, ws.max_row + 1) if ws.cell(r, 1).value == "TOTAL DE GASTOS")
+    assert ws.cell(fila_total_real, 16).value == f'=IFERROR(P7/P${r_def},"")'
 
 
 def test_estad_fiscal_sin_libro_usa_el_de_la_pagina(cliente):

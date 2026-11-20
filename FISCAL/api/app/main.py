@@ -827,9 +827,10 @@ def ejecucion_estad(departamento: str = Query(..., pattern=r"^(16|22|25)$"), des
     e = estad_fiscal.armar(departamento, desde or None, hasta or None)
     if e is None:
         raise HTTPException(404, "Todavía no hay gasto del MEF en la página para esta región.")
-    if formato == "xlsx":
+    if formato == "xlsx":                       # el Excel lleva todos los años que tiene la página, hasta «hasta»
+        e = estad_fiscal.armar(departamento, f"{estad_fiscal.primer_anio(departamento)}-01", e["hasta"])
         return Response(estad_fiscal.excel(e, departamento), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers=_adjunto(f"ESTAD gasto e inversion {estad_fiscal.CORTO[departamento]} {e['desde']} a {e['hasta']}.xlsx"))
+                        headers=_adjunto(f"ESTAD gasto e inversion {estad_fiscal.CORTO[departamento]} hasta {e['hasta']}.xlsx"))
     return {**e, "diferencias": estad_fiscal.diferencias(e)}
 
 

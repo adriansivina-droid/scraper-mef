@@ -20,7 +20,6 @@ sus últimos 25 meses para compararlos); si no se subió, del que viene con la p
 etiquetas). Contra el ESTAD cargado (2025 a julio 2026) coincide el 97 % de las celdas a ±1 mil soles; el resto son
 revisiones posteriores del MEF.
 """
-import base64
 import io
 import json
 import re
@@ -206,37 +205,12 @@ def leer_libro(ruta):
         wb.close()
 
 
-def plantilla(ruta):
-    """El libro ESTAD reducido a sus hojas de gasto e inversión, con su formato y sus fórmulas (totales, variaciones,
-    cuadro en reales), para llenarlo después con los meses nuevos. bytes .xlsx (~400 KB)."""
-    wb = load_workbook(ruta)
-    try:
-        quedan = [ws.title for ws in wb.worksheets if hoja_fiscal(ws.title)]
-        for ws in list(wb.worksheets):
-            if ws.title not in quedan:
-                wb.remove(ws)
-        for nombre in list(wb.defined_names):            # nombres que apuntan a hojas que ya no están
-            dest = str(wb.defined_names[nombre].attr_text or "")
-            hojas = re.findall(r"'?([^'!]+)'?!", dest)
-            if hojas and any(h.strip("'") not in quedan for h in hojas if "[" not in h):
-                del wb.defined_names[nombre]
-        buf = io.BytesIO()
-        wb.save(buf)
-        return buf.getvalue()
-    finally:
-        wb.close()
-
-
 def cargar_libro(ruta, nombre=""):
-    """Guarda el orden de filas, los valores recientes y la plantilla (formato y fórmulas) de las hojas fiscales de un
-    ESTAD. -> avisos."""
+    """Guarda el orden de filas y los valores recientes (para comparar) de las hojas fiscales de un ESTAD. -> avisos."""
     avisos = []
-    libro = leer_libro(ruta)
-    plantilla_xlsx = plantilla(ruta) if libro else None
-    for depto, x in libro.items():
+    for depto, x in leer_libro(ruta).items():
         x.update(archivo=nombre, fecha=datetime.now(timezone.utc).isoformat(timespec="seconds"))
         db.guardar_documento(f"estad-fiscal-{depto}", json.dumps(x, ensure_ascii=False), x["fecha"])
-        db.guardar_documento(f"estad-fiscal-plantilla-{depto}", base64.b64encode(plantilla_xlsx).decode(), x["fecha"])
         avisos.append(f"{nombre or 'ESTAD'}: {len(x['hojas'])} hojas de gasto e inversión de {DEPTOS[depto].title()} guardadas "
                       "(Ejecución del presupuesto → ESTAD).")
     return avisos
@@ -306,6 +280,12 @@ def _meses(desde, hasta):
     return salida
 
 
+def primer_anio(depto):
+    """El primer año con gasto por genérica en la página, o None."""
+    df = db.leer("gasto-dev-generica", [depto], list(NIVEL), "1990-01", "2100-12")
+    return None if df.empty else int(df["AÑO"].astype(int).min())
+
+
 def ultimo_mes(depto):
     """El último mes con gasto por genérica en la página (AAAA-MM), o None."""
     df = db.leer("gasto-dev-generica", [depto], list(NIVEL), "1990-01", "2100-12")
@@ -356,206 +336,212 @@ def diferencias(e, tolerancia=1):
     return salida
 
 
+AZUL = "FF0000FF"
+REBASE_2009 = 1.56776      # IPC de Lima base dic. 2021 = 100 -> la base del deflactor del ESTAD (nuevos soles de 2009)
+MES_CORTO = ["Ene.", "Feb.", "Mar.", "Abr.", "May.", "Jun.", "Jul.", "Ago.", "Set.", "Oct.", "Nov.", "Dic."]
+
+
+def _estilo(tipo):
+    """Fuente de una fila como en el ESTAD: total (negrita, subrayado, azul), grupo (negrita) o detalle."""
+    if tipo == "total":
+        return Font(name="Arial", size=10, bold=True, underline="single", color=AZUL)
+    if tipo == "grupo":
+        return Font(name="Arial", size=10, bold=True)
+    return Font(name="Arial", size=10)
+
+
+def _tipo_fila(f, filtro):
+    if not f["llena"]:
+        return "detalle"
+    if filtro is None:
+        return "total"
+    e = _k(f["etiqueta"])
+    return "grupo" if e.startswith(("GASTOS CORRIENTES", "GASTOS DE CAPITAL", "SERVICIO DE LA DEUDA")) else "detalle"
+
+
 def excel(e, depto=None):
-    """El Excel del ESTAD: con el último ESTAD subido como plantilla (mismo formato, totales, variaciones y cuadro en
-    reales, con sus fórmulas) llenado con los meses pedidos; si no se subió, uno simple con las mismas filas."""
-    doc = db.documento(f"estad-fiscal-plantilla-{depto}") if depto else None
-    if doc:
-        return llenar_plantilla(base64.b64decode(doc[0]), e)
-    return excel_simple(e)
-
-
-_REF = re.compile(r"\$?[A-Z]{1,3}\$?\d+")
-_SUELTAS = re.compile(r"(?<![:A-Z$])\$?([A-Z]{1,3})\$?(\d+)(?![:\d])(?!\s*:)")   # celdas sueltas (no rangos A1:A9)
-
-
-def _con_referencias(v):
-    return isinstance(v, str) and v.startswith("=") and bool(_REF.search(v[1:]))
-
-
-def llenar_plantilla(xlsx, e):
-    from openpyxl.formula.translate import Translator
+    """El ESTAD de gasto e inversión armado con los datos del scraper del MEF, con el diseño del ESTAD: un bloque de 12
+    meses y su total por año, las variaciones del último mes y de enero a ese mes, y (en las hojas de gasto) el mismo
+    cuadro en términos reales con el deflactor del IPC de Lima. Los montos van en miles de soles con sus decimales
+    (soles / 1000): el formato muestra solo los miles."""
+    from openpyxl.styles import Border, Side
+    from openpyxl.utils import get_column_letter as L
     from . import ipc
-    wb = load_workbook(io.BytesIO(xlsx))
+    fino = Side(style="thin")
+    t11, t10 = Font(name="Arial", size=11, bold=True, color=AZUL), Font(name="Arial", size=10, color=AZUL)
+    t10b = Font(name="Arial", size=10, bold=True, color=AZUL)
     serie_ipc = ipc.serie()
-    avisos = []
-    # el bloque consolidado de G.R. (San Martín, Ucayali) apunta a otra copia del ESTAD en una carpeta de red
-    # ('[1]GASTOS G.N.'!ET9): se apunta a la hoja del mismo libro, que es la que se acaba de llenar
-    externas = 0
-    for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            for c in row:
-                if isinstance(c.value, str) and c.value.startswith("=") and "[" in c.value:
-                    nuevo = re.sub(r"'\[\d+\]([^']+)'!", lambda m: f"'{m.group(1)}'!" if m.group(1) in wb.sheetnames else m.group(0), c.value)
-                    if nuevo != c.value:
-                        c.value, externas = nuevo, externas + 1
-    if externas:
-        avisos.append(f"{externas} fórmulas que apuntaban a otra copia del ESTAD (vínculo externo) ahora usan las hojas de este libro.")
-    for h in e["hojas"]:
-        if h["hoja"] not in wb.sheetnames:
-            avisos.append(f"{h['hoja']}: no está en el ESTAD subido.")
-            continue
-        ws = wb[h["hoja"]]
-        ff = h["fila_fechas"]
-        col = {}
-        for c in ws[ff]:
-            if isinstance(c.value, datetime):
-                col[f"{c.value.year}-{c.value.month:02d}"] = c.column
-        orden = sorted(col)
-        faltan = [p for p in e["meses"] if p not in col]
-        if faltan:
-            avisos.append(f"{h['hoja']}: el ESTAD no tiene columna para {', '.join(faltan)}.")
-        # la fila del deflactor: la que dividen las fórmulas del cuadro en reales (=+EV7/$EV$36)
-        filas_def = re.findall(r"/\$[A-Z]{1,3}\$(\d+)", " ".join(str(c.value) for row in ws.iter_rows() for c in row
-                                                                 if isinstance(c.value, str) and c.value.startswith("=")))
-        fila_def = int(max(set(filas_def), key=filas_def.count)) if filas_def else None
-        llenas = {f["fila"]: f for f in h["filas"] if f["llena"]}
-        for p in e["meses"]:
-            if p not in col:
+    anios = list(range(int(e["desde"][:4]), int(e["hasta"][:4]) + 1))
+    ah, mh = int(e["hasta"][:4]), int(e["hasta"][5:7])
+    col_mes = {}                                            # AAAA-MM -> columna
+    col_tot = {}
+    c = 2
+    for a in anios:
+        for m in range(1, 13):
+            col_mes[f"{a}-{m:02d}"] = c
+            c += 1
+        col_tot[a] = c
+        c += 1
+    c_var = c + 1                                           # una columna en blanco y las de variación
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    def cabecera(ws, r):
+        """Fila r: años (y «Total»); fila r+1: meses (y el año del total); a la derecha, las variaciones."""
+        for a in anios:
+            c0 = col_mes[f"{a}-01"]
+            ws.cell(r, c0, a).font = t10
+            for m in range(1, 13):
+                x = ws.cell(r + 1, c0 + m - 1, MES_CORTO[m - 1])
+                x.font, x.alignment = t10, Alignment(horizontal="center")
+                x.border = Border(bottom=fino, left=fino if m == 1 else None)
+                ws.cell(r, c0 + m - 1).border = Border(top=fino, left=fino if m == 1 else None)
+                ws.cell(r, c0 + m - 1).alignment = Alignment(horizontal="centerContinuous")
+            for rr, v in ((r, "Total"), (r + 1, a)):
+                x = ws.cell(rr, col_tot[a], v)
+                x.font, x.alignment = t10, Alignment(horizontal="center")
+                x.border = Border(left=fino, right=fino, top=fino if rr == r else None, bottom=fino if rr == r + 1 else None)
+        etiquetas = [(f"Var.% {ah}/{ah - 1}", MESES_CORTOS_TXT(mh)), ("", f"Ene.-{MES_CORTO[mh - 1]}"), (ah - 1, f"Ene.-{MES_CORTO[mh - 1]}"),
+                     (ah, f"Ene.-{MES_CORTO[mh - 1]}")]
+        for k, (arriba, abajo) in enumerate(etiquetas):
+            for rr, v in ((r, arriba), (r + 1, abajo)):
+                x = ws.cell(rr, c_var + k, v if v != "" else None)
+                x.font, x.alignment = t10b, Alignment(horizontal="center")
+                x.border = Border(left=fino, right=fino, top=fino if rr == r else None, bottom=fino if rr == r + 1 else None)
+        ws.merge_cells(start_row=r, start_column=c_var, end_row=r, end_column=c_var + 1)
+        ws.cell(r, 1).border = Border(left=fino, right=fino, top=fino)
+        ws.cell(r + 1, 1).border = Border(left=fino, right=fino, bottom=fino)
+
+    def fila_datos(ws, r, etiqueta, tipo, valores, formula=None):
+        """valores: {AAAA-MM: número} o formula(col) -> texto de la fórmula del mes."""
+        fuente = _estilo(tipo)
+        x = ws.cell(r, 1, etiqueta)
+        x.font, x.border = fuente, Border(left=fino, right=fino)
+        for p, cc in col_mes.items():
+            if p > e["hasta"]:
+                ws.cell(r, cc).border = Border(left=fino) if p.endswith("-01") else Border()
                 continue
-            j = col[p]
-            i = orden.index(p)
-            antes = col[orden[i - 1]] if i else None
-            # 1. montos de las filas que la página sabe llenar (miles de soles con decimales; el formato muestra los miles)
-            for r, f in llenas.items():
-                v = f["valores"].get(p)
-                celda, previa = ws.cell(r, j), ws.cell(r, antes) if antes else None
-                if _con_referencias(celda.value) or (previa is not None and _con_referencias(previa.value) and celda.value is None):
-                    continue                              # total con fórmula: lo calcula el ESTAD
-                if v is not None:
-                    celda.value = v
-                    if celda.number_format == "General":       # que se vean solo los miles (los decimales quedan en la celda)
-                        celda.number_format = previa.number_format if previa is not None and previa.number_format != "General" else "#,##0"
-            # 2. filas que no llena la página pero que el ESTAD pone en 0 (FONCOR, privatizaciones)
+            v = formula(cc) if formula else valores.get(p)
+            x = ws.cell(r, cc, v)
+            x.font, x.number_format = fuente, "#,##0"
+            if p.endswith("-01"):
+                x.border = Border(left=fino)
+        for a, cc in col_tot.items():
+            x = ws.cell(r, cc, f"=SUM({L(col_mes[f'{a}-01'])}{r}:{L(col_mes[f'{a}-12'])}{r})")
+            x.font, x.number_format, x.border = fuente, "#,##0", Border(left=fino, right=fino)
+        actual, previo = L(col_mes[e["hasta"]]), L(col_mes.get(f"{ah - 1}-{mh:02d}", 0)) if f"{ah - 1}-{mh:02d}" in col_mes else None
+        ene_a, ene_b = L(col_mes[f"{ah}-01"]), L(col_mes[f"{ah - 1}-01"]) if f"{ah - 1}-01" in col_mes else None
+        acum_a = f"SUM({ene_a}{r}:{actual}{r})"
+        acum_b = f"SUM({ene_b}{r}:{previo}{r})" if previo else None
+        formulas = [f'=IFERROR(({actual}{r}/{previo}{r}-1)*100,"")' if previo else None,
+                    f'=IFERROR(({L(c_var + 3)}{r}/{L(c_var + 2)}{r}-1)*100,"")' if previo else None,
+                    f"={acum_b}" if acum_b else None, f"={acum_a}"]
+        for k, v in enumerate(formulas):
+            x = ws.cell(r, c_var + k, v)
+            x.font, x.border = fuente, Border(left=fino, right=fino)
+            x.number_format, x.alignment = ("#,##0.0" if k < 2 else "#,##0"), Alignment(horizontal="right")
+
+    for h in e["hojas"]:
+        ws = wb.create_sheet(h["hoja"][:31])
+        ws.sheet_view.showGridLines = False
+        tipo_hoja = h["tipo"]
+        titulo = h["titulo"] + [""] * 3
+        for i in range(3):
+            ws.cell(i + 1, 1, titulo[i]).font = t11
+        r_cab = 4
+        cabecera(ws, r_cab)
+        conceptos = {it["fila"]: it for it in _filas_de([(f["fila"], f["etiqueta"]) for f in h["filas"]], tipo_hoja)}
+        # el cuadro empieza en la fila 7, como el ESTAD; las filas conservan su orden y sus espacios
+        desfase = 7 - min(f["fila"] for f in h["filas"])
+        fila_de = {}
+        for f in h["filas"]:
+            r = f["fila"] + desfase
+            fila_de[f["fila"]] = r
+            filtro = conceptos.get(f["fila"], {}).get("filtro")
+            fila_datos(ws, r, f["etiqueta"], _tipo_fila(f, filtro), f["valores"] if f["llena"] else {})
+            if not f["llena"]:
+                cero = re.search(r"PRIVATIZ|COMPENSACION", _k(f["etiqueta"]))   # el ESTAD los pone en 0 (van en R. determinados)
+                total_fuente = next((x for x in h["filas"] if x["llena"] and conceptos.get(x["fila"], {}).get("base") in ("fue", "ifu")
+                                     and conceptos.get(x["fila"], {}).get("filtro") is None), None)
+                for cc in list(col_mes.values()) + list(col_tot.values()) + [c_var + k for k in range(4)]:
+                    ws.cell(r, cc).value = None
+                if cero and total_fuente:
+                    for p_, cc in col_mes.items():
+                        if total_fuente["valores"].get(p_) is not None:
+                            ws.cell(r, cc).value = 0
+        ultima = max(fila_de.values())
+        for cc in range(1, c_var + 4):
+            ws.cell(ultima + 1, cc).border = Border(top=fino)
+        ws.cell(ultima + 2, 1, "Fuente: MEF, Consulta Amigable (devengado). Elaborado con el scraper de la página.").font = Font(name="Arial", size=10)
+        ws.cell(ultima + 3, 1, "1 / Preliminar").font = Font(name="Arial", size=10)
+        if tipo_hoja == "gasto":                            # el mismo cuadro en términos reales
+            r0 = ultima + 6
+            ws.cell(r0, 1, f"{e['departamento']}: {titulo[1].split(':', 1)[-1].strip()} (REALES)").font = t11
+            ws.cell(r0 + 1, 1, "(Miles de soles de 2009)").font = t11
+            r_def = r0 + 1
+            for p, cc in col_mes.items():
+                if p > e["hasta"] or p not in serie_ipc:
+                    continue
+                ws.cell(r_def, cc, serie_ipc[p] / 100 * REBASE_2009).number_format = "0.00"
+                antes = f"{int(p[:4]) - (p[5:] == '01')}-{12 if p[5:] == '01' else int(p[5:]) - 1:02d}"
+                if antes in serie_ipc:
+                    ws.cell(r0, cc, (serie_ipc[p] / serie_ipc[antes] - 1) * 100).number_format = "0.00"
+            ws.cell(r0, c_var - 1, "Var. % IPC mensual →").font = Font(name="Arial", size=8, italic=True)
+            cabecera(ws, r0 + 2)
             for f in h["filas"]:
-                if not f["llena"] and antes and ws.cell(f["fila"], j).value is None and ws.cell(f["fila"], antes).value == 0:
-                    ws.cell(f["fila"], j).value = 0
-            # 3. deflactor: variación % mensual del IPC (fila de encima) e índice encadenado
-            if fila_def and antes:
-                ip, ia = serie_ipc.get(p), serie_ipc.get(orden[i - 1])
-                d_ant = ws.cell(fila_def, antes).value
-                if ip and ia and isinstance(d_ant, (int, float)) and ws.cell(fila_def, j).value is None:
-                    var = round((ip / ia - 1) * 100, 2)
-                    ws.cell(fila_def - 1, j).value = var
-                    ws.cell(fila_def, j).value = d_ant * (1 + var / 100)
-                    for rr in (fila_def - 1, fila_def):
-                        ws.cell(rr, j).number_format = ws.cell(rr, antes).number_format
-                elif ws.cell(fila_def, j).value is None:
-                    avisos.append(f"{h['hoja']}: falta el IPC de {etiqueta_mes(p)} para el deflactor.")
-            # 4. fórmulas del mes anterior que este mes aún no tiene (totales, cuadro en reales, deflactados)
-            if antes:
-                nuevas = []
-                for r in range(1, ws.max_row + 1):
-                    previa, celda = ws.cell(r, antes), ws.cell(r, j)
-                    if celda.value is None and _con_referencias(previa.value):
-                        f = Translator(previa.value, origin=previa.coordinate).translate_formula(celda.coordinate)
-                        # el ESTAD fija con $ la columna del propio mes (=+EV7/$EV$36): esa también se corre al mes nuevo
-                        celda.value = re.sub(rf"\${previa.column_letter}\$(\d+)", rf"${celda.column_letter}$\1", f)
-                        if celda.number_format == "General":
-                            celda.number_format = previa.number_format
-                        nuevas.append(celda)
-                # una fórmula que usa un dato que la página no tiene (p. ej. el índice de precios al por mayor) se deja
-                # vacía, como el ESTAD antes de cargar el mes (si no, daría #¡DIV/0!)
-                letra, cambio = ws.cell(1, j).column_letter, True
-                while cambio:
-                    cambio = False
-                    for celda in nuevas:
-                        if celda.value is None:
-                            continue
-                        for c_, r_ in _SUELTAS.findall(celda.value):
-                            if c_ == letra and ws.cell(int(r_), j).value is None:
-                                celda.value, cambio = None, True
-                                break
-                        if celda.number_format == "General":
-                            celda.number_format = previa.number_format
-        # 5. las columnas de variación (Var.% y Ene.-mes) toman como referencia el último mes llenado: en el ESTAD es una
-        #    celda «=EV5» (o «=EV38» en el cuadro en reales) que se cambia a mano cada mes
-        if e["hasta"] in col and orden:
-            ultima = max(col.values())
-            nueva = ws.cell(1, col[e["hasta"]]).column_letter
-            letras = {ws.cell(1, c).column_letter for c in col.values()}
-            for row in ws.iter_rows(min_col=ultima + 1):
-                for c in row:
-                    m = re.fullmatch(r"=\+?(\$?)([A-Z]{1,3})(\$?)(\d+)", str(c.value or "").strip())
-                    if m and m.group(2) in letras and int(m.group(4)) == c.row:
-                        c.value = f"={m.group(1)}{nueva}{m.group(3)}{m.group(4)}"
+                r = fila_de[f["fila"]] + (r0 + 3 - 4)        # misma distancia a la cabecera que en el cuadro nominal
+                if not f["llena"]:
+                    ws.cell(r, 1, f["etiqueta"]).font = _estilo("detalle")
+                    ws.cell(r, 1).border = Border(left=fino, right=fino)
+                    continue
+                filtro = conceptos.get(f["fila"], {}).get("filtro")
+                rn = fila_de[f["fila"]]
+                fila_datos(ws, r, f["etiqueta"], _tipo_fila(f, filtro), {},
+                           formula=lambda cc, rn=rn: f'=IFERROR({L(cc)}{rn}/{L(cc)}${r_def},"")')
+            ultima_r = max(fila_de.values()) + (r0 + 3 - 4)
+            for cc in range(1, c_var + 4):
+                ws.cell(ultima_r + 1, cc).border = Border(top=fino)
+            ws.cell(ultima_r + 2, 1, "Deflactado con el IPC de Lima Metropolitana (INEI), llevado a base 2009 = 100.").font = Font(name="Arial", size=10)
+        ws.column_dimensions["A"].width = 38
+        for cc in col_mes.values():
+            ws.column_dimensions[L(cc)].width = 9
+        for cc in col_tot.values():
+            ws.column_dimensions[L(cc)].width = 12
+        ws.column_dimensions[L(c_var - 1)].width = 4.6
+        for k, w in enumerate((8, 8, 12, 12)):
+            ws.column_dimensions[L(c_var + k)].width = w
+        ws.freeze_panes = ws.cell(r_cab + 2, 2)
+        # que se abra mostrando el último año
+        ws.sheet_view.topLeftCell = "A1"
     dif = diferencias(e)
     ws = wb.create_sheet("Diferencias")
     ws.append(["Hoja", "Fila", "Etiqueta", "Mes", "ESTAD subido", "Página", "Diferencia"])
     for x in dif:
         ws.append([x["hoja"], x["fila"], x["etiqueta"], x["mes"], x["estad"], x["pagina"], x["dif"]])
     if not dif:
-        ws.append(["Sin diferencias de más de 1 mil soles con el ESTAD subido"])
+        ws.append(["Sin diferencias de más de 1 mil soles con el ESTAD subido" if e["origen"]["subido"]
+                   else "No hay un ESTAD subido con qué comparar"])
     nota = wb.create_sheet("Notas")
-    for t in [f"Meses llenados por la página: {etiqueta_mes(e['desde'])} a {etiqueta_mes(e['hasta'])}, con los datos del MEF "
-              "(devengado, Consulta Amigable) en miles de soles con sus decimales: el formato muestra solo los miles.",
-              "Los totales, el cuadro en reales y las variaciones son las fórmulas del ESTAD subido; el deflactor (variación "
-              "% mensual e índice) sale del IPC de Lima que tiene la página.",
-              "No se llenan: Fondo de Compensación Regional y Privatizaciones (el MEF los incluye en Recursos determinados), "
-              "el índice de precios al por mayor ni las hojas de INGRESOS."] + avisos:
+    for t in [f"Datos: scraper del MEF de la página (Consulta Amigable, devengado), {etiqueta_mes(e['desde'])} a {etiqueta_mes(e['hasta'])}.",
+              "Montos en miles de soles con sus decimales (soles / 1000): el formato muestra solo los miles; los totales del año, "
+              "las variaciones y el cuadro en reales se calculan con esos decimales.",
+              "Gasto: genéricas 5-21 a 5-25 (corriente), 6-24 a 6-27 (capital) y 7-28 (servicio de la deuda). Inversión: genérica 2.6.",
+              "Reales: cada mes dividido por el IPC de Lima Metropolitana del mes (INEI, base dic. 2021 = 100) llevado a base 2009 "
+              f"(× {REBASE_2009}), como el deflactor del ESTAD. Las variaciones reales no dependen de la base.",
+              "Sin dato: gasto e inversión por fuente antes de 2025 (la página los descarga desde enero de 2025); Fondo de Compensación "
+              "Regional y Privatizaciones (el MEF los incluye en Recursos determinados); las hojas de INGRESOS.",
+              f"Orden y nombre de las filas: {'el último ESTAD subido' if e['origen']['subido'] else 'los del ESTAD de la región (vienen con la página)'}."]:
         nota.append([t])
     nota.column_dimensions["A"].width = 140
-    wb.calculation.fullCalcOnLoad = True
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def MESES_CORTOS_TXT(m):
+    return MES_CORTO[m - 1]
 
 
 def etiqueta_mes(p):
     meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"]
     return f"{meses[int(p[5:7]) - 1]} {p[:4]}"
-
-
-def excel_simple(e):
-    """Un libro con las mismas hojas y filas que el ESTAD (las etiquetas en la columna A, en su misma fila) y los meses
-    en columnas, para copiar el bloque de meses y pegarlo en el ESTAD. Más una hoja «Diferencias» con el ESTAD subido."""
-    wb = Workbook()
-    wb.remove(wb.active)
-    negrita, gris = Font(bold=True), PatternFill("solid", fgColor="EEEEEE")
-    for h in e["hojas"]:
-        ws = wb.create_sheet(h["hoja"][:31])
-        for i, t in enumerate(h["titulo"][:3], 1):
-            ws.cell(i, 1, t).font = negrita
-        ff = h["fila_fechas"]
-        ws.cell(ff - 1, 2, f"Calculado por la página con los datos del MEF ({e['unidad']}). Copia las columnas de los meses y pégalas en el ESTAD.")
-        for j, p in enumerate(e["meses"], 2):
-            c = ws.cell(ff, j, datetime(int(p[:4]), int(p[5:7]), 1))
-            c.number_format, c.font, c.alignment = "mmm-yy", negrita, Alignment(horizontal="center")
-        for f in h["filas"]:
-            ws.cell(f["fila"], 1, f["etiqueta"])
-            if not f["llena"]:
-                ws.cell(f["fila"], 1).fill = gris
-                continue
-            for j, p in enumerate(e["meses"], 2):
-                v = f["valores"].get(p)
-                if v is not None:
-                    ws.cell(f["fila"], j, v).number_format = "#,##0"   # los miles; los decimales quedan en la celda
-        ws.column_dimensions["A"].width = 46
-        for j in range(2, len(e["meses"]) + 2):
-            ws.column_dimensions[ws.cell(1, j).column_letter].width = 11
-        ws.freeze_panes = ws.cell(ff + 1, 2)
-    dif = diferencias(e)
-    ws = wb.create_sheet("Diferencias")
-    ws.append(["Hoja", "Fila", "Etiqueta", "Mes", "ESTAD subido", "Página", "Diferencia"])
-    for c in ws[1]:
-        c.font = negrita
-    for x in dif:
-        ws.append([x["hoja"], x["fila"], x["etiqueta"], x["mes"], x["estad"], x["pagina"], x["dif"]])
-    if not dif:
-        ws.append(["Sin diferencias de más de 1 mil soles con el ESTAD subido" if e["origen"]["subido"]
-                   else "Todavía no se subió el ESTAD de la región: no hay con qué comparar"])
-    ws.column_dimensions["A"].width, ws.column_dimensions["C"].width = 18, 40
-    nota = wb.create_sheet("Notas")
-    for t in ["Montos en miles de soles (devengado), redondeados a la unidad. Fuente: MEF, Consulta Amigable.",
-              "Gasto: genéricas 5-21 a 5-25 (corriente), 6-24 a 6-27 (capital) y 7-28 (servicio de la deuda: amortización e intereses).",
-              "Inversión: genérica 2.6 (adquisición de activos no financieros) por función y por fuente de financiamiento.",
-              "Filas en gris: la página no las llena (títulos, filas repetidas, o rubros que el MEF no separa en la consulta por "
-              "fuente: Fondo de Compensación Regional y Privatizaciones y concesiones, que van dentro de Recursos determinados).",
-              ("Meses sin datos por fuente (la página los tiene desde enero de 2025): " + ", ".join(e["sin_fuente"])) if e["sin_fuente"] else "",
-              f"Orden de filas: {'el ESTAD subido (' + (e['origen']['archivo'] or '') + ')' if e['origen']['subido'] else 'el que viene con la página'}."]:
-        if t:
-            nota.append([t])
-    nota.column_dimensions["A"].width = 140
-    buf = io.BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
