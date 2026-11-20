@@ -176,3 +176,15 @@ def test_hojas_de_ingresos():
     assert ef._valor(d, "ing", c[65]["filtro"], "R", "2026-01") == 30.0
     assert ef._valor(d, "ing", c[23]["filtro"], "R", "2026-01") == 45.0 and ef._valor(d, "ing", c[24]["filtro"], "R", "2026-01") == 0
     assert ef._valor(d, "ing", c[23]["filtro"], "R", "2026-02") is None            # mes sin datos: vacío
+
+
+def test_anexo_sin_activos_financieros():
+    import pandas as pd
+    from app import ejecucion
+    g = pd.DataFrame({"AÑO": [2025] * 3, "MES": ["10: Octubre"] * 3, "NIVEL_GOBIERNO": ["E: GOBIERNO NACIONAL"] * 3,
+                      "COD_GENERICA": ["6-2-5", "6-2-7", "6-2-6"],
+                      "GENERICA": ["6-25: OTROS GASTOS", "6-27: ADQUISICION DE ACTIVOS FINANCIEROS", "6-26: ADQUISICION DE ACTIVOS NO FINANCIEROS"],
+                      "DEVENGADO": [10, 249881, 500]})
+    p = ejecucion.panel_no_financiero(g)
+    assert p["MONTO"].sum() == 510
+    assert p.loc[p.ITEM == "Otros gastos de capital", "MONTO"].sum() == 10
