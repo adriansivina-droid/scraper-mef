@@ -296,14 +296,17 @@ def ultimo_mes(depto):
     return f"{p // 100}-{p % 100:02d}"
 
 
-def armar(depto, desde=None, hasta=None):
-    """Las hojas de gasto e inversión de la región, mes a mes, con el ESTAD subido al lado para comparar."""
+def armar(depto, desde=None, hasta=None, sector=None):
+    """Las hojas de gasto e inversión de la región, mes a mes, con el ESTAD subido al lado para comparar.
+    sector: 'gasto' o 'inversion' para solo esas hojas (un invitado puede tener acceso a una sola)."""
     hasta = hasta or ultimo_mes(depto)
     if not hasta:
         return None
     desde = desde or f"{hasta[:4]}-01"
     meses = _meses(desde, hasta)
     hojas, origen = estructura(depto)
+    if sector:
+        hojas = [h for h in hojas if h["tipo"] == sector]
     d = _datos(depto, desde, hasta)
     salida = []
     for h in hojas:

@@ -819,16 +819,17 @@ def contraste_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sect
 
 @app.get("/v1/ejecucion/estad", dependencies=[Depends(acceso)])
 def ejecucion_estad(departamento: str = Query(..., pattern=r"^(16|22|25)$"), desde: str = Query("", pattern=r"^(\d{4}-\d{2})?$"),
-                    hasta: str = Query("", pattern=r"^(\d{4}-\d{2})?$"), formato: str = Query("json", pattern="^(json|xlsx)$")):
+                    hasta: str = Query("", pattern=r"^(\d{4}-\d{2})?$"), formato: str = Query("json", pattern="^(json|xlsx)$"),
+                    sector: str = Query("", pattern="^(gasto|inversion)?$")):
     """Las hojas de gasto e inversión del ESTAD (G.N., G.R. y G.L.) armadas con los datos del MEF de la página, mes a mes,
     con las diferencias contra el último ESTAD subido. Por defecto, de enero al último mes con datos."""
     if desde and hasta and desde > hasta:
         raise HTTPException(422, "«Desde» no puede ser posterior a «hasta».")
-    e = estad_fiscal.armar(departamento, desde or None, hasta or None)
+    e = estad_fiscal.armar(departamento, desde or None, hasta or None, sector or None)
     if e is None:
         raise HTTPException(404, "Todavía no hay gasto del MEF en la página para esta región.")
     if formato == "xlsx":                       # el Excel lleva todos los años que tiene la página, hasta «hasta»
-        e = estad_fiscal.armar(departamento, f"{estad_fiscal.primer_anio(departamento)}-01", e["hasta"])
+        e = estad_fiscal.armar(departamento, f"{estad_fiscal.primer_anio(departamento)}-01", e["hasta"], sector or None)
         return Response(estad_fiscal.excel(e, departamento), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(f"ESTAD gasto e inversion {estad_fiscal.CORTO[departamento]} hasta {e['hasta']}.xlsx"))
     return {**e, "diferencias": estad_fiscal.diferencias(e)}

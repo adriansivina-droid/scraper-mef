@@ -181,3 +181,15 @@ def test_enlace_vencido_muestra_una_pagina_legible(sitio):
     r = TestClient(app).get("/?t=inventada")
     assert r.status_code == 403 and "text/html" in r.headers["content-type"] and "Este enlace ya no es válido" in r.text
     assert TestClient(app).get("/v1/estado").headers["content-type"].startswith("application/json")        # lo demás, igual
+
+
+def test_pestana_estad_para_invitados():
+    """La pestaña ESTAD de Ejecución: el invitado con Gasto (o Inversión) de la región ve las hojas de ese sector."""
+    from app.compartir import permitido
+    perm = {"lor": ["gasto"]}
+    ok = lambda q: permitido(perm, "GET", "/v1/ejecucion/estad", q, descargas=True)[0]
+    assert ok({"departamento": "16", "sector": "gasto"})
+    assert not ok({"departamento": "16", "sector": "inversion"})
+    assert not ok({"departamento": "16"})                     # sin sector: las seis hojas, pide los dos
+    assert not ok({"departamento": "22", "sector": "gasto"})
+    assert permitido({"lor": ["gasto", "inversion"]}, "GET", "/v1/ejecucion/estad", {"departamento": "16"}, descargas=True)[0]

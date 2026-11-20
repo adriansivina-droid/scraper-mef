@@ -1414,11 +1414,11 @@
 
   // ── ESTAD de Ejecución del presupuesto: las hojas de gasto e inversión (G.N., G.R., G.L.) con los datos del MEF ──
   const estadSt = {};
-  async function estadFiscal(r, caja) {
-    const st = estadSt[r.cod] || (estadSt[r.cod] = { desde: "", hasta: "", hoja: 0 });
+  async function estadFiscal(r, caja, sector) {
+    const st = estadSt[r.cod + sector] || (estadSt[r.cod + sector] = { desde: "", hasta: "", hoja: 0 });
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando el ESTAD de gasto e inversión…</div>';
     let e;
-    try { e = await api(`/v1/ejecucion/estad?${new URLSearchParams({ departamento: r.cod, desde: st.desde, hasta: st.hasta })}`); }
+    try { e = await api(`/v1/ejecucion/estad?${new URLSearchParams({ departamento: r.cod, desde: st.desde, hasta: st.hasta, sector })}`); }
     catch (er) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar el ESTAD</b><span>${esc(er.message)}</span></div>`; return; }
     st.desde = e.desde; st.hasta = e.hasta;
     if (st.hoja >= e.hojas.length) st.hoja = 0;
@@ -1431,14 +1431,14 @@
         const d = difDe[`${h.hoja}|${f.fila}|${p}`];
         return `<td class="n${d ? " baja" : ""}"${d ? ` title="ESTAD subido: ${n(d.estad)} · diferencia ${d.dif > 0 ? "+" : ""}${n(d.dif)}"` : ""}>${f.llena ? n(f.valores[p]) : ""}</td>`; }).join("")}</tr>`).join("");
     const porHoja = e.hojas.map((x) => e.diferencias.filter((d) => d.hoja === x.hoja).length);
-    caja.innerHTML = `<div class="caja"><h3>ESTAD de ${esc(r.nombre)}: gasto e inversión por nivel de gobierno</h3>
+    caja.innerHTML = `<div class="caja"><h3>ESTAD de ${esc(r.nombre)}: ${sector === "gasto" ? "gasto" : "inversión"} por nivel de gobierno</h3>
         <p>Las hojas de gasto e inversión del ESTAD (Gobierno Nacional, Regional y Locales), armadas con los datos del MEF que ya tiene la página: mismas filas y en el mismo orden que el ESTAD, en <b>miles de soles</b>. Aquí se ven los miles; el dato guarda sus decimales (soles / 1000) para que las variaciones reales salgan precisas.</p>
         <p><b>El Excel sale entero del scraper del MEF</b>, con el diseño del ESTAD: todos los años que tiene la página (12 meses y su total), las variaciones del último mes y de enero a ese mes y, en las hojas de gasto, el mismo cuadro en términos reales con el deflactor del IPC de Lima. No usa los montos de ningún ESTAD.</p>
         <div class="fila">
           <label class="campo">Desde <input type="month" id="ef-desde" value="${esc(e.desde)}"></label>
           <label class="campo">Hasta <input type="month" id="ef-hasta" value="${esc(e.hasta)}"></label>
           <button class="btn" type="button" id="ef-ver">Ver</button>
-          <a class="btn sec" href="/v1/ejecucion/estad?${new URLSearchParams({ departamento: r.cod, desde: e.desde, hasta: e.hasta, formato: "xlsx" })}">Descargar el ESTAD (6 hojas, todos los años)</a></div>
+          <a class="btn sec" href="/v1/ejecucion/estad?${new URLSearchParams({ departamento: r.cod, desde: e.desde, hasta: e.hasta, sector, formato: "xlsx" })}">Descargar el ESTAD (${sector === "gasto" ? "hojas de gasto" : "hojas de inversión"}, todos los años)</a></div>
         <p class="nota">${e.origen.subido ? `Orden de filas y comparación: el ESTAD subido (${esc(e.origen.archivo || "")}${e.origen.fecha ? `, ${esc(fecha(e.origen.fecha))}` : ""}).`
           : "Orden y nombre de las filas: los del ESTAD de la región (vienen con la página)."}
           ${e.diferencias.length ? ` <b>${e.diferencias.length} celdas</b> difieren del ESTAD subido en más de 1 mil soles (en rojo; pasa el mouse para ver el valor del ESTAD): suelen ser meses que el MEF corrigió después.` : e.origen.subido ? " Todo coincide con el ESTAD subido (±1 mil soles)." : ""}
@@ -1446,8 +1446,8 @@
         <div class="tabs-mini" role="tablist">${e.hojas.map((x, i) => `<button type="button" class="btn ${i === st.hoja ? "" : "sec"}" data-h="${i}">${esc(x.hoja)}${porHoja[i] ? ` (${porHoja[i]})` : ""}</button>`).join(" ")}</div>
         <div class="scroll"><table><tr><th>${esc(h.titulo[1] || h.hoja)}</th>${e.meses.map((p) => `<th class="n">${corto(p)}</th>`).join("")}</tr>${filas}</table></div>
         <p class="nota">Filas en gris: la página no las llena (títulos, filas repetidas o rubros que el MEF no separa por fuente: Fondo de Compensación Regional y Privatizaciones y concesiones, incluidos en Recursos determinados). Gasto: genéricas 5-21 a 5-25, 6-24 a 6-27 y 7-28 (servicio de la deuda). Inversión: genérica 2.6. Fuente: MEF, Consulta Amigable. Las hojas de INGRESOS no se arman: la página no descarga los ingresos.</p></div>`;
-    caja.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", () => { st.hoja = +b.dataset.h; estadFiscal(r, caja); }));
-    caja.querySelector("#ef-ver").addEventListener("click", () => { st.desde = caja.querySelector("#ef-desde").value; st.hasta = caja.querySelector("#ef-hasta").value; estadFiscal(r, caja); });
+    caja.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", () => { st.hoja = +b.dataset.h; estadFiscal(r, caja, sector); }));
+    caja.querySelector("#ef-ver").addEventListener("click", () => { st.desde = caja.querySelector("#ef-desde").value; st.hasta = caja.querySelector("#ef-hasta").value; estadFiscal(r, caja, sector); });
   }
 
   // ── Contraste: lo que tiene la página contra lo publicado por el MEF (vista anual de Consulta Amigable, de los CSV de CONTROL del scraper) ──
@@ -1806,7 +1806,7 @@
     else if (t === "Resumen Export") panel = '<div id="resumen-sunat"></div>';
     else if (t === "Resumen Import") panel = '<div id="resumen-sunat" data-flujo="impo"></div>';
     else if (t === "Contraste") panel = `<div id="contraste" data-sector="${id}"></div>`;
-    else if (t === "ESTAD" && s.cuadros === "ejecucion") panel = '<div id="estad-fiscal"></div>';
+    else if (t === "ESTAD" && s.cuadros === "ejecucion") panel = `<div id="estad-fiscal" data-sector="${id}"></div>`;
     else if (t === "Cuadros") panel = s.cuadros === "manufactura" ? '<div id="cuadros-manu"></div>' : s.cuadros === "empleo" ? '<div id="cuadros-empleo"></div>' : s.cuadros === "hidrocarburos" ? '<div id="cuadros-hidro"></div>'
       : `<div class="caja"><h3>Cuadros para la síntesis de ${esc(r.nombre)}</h3><p>Se generarán aquí, con el formato del informe.</p><div class="scroll"><table><tr><th>Cuadro</th><th>Estado</th></tr>${s.cuadros.map((c) => `<tr><td>${esc(c)}</td><td><span class="chip falta">pronto</span></td></tr>`).join("")}</table></div></div>`;
     else if (t === "Actualizar") panel = s.actualizar === "mef" ? `<div class="comparte">El MEF se baja una sola vez para las tres regiones (y el detalle municipal y el PIM para los 25 departamentos). ${irComun("act-mef", "Ir al scraper del MEF →")}</div>${cajaSubida("sub-ipc", IPC_TXT)}`
@@ -2062,7 +2062,7 @@
     if ($("resumen-ejec")) resumenEjecutivo(REG[grupo], $("resumen-ejec"));
     if ($("drae-graf")) graficosDRAE(REG[grupo], $("drae-graf"));
     if ($("contraste")) contrasteMEF($("contraste").dataset.sector, REG[grupo], $("contraste"));
-    if ($("estad-fiscal")) estadFiscal(REG[grupo], $("estad-fiscal"));
+    if ($("estad-fiscal")) estadFiscal(REG[grupo], $("estad-fiscal"), $("estad-fiscal").dataset.sector);
     window.scrollTo(0, 0);
   }
   $("sel-movil").addEventListener("change", (ev) => { location.hash = ev.target.value; });

@@ -208,6 +208,9 @@ def permitido(perm, metodo, ruta, q, descargas=False):
         exigencias = [("depto", "drae", q.get("departamento", ""))]
     elif ruta == "/v1/cuadros/ejecucion":
         exigencias = [("depto", q.get("sector", "gasto") if q.get("sector") in ("gasto", "inversion") else "gasto", q.get("departamento", ""))]
+    elif ruta == "/v1/ejecucion/estad":
+        sectores = [q.get("sector")] if q.get("sector") in ("gasto", "inversion") else ["gasto", "inversion"]
+        exigencias = [("depto", s_, q.get("departamento", "")) for s_ in sectores]
     elif ruta in ("/v1/variaciones", "/v1/proyectos"):
         exigencias = [("depto", "inversion", q.get("departamento", ""))]
     elif ruta == "/v1/cuadros/pesca":
