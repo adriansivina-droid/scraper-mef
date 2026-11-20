@@ -89,7 +89,7 @@ def test_conceptos():
     assert estad_fiscal.concepto("Transporte y Comunicaciones", None, "inversion") == ("fun", ["15", "16"])
     assert estad_fiscal.concepto("Medio Ambiente", None, "inversion") == ("fun", ["17"])
     assert estad_fiscal.concepto("Fondo de compensación regional", "fuente", "gasto") is None
-    assert estad_fiscal.hoja_fiscal("INGRESOS G.R.") is None and estad_fiscal.hoja_fiscal("INVERSIÓN G.L.") == ("M", "inversion")
+    assert estad_fiscal.hoja_fiscal("INGRESOS G.R.") == ("R", "ingresos") and estad_fiscal.hoja_fiscal("INVERSIÓN G.L.") == ("M", "inversion")
 
 
 def test_estad_fiscal_con_el_libro_subido(cliente, tmp_path):
@@ -146,7 +146,33 @@ def test_estad_fiscal_sin_libro_usa_el_de_la_pagina(cliente):
     datos()
     e = cliente.get("/v1/ejecucion/estad?departamento=16").json()
     assert not e["origen"]["subido"] and e["hasta"] == "2026-02" and e["desde"] == "2026-01"
-    assert len(e["hojas"]) == 6 and e["diferencias"] == []
+    assert len(e["hojas"]) == 8 and e["diferencias"] == []          # 6 de gasto e inversión y 2 de ingresos
     gr = next(h for h in e["hojas"] if h["hoja"] == "GASTOS G.R.")
     assert next(f for f in gr["filas"] if f["etiqueta"] == "TOTAL DE GASTOS")["valores"]["2026-02"] == 359.2
     assert cliente.get("/v1/ejecucion/estad?departamento=22").status_code == 404
+
+
+def test_hojas_de_ingresos():
+    """INGRESOS G.R./G.L.: cada fila según su etiqueta, con las convenciones de cada ESTAD."""
+    from app import estad_fiscal as ef
+    principal = [(7, "TOTAL DE INGRESOS"), (9, "INGRESOS CORRIENTES"), (11, "3: VENTA DE BIENES Y SERVICIOS"), (12, "4: DONACIONES Y TRANSFERENCIAS"),
+                 (13, "5: OTROS INGRESOS"), (17, "FINANCIAMIENTO"), (19, "9: SALDOS DE BALANCE"), (21, "TOTAL INGRESOS POR FUENTE"),
+                 (23, "5: RECURSOS DETERMINADOS"), (24, "Privatizaciones y concesiones"), (25, "Fondo de compensación regional")]
+    dyt = [(53, "4: DONACIONES Y TRANSFERENCIAS"), (54, "D y T CORRIENTES"), (58, "Del Gobierno Nacional"), (63, "Canon petrolero"),
+           (64, "Sobrecanon petrolero"), (65, "Eliminación exoneraciones"), (67, "D DE CAPITAL"), (71, "Del Gobierno Nacional")]
+    h = {"tipo": "ingresos", "filas": [{"fila": f, "etiqueta": e} for f, e in principal] + [{"fila": f, "etiqueta": e, "bloque": "dyt"} for f, e in dyt]}
+    c = ef._conceptos(h)
+    assert c[9]["filtro"] == [[1, "C:1-1"], [1, "C:1-2"], [1, "C:1-3"], [1, "C:1-4"], [1, "C:1-5"]]
+    assert c[24]["filtro"] == c[25]["filtro"] == [[1, "Z"]]                        # en 0 (van en recursos determinados)
+    assert c[58]["filtro"] == [[1, "H:1-4-1-3-1:NACIONAL"]] and c[71]["filtro"] == [[1, "H:1-4-2-3-1:NACIONAL"]]
+    # sin fila de FONCOR, «Eliminación exoneraciones» lleva también el Fondo de Compensación Regional (como el ESTAD de Loreto)
+    assert c[65]["filtro"] == [[1, "H:1-4-1-4:ELIMINACION"], [1, "H:1-4-1-4:COMPENSACION REGIONAL"]]
+    d = {"ing": pd.DataFrame([
+        {"N": "R", "P": "2026-01", "CLASIFICADOR": "ESPECIFICA_DETALLE", "CODIGO": "1-4-1-4-1-1", "K": "CANON PETROLERO", "V": 10.0},
+        {"N": "R", "P": "2026-01", "CLASIFICADOR": "ESPECIFICA_DETALLE", "CODIGO": "1-4-1-4-1-2", "K": "SOBRECANON PETROLERO", "V": 5.0},
+        {"N": "R", "P": "2026-01", "CLASIFICADOR": "ESPECIFICA", "CODIGO": "1-4-1-4-7", "K": "FONDO DE COMPENSACION REGIONAL", "V": 30.0},
+        {"N": "R", "P": "2026-01", "CLASIFICADOR": "FUENTE", "CODIGO": "5", "K": "RECURSOS DETERMINADOS", "V": 45.0}])}
+    assert ef._valor(d, "ing", c[63]["filtro"], "R", "2026-01") == 10.0            # canon, sin el sobrecanon
+    assert ef._valor(d, "ing", c[65]["filtro"], "R", "2026-01") == 30.0
+    assert ef._valor(d, "ing", c[23]["filtro"], "R", "2026-01") == 45.0 and ef._valor(d, "ing", c[24]["filtro"], "R", "2026-01") == 0
+    assert ef._valor(d, "ing", c[23]["filtro"], "R", "2026-02") is None            # mes sin datos: vacío

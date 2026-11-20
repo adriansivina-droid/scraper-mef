@@ -54,13 +54,128 @@ def _k(t):
 
 
 def hoja_fiscal(nombre):
-    """(nivel E/R/M, tipo 'gasto'|'inversion') de una hoja del ESTAD, o None (INGRESOS y las demás)."""
+    """(nivel E/R/M, tipo 'gasto'|'inversion'|'ingresos') de una hoja del ESTAD, o None."""
     h = _k(nombre)
-    if "INGRESO" in h:
-        return None
     n = "E" if "G.N" in h else "R" if "G.R" in h else "M" if "G.L" in h else None
-    t = "gasto" if "GASTO" in h else "inversion" if "INVERSI" in h else None
+    t = "ingresos" if "INGRESO" in h else "gasto" if "GASTO" in h else "inversion" if "INVERSI" in h else None
     return (n, t) if n and t else None
+
+
+def concepto_ingresos(etiqueta, bloque, ctx):
+    """Una fila de las hojas de INGRESOS -> ("ing", términos) o None. Términos: [[signo, selector]] con selector
+    «C:código» (clasificador), «F:fuente», «H:padre:palabra» (el hijo del padre cuyo nombre la contiene) o «Z» (cero).
+    ctx: qué filas trae la hoja (cada región separa conceptos distintos)."""
+    e = re.sub(r"^\d+\s*:\s*", "", _k(etiqueta))
+    e = re.sub(r"^[-.\s]+", "", e)
+    if not e or e.startswith(("FUENTE", "1 /", "1/", "CUADRO", "(")):
+        return None
+    t = lambda *xs: ("ing", [[1, x] for x in xs])
+    if bloque in ("dyt_total", "dyt_corr", "dyt_cap"):
+        p = "1-4-2" if bloque == "dyt_cap" else "1-4-1"
+        if bloque == "dyt_total":
+            return t("C:1-4")
+        if e.startswith("D Y T CORRIENTES"):
+            return t("C:1-4-1")
+        if e.startswith("D DE CAPITAL"):
+            return t("C:1-4-2")
+        if e.startswith("DE GOBIERNOS EXTRANJEROS"):
+            return t(f"C:{p}-1")
+        if e.startswith("DE ORGANISMOS INTERNACIONALES"):
+            return t(f"C:{p}-2")
+        if e.startswith("DE AGENCIAS"):
+            return t(f"H:{p}:AGENCIA")
+        if e.startswith("DE OTRAS UNIDADES DE GOBIERNO"):
+            return t(f"C:{p}-3")
+        for clave, palabra in (("DEL GOBIERNO NACIONAL", "NACIONAL"), ("DEL GOBIERNO REGIONAL", "REGIONAL"), ("DE LOS GOBIERNOS REGIONALES", "REGIONAL"),
+                               ("DE LOS GOBIERNOS LOCALES", "LOCAL"), ("DE OTRAS ENTIDADES", "ENTIDADES"), ("DE FONDOS", "FONDOS")):
+            if e.startswith(clave):
+                return t(f"H:{p}-3-1:{palabra}")
+        if e.startswith("POR PARTICIPACIONES"):
+            return t("C:1-4-1-4")
+        if e.startswith("CANON Y SOBRECANON"):
+            return t("C:1-4-1-4-1")
+        for clave in ("SOBRECANON PETROLERO", "CANON PETROLERO", "CANON MINERO", "CANON GASIFERO", "CANON FORESTAL", "CANON HIDROENERGETICO"):
+            if e.startswith(clave):
+                return t(f"H:1-4-1-4-1:{clave}")
+        if e.startswith("REGALIA"):
+            return t("H:1-4-1-4:REGALIA")
+        if e.startswith("RENTA DE ADUANAS"):
+            return t("H:1-4-1-4:ADUANA")
+        if "ELIMINACION" in e or "ELEMINACION" in e:
+            return ("ing", [[1, "H:1-4-1-4:ELIMINACION"]] + ([] if ctx["foncor"] else [[1, "H:1-4-1-4:COMPENSACION REGIONAL"]]))
+        if e.startswith("FONCOMUN"):
+            return ("ing", [[1, "H:1-4-1-4:COMPENSACION MUNICIPAL"]] + ([] if ctx["eliminacion"] else [[1, "H:1-4-1-4:ELIMINACION"]]))
+        if e.startswith("FONDO DE COMPENSACION REGIONAL") or e.startswith("FONCOR"):
+            return t("H:1-4-1-4:COMPENSACION REGIONAL")
+        if e.startswith("POR ASIGNACION ESPECIAL"):
+            return t("H:1-4-1-4:ASIGNACION ESPECIAL")
+        if e.startswith("POR PLAN DE INCENTIVOS"):
+            return t("H:1-4-1-4-6:INCENTIVOS")
+        if e.startswith("POR BONO"):
+            return t("H:1-4-1-4-6:BONO")
+        return None
+    if bloque == "fuente":
+        if e.startswith(("TOTAL INGRESOS POR FUENTE", "INGRESOS POR FUENTE")):
+            return t("F:*")
+        if "DETERMINADOS" in e:
+            return t("F:5")
+        if "DIRECTAMENTE" in e:
+            return t("F:2")
+        if "CREDITO" in e or "OPERACIONES" in e:
+            return t("F:3")
+        if e.startswith("DONACIONES"):
+            return t("F:4")
+        if "COMPESACION" in e or "COMPENSACION" in e or "PRIVATIZ" in e:
+            return ("ing", [[1, "Z"]])
+        return None
+    if e.startswith(("TOTAL DE INGRESOS", "INGRESOS DEL GOBIERNO", "INGRESOS DE LOS GOBIERNOS")):
+        return t(*[f"C:1-{i}" for i in range(1, 10)])
+    if e.startswith("INGRESOS CORRIENTES"):
+        return t("C:1-1", "C:1-2", "C:1-3", "C:1-4-1" if ctx["transferencias"] else "C:1-4", "C:1-5")
+    if e.startswith("IMPUESTOS"):
+        return t("C:1-1")
+    if e.startswith("CONTRIBUCIONES SOCIALES"):
+        return t("C:1-2")
+    if e.startswith("VENTA DE BIENES Y SERVICIOS"):
+        return t("C:1-3")
+    if e.startswith("TASAS"):
+        return t("C:1-3-2")
+    if e == "VENTA DE BIENES":
+        return t("C:1-3-1")
+    if e.startswith("PRESTACION DE SERVICIOS"):
+        return t("C:1-3-3")
+    if e.startswith("RENTAS DE LA PROPIEDAD"):
+        return t("C:1-5-1")
+    if e.startswith("MULTAS"):
+        return t("C:1-5-2")
+    if e.startswith("DONACIONES Y TRANSFERENCIAS"):
+        return t("C:1-4-1" if ctx["transferencias"] else "C:1-4")
+    if e.startswith("OTROS INGRESOS CORRIENTES"):
+        return ("ing", [[1, "C:1-5"]] + ([[-1, "C:1-5-1"]] if ctx["rentas"] else []) + ([[-1, "C:1-5-2"]] if ctx["multas"] else []))
+    if e.startswith("OTROS INGRESOS"):
+        return t("C:1-5")
+    if e.startswith("INGRESOS DE CAPITAL"):
+        return t("C:1-6", "C:1-7")
+    if e.startswith("VENTA DE ACTIVOS NO FINANCIEROS"):
+        return t("C:1-6")
+    if e.startswith("VENTA DE ACTIVOS FINANCIEROS"):
+        return t("C:1-7")
+    if e.startswith("TRANSFERENCIAS"):
+        return t("C:1-4-2")
+    if e.startswith("FINANCIAMIENTO"):
+        return t("C:1-8", "C:1-9")
+    if e.startswith("ENDEUDAMIENTO"):
+        return t("C:1-8")
+    if e.startswith("SALDO"):
+        return t("C:1-9")
+    return None
+
+
+def _contexto_ingresos(etiquetas):
+    es = [re.sub(r"^[\d\s:.-]+", "", _k(x)) for _, x in etiquetas]
+    return {"transferencias": any(x == "TRANSFERENCIAS" for x in es), "rentas": any(x.startswith("RENTAS DE LA PROPIEDAD") for x in es),
+            "multas": any(x.startswith("MULTAS") for x in es), "foncor": any(x.startswith(("FONDO DE COMPENSACION REGIONAL", "FONCOR")) for x in es),
+            "eliminacion": any("ELIMINACION" in x or "ELEMINACION" in x for x in es)}
 
 
 def concepto(etiqueta, bloque, tipo):
@@ -129,7 +244,19 @@ def concepto(etiqueta, bloque, tipo):
 
 
 def _bloque(etiqueta, actual):
-    e = _k(etiqueta)
+    e = re.sub(r"^\d+\s*:\s*", "", _k(etiqueta))
+    if actual and actual.startswith("dyt"):
+        if e.startswith("D Y T CORRIENTES"):
+            return "dyt_corr"
+        if e.startswith("D DE CAPITAL"):
+            return "dyt_cap"
+        return actual
+    if e.startswith("INGRESOS CORRIENTES"):
+        return "corriente"
+    if e.startswith("INGRESOS DE CAPITAL"):
+        return "capital"
+    if e.startswith("FINANCIAMIENTO"):
+        return "financiamiento"
     if "POR FUENTE" in e or e.startswith("FUENTES DE FINANCIAMIENTO"):
         return "fuente"
     if e.startswith("GASTOS CORRIENTES"):
@@ -141,18 +268,20 @@ def _bloque(etiqueta, actual):
     return actual
 
 
-def _filas_de(etiquetas, tipo):
-    """[(fila, etiqueta)] del cuadro nominal (hasta la nota «Fuente: MEF») -> [{fila, etiqueta, base, filtro}]."""
-    salida, bloque, vistos = [], None, set()
-    for fila, etiqueta in etiquetas:
+def _filas_de(etiquetas, tipo, bloque_inicial=None):
+    """[(fila, etiqueta)] del cuadro nominal (hasta la nota «Fuente: MEF») -> [{fila, etiqueta, base, filtro}].
+    En INGRESOS, el cuadro de donaciones y transferencias se pasa aparte, con bloque_inicial «dyt_total»."""
+    salida, bloque, vistos = [], bloque_inicial, set()
+    ctx = _contexto_ingresos(etiquetas) if tipo == "ingresos" else None
+    for i, (fila, etiqueta) in enumerate(etiquetas):
         e = _k(etiqueta)
         if e.startswith(("FUENTE:", "FUENTE :")):
             break
         bloque = _bloque(etiqueta, bloque)
-        c = concepto(etiqueta, bloque, tipo)
+        c = concepto_ingresos(etiqueta, bloque, ctx) if tipo == "ingresos" else concepto(etiqueta, bloque, tipo)
         if c is not None:
             clave = (c[0], json.dumps(c[1]))
-            if clave in vistos:                       # fila repetida: el ESTAD solo llena la primera
+            if clave in vistos and c[1] != [[1, "Z"]]:  # fila repetida: el ESTAD solo llena la primera
                 c = None
             else:
                 vistos.add(clave)
@@ -174,7 +303,7 @@ def leer_libro(ruta):
             ht = hoja_fiscal(ws.title)
             if not ht:
                 continue
-            filas = [list(r) for r in ws.iter_rows(min_row=1, max_row=60, values_only=True)]
+            filas = [list(r) for r in ws.iter_rows(min_row=1, max_row=110, values_only=True)]
             titulo = [str(r[0]).strip() if r and r[0] is not None else "" for r in filas[:3]]
             depto = next((d for d, n in DEPTOS.items() if _k(" ".join(titulo)).find(_k(n) + ":") >= 0), None)
             ff = next((i for i, r in enumerate(filas[:10]) if sum(isinstance(v, datetime) for v in r) >= 3), None)
@@ -183,6 +312,12 @@ def leer_libro(ruta):
             cols = {f"{v.year}-{v.month:02d}": j for j, v in enumerate(filas[ff]) if isinstance(v, datetime)}
             etiquetas = [(i + 1, r[0]) for i, r in enumerate(filas) if i > ff and r and isinstance(r[0], str) and r[0].strip()]
             items = _filas_de(etiquetas, ht[1])
+            if ht[1] == "ingresos":                   # y el cuadro de donaciones y transferencias, más abajo
+                k = next((j for j, (_, x) in enumerate(etiquetas) if _k(x).startswith("D Y T CORRIENTES")), None)
+                if k:
+                    dyt = etiquetas[k - 1:]
+                    fin = next((j for j, (_, x) in enumerate(dyt) if _k(x).startswith(("FUENTE", "1 /", "1/"))), len(dyt))
+                    items += [{**it, "bloque": "dyt"} for it in _filas_de(dyt[:fin], "ingresos", "dyt_total")]
             recientes = sorted(cols)[-MESES_VALORES:]
             # un mes que aún no se llenó con montos (p. ej. trae la variación %): su total es mucho menor que el de los demás
             fila_total = next((it["fila"] for it in items if it["base"] and it["filtro"] is None), None)
@@ -199,7 +334,8 @@ def leer_libro(ruta):
                     valores[str(it["fila"])] = v
             salida.setdefault(depto, {"hojas": []})["hojas"].append(
                 {"hoja": ws.title, "nivel": ht[0], "tipo": ht[1], "titulo": titulo, "fila_fechas": ff + 1,
-                 "filas": [{"fila": it["fila"], "etiqueta": it["etiqueta"]} for it in items], "valores": valores})
+                 "filas": [{"fila": it["fila"], "etiqueta": it["etiqueta"], **({"bloque": "dyt"} if it.get("bloque") else {})} for it in items],
+                 "valores": valores})
         return salida
     finally:
         wb.close()
@@ -227,6 +363,16 @@ def estructura(depto):
 
 
 # ── Cálculo con las bases de la página ──
+def _conceptos(h):
+    """{fila: concepto} de una hoja, con el cuadro de donaciones y transferencias aparte en las de ingresos."""
+    principal = [(f["fila"], f["etiqueta"]) for f in h["filas"] if not f.get("bloque")]
+    dyt = [(f["fila"], f["etiqueta"]) for f in h["filas"] if f.get("bloque") == "dyt"]
+    salida = {it["fila"]: it for it in _filas_de(principal, h["tipo"])}
+    if dyt:
+        salida.update({it["fila"]: it for it in _filas_de(dyt, "ingresos", "dyt_total")})
+    return salida
+
+
 def _datos(depto, desde, hasta):
     def prep(base):
         df = db.leer(base, [depto], list(NIVEL), desde, hasta)
@@ -235,10 +381,46 @@ def _datos(depto, desde, hasta):
         mes = pd.to_numeric(df["MES"].astype(str).str.extract(r"(\d+)")[0], errors="coerce")
         return df.assign(P=df["AÑO"].astype(int).astype(str) + "-" + mes.astype(int).map("{:02d}".format),
                          N=df["NIVEL_GOBIERNO"].astype(str).str[0], V=pd.to_numeric(df["DEVENGADO"], errors="coerce").fillna(0) / 1000)
-    return {"gen": prep("gasto-dev-generica"), "fue": prep("gasto-dev-fuente"), "fun": prep("inv-dev-funcion"), "ifu": prep("inv-dev-fuente")}
+    ing = db.leer("ingresos", [depto], list(NIVEL), desde, hasta)
+    if not ing.empty:
+        mes = pd.to_numeric(ing["MES"].astype(str).str.extract(r"(\d+)")[0], errors="coerce")
+        ing = ing.assign(P=ing["AÑO"].astype(int).astype(str) + "-" + mes.astype(int).map("{:02d}".format),
+                         N=ing["NIVEL_GOBIERNO"].astype(str).str[0], V=pd.to_numeric(ing["RECAUDADO"], errors="coerce").fillna(0) / 1000,
+                         CODIGO=ing["CODIGO"].astype(str), K=ing["CONCEPTO"].map(_k))
+    return {"gen": prep("gasto-dev-generica"), "fue": prep("gasto-dev-fuente"), "fun": prep("inv-dev-funcion"), "ifu": prep("inv-dev-fuente"),
+            "ing": ing}
+
+
+def _valor_ingresos(d, terminos, nivel, p):
+    x = d["ing"]
+    if x is None or x.empty:
+        return None
+    x = x[(x.N == nivel) & (x.P == p)]
+    if x.empty:
+        return None
+    clas = x[~x.CLASIFICADOR.isin(["FUENTE", "RUBRO"])]
+    fte = x[x.CLASIFICADOR == "FUENTE"]
+    total = 0.0
+    for signo, sel in terminos:
+        if sel == "Z":
+            continue
+        if sel.startswith("C:"):
+            v = clas.loc[clas.CODIGO == sel[2:], "V"].sum()
+        elif sel == "F:*":
+            v = fte.V.sum()
+        elif sel.startswith("F:"):
+            v = fte.loc[fte.CODIGO == sel[2:], "V"].sum()
+        else:                                          # H:padre:palabra -> el hijo del padre que la contiene en su nombre
+            _, padre, palabra = sel.split(":", 2)
+            hijos = clas[clas.CODIGO.str.startswith(padre + "-") & (clas.CODIGO.str.count("-") == padre.count("-") + 1)]
+            v = hijos.loc[hijos.K.str.contains(r"(?:^|\s)" + re.escape(palabra)), "V"].sum()   # «CANON PETROLERO» no es «SOBRECANON …»
+        total += signo * v
+    return total
 
 
 def _valor(d, base, filtro, nivel, p):
+    if base == "ing":
+        return _valor_ingresos(d, filtro, nivel, p)
     if base == "deu":
         x = d["gen"]
         x = x[(x.N == nivel) & (x.P == p)] if not x.empty else x
@@ -305,20 +487,20 @@ def armar(depto, desde=None, hasta=None, sector=None):
     desde = desde or f"{hasta[:4]}-01"
     meses = _meses(desde, hasta)
     hojas, origen = estructura(depto)
-    if sector:
-        hojas = [h for h in hojas if h["tipo"] == sector]
+    if sector:                                    # las hojas de ingresos van con las de gasto
+        hojas = [h for h in hojas if h["tipo"] == sector or (sector == "gasto" and h["tipo"] == "ingresos")]
     d = _datos(depto, desde, hasta)
     salida = []
     for h in hojas:
         tipo, nivel = h["tipo"], h["nivel"]
-        conceptos = {it["fila"]: it for it in _filas_de([(f["fila"], f["etiqueta"]) for f in h["filas"]], tipo)}
+        conceptos = _conceptos(h)
         filas = []
         for f in h["filas"]:
             c = conceptos.get(f["fila"], {})
             vals = {p: _miles(_valor(d, c["base"], c["filtro"], nivel, p)) for p in meses} if c.get("base") else {}
             estad = (h.get("valores") or {}).get(str(f["fila"]), {})
             filas.append({"fila": f["fila"], "etiqueta": f["etiqueta"], "llena": bool(c.get("base")), "valores": vals,
-                          "estad": {p: estad[p] for p in meses if p in estad}})
+                          "estad": {p: estad[p] for p in meses if p in estad}, **({"bloque": f["bloque"]} if f.get("bloque") else {})})
         salida.append({"hoja": h["hoja"], "nivel": NIVEL[nivel], "tipo": tipo, "titulo": h.get("titulo", []),
                        "fila_fechas": h.get("fila_fechas", 5), "filas": filas})
     sin_fuente = sorted({p for p in meses if all(_valor(d, "fue", None, n, p) is None for n in NIVEL)})
@@ -356,10 +538,12 @@ def _estilo(tipo):
 def _tipo_fila(f, filtro):
     if not f["llena"]:
         return "detalle"
-    if filtro is None:
+    e = re.sub(r"^\d+\s*:\s*", "", _k(f["etiqueta"]))
+    if filtro is None or e.startswith(("TOTAL", "INGRESOS DEL GOBIERNO", "INGRESOS DE LOS GOBIERNOS", "INGRESOS POR FUENTE")):
         return "total"
-    e = _k(f["etiqueta"])
-    return "grupo" if e.startswith(("GASTOS CORRIENTES", "GASTOS DE CAPITAL", "SERVICIO DE LA DEUDA")) else "detalle"
+    return "grupo" if e.startswith(("GASTOS CORRIENTES", "GASTOS DE CAPITAL", "SERVICIO DE LA DEUDA", "INGRESOS CORRIENTES",
+                                    "INGRESOS DE CAPITAL", "FINANCIAMIENTO", "TRANSFERENCIAS", "D Y T CORRIENTES", "D DE CAPITAL",
+                                    "POR PARTICIPACIONES", "DE OTRAS UNIDADES")) else "detalle"
 
 
 def excel(e, depto=None):
@@ -453,13 +637,20 @@ def excel(e, depto=None):
             ws.cell(i + 1, 1, titulo[i]).font = t11
         r_cab = 4
         cabecera(ws, r_cab)
-        conceptos = {it["fila"]: it for it in _filas_de([(f["fila"], f["etiqueta"]) for f in h["filas"]], tipo_hoja)}
+        conceptos = _conceptos({"tipo": tipo_hoja, "filas": h["filas"]})
         # el cuadro empieza en la fila 7, como el ESTAD; las filas conservan su orden y sus espacios
-        desfase = 7 - min(f["fila"] for f in h["filas"])
-        fila_de = {}
+        principal = [f for f in h["filas"] if not f.get("bloque")]
+        dyt = [f for f in h["filas"] if f.get("bloque") == "dyt"]
+        desfase = 7 - min(f["fila"] for f in principal)
+        ultima_p = max(f["fila"] for f in principal) + desfase
+        fila_de = {f["fila"]: f["fila"] + desfase for f in principal}
+        if dyt:                                         # INGRESOS: el detalle de donaciones y transferencias, debajo
+            r_dyt = ultima_p + 6
+            ws.cell(r_dyt - 1, 1, "DONACIONES Y TRANSFERENCIAS (detalle)").font = t11
+            cabecera(ws, r_dyt)
+            fila_de.update({f["fila"]: f["fila"] - dyt[0]["fila"] + r_dyt + 3 for f in dyt})
         for f in h["filas"]:
-            r = f["fila"] + desfase
-            fila_de[f["fila"]] = r
+            r = fila_de[f["fila"]]
             filtro = conceptos.get(f["fila"], {}).get("filtro")
             fila_datos(ws, r, f["etiqueta"], _tipo_fila(f, filtro), f["valores"] if f["llena"] else {})
             if not f["llena"]:
@@ -473,10 +664,13 @@ def excel(e, depto=None):
                         if total_fuente["valores"].get(p_) is not None:
                             ws.cell(r, cc).value = 0
         ultima = max(fila_de.values())
-        for cc in range(1, c_var + 4):
-            ws.cell(ultima + 1, cc).border = Border(top=fino)
-        ws.cell(ultima + 2, 1, "Fuente: MEF, Consulta Amigable (devengado). Elaborado con el scraper de la página.").font = Font(name="Arial", size=10)
-        ws.cell(ultima + 3, 1, "1 / Preliminar").font = Font(name="Arial", size=10)
+        fuente_txt = ("Fuente: MEF, Consulta Amigable de Ingresos (recaudado)." if tipo_hoja == "ingresos"
+                      else "Fuente: MEF, Consulta Amigable (devengado).") + " Elaborado con el scraper de la página."
+        for fin in ([ultima_p, ultima] if dyt else [ultima]):
+            for cc in range(1, c_var + 4):
+                ws.cell(fin + 1, cc).border = Border(top=fino)
+            ws.cell(fin + 2, 1, fuente_txt).font = Font(name="Arial", size=10)
+            ws.cell(fin + 3, 1, "1 / Preliminar").font = Font(name="Arial", size=10)
         if tipo_hoja == "gasto":                            # el mismo cuadro en términos reales
             r0 = ultima + 6
             ws.cell(r0, 1, f"{e['departamento']}: {titulo[1].split(':', 1)[-1].strip()} (REALES)").font = t11
@@ -531,8 +725,10 @@ def excel(e, depto=None):
               "Gasto: genéricas 5-21 a 5-25 (corriente), 6-24 a 6-27 (capital) y 7-28 (servicio de la deuda). Inversión: genérica 2.6.",
               "Reales: cada mes dividido por el IPC de Lima Metropolitana del mes (INEI, base dic. 2021 = 100) llevado a base 2009 "
               f"(× {REBASE_2009}), como el deflactor del ESTAD. Las variaciones reales no dependen de la base.",
+              "Ingresos (hojas INGRESOS G.R. y G.L.): recaudado de la Consulta Amigable de Ingresos del MEF por genérica, subgenérica, "
+              "fuente y el detalle de donaciones y transferencias (canon, FONCOMUN, FONCOR, etc.), como los agrupa el ESTAD de la región.",
               "Sin dato: gasto e inversión por fuente antes de 2025 (la página los descarga desde enero de 2025); Fondo de Compensación "
-              "Regional y Privatizaciones (el MEF los incluye en Recursos determinados); las hojas de INGRESOS.",
+              "Regional y Privatizaciones por fuente (el MEF los incluye en Recursos determinados).",
               f"Orden y nombre de las filas: {'el último ESTAD subido' if e['origen']['subido'] else 'los del ESTAD de la región (vienen con la página)'}."]:
         nota.append([t])
     nota.column_dimensions["A"].width = 140

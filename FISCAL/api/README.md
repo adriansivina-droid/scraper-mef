@@ -491,6 +491,13 @@ Cada fila se reconoce por su etiqueta (`concepto`), porque cada región ordena y
 
 **Ruta:** `GET /v1/ejecucion/estad?departamento=&desde=&hasta=&formato=json|xlsx`. El Excel lleva todos los años hasta «hasta».
 
+**Ingresos (hojas INGRESOS G.R. y G.L.).** El scraper es `FISCAL/automatizacion/ingresos_mef.py`, de la Consulta Amigable de Ingresos, mensual. Lo corre el flujo «Fiscal · ingresos del MEF» el día 2 de cada mes, o a mano con los años. Guarda la base `ingresos`.
+
+- **Qué baja:** el recaudado por genérica, subgenérica (1-3, 1-4, 1-5), el detalle de donaciones y transferencias (otras unidades de gobierno, canon y sobrecanon, regalías, renta de aduanas, eliminación de exoneraciones, FONCOMUN, FONCOR, asignación especial), por fuente y por rubro.
+- **Claves de la consulta:** 1 nivel, 2 sector, 3 pliego (453, 459, 462), 23 tipo de gobierno local, 5 departamento, 8 fuente, 9 rubro, 17 mes y 18–22 los niveles del clasificador.
+- **Cómo se ubica cada fila:** `concepto_ingresos` sigue las convenciones de cada ESTAD. Por ejemplo, en Loreto FONCOMUN incluye la eliminación de exoneraciones cuando no tiene fila propia, y en G.R. «Eliminación exoneraciones» lleva el FONCOR.
+- **Contraste con los ESTAD (2025):** Loreto 98,7 %, San Martín 99,0 %, Ucayali 91,6 %. En Ucayali, el ESTAD pone todo «Otros ingresos» en «Otros ingresos corrientes» y suma las transferencias de capital a las corrientes; la página separa ambas cosas.
+
 ## Cuadros y gráficos BCRP
 
 En cada sector con cuadros (pesca, hidrocarburos, empleo, gasto corriente e inversión pública) la pestaña **«Cuadros y
