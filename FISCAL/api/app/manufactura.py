@@ -63,7 +63,7 @@ def reconocer(ruta):
         return False
     try:
         for ws in wb.worksheets:
-            b2 = next(ws.iter_rows(min_row=2, max_row=2, min_col=2, max_col=2, values_only=True))[0]
+            b2 = next(ws.iter_rows(min_row=2, max_row=2, min_col=2, max_col=2, values_only=True), (None,))[0]
             if "VOLUMENFISICOMANUFACTURERO" in _clave(b2):
                 return True
         return False

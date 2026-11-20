@@ -21,7 +21,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
 
-from . import almacen, archivos, bcrp_excel, carga, compartir, controles, db, drae, ejecucion, empleo, expo_cuadros, hidrocarburos, hidrologia, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
+from . import almacen, archivos, bcrp_excel, carga, compartir, controles, db, drae, ejecucion, empleo, estad_fiscal, expo_cuadros, hidrocarburos, hidrologia, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
@@ -815,6 +815,22 @@ def contraste_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sect
     del scraper), por bloque, nivel de gobierno y año."""
     _ejecucion(departamento, "", "")
     return {"contraste": controles.contraste(departamento, sector)}
+
+
+@app.get("/v1/ejecucion/estad", dependencies=[Depends(acceso)])
+def ejecucion_estad(departamento: str = Query(..., pattern=r"^(16|22|25)$"), desde: str = Query("", pattern=r"^(\d{4}-\d{2})?$"),
+                    hasta: str = Query("", pattern=r"^(\d{4}-\d{2})?$"), formato: str = Query("json", pattern="^(json|xlsx)$")):
+    """Las hojas de gasto e inversión del ESTAD (G.N., G.R. y G.L.) armadas con los datos del MEF de la página, mes a mes,
+    con las diferencias contra el último ESTAD subido. Por defecto, de enero al último mes con datos."""
+    if desde and hasta and desde > hasta:
+        raise HTTPException(422, "«Desde» no puede ser posterior a «hasta».")
+    e = estad_fiscal.armar(departamento, desde or None, hasta or None)
+    if e is None:
+        raise HTTPException(404, "Todavía no hay gasto del MEF en la página para esta región.")
+    if formato == "xlsx":
+        return Response(estad_fiscal.excel(e), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"ESTAD gasto e inversion {estad_fiscal.CORTO[departamento]} {e['desde']} a {e['hasta']}.xlsx"))
+    return {**e, "diferencias": estad_fiscal.diferencias(e)}
 
 
 def _panel_muni(departamento):

@@ -1,0 +1,2151 @@
+{
+ "16": {
+  "archivo": "ESTADLO.xlsx",
+  "hojas": [
+   {
+    "hoja": "GASTO G.N.",
+    "nivel": "E",
+    "tipo": "gasto",
+    "titulo": [
+     "CUADRO Nº 18",
+     "LORETO: GASTOS NO FINANCIEROS  DEL GOBIERNO NACIONAL    1/",
+     "(Miles de soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "GASTOS POR GENERICA"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias (2)"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Adquisición de activos no financieros"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "6-27: ADQUISICION DE ACTIVOS FINANCIEROS"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses+comisiones"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "1: RECURSOS ORDINARIOS"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "5: RECURSOS DETERMINADOS"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "2: RECURSOS DIRECTAMENTE RECAUDADOS"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "3: RECURSOS POR OPERACIONES OFICIALES DE CREDITO"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "4: DONACIONES Y TRANSFERENCIAS"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSIÓN G.N.",
+    "nivel": "E",
+    "tipo": "inversion",
+    "titulo": [
+     "CUADRO Nº 19",
+     "LORETO: INVERSIONES NO FINANCIERAS DEL GOBIERNO NACIONAL    1/",
+     "(En miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "INVERSION POR FUNCIONES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "01: LEGISLATIVA"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Relaciones Exteriores"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Planeamiento, Gestión y Reserva"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Defensa y Seguridad"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Justicia"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "13: MINERIA"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Transporte y Comunicaciones"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Transporte y Comunicaciones"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Ambiente"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "24: PREVISION SOCIAL"
+     },
+     {
+      "fila": 33,
+      "etiqueta": "25: DEUDA PUBLICA"
+     },
+     {
+      "fila": 35,
+      "etiqueta": "INVERSION POR FUENTE"
+     },
+     {
+      "fila": 37,
+      "etiqueta": "Donaciones y Transferencias"
+     },
+     {
+      "fila": 38,
+      "etiqueta": "Fondo de Compensación Regional"
+     },
+     {
+      "fila": 39,
+      "etiqueta": "Privatizaciones y Concesiones"
+     },
+     {
+      "fila": 40,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 41,
+      "etiqueta": "Recursos Directamente Recaudados"
+     },
+     {
+      "fila": 42,
+      "etiqueta": "Recursos Ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 43,
+      "etiqueta": "Recursos por Oper. Ofi. De Créd. Interno"
+     }
+    ]
+   },
+   {
+    "hoja": "GASTOS G.R.",
+    "nivel": "R",
+    "tipo": "gasto",
+    "titulo": [
+     "CUADRO Nº 21",
+     "LORETO: GASTOS NO FINANCIEROS DEL GOBIERNO REGIONAL1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE GASTOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias (2)"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Adquisición de activos no financieros"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Inversiones financieras"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses+comisiones"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Recursos ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Recursos por oper. ofi. créd. interno"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Privatizaciones y concesiones"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Fondo de compensación regional"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSIÓN G.R.",
+    "nivel": "R",
+    "tipo": "inversion",
+    "titulo": [
+     "CUADRO Nº 22",
+     "LORETO:  INVERSIÓN NO FINANCIERA DEL GOBIERNO REGIONAL    1/",
+     "(En miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INVERSIONES POR FUNCIONES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Legislativa"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Relaciones Exteriores"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Planeamiento, Gestión y Reserva de Contingencia"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Defensa y Seguridad Nacional"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Justicia"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Minería"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Transporte"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Comunicaciones"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Medio Ambiente"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Previsión Social"
+     },
+     {
+      "fila": 33,
+      "etiqueta": "Deuda Pública"
+     },
+     {
+      "fila": 35,
+      "etiqueta": "INVERSIÓN POR FUENTE"
+     },
+     {
+      "fila": 37,
+      "etiqueta": "Recursos Ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 38,
+      "etiqueta": "Recursos Directamente Recaudados"
+     },
+     {
+      "fila": 39,
+      "etiqueta": "Recursos por Oper. Ofi. De Crédito"
+     },
+     {
+      "fila": 40,
+      "etiqueta": "Donaciones y Transferencias"
+     },
+     {
+      "fila": 41,
+      "etiqueta": "Recursos determinados"
+     }
+    ]
+   },
+   {
+    "hoja": "GASTOS G.L.",
+    "nivel": "M",
+    "tipo": "gasto",
+    "titulo": [
+     "CUADRO Nº 24",
+     "LORETO: EJECUCIÓN DE GASTOS DE LOS GOBIERNOS LOCALES    1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE GASTOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias (2)"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Adquisición de activos no financieros"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Inversiones financieras"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses +comisiones"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Recursos Ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos Directamente Recaudados"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Recursos por Oper. Ofi. De Créd. Interno"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Donaciones y Transferencias"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Privatizaciones y Concesiones"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Fondo de Compensación Regional"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSIÓN G.L.",
+    "nivel": "M",
+    "tipo": "inversion",
+    "titulo": [
+     "CUADRO Nº 25",
+     "LORETO: INVERSIONES NO FINANCIERAS DEL GOBIERNO LOCAL    1/",
+     "(En miles de soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INVERSIONES POR FUNCIONES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Legislativa"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Relaciones Exteriores"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Planeamiento, Gestión y Reserva"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Defensa y Seguridad Nacional"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Justicia"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Minería"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Transporte y Comunicaciones"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Ambiente"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Previsión Social"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Deuda Pública"
+     },
+     {
+      "fila": 34,
+      "etiqueta": "INVERSIÓN POR FUENTE"
+     },
+     {
+      "fila": 36,
+      "etiqueta": "Recursos Ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 37,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 38,
+      "etiqueta": "Recursos Directamente Recaudados"
+     },
+     {
+      "fila": 39,
+      "etiqueta": "Recursos por Oper. Ofi. De Créd. Interno"
+     },
+     {
+      "fila": 40,
+      "etiqueta": "Donaciones y Transferencias"
+     },
+     {
+      "fila": 41,
+      "etiqueta": "Privatizaciones y Concesiones"
+     },
+     {
+      "fila": 42,
+      "etiqueta": "Fondo de Compensación Regional"
+     }
+    ]
+   }
+  ]
+ },
+ "22": {
+  "archivo": "ESTADSMN.xlsx",
+  "hojas": [
+   {
+    "hoja": "GASTO G.N.",
+    "nivel": "E",
+    "tipo": "gasto",
+    "titulo": [
+     "Cuadro Nº 16",
+     "SAN MARTÍN: GASTOS NO FINANCIEROS DEL GOBIERNO NACIONAL 1/.",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE GASTOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias (2)"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Adquisición de activos no financieros"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Inversiones financieras"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses+comisiones"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Recursos ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos por operaciones oficiales de crédito externo"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Fondo de Compensación Regional"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSION G.N.",
+    "nivel": "E",
+    "tipo": "inversion",
+    "titulo": [
+     "Cuadro Nº 17",
+     "SAN MARTÍN: INVERSIONES NO FINANCIERAS DEL GOBIERNO NACIONAL 1/.",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INVERSIONES POR FUNCIONES"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Defensa y Seguridad Nacional"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Justicia"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Ambiente"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Minería"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Planeamiento, Gestión y Reserva"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Transporte"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Comunicaciones"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Recursos ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 33,
+      "etiqueta": "Recursos por operaciones oficiales de crédito externo"
+     },
+     {
+      "fila": 34,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 35,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 36,
+      "etiqueta": "Fondo de Compensación Regional"
+     },
+     {
+      "fila": 37,
+      "etiqueta": "Privatizaciones y concesiones"
+     }
+    ]
+   },
+   {
+    "hoja": "GASTO G.R.",
+    "nivel": "R",
+    "tipo": "gasto",
+    "titulo": [
+     "Cuadro Nº 19",
+     "SAN MARTÍN: GASTOS NO FINANCIEROS DEL GOBIERNO REGIONAL1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE GASTOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Adquisición de activos no financieros"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Inversiones financieras"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Donaciones y transferencias (2)"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses +comisiones"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Recursos ordinarios"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos por operaciones oficiales de crédito externo"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Fondo de Compensación Regional"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Privatizaciones y concesiones"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSION G.R.",
+    "nivel": "R",
+    "tipo": "inversion",
+    "titulo": [
+     "Cuadro Nº 20",
+     "SAN MARTÍN: INVERSIONES NO FINANCIERAS DEL GOBIERNO REGIONAL 1/.",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INVERSIONES POR FUNCIONES"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "Relaciones Exteriores"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Defensa y Seguridad Nacional"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Justicia"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Medio Ambiente"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Minería"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Planeamiento, Gestión y Reserva"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Transporte"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Comunicaciones"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Recursos ordinarios"
+     },
+     {
+      "fila": 33,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 34,
+      "etiqueta": "Recursos por operaciones oficiales.."
+     },
+     {
+      "fila": 35,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 36,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 37,
+      "etiqueta": "Fondo de Compensación Regional"
+     },
+     {
+      "fila": 38,
+      "etiqueta": "Privatizaciones y concesiones"
+     }
+    ]
+   },
+   {
+    "hoja": "GASTO G.L.",
+    "nivel": "M",
+    "tipo": "gasto",
+    "titulo": [
+     "Cuadro Nº 22",
+     "SAN MARTÍN: GASTOS NO FINANCIEROS DE LOS GOBIERNOS LOCALES 1/.",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE GASTOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias (2)"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Adquisición de activos no financieros"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Inversiones financieras"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Recursos ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos por operaciones oficiales de crédito"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Fondo de Compensación Regional"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Privatizaciones y concesiones"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSION G.L.",
+    "nivel": "M",
+    "tipo": "inversion",
+    "titulo": [
+     "Cuadro Nº 23",
+     "SAN MARTÍN: INVERSIONES NO FINANCIERAS DE LOS GOBIERNOS LOCALES 1/.",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INVERSIONES"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Defensa y Seguridad Nacional"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Justicia"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Medio Ambiente"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Minería"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Planeamiento, Gestión y Reserva"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Transporte"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Comunicaciones"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Recursos ordinarios (Asignación MEF)"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 33,
+      "etiqueta": "Recursos por operaciones oficiales de crédito"
+     },
+     {
+      "fila": 34,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 35,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 36,
+      "etiqueta": "Fondo de Compensación Regional"
+     },
+     {
+      "fila": 37,
+      "etiqueta": "Privatizaciones y concesiones"
+     }
+    ]
+   }
+  ]
+ },
+ "25": {
+  "archivo": "ESTADUCA.xlsx",
+  "hojas": [
+   {
+    "hoja": "GASTOS G.N.",
+    "nivel": "E",
+    "tipo": "gasto",
+    "titulo": [
+     "CUADRO Nº 17",
+     "UCAYALI: GASTOS NO FINANCIEROS DEL GOBIERNO NACIONAL",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE GASTOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y otras prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias corrientes"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias de capital"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Inversiones no financieras"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Inversiones financieras"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Recursos ordinarios"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos por oper. ofi. de crédito"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Privatización y concesiones"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Fondo de compensacion regional"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSIÓN G.N.",
+    "nivel": "E",
+    "tipo": "inversion",
+    "titulo": [
+     "CUADRO Nº 18",
+     "UCAYALI: INVERSIÓN NO FINANCIERA DEL GOBIERNO NACIONAL 1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "INVERSIONES POR FUNCIONES"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "Planeamiento"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Justicia"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Defensa y Seguridad Nacional"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Ambiente"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Transporte"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Comunicaciones"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "FUENTES DE FINANCIAMIENTO"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Recursos ordinarios"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Recusos por operaciones oficiales de credito"
+     },
+     {
+      "fila": 33,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 34,
+      "etiqueta": "Recursos determinados"
+     }
+    ]
+   },
+   {
+    "hoja": "GASTOS G.R.",
+    "nivel": "R",
+    "tipo": "gasto",
+    "titulo": [
+     "CUADRO Nº 20",
+     "UCAYALI: GASTOS NO FINANCIEROS DEL GOBIERNO REGIONAL",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE GASTOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y otras prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias corrientes"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Inversiones no financieras"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Inversiones financieras"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Donaciones y transferencias de capital"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Recursos ordinarios"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos D. recaudados"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Recursos por Oper. créd. interno"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Privatización y concesiones"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Fondo de compensacion regional"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Fondo de compénsación"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSIÓN G.R.",
+    "nivel": "R",
+    "tipo": "inversion",
+    "titulo": [
+     "CUADRO Nº 21",
+     "UCAYALI: INVERSIONES NO FINANCIERAS DEL GOBIERNO REGIONAL 1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "INVERSIONES POR FUNCIONES"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "Planeamiento"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Justicia"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Medio Ambiente"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Transporte"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Minería"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Comunicaciones"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "FUENTES DE FINANCIAMIENTO"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Recursos ordinarios"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 33,
+      "etiqueta": "Recursos por operaiones de crédito externo"
+     },
+     {
+      "fila": 34,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 36,
+      "etiqueta": "Fondo de Compensación regional"
+     }
+    ]
+   },
+   {
+    "hoja": "GASTOS G.L.",
+    "nivel": "M",
+    "tipo": "gasto",
+    "titulo": [
+     "CUADRO Nº 23",
+     "UCAYALI: GASTOS NO FINANCIEROS DE LOS GOBIERNOS LOCALES",
+     "(Miles nuevos soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE GASTOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "GASTOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Personal y obligaciones"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Pensiones y otras prestaciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Bienes y servicios"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Donaciones y transferencias corrientes"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Otros gastos corrientes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "GASTOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias de capital"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Otros gastos de capital"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Inversiones no financieras"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Inversiones financieras"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "SERVICIO DE LA DEUDA"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Intereses"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Amortización"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "GASTOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Recursos ordinarios"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos por oper. ofi. de crédito"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Donaciones y Transferencias"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Privatización y concesiones"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Fondo de compensacion regional"
+     }
+    ]
+   },
+   {
+    "hoja": "INVERSIÓN G.L.",
+    "nivel": "M",
+    "tipo": "inversion",
+    "titulo": [
+     "CUADRO Nº 24",
+     "UCAYALI: INVERSIÓN NO FINANCIERA DE LOS GOBIERNOS LOCALES 1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "INVERSIONES POR SECTORES"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "Planeamiento"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Agropecuaria"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Protección Social"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Trabajo"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Orden Público y Seguridad"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Educación"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Cultura y Deporte"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Energía"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Industria"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Comercio"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Pesca"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Saneamiento"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Salud"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Ambiente"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Transporte"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "Comunicaciones"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Turismo"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Vivienda y Desarrollo Urbano"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "FUENTES DE FINANCIAMIENTO"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos ordinarios"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Recursos por operaciones oficiales de crédito"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Recursos determinados"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -456,6 +456,32 @@ En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
   y, de respaldo, `PN01270PM`). Si no responde, se usa el `IPC.xlsx` que se suba en la página. Sin IPC, los
   cuadros muestran la variación nominal y lo avisan.
 
+### ESTAD de gasto e inversión (pestaña «ESTAD» de Gasto e Inversión)
+
+`app/estad_fiscal.py` arma las seis hojas fiscales del ESTAD de cada región (GASTO(S) e INVERSIÓN de G.N., G.R. y G.L.)
+con las bases del MEF de la página, en miles de soles redondeados a la unidad:
+
+- **Genéricas y deuda:** `gasto-dev-generica`.
+- **Gasto por fuente:** `gasto-dev-fuente`.
+- **Inversión por función:** `inv-dev-funcion`.
+- **Inversión por fuente:** `inv-dev-fuente`.
+
+**Cómo se ubica cada dato:**
+
+- Cada fila se reconoce por su etiqueta (`concepto`), porque cada región ordena y nombra las filas a su manera.
+- El Excel deja las etiquetas en la misma fila que el ESTAD y los meses en columnas, para copiar y pegar.
+- El orden de filas sale del último ESTAD subido. Lo guarda la carga, en `documentos` (`estad-fiscal-<depto>`), junto con sus últimos 25 meses para comparar. Si no se subió, sale de `app/estad_fiscal_filas.json` (solo etiquetas).
+
+**Lo que no se llena:**
+
+- Las hojas de INGRESOS, porque la página no descarga ingresos.
+- El Fondo de Compensación Regional y Privatizaciones, que son rubros dentro de Recursos determinados.
+- La segunda fila de una etiqueta repetida.
+
+**Contraste:** contra los ESTAD de las tres regiones (enero 2025 a julio 2026) coincide el 98,6 % de las celdas a ±1 mil soles. El resto son revisiones posteriores del MEF.
+
+**Ruta:** `GET /v1/ejecucion/estad?departamento=&desde=&hasta=&formato=json|xlsx`.
+
 ## Cuadros y gráficos BCRP
 
 En cada sector con cuadros (pesca, hidrocarburos, empleo, gasto corriente e inversión pública) la pestaña **«Cuadros y
