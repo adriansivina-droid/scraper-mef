@@ -828,7 +828,7 @@ def ejecucion_estad(departamento: str = Query(..., pattern=r"^(16|22|25)$"), des
     if e is None:
         raise HTTPException(404, "Todavía no hay gasto del MEF en la página para esta región.")
     if formato == "xlsx":
-        return Response(estad_fiscal.excel(e), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        return Response(estad_fiscal.excel(e, departamento), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(f"ESTAD gasto e inversion {estad_fiscal.CORTO[departamento]} {e['desde']} a {e['hasta']}.xlsx"))
     return {**e, "diferencias": estad_fiscal.diferencias(e)}
 

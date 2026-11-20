@@ -1432,7 +1432,8 @@
         return `<td class="n${d ? " baja" : ""}"${d ? ` title="ESTAD subido: ${n(d.estad)} · diferencia ${d.dif > 0 ? "+" : ""}${n(d.dif)}"` : ""}>${f.llena ? n(f.valores[p]) : ""}</td>`; }).join("")}</tr>`).join("");
     const porHoja = e.hojas.map((x) => e.diferencias.filter((d) => d.hoja === x.hoja).length);
     caja.innerHTML = `<div class="caja"><h3>ESTAD de ${esc(r.nombre)}: gasto e inversión por nivel de gobierno</h3>
-        <p>Las hojas de gasto e inversión del ESTAD (Gobierno Nacional, Regional y Locales), armadas con los datos del MEF que ya tiene la página: mismas filas y en el mismo orden que el ESTAD, en <b>miles de soles</b>. Descarga el Excel, copia las columnas de los meses y pégalas en el ESTAD.</p>
+        <p>Las hojas de gasto e inversión del ESTAD (Gobierno Nacional, Regional y Locales), armadas con los datos del MEF que ya tiene la página: mismas filas y en el mismo orden que el ESTAD, en <b>miles de soles</b>. Aquí se ven los miles; el dato guarda sus decimales (soles / 1000) para que las variaciones reales salgan precisas.</p>
+        <p>${e.origen.subido ? "<b>El Excel es tu ESTAD subido, con sus seis hojas de gasto e inversión llenadas</b>: mismo formato, totales, cuadro en reales (con el deflactor del IPC de Lima), totales del año y variaciones, con sus fórmulas." : "Sube el ESTAD de la región en «Actualizar» y el Excel saldrá con su mismo formato, totales, cuadro en reales y variaciones; por ahora es una versión simple con las mismas filas."}</p>
         <div class="fila">
           <label class="campo">Desde <input type="month" id="ef-desde" value="${esc(e.desde)}"></label>
           <label class="campo">Hasta <input type="month" id="ef-hasta" value="${esc(e.hasta)}"></label>
