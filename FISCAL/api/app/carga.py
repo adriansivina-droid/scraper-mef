@@ -20,7 +20,7 @@ from xml.etree import ElementTree as ET
 
 import pandas as pd
 
-from . import controles, db, drae, empleo, exportaciones, hidrocarburos, ipc, manufactura, pesca, sunat_expo, sunat_impo
+from . import controles, db, drae, empleo, estad_fiscal, exportaciones, hidrocarburos, ipc, manufactura, pesca, sunat_expo, sunat_impo
 from .catalogo import BASES, INTERNAS, NIVEL_DE_CORTO, NIVEL_MEF, NIVEL_PIM
 
 _RE_MES = re.compile(r"(\d{4}) - Mes (\d{2})")
@@ -173,8 +173,12 @@ def leer_archivos(raiz):
             continue
         if ruta.suffix.lower() == ".xlsx":
             estad = exportaciones.reconocer(ruta)          # ESTADLO / ESTADSMN / ESTADUCA (exportaciones e importaciones)
+            fiscal = estad_fiscal.cargar_libro(ruta, ruta.name)   # y sus hojas de gasto e inversión (Ejecución → ESTAD)
+            avisos += fiscal
             if estad:
                 de_estad.append((n_archivo, ruta, estad))
+                continue
+            if fiscal:
                 continue
             if sunat_expo.es_diccionario(ruta):            # diccionarios de exportaciones editados en Excel
                 avisos += [f"{ruta.name}: {a}" for a in sunat_expo.cargar_diccionario_excel(ruta)]
