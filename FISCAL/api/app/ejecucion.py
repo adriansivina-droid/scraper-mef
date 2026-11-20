@@ -115,7 +115,7 @@ def anexos(sector, panel, p):
 
     def valores(df):
         s = df.groupby("P")["MONTO"].sum() / 1e6
-        return [round(float(s[s.index.isin(c["total"])].sum() if "total" in c else s.get(c["P"], 0)), 3) for c in cols]
+        return [round(float(s[s.index.isin(c["total"])].sum() if "total" in c else s.get(c["P"], 0)), 6) for c in cols]   # sin redondear a 3: 0.249881 -> 0.250 -> «0,3»
     salida = []
     for n, nombre in NIVELES.items():
         d = panel[panel["NIVEL"] == n]
@@ -232,8 +232,8 @@ def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None):
 
     # series de los dos años (millones de soles corrientes), mes a mes y acumuladas, en total y por nivel
     mensual = panel.groupby("P")["MONTO"].sum() / 1e6
-    serie = lambda anio: [round(float(mensual.get(anio * 100 + k, 0)), 3) if anio * 100 + k in mensual.index else None for k in range(1, 13)]
-    acumulada = lambda s: [None if v is None else round(sum(x or 0 for x in s[:i + 1]), 3) for i, v in enumerate(s)]
+    serie = lambda anio: [round(float(mensual.get(anio * 100 + k, 0)), 6) if anio * 100 + k in mensual.index else None for k in range(1, 13)]
+    acumulada = lambda s: [None if v is None else round(sum(x or 0 for x in s[:i + 1]), 6) for i, v in enumerate(s)]
     sa, sb = serie(a), serie(b)
     por_nivel = {CORTO[n]: {"a": [round(float(panel[(panel["NIVEL"] == n) & (panel["P"] == a * 100 + k)]["MONTO"].sum()) / 1e6, 6) if a * 100 + k in mensual.index else None for k in range(1, 13)]}
                  for n in NIVELES}
