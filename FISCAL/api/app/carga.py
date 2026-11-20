@@ -355,15 +355,38 @@ def _expo_al_almacen():
 
 
 def _depurada_al_estad(df):
-    """Los meses de una base depurada pasan solos al ESTAD de su región (los cuadros salen de ahí)."""
-    dep = df[df["MOTIVO"] == sunat_expo.DEPURADA]
-    avisos = []
-    for (d, a, m) in sorted({(str(d), int(a), int(m)) for d, a, m in zip(dep["_depto"], dep["_anio"], dep["_mes"])}):
+    """Los meses del ANUAL_PRO o de una base depurada pasan solos al ESTAD de su región (los cuadros salen de ahí).
+    Base depurada: todos sus meses. ANUAL_PRO: los meses que aún no están en el ESTAD y su último mes si es el más reciente
+    del ESTAD (el mes en curso, corregido); un mes anterior que ya está en el ESTAD no se reemplaza (puede ser una cifra ya
+    publicada, p. ej. al subir el ANUAL_PRO de un año pasado): si difiere, se avisa."""
+    if "_al_estad" not in df.columns:
+        return []
+    avisos, df = [], df[df["_al_estad"] != ""]
+    ultimo = {d: max(zip(g["_anio"], g["_mes"])) for d, g in df[df["_al_estad"] == "anual"].groupby("_depto")}
+    en_estad = {d: sunat_expo.ultimo_estad(d) for d in ultimo}
+    meses = sorted({(str(d), int(a), int(m), t) for d, a, m, t in zip(df["_depto"], df["_anio"], df["_mes"], df["_al_estad"])})
+    for d, a, m in sorted({(d, a, m) for d, a, m, _ in meses}):
+        nombre = f"Exportaciones {sunat_expo.NOMBRE[d]} {a}-{m:02d}"
+        solo_anual = all(t == "anual" for dd, aa, mm, t in meses if (dd, aa, mm) == (d, a, m))
+        es_vigente = (a, m) == tuple(int(x) for x in ultimo.get(d, (0, 0))) and (en_estad.get(d) is None or (a, m) >= en_estad[d])
+        if solo_anual and not es_vigente:
+            p = sunat_expo.propuesta(d, a, m)
+            if p is None:
+                avisos.append(f"{nombre}: no pasó al ESTAD (primero sube el ESTAD de la región).")
+                continue
+            if p["hay_estad"]:
+                difieren = [f for f in p["filas"] if f["dif"] is not None and abs(f["dif"]) >= 1]
+                if difieren:
+                    tot = next((f for f in p["filas"] if f["nivel"] == "total"), {})
+                    avisos.append(f"{nombre}: ya estaba en el ESTAD y el ANUAL_PRO difiere en {len(difieren)} filas (total "
+                                  f"{tot.get('sunat', 0):,.0f} vs {tot.get('estad') or 0:,.0f} mil US$); no se reemplazó. Si corresponde, "
+                                  "usa «Volver a pasar al ESTAD» en «Base mensual».".replace(",", " "))
+                continue
         try:
             n = sunat_expo.pasar_al_estad(d, a, m)
-            avisos.append(f"Exportaciones {sunat_expo.NOMBRE[d]} {a}-{m:02d}: pasó al ESTAD ({n} filas); los cuadros ya lo usan.")
+            avisos.append(f"{nombre}: pasó al ESTAD ({n} filas); los cuadros ya lo usan.")
         except ValueError as e:
-            avisos.append(f"Exportaciones {sunat_expo.NOMBRE[d]} {a}-{m:02d}: no pasó al ESTAD ({e})")
+            avisos.append(f"{nombre}: no pasó al ESTAD ({e})")
     return avisos
 
 

@@ -287,7 +287,36 @@ def test_base_depurada_entra_completa_y_pasa_sola_al_estad(cliente):
     assert len(ago) == 3 and set(ago["ESTADO"]) == {"ok"}
 
 
-def test_base_cruda_avisa_que_hay_que_subir_la_depurada(cliente):
+def test_base_cruda_avisa_que_hay_que_subir_el_anual_pro(cliente):
     subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
     r = subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
-    assert any("Sube la base depurada" in a for a in r["avisos"]) and not any("pasó al ESTAD" in a for a in r["avisos"])
+    assert any("Sube el ANUAL_PRO actualizado" in a for a in r["avisos"]) and not any("pasó al ESTAD" in a for a in r["avisos"])
+
+
+def test_anual_pro_pasa_solo_al_estad_el_ultimo_mes_y_no_pisa_lo_publicado(cliente):
+    """ORIGEN con julio y agosto: agosto (el último) pasa al ESTAD; julio ya estaba y difiere: se avisa y no se reemplaza."""
+    wb = load_workbook(io.BytesIO(anual_pro()))
+    o = wb["ORIGEN"]
+    o.append(fila("20513842377", "2709000000", "PETROLEO CRUDO", 17033000))                       # agosto
+    o.append(fila("20999999999", "1801001900", "CACAO", 8000))                                    # empresa nueva: no entra
+    buf = io.BytesIO()
+    wb.save(buf)
+    subir(cliente, **{"ESTADLO.xlsx": estadlo()})
+    antes = datos(cliente, "expo-estad", "16").query("AÑO == 2026 and MES == 7").set_index("RUBRO")["FOB"]
+    r = subir(cliente, **{"ANUAL_PRO_2026.xlsx": buf.getvalue()})
+    assert any("LORETO 2026-08: pasó al ESTAD" in a for a in r["avisos"])
+    assert any("LORETO 2026-07: ya estaba en el ESTAD" in a and "no se reemplazó" in a for a in r["avisos"])
+    assert any("1 filas por verificar o sin clasificar" in a for a in r["avisos"])
+    est = datos(cliente, "expo-estad", "16").query("AÑO == 2026")
+    ago = est[est["MES"] == 8].set_index("RUBRO")["FOB"]
+    assert ago["Petróleo crudo y derivados"] == 17033 and ago["TOTAL EXPORTACIONES"] == 17033
+    assert est[est["MES"] == 7].set_index("RUBRO")["FOB"].equals(antes)
+
+
+def test_anual_pro_de_un_anio_pasado_no_reemplaza_su_ultimo_mes(cliente):
+    """ANUAL_PRO con solo julio, cuando el ESTAD ya llega a agosto: julio no es el mes en curso y no se reemplaza."""
+    subir(cliente, **{"ESTADLO.xlsx": estadlo()})
+    antes = datos(cliente, "expo-estad", "16").query("AÑO == 2026 and MES == 7").set_index("RUBRO")["FOB"]
+    r = subir(cliente, **{"ANUAL_PRO_2026.xlsx": anual_pro()})
+    assert any("LORETO 2026-07: ya estaba en el ESTAD" in a for a in r["avisos"]) and not any("pasó al ESTAD" in a for a in r["avisos"])
+    assert datos(cliente, "expo-estad", "16").query("AÑO == 2026 and MES == 7").set_index("RUBRO")["FOB"].equals(antes)

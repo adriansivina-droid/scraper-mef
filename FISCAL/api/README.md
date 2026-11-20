@@ -339,7 +339,15 @@ Cuadros (`/v1/cuadros/exportaciones?departamento=16&periodo=AAAA-MM[&flujo=impo]
 
 ### Base mensual (pestañas «Base mensual» y «Resumen Export» de Exportaciones)
 
-**Desde el 19/11/2026: base depurada.** El usuario limpia y clasifica la base del mes en su computadora y sube un
+**Desde el 20/11/2026: ANUAL_PRO actualizado (vía principal).** El usuario mantiene el ANUAL_PRO_AAAA.xlsx al día en su
+computadora (hoja ORIGEN y diccionarios: UNICOS con PROD_UNICOS, PAISES, EMPRESAS y ADUANA; PARTIDA o LISTA SUNAT) y lo
+sube en «Base mensual». La página carga los diccionarios, procesa la hoja ORIGEN (entran las filas de empresas con
+BORRAR PARA = OK; las por verificar o sin clasificar se avisan y se corrigen en el ANUAL_PRO) y **pasa solos al ESTAD**
+los meses que aún no están en él y su último mes si es el más reciente del ESTAD (`carga._depurada_al_estad`). Un mes
+anterior que ya está en el ESTAD no se reemplaza (puede estar publicado; p. ej. al subir el ANUAL_PRO de un año pasado):
+si difiere, la carga lo avisa y se pasa a mano con «Volver a pasar al ESTAD».
+
+**También (19/11/2026): base depurada.** El usuario limpia y clasifica la base del mes en su computadora y sube un
 `.xlsx` con las columnas de SUNAT (`ruc11`, `partorig`, `dcom`, `fob`, `ubigeo_dep`, `ano_mes` o `AÑO` y `MES`,
 `pais`, `aduana`, `kilos`…; el encabezado puede estar en cualquiera de las primeras 15 filas) **más `TIPO`, `CATEGORÍA`
 y `PRODUCTO`** (`sunat_expo.es_depurada` / `leer_depurada`). Todas sus filas quedan **ok** (MOTIVO «Base depurada»): no

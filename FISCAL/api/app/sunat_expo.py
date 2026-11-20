@@ -582,7 +582,7 @@ def _cumple(regla, ruc, partida, descripcion, producto):
 
 
 def leer(archivos):
-    """archivos: [(n, ruta, 'sunat'|'anual')] -> ({"expo-sunat": df}, avisos)."""
+    """archivos: [(n, ruta, 'sunat'|'anual'|'depurada')] -> ({"expo-sunat": df}, avisos)."""
     partes, avisos = [], []
     for n, ruta, tipo in archivos:
         if tipo == "depurada":
@@ -595,7 +595,7 @@ def leer(archivos):
             else:
                 crudo = leer_crudo(ruta)
                 avisos.append(f"{ruta.name}: es la base cruda de SUNAT (sin TIPO, CATEGORIA ni PRODUCTO). La página ya no la "
-                              "revisa: sus filas por verificar no entran a los cuadros. Sube la base depurada.")
+                              "revisa: sus filas por verificar no entran a los cuadros. Sube el ANUAL_PRO actualizado (o la base depurada).")
             df, fuera = procesar(crudo)
         if fuera:
             avisos.append(f"{ruta.name}: {fuera} filas de otros departamentos; no se guardaron.")
@@ -605,7 +605,12 @@ def leer(archivos):
         per = sorted(set(zip(df["AÑO"], df["MES"])))
         avisos.append(f"{ruta.name}: {'base depurada' if tipo == 'depurada' else 'base mensual'} {per[0][0]}-{per[0][1]:02d} a {per[-1][0]}-{per[-1][1]:02d}, " +
                       ", ".join(f"{k} {int(v['count'])} filas ({v['sum']:,.0f} mil US$)".replace(",", " ") for k, v in cuenta.iterrows()) + ".")
-        partes.append(df.assign(_archivo=n))
+        pend = df[df["ESTADO"].isin(["verificar", "clasificar"])]
+        if tipo == "anual" and len(pend):
+            avisos.append(f"{ruta.name}: {len(pend)} filas por verificar o sin clasificar ({pend['FOB'].sum():,.0f} mil US$) no entran a los "
+                          "cuadros: complétalas en EMPRESAS (BORRAR PARA) o PARTIDA del ANUAL_PRO y vuelve a subirlo.".replace(",", " "))
+        # «_al_estad»: el ANUAL_PRO y la base depurada pasan solos al ESTAD (carga.py); la base cruda no
+        partes.append(df.assign(_archivo=n, _al_estad=tipo if tipo in ("anual", "depurada") else ""))
     return ({"expo-sunat": pd.concat(partes, ignore_index=True)} if partes else {}), avisos
 
 
@@ -723,6 +728,17 @@ def propuesta(depto, anio, mes, df=None):
         c = car.get(f"{f['rubro']}|{f['tipo']}|{f['nivel']}")
         filas.append({**f, "sunat": v, "estad": None if c is None else float(c), "dif": None if c is None else round(v - float(c), 1)})
     return {"filas": filas, "hay_estad": bool(car)}
+
+
+def ultimo_estad(depto):
+    """(año, mes) del último mes del ESTAD de la región, o None."""
+    from .catalogo import BASES
+    t = BASES["expo-estad"].tabla
+    if not db.existe(t):
+        return None
+    with db.motor().connect() as cx:
+        p = cx.execute(text(f'SELECT MAX(_anio * 100 + _mes) FROM "{t}" WHERE _depto = :d'), {"d": depto}).scalar()
+    return None if p is None else (int(p) // 100, int(p) % 100)
 
 
 def pasar_al_estad(depto, anio, mes):
