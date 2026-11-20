@@ -79,9 +79,13 @@ def panel_gasto(gen):
 
 
 def panel_no_financiero(gen):
-    """Gasto no financiero (corriente y de capital, sin la deuda) con TIPO 5 / 6, para los anexos de la síntesis."""
+    """Gasto no financiero (corriente y de capital, sin la deuda) con TIPO 5 / 6, para los anexos de la síntesis.
+    No incluye la adquisición de activos financieros (6-2-7): es gasto financiero."""
     if gen is None or gen.empty:
         return pd.DataFrame(columns=["P", "NIVEL", "TIPO", "ITEM", "MONTO"])
+    cod = gen["COD_GENERICA"].astype(str).str.strip()
+    financiero = cod.str.replace(r"[^\d]", "", regex=True).isin(["627", "27"]) | gen["GENERICA"].map(lambda e: "activos financieros" in _norm(e) and "no financieros" not in _norm(e))
+    gen = gen[~financiero]
     tipo = gen["COD_GENERICA"].astype(str).str.strip().str[0]
     g = gen[tipo.isin(["5", "6"])]
     tipo = tipo[tipo.isin(["5", "6"])]
