@@ -249,6 +249,192 @@
     ]
    },
    {
+    "hoja": "INGRESOS G.R.",
+    "nivel": "R",
+    "tipo": "ingresos",
+    "titulo": [
+     "CUADRO Nº 20",
+     "LORETO: EJECUCIÓN DE INGRESOS DEL GOBIERNO REGIONAL1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INGRESOS"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "INGRESOS CORRIENTES"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "2: CONTRIBUCIONES SOCIALES"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "3: VENTA DE BIENES Y SERVICIOS Y DERECHOS ADMINISTRATIVOS"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "4: DONACIONES Y TRANSFERENCIAS"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "5: OTROS INGRESOS"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "INGRESOS DE CAPITAL"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "6: VENTA DE ACTIVOS NO FINANCIEROS"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "7: VENTA DE ACTIVOS FINANCIEROS"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "FINANCIAMIENTO"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "8: ENDEUDAMIENTO"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "9: SALDOS DE BALANCE"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "TOTAL INGRESOS POR FUENTE"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "5: RECURSOS DETERMINADOS"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "2: RECURSOS DIRECTAMENTE RECAUDADOS"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "3: RECURSOS POR OPERACIONES OFICIALES DE CREDITO"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "4: DONACIONES Y TRANSFERENCIAS"
+     },
+     {
+      "fila": 53,
+      "etiqueta": "4: DONACIONES Y TRANSFERENCIAS",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 54,
+      "etiqueta": "D y T CORRIENTES",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 55,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 56,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 57,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 58,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 59,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 60,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 61,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 62,
+      "etiqueta": "Por participaciones de recursos determinados Canon y sobrecanon",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 63,
+      "etiqueta": "Canon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 64,
+      "etiqueta": "Canon gasífero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 65,
+      "etiqueta": "Eliminación exoneraciones",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 67,
+      "etiqueta": "D DE CAPITAL",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 68,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 69,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 70,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 71,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 72,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 73,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 74,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     }
+    ]
+   },
+   {
     "hoja": "GASTOS G.R.",
     "nivel": "R",
     "tipo": "gasto",
@@ -491,6 +677,246 @@
      {
       "fila": 41,
       "etiqueta": "Recursos determinados"
+     }
+    ]
+   },
+   {
+    "hoja": "INGRESOS G.L.",
+    "nivel": "M",
+    "tipo": "ingresos",
+    "titulo": [
+     "CUADRO Nº 23",
+     "LORETO: EJECUCIÓN DE INGRESOS DE LOS GOBIERNOS LOCALES1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INGRESOS"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "INGRESOS CORRIENTES"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "2: CONTRIBUCIONES SOCIALES"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "1: IMPUESTOS Y CONTRIBUCIONES OBLIGATORIAS"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "3: VENTA DE BIENES Y SERVICIOS Y DERECHOS ADMINISTRATIVOS"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "4: DONACIONES Y TRANSFERENCIAS"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "5: OTROS INGRESOS"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "INGRESOS DE CAPITAL"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "6: VENTA DE ACTIVOS NO FINANCIEROS"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "7: VENTA DE ACTIVOS FINANCIEROS"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "FINANCIAMIENTO"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "8: ENDEUDAMIENTO"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "9: SALDOS DE BALANCE"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "TOTAL INGRESOS POR FUENTE"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "5: RECURSOS DETERMINADOS"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "2: RECURSOS DIRECTAMENTE RECAUDADOS"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "3: RECURSOS POR OPERACIONES OFICIALES DE CREDITO"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "4: DONACIONES Y TRANSFERENCIAS"
+     },
+     {
+      "fila": 52,
+      "etiqueta": "4: DONACIONES Y TRANSFERENCIAS",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 53,
+      "etiqueta": "D y T CORRIENTES",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 54,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 55,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 56,
+      "etiqueta": "3: DE OTRAS UNIDADES DE GOBIERNO",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 57,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 58,
+      "etiqueta": "De los gobiernos regionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 59,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 60,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 61,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 62,
+      "etiqueta": "Por participaciones de recursos determinados",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 63,
+      "etiqueta": "Canon y sobrecanon",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 64,
+      "etiqueta": "Canon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 65,
+      "etiqueta": "Sobrecanon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 66,
+      "etiqueta": "Canon gasífero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 67,
+      "etiqueta": "Canon forestal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 68,
+      "etiqueta": "Regalías",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 69,
+      "etiqueta": "Renta de aduanas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 70,
+      "etiqueta": "FONCOMUN",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 71,
+      "etiqueta": "Por asignación especial",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 72,
+      "etiqueta": "Por plan de incentivos a la mejora de la gestión y modernización municipal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 73,
+      "etiqueta": "Por bono de incentivo por la ejecución eficaz de inversiones",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 75,
+      "etiqueta": "D DE CAPITAL",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 76,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 77,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 78,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 79,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 80,
+      "etiqueta": "Del gobierno regional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 81,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 82,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 83,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
      }
     ]
    },
@@ -984,6 +1410,242 @@
     ]
    },
    {
+    "hoja": "INGRESO G.R.",
+    "nivel": "R",
+    "tipo": "ingresos",
+    "titulo": [
+     "Cuadro Nº 18",
+     "SAN MARTÍN: EJECUCIÓN DE INGRESOS DEL GOBIERNO REGIONAL 1/.",
+     "(Miles de soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INGRESOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "INGRESOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Impuestos y contribuciones obligatorias"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Venta de bienes y servicios y derechos administrativas"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Tasas"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Venta de bienes"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Prestación de servicios"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Otros ingresos corrientes"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "INGRESOS DE CAPITAL"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Venta de activos no financieros"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Venta de activos financieros"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "FINANCIAMIENTO"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Endeudamiento"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Saldo de balance"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "INGRESOS POR FUENTE"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos por operaciones oficiales de crédito externo"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Fondo de Compesación Regional"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Privatizaciones y concesiones"
+     },
+     {
+      "fila": 53,
+      "etiqueta": "TOTAL",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 54,
+      "etiqueta": "D y T CORRIENTES",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 55,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 56,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 57,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 58,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 59,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 60,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 61,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 62,
+      "etiqueta": "Por participaciones de recursos determinados Canon y sobrecanon",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 63,
+      "etiqueta": "Canon y sobrecanon",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 64,
+      "etiqueta": "Canon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 65,
+      "etiqueta": "Canon minero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 66,
+      "etiqueta": "Canon gasífero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 67,
+      "etiqueta": "Canon hidroenergético",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 68,
+      "etiqueta": "Canon forestal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 69,
+      "etiqueta": "Regalías mineras",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 70,
+      "etiqueta": "Por eliminación de exoneraciones",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 71,
+      "etiqueta": "D DE CAPITAL",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 72,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 73,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 74,
+      "etiqueta": "De agencias gubernamentales de cooperación internacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 75,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 76,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 77,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 78,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 79,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     }
+    ]
+   },
+   {
     "hoja": "GASTO G.R.",
     "nivel": "R",
     "tipo": "gasto",
@@ -1222,6 +1884,276 @@
      {
       "fila": 38,
       "etiqueta": "Privatizaciones y concesiones"
+     }
+    ]
+   },
+   {
+    "hoja": "INGRESO G.L.",
+    "nivel": "M",
+    "tipo": "ingresos",
+    "titulo": [
+     "Cuadro Nº 21",
+     "SAN MARTÍN: EJECUCIÓN DE INGRESOS DE LOS GOBIERNOS LOCALES 1/.",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "TOTAL DE INGRESOS"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "INGRESOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Impuestos y contribuciones obligatorias"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Contribuciones sociales"
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Venta de bienes y servicios y derechos administrativos"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Tasas"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Venta de bienes"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Prestación de servicios"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Otros ingresos corrientes"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "INGRESOS DE CAPITAL"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "Venta de activos no financieros"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Venta de activos financieros"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "FINANCIAMIENTO"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "Endeudamiento"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Saldo de balance"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "INGRESOS POR FUENTE"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 26,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos por operaciones oficiales de crédito externo"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Fondo de Compesación Regional"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Privatizaciones y concesiones"
+     },
+     {
+      "fila": 52,
+      "etiqueta": "Donaciones y transferencias",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 53,
+      "etiqueta": "D y T CORRIENTES",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 54,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 55,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 56,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 57,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 58,
+      "etiqueta": "De los gobiernos regionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 59,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 60,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 61,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 62,
+      "etiqueta": "Por participaciones de recursos determinados",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 63,
+      "etiqueta": "Canon y sobrecanon",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 64,
+      "etiqueta": "Canon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 65,
+      "etiqueta": "Sobrecanon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 66,
+      "etiqueta": "Canon minero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 67,
+      "etiqueta": "Canon gasífero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 68,
+      "etiqueta": "Canon hidroenergético",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 69,
+      "etiqueta": "Canon forestal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 70,
+      "etiqueta": "Regalías",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 71,
+      "etiqueta": "Renta de aduanas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 72,
+      "etiqueta": "FONCOMUN",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 73,
+      "etiqueta": "Por asignación especial",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 74,
+      "etiqueta": "Por plan de incentivos a la mejora de la gestión y modernización municipal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 75,
+      "etiqueta": "Por bono de incentivo por la ejecución eficaz de inversiones",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 77,
+      "etiqueta": "D DE CAPITAL",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 78,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 79,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 80,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 81,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 82,
+      "etiqueta": "Del gobierno regional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 83,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 84,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 85,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
      }
     ]
    },
@@ -1695,6 +2627,273 @@
     ]
    },
    {
+    "hoja": "INGRESOS G.R.",
+    "nivel": "R",
+    "tipo": "ingresos",
+    "titulo": [
+     "Cuadro Nº 19",
+     "UCAYALI: EJECUCIÓN DE INGRESOS DEL GOBIERNO REGIONAL 1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "INGRESOS DEL GOBIERNO REGIONAL"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "INGRESOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Impuestos y contribuciones obligatorias"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Venta de bienes y servicios y derechos adm."
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Tasas"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Venta de bienes"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Prestación de servicios"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Rentas de la propiedad"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Multas, sanciones y otros"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Otros ingresos corrientes"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "INGRESOS DE CAPITAL"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Venta de activos no financieros"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Venta de activos financieros"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "TRANSFERENCIAS"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Transferencias"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "FINANCIAMIENTO"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Endeudamiento"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Saldo de balance"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "INGRESOS POR FUENTE"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos por operaciones oficiales de crédito"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 32,
+      "etiqueta": "Recursos por privatización y concesiones"
+     },
+     {
+      "fila": 33,
+      "etiqueta": "Fondo de compensación regional"
+     },
+     {
+      "fila": 62,
+      "etiqueta": "Donaciones y transferencias",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 63,
+      "etiqueta": "D y T CORRIENTES",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 64,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 65,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 66,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 67,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 68,
+      "etiqueta": "De los gobiernos regionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 69,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 70,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 71,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 72,
+      "etiqueta": "Por participaciones de recursos determinados Canon y sobrecanon",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 73,
+      "etiqueta": "Canon y sobrecanon",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 74,
+      "etiqueta": "Canon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 75,
+      "etiqueta": "Sobrecanon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 76,
+      "etiqueta": "Canon gasífero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 77,
+      "etiqueta": "Canon forestal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 78,
+      "etiqueta": "Regalías (FOCAM)",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 79,
+      "etiqueta": "Por asignación especial",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 80,
+      "etiqueta": "Por plan de incentivos a la mejora de la gestión y modernización municipal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 81,
+      "etiqueta": "Por bono de incentivo por la ejecución eficaz de inversiones",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 82,
+      "etiqueta": "Por eleminación de exoneración tributarias",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 83,
+      "etiqueta": "D DE CAPITAL",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 84,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 85,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 86,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 87,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 88,
+      "etiqueta": "De los gobiernos regionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 89,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 90,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 91,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     }
+    ]
+   },
+   {
     "hoja": "GASTOS G.R.",
     "nivel": "R",
     "tipo": "gasto",
@@ -1925,6 +3124,275 @@
      {
       "fila": 36,
       "etiqueta": "Fondo de Compensación regional"
+     }
+    ]
+   },
+   {
+    "hoja": "INGRESOS G.L.",
+    "nivel": "M",
+    "tipo": "ingresos",
+    "titulo": [
+     "CUADRO Nº 22",
+     "UCAYALI: EJECUCIÓN DE INGRESOS DE LOS GOBIERNOS LOCALES 1/",
+     "(Miles de Soles)"
+    ],
+    "fila_fechas": 5,
+    "filas": [
+     {
+      "fila": 7,
+      "etiqueta": "INGRESOS DEL GOBIERNO REGIONAL"
+     },
+     {
+      "fila": 8,
+      "etiqueta": "INGRESOS CORRIENTES"
+     },
+     {
+      "fila": 9,
+      "etiqueta": "Impuestos y contribuciones obligatorias"
+     },
+     {
+      "fila": 10,
+      "etiqueta": "Venta de bienes y servicios y derechos adm."
+     },
+     {
+      "fila": 11,
+      "etiqueta": "Tasas"
+     },
+     {
+      "fila": 12,
+      "etiqueta": "Venta de bienes"
+     },
+     {
+      "fila": 13,
+      "etiqueta": "Prestación de servicios"
+     },
+     {
+      "fila": 14,
+      "etiqueta": "Rentas de la propiedad"
+     },
+     {
+      "fila": 15,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 16,
+      "etiqueta": "Multas, sanciones y otros"
+     },
+     {
+      "fila": 17,
+      "etiqueta": "Otros ingresos corrientes"
+     },
+     {
+      "fila": 18,
+      "etiqueta": "INGRESOS DE CAPITAL"
+     },
+     {
+      "fila": 19,
+      "etiqueta": "Venta de activos no financieros"
+     },
+     {
+      "fila": 20,
+      "etiqueta": "Venta de activos financieros"
+     },
+     {
+      "fila": 21,
+      "etiqueta": "TRANSFERENCIAS"
+     },
+     {
+      "fila": 22,
+      "etiqueta": "Transferencias"
+     },
+     {
+      "fila": 23,
+      "etiqueta": "FINANCIAMIENTO"
+     },
+     {
+      "fila": 24,
+      "etiqueta": "Endeudamiento"
+     },
+     {
+      "fila": 25,
+      "etiqueta": "Saldo de balance"
+     },
+     {
+      "fila": 27,
+      "etiqueta": "INGRESOS POR FUENTE"
+     },
+     {
+      "fila": 28,
+      "etiqueta": "Recursos determinados"
+     },
+     {
+      "fila": 29,
+      "etiqueta": "Recursos directamente recaudados"
+     },
+     {
+      "fila": 30,
+      "etiqueta": "Recursos por operaciones oficiales de crédito"
+     },
+     {
+      "fila": 31,
+      "etiqueta": "Donaciones y transferencias"
+     },
+     {
+      "fila": 59,
+      "etiqueta": "Donaciones y transferencias",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 60,
+      "etiqueta": "D y T CORRIENTES",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 61,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 62,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 63,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 64,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 65,
+      "etiqueta": "De los gobiernos regionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 66,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 67,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 68,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 69,
+      "etiqueta": "Por participaciones de recursos determinados",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 70,
+      "etiqueta": "Canon y sobrecanon",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 71,
+      "etiqueta": "Canon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 72,
+      "etiqueta": "Sobrecanon petrolero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 73,
+      "etiqueta": "Canon minero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 74,
+      "etiqueta": "Canon gasífero",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 75,
+      "etiqueta": "Canon forestal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 76,
+      "etiqueta": "Regalías (Focam)",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 77,
+      "etiqueta": "Renta de aduanas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 78,
+      "etiqueta": "FONCOMUN",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 79,
+      "etiqueta": "Por asignación especial",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 80,
+      "etiqueta": "Por plan de incentivos a la mejora de la gestión y modernización municipal",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 81,
+      "etiqueta": "Por bono de incentivo por la ejecución eficaz de inversiones",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 83,
+      "etiqueta": "D DE CAPITAL",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 84,
+      "etiqueta": "De gobiernos extranjeros",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 85,
+      "etiqueta": "De organismos internacionales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 86,
+      "etiqueta": "De otras unidades de gobierno",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 87,
+      "etiqueta": "Del Gobierno Nacional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 88,
+      "etiqueta": "Del gobierno regional",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 89,
+      "etiqueta": "De los gobiernos locales",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 90,
+      "etiqueta": "De otras entidades públicas",
+      "bloque": "dyt"
+     },
+     {
+      "fila": 91,
+      "etiqueta": "De fondos públicos",
+      "bloque": "dyt"
      }
     ]
    },
