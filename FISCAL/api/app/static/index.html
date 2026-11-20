@@ -75,8 +75,8 @@
       lead: "Índice de volumen físico manufacturero por rama CIIU: cuadro de la síntesis (mes y enero-mes, var. %, contribución y estructura) y la variación de la manufactura no primaria, calculados del IVFM sin copias a mano." },
     empleo: { t: "Empleo", fuente: "MTPE, Planilla Electrónica (PLAME y T-Registro)", entra: "Scraper del MTPE los días 2 y 21, o subiendo el Excel", bases: () => ["empleo"], actualizar: "empleo",
       lead: "Trabajadores asalariados privados formales: el total de la región por mes y, desde la base por sectores, el detalle por rama de actividad.", cuadros: "empleo" },
-    expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "Base depurada del mes en «Base mensual» (pasa sola al ESTAD)", bases: () => ["expo-estad"], sinActualizar: true,
-      lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos. En «Base mensual» se sube la base del mes ya depurada en tu computadora y pasa sola al ESTAD; «Resumen Export» trae los datos destacados y el borrador de la síntesis.", cuadros: "exportaciones", extra: ["Base mensual", "Resumen Export"] },
+    expo: { t: "Exportaciones", fuente: "ESTAD de la región (miles de US$)", entra: "ANUAL_PRO actualizado en «Base mensual» (pasa solo al ESTAD)", bases: () => ["expo-estad"], sinActualizar: true,
+      lead: "Exportaciones tradicionales y no tradicionales por grupo de productos (FOB), desde el ESTAD: cuadro de la síntesis, anexo, variación anual y principales productos. En «Base mensual» se sube el ANUAL_PRO actualizado (con su hoja ORIGEN y los diccionarios) y el mes pasa solo al ESTAD; «Resumen Export» trae los datos destacados y el borrador de la síntesis.", cuadros: "exportaciones", extra: ["Base mensual", "Resumen Export"] },
     impo: { t: "Importaciones", fuente: "ESTAD de Loreto, aduana de Iquitos (miles de US$)", entra: "Base mensual del mes → «Pasar al ESTAD»", bases: () => ["impo-estad"], sinActualizar: true,
       lead: "Importaciones por la aduana de Iquitos según uso o destino económico (FOB): Cuadro N° 16 y anexo. En «Base mensual» se clasifica la base del mes (CUODE) y arma el ESTAD; «Resumen Import» trae los datos destacados y el borrador de la síntesis.",
       cuadros: "importaciones", extra: ["Resumen Import", "Base mensual"] },
@@ -644,7 +644,7 @@
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
     try {
       const c = (await api(`/v1/cuadros/exportaciones?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo, flujo })}`)).cuadros;
-      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay ${expo ? "exportaciones" : "importaciones"} de ${esc(r.nombre)} en la página.</b><span>${expo ? "Sube la base depurada del mes en «Base mensual»: pasa sola al ESTAD." : "Sube la base del mes en «Base mensual» y pásala al ESTAD."}</span></div>`; return; }
+      if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay ${expo ? "exportaciones" : "importaciones"} de ${esc(r.nombre)} en la página.</b><span>${expo ? "Sube el ANUAL_PRO actualizado en «Base mensual»: el mes pasa solo al ESTAD." : "Sube la base del mes en «Base mensual» y pásala al ESTAD."}</span></div>`; return; }
       const a = c.anio, b = c.comparar, mes = c.titulo_mes, m3 = mes.slice(0, 3), d = c.dec, R = r.nombre.toUpperCase();
       const nd = (v) => v == null ? "" : v.toLocaleString("es-PE", { minimumFractionDigits: d, maximumFractionDigits: d });
       const vs = (v) => v == null ? "-" : pct(v), cls = (v) => v == null ? "" : v >= 0 ? "sube" : "baja";
@@ -677,33 +677,34 @@
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
   }
 
-  // ── Base mensual de exportaciones: la base depurada que sube el usuario (ya limpia y clasificada) y lo que pasó al ESTAD ──
+  // ── Base mensual de exportaciones: la hoja ORIGEN del ANUAL_PRO (o una base depurada) que sube el usuario y lo que pasó al ESTAD ──
   async function sunatExpo(r, caja) {
     const clave = `su-${grupo}`, st = estadoEjec(clave), mil = (v) => v == null ? "" : fmt(v);
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Leyendo la base mensual…</div>';
     try {
       const x = (await api(`/v1/exportaciones/sunat?${new URLSearchParams({ departamento: r.cod, periodo: st.periodo })}`)).revision;
-      if (!x) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay base mensual de exportaciones de ${esc(r.nombre)}.</b><span>Sube arriba la base del mes depurada en tu computadora (con TIPO, CATEGORÍA y PRODUCTO): pasa sola al ESTAD.</span></div>`; return; }
+      if (!x) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay base mensual de exportaciones de ${esc(r.nombre)}.</b><span>Sube arriba el ANUAL_PRO_AAAA.xlsx actualizado (hoja ORIGEN y diccionarios): el mes pasa solo al ESTAD.</span></div>`; return; }
       const m3 = etqMes(x.periodo), ETQ = { ok: "en los cuadros", verificar: "por verificar (base cruda)", borrar: "borradas (base cruda)", clasificar: "sin clasificar (base cruda)" };
       const est = x.estados.map((e) => `<div class="stat"><small>${esc(ETQ[e.ESTADO] || e.ESTADO)}</small><b>${fmt(e.filas)} filas</b><span>${mil(e.fob)} mil US$</span></div>`).join("");
       const pr = x.propuesta, nivelInd = { total: 0, tipo: 0, grupo: 1, producto: 2 };
-      const propuesta = pr ? `<div class="scroll"><table><tr><th>Fila del ESTAD</th><th class="n">Base depurada</th><th class="n">ESTAD cargado</th><th class="n">Diferencia</th></tr>
+      const propuesta = pr ? `<div class="scroll"><table><tr><th>Fila del ESTAD</th><th class="n">Base mensual</th><th class="n">ESTAD cargado</th><th class="n">Diferencia</th></tr>
           ${pr.filas.map((f) => `<tr class="${f.nivel === "total" || f.nivel === "tipo" ? "fuerte" : ""}"><td style="padding-left:${10 + nivelInd[f.nivel] * 16}px">${esc(f.rubro)}</td><td class="n">${mil(f.sunat)}</td><td class="n">${f.estad == null ? "—" : mil(f.estad)}</td>
             <td class="n ${f.dif ? (Math.abs(f.dif) >= 1 ? "baja" : "") : ""}">${f.dif == null ? "" : mil(f.dif)}</td></tr>`).join("")}</table></div>
           <div class="fila"><button class="btn sec" type="button" id="${clave}-pasar">Volver a pasar al ESTAD (${esc(m3)})</button><button class="btn sec" type="button" id="${clave}-xls">Descargar en Excel (con el detalle)</button>
-          <span class="nota">${pr.hay_estad ? "Al subir la base depurada, el mes pasa solo al ESTAD. El botón sirve si subiste el ESTAD de la región después." : "El mes aún no está en el ESTAD."}</span></div><div id="${clave}-pres"></div>`
-        : '<p class="nota">Sube primero el ESTAD de la región: la base depurada se ubica en sus filas.</p>';
+          <span class="nota">${pr.hay_estad ? "Al subir el ANUAL_PRO, el último mes pasa solo al ESTAD; los meses anteriores que ya estaban no se reemplazan. El botón lo hace a mano (p. ej. si corregiste un mes ya publicado o subiste el ESTAD después)." : "El mes aún no está en el ESTAD."}</span></div><div id="${clave}-pres"></div>`
+        : '<p class="nota">Sube primero el ESTAD de la región: la base mensual se ubica en sus filas.</p>';
       const resto = x.a_resto.length ? `<div class="scroll"><table><tr><th>Producto</th><th>Categoría</th><th class="n">FOB (últimos 12 meses)</th></tr>
           ${x.a_resto.map((p) => `<tr><td>${esc(p.producto)}</td><td>${esc(p.categoria || "")}</td><td class="n">${mil(p.fob)}</td></tr>`).join("")}</table></div>` : '<p class="nota">Ningún producto va a «Resto».</p>';
       caja.innerHTML = `<div class="fila controles"><label class="campo" for="${clave}-p">Mes<select id="${clave}-p">${[...x.meses].reverse().map((m) => `<option value="${m}"${m === x.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
           <a class="btn sec" href="/v1/descargas?base=expo-sunat&departamento=${r.cod}&desde=${x.periodo}&hasta=${x.periodo}">Descargar la base del mes</a></div>
-        ${x.depurada ? "" : `<div class="err-box"><b>${esc(m3)} no está cargado con la base depurada</b><span>Se cargó con la base cruda de SUNAT, que la página ya no revisa: solo entran sus filas ok. Sube la base depurada del mes para reemplazarla.</span></div>`}
+        ${(() => { const p = x.estados.filter((e) => e.ESTADO === "verificar" || e.ESTADO === "clasificar"); const n = p.reduce((s, e) => s + e.filas, 0);
+          return n ? `<div class="err-box"><b>${fmt(n)} filas de ${esc(m3)} no entran a los cuadros</b><span>Están por verificar (empresa sin BORRAR PARA) o sin clasificar (partida sin TIPO). Complétalas en las hojas EMPRESAS o PARTIDA de tu ANUAL_PRO y vuelve a subirlo.</span></div>` : ""; })()}
         <div class="stats tiles">${est}</div>
-        <div class="caja"><h3>ESTAD del mes · ${esc(m3)}</h3><p>Lo que suma la base depurada, fila por fila del ESTAD de ${esc(r.nombre)} (miles de US$), contra el ESTAD cargado. Con la base depurada, las dos columnas coinciden.</p>${propuesta}</div>
-        <div class="caja"><h3>Productos que van a «Resto»</h3><p>Su PRODUCTO no coincide con ninguna fila propia del ESTAD. Si alguno debe ir a otra fila, corrige su nombre en tu base depurada y vuelve a subirla.</p>${resto}</div>`;
+        <div class="caja"><h3>ESTAD del mes · ${esc(m3)}</h3><p>Lo que suman las filas que entran (las del ANUAL_PRO con BORRAR PARA = OK), fila por fila del ESTAD de ${esc(r.nombre)} (miles de US$), contra el ESTAD cargado.</p>${propuesta}</div>
+        <div class="caja"><h3>Productos que van a «Resto»</h3><p>Su PRODUCTO no coincide con ninguna fila propia del ESTAD. Si alguno debe ir a otra fila, corrige su nombre común (PROD_UNICOS o PARTIDA) en tu ANUAL_PRO y vuelve a subirlo.</p>${resto}</div>`;
       $(`${clave}-p`).addEventListener("change", (ev) => { st.periodo = ev.target.value; sunatExpo(r, caja); });
       if ($(`${clave}-pasar`)) $(`${clave}-pasar`).addEventListener("click", async (ev) => {
-        if (!confirm(`¿Pasar al ESTAD de ${r.nombre} lo que suma la base depurada de ${m3}?${pr.hay_estad ? " Reemplaza lo que hay de ese mes." : ""}`)) return;
+        if (!confirm(`¿Pasar al ESTAD de ${r.nombre} lo que suma la base mensual de ${m3}?${pr.hay_estad ? " Reemplaza lo que hay de ese mes." : ""}`)) return;
         ev.target.disabled = true;
         try { const k = await api(`/v1/exportaciones/sunat-estad?${new URLSearchParams({ departamento: r.cod, periodo: x.periodo })}`, { method: "POST" });
           ESTADO = await api("/v1/estado"); pintarIndice(); pintarHasta(); $(`${clave}-pres`).innerHTML = `<div class="ok-box"><b>Listo: ${fmt(k.filas)} filas en el ESTAD de ${esc(m3)}.</b><span>Los cuadros, el anexo y los gráficos ya lo usan.</span></div>`; }
@@ -1763,7 +1764,7 @@
     else if (t === RESUMEN_TAB) panel = '<div id="resumen-ejec"></div>';
     else if (t === DRAE_TAB) panel = '<div id="drae-graf"></div>';
     else if (t === "Base mensual" && id === "impo") panel = `${cajaSubida("sub-impo", "La base mensual de importaciones tal como llega (M_AAAAMM.xlsx: aduana, ruc, partida, fob, flete, seguro, kilos, pais_adqui, cuode, periodo, …) o el ANUAL_PRO - IMPORTACIONES (.xlsm: sus diccionarios PARTIDAS, CUODE y UNICOS y su hoja ORIGEN). Entran las filas de la aduana de Iquitos (226).")}<div id="base-impo"></div>`;
-    else if (t === "Base mensual") panel = `${cajaSubida("sub-sunat", "La base mensual de exportaciones ya depurada en tu computadora (.xlsx): las columnas de SUNAT (ruc11, partorig, dcom, fob, ubigeo_dep, ano_mes o AÑO y MES, pais, aduana…) más TIPO, CATEGORÍA y PRODUCTO. Todas sus filas entran a los cuadros y el mes pasa solo al ESTAD. Sirve para las tres regiones: cada fila va a su departamento.")}<div id="sunat-expo"></div>`;
+    else if (t === "Base mensual") panel = `${cajaSubida("sub-sunat", "El ANUAL_PRO_AAAA.xlsx actualizado: carga sus diccionarios (UNICOS: productos, países, empresas y aduanas; PARTIDA) y su hoja ORIGEN como base del año. Las filas de empresas con BORRAR PARA = OK entran a los cuadros, y el último mes (y los que aún no estén en el ESTAD) pasan solos al ESTAD. También se acepta una base depurada (.xlsx con las columnas de SUNAT más TIPO, CATEGORÍA y PRODUCTO). Sirve para las tres regiones: cada fila va a su departamento.")}<div id="sunat-expo"></div>`;
     else if (t === "Resumen Export") panel = '<div id="resumen-sunat"></div>';
     else if (t === "Resumen Import") panel = '<div id="resumen-sunat" data-flujo="impo"></div>';
     else if (t === "Contraste") panel = `<div id="contraste" data-sector="${id}"></div>`;
@@ -1856,7 +1857,7 @@
         ["Empleo", "MTPE, Planilla Electrónica", "auto", "Nada: se baja solo los días 2 y 21. Si urge, usa el botón.", ["empleo"], "tres-act-empleo", "Scraper de empleo"],
         ["Hidrocarburos", "PERUPETRO", "auto", "Nada: se baja solo todos los días a las 7:00 a. m.", ["hidro-produccion", "hidro-canon"], "tres-act-hidro", "Hidrocarburos"],
         ["Pesca", "DIREPRO de cada región", "mano", "Subir el Excel que envía cada DIREPRO, tal como llega.", pescas, "tres-act-archivos", "Subir archivos"],
-        ["Exportaciones", "Base mensual depurada (con TIPO, CATEGORÍA y PRODUCTO)", "mano", "Depurarla en tu computadora y subirla en Exportaciones → «Base mensual»: pasa sola al ESTAD.", ["expo-estad"], "lor-expo", "Exportaciones"],
+        ["Exportaciones", "ANUAL_PRO_AAAA.xlsx actualizado (hoja ORIGEN y diccionarios)", "mano", "Actualizarlo en tu computadora y subirlo en Exportaciones → «Base mensual»: el mes pasa solo al ESTAD.", ["expo-estad"], "lor-expo", "Exportaciones"],
         ["Importaciones (Loreto)", "Base mensual de SUNAT (M_AAAAMM.xlsx)", "mano", "Igual que exportaciones, en Importaciones → «Base mensual».", ["impo-estad"], "lor-impo", "Importaciones"],
         ["Manufactura", "IVFM de cada región", "mano", "Subir el IVFM del año (IVFM-LO / SM / UCA … TOTAL.xlsx).", ["manu-ivf"], "tres-act-archivos", "Subir archivos"],
         ["Gráficos DRAE", "SERIES de cada departamento", "mano", "Subir las SERIES solo cuando cambien.", null, "lor-drae", "Gráficos DRAE"],
@@ -1870,7 +1871,7 @@
         ["Var. % real", "Variación descontando la inflación, con el IPC de Lima que la página trae sola del BCRP."],
         ["VBP", "Valor Bruto de Producción de la pesca, a precios de 2007."],
         ["ESTAD", "El libro Excel de la sucursal con las exportaciones e importaciones por grupo de productos. Los cuadros del sector externo salen de ahí."],
-        ["Base mensual", "La base de SUNAT del mes, operación por operación. En exportaciones se sube ya depurada (con TIPO, CATEGORÍA y PRODUCTO) y pasa sola al ESTAD; en importaciones la página la clasifica y propone el ESTAD del mes."],
+        ["Base mensual", "La base de SUNAT del mes, operación por operación. En exportaciones llega en la hoja ORIGEN del ANUAL_PRO (con sus diccionarios) y el mes pasa solo al ESTAD; en importaciones la página la clasifica y propone el ESTAD del mes."],
         ["LONG", "Formato de tabla con una fila por dato (año, mes, región, valor): el más cómodo para tablas dinámicas."],
         ["SERIES / DRAE", "Los Excel de la sucursal con los gráficos de cada departamento. La página los redibuja con un formato uniforme."],
         ["Contraste", "Comparación entre lo guardado en la página y el total anual que publica el MEF, para detectar descargas incompletas."],
