@@ -20,6 +20,7 @@ sus últimos 25 meses para compararlos); si no se subió, del que viene con la p
 etiquetas). Contra el ESTAD cargado (2025 a julio 2026) coincide el 97 % de las celdas a ±1 mil soles; el resto son
 revisiones posteriores del MEF.
 """
+import functools
 import io
 import json
 import re
@@ -387,60 +388,80 @@ def _datos(depto, desde, hasta):
         ing = ing.assign(P=ing["AÑO"].astype(int).astype(str) + "-" + mes.astype(int).map("{:02d}".format),
                          N=ing["NIVEL_GOBIERNO"].astype(str).str[0], V=pd.to_numeric(ing["RECAUDADO"], errors="coerce").fillna(0) / 1000,
                          CODIGO=ing["CODIGO"].astype(str), K=ing["CONCEPTO"].map(_k))
-    return {"gen": prep("gasto-dev-generica"), "fue": prep("gasto-dev-fuente"), "fun": prep("inv-dev-funcion"), "ifu": prep("inv-dev-fuente"),
-            "ing": ing}
+    d = {"gen": prep("gasto-dev-generica"), "fue": prep("gasto-dev-fuente"), "fun": prep("inv-dev-funcion"), "ifu": prep("inv-dev-fuente"),
+         "ing": ing}
+    d["_idx"] = _indice(d)
+    return d
+
+
+# columnas que necesita cada base para calcular una celda
+_CAMPOS = {"gen": ("COD_GENERICA", "DESGLOSE"), "fue": ("COD_FUENTE",), "ifu": ("COD_FUENTE",), "fun": ("FUNCION",),
+           "ing": ("CLASIFICADOR", "CODIGO", "K")}
+
+
+def _indice(d):
+    """{base: {(nivel, mes): [(campos…, V)]}}: cada celda recorre las pocas filas de su nivel y mes en Python puro. Antes
+    filtraba la base entera con pandas en cada celda: el Excel de 5 años hacía ~9 000 filtros (20 s en una PC, más de un
+    minuto en el servidor, que mientras tanto casi no atendía a nadie más: la página se colgaba)."""
+    idx = {}
+    for base, campos in _CAMPOS.items():
+        x, grupos = d.get(base), {}
+        if x is not None and not x.empty:
+            cols = [x["N"].astype(str), x["P"].astype(str)] + [x[c].astype(str) for c in campos] + [x["V"].astype(float)]
+            for n, p, *resto in zip(*cols):
+                grupos.setdefault((n, p), []).append(tuple(resto))
+        idx[base] = grupos
+    return idx
+
+
+@functools.lru_cache(maxsize=256)
+def _palabra(palabra):
+    return re.compile(r"(?:^|\s)" + re.escape(palabra))     # «CANON PETROLERO» no es «SOBRECANON …»
 
 
 def _valor_ingresos(d, terminos, nivel, p):
-    x = d["ing"]
-    if x is None or x.empty:
+    x = d["_idx"]["ing"].get((nivel, p))
+    if not x:
         return None
-    x = x[(x.N == nivel) & (x.P == p)]
-    if x.empty:
-        return None
-    clas = x[~x.CLASIFICADOR.isin(["FUENTE", "RUBRO"])]
-    fte = x[x.CLASIFICADOR == "FUENTE"]
     total = 0.0
     for signo, sel in terminos:
         if sel == "Z":
             continue
         if sel.startswith("C:"):
-            v = clas.loc[clas.CODIGO == sel[2:], "V"].sum()
+            cod = sel[2:]
+            v = sum(val for cl, c, _, val in x if c == cod and cl not in ("FUENTE", "RUBRO"))
         elif sel == "F:*":
-            v = fte.V.sum()
+            v = sum(val for cl, _, _, val in x if cl == "FUENTE")
         elif sel.startswith("F:"):
-            v = fte.loc[fte.CODIGO == sel[2:], "V"].sum()
+            cod = sel[2:]
+            v = sum(val for cl, c, _, val in x if cl == "FUENTE" and c == cod)
         else:                                          # H:padre:palabra -> el hijo del padre que la contiene en su nombre
             _, padre, palabra = sel.split(":", 2)
-            hijos = clas[clas.CODIGO.str.startswith(padre + "-") & (clas.CODIGO.str.count("-") == padre.count("-") + 1)]
-            v = hijos.loc[hijos.K.str.contains(r"(?:^|\s)" + re.escape(palabra)), "V"].sum()   # «CANON PETROLERO» no es «SOBRECANON …»
+            pre, guiones, rx = padre + "-", padre.count("-") + 1, _palabra(palabra)
+            v = sum(val for cl, c, k, val in x if cl not in ("FUENTE", "RUBRO") and c.startswith(pre) and c.count("-") == guiones
+                    and rx.search(k))
         total += signo * v
     return total
 
 
 def _valor(d, base, filtro, nivel, p):
+    if "_idx" not in d:
+        d["_idx"] = _indice(d)
     if base == "ing":
         return _valor_ingresos(d, filtro, nivel, p)
     if base == "deu":
-        x = d["gen"]
-        x = x[(x.N == nivel) & (x.P == p)] if not x.empty else x
-        if x.empty:
+        x = d["_idx"]["gen"].get((nivel, p))
+        if not x:
             return None                               # sin gasto ese mes: vacío; con gasto y sin deuda: 0
-        x = x[x.COD_GENERICA.astype(str) == "7-2-8"]
-        return x.loc[x.DESGLOSE.astype(str).str.upper() == filtro, "V"].sum()
-    x = d[base]
-    if x.empty:
-        return None
-    x = x[(x.N == nivel) & (x.P == p)]
-    if x.empty:
+        return sum(v for cod, des, v in x if cod == "7-2-8" and des.upper() == filtro)
+    x = d["_idx"][base].get((nivel, p))
+    if not x:
         return None
     if filtro is None:
-        return x.V.sum()
-    if base == "gen":
-        return x.loc[x.COD_GENERICA.astype(str).isin(filtro), "V"].sum()
-    if base in ("fue", "ifu"):
-        return x.loc[x.COD_FUENTE.astype(str).isin(filtro), "V"].sum()
-    return x.loc[x.FUNCION.astype(str).str[:2].isin(filtro), "V"].sum()
+        return sum(f[-1] for f in x)
+    if base == "fun":
+        return sum(v for fn, v in x if fn[:2] in filtro)
+    return sum(f[-1] for f in x if f[0] in filtro)     # gen: COD_GENERICA; fue / ifu: COD_FUENTE
 
 
 def _r0(v):

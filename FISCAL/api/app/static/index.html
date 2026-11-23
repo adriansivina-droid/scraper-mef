@@ -47,10 +47,22 @@
   const pct = (v) => v == null ? "n.d." : v.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const fecha = (f) => new Date(f).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
   const titulo = (n) => (n.charAt(0) + n.slice(1).toLowerCase().replace(/ (\S)/g, (m, c) => " " + c.toUpperCase())).replace(/ De /g, " de ");
-  async function api(url, opciones) {
-    const r = await fetch(url, opciones);
+  // Las consultas (GET) se cortan a los 150 s con un mensaje claro: antes, si el servidor se trababa, la página quedaba
+  // «Cargando…» para siempre. Los POST no se cortan: lanzan trabajos que siguen en el servidor aunque el navegador espere.
+  const ESPERA_MAX_MS = 150000;
+  async function api(url, opciones = {}) {
+    const get = !opciones.method || opciones.method === "GET";
+    const ctl = new AbortController(), reloj = get ? setTimeout(() => ctl.abort(), ESPERA_MAX_MS) : null;
+    let r;
+    try { r = await fetch(url, { ...opciones, signal: ctl.signal }); }
+    catch (e) {
+      throw new Error(e.name === "AbortError" ? "El servidor tardó más de 2 minutos en responder. Intenta de nuevo en un momento."
+                                               : "No hay conexión con el servidor (puede estar reiniciándose). Intenta de nuevo en un minuto.");
+    } finally { clearTimeout(reloj); }
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : `El servidor respondió ${r.status}.`);
+    if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail
+      : [502, 503, 504].includes(r.status) ? "El servidor se está reiniciando o está ocupado. Intenta de nuevo en un minuto."
+      : `El servidor respondió ${r.status}.`);
     return j;
   }
 
@@ -215,10 +227,12 @@
     if (!p.marcadas.length || !p.deptos().length) { caja.innerHTML = `<p class="nota">Marca al menos una base${p.deptos().length ? "" : " y un departamento"} para ver la vista previa.</p>`; return; }
     if (p.desde > p.hasta) { caja.innerHTML = '<div class="err-box"><b>El periodo está al revés</b><span>«Desde» es posterior a «Hasta».</span></div>'; return; }
     clearTimeout(temporizador);
+    const turno = p.turnoVista = (p.turnoVista || 0) + 1;      // si cambian los filtros mientras busca, gana la última búsqueda
     temporizador = setTimeout(async () => {
       caja.innerHTML = '<div class="loading"><span class="spin"></span>Buscando en la base de datos…</div>';
       try {
         const v = await api(`/v1/descargas/vista-previa?${consultaPanel(clave)}&filas=8`);
+        if (turno !== p.turnoVista) return;
         const a = v.archivos.find((x) => x.hoja === p.hoja) || v.archivos[0];
         p.hoja = a.hoja;
         const pesca = base(a.base).grupo === "pesca";
@@ -230,7 +244,7 @@
           ${v.avisos.map((x) => `<p class="nota">${esc(x)}</p>`).join("")}
           <div class="scroll"><table><tr>${a.columnas.map((k) => `<th>${esc(k)}</th>`).join("")}</tr>${filas}</table></div>`;
         caja.querySelectorAll("[data-hoja]").forEach((b) => b.addEventListener("click", () => { p.hoja = b.dataset.hoja; vistaPrevia(clave); }));
-      } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar la vista previa</b><span>${esc(e.message)}</span></div>`; }
+      } catch (e) { if (turno === p.turnoVista) caja.innerHTML = `<div class="err-box"><b>No se pudo armar la vista previa</b><span>${esc(e.message)}</span></div>`; }
     }, 250);
   }
 
@@ -280,7 +294,7 @@
           ${v.sin_datos.length ? `<p class="nota">Sin datos cargados: ${esc(v.sin_datos.join(", "))}. Para traerlas, lanza el scraper de empleo con «Todas las regiones» (${irComun("act-empleo", "Scraper de empleo")}).</p>` : ""}
           <div class="scroll"><table><tr>${v.columnas.map((k) => `<th class="${k === "EMPLEO" ? "n" : ""}">${esc(k)}</th>`).join("")}</tr>${filas}</table></div>`;
         caja.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.ir; }));
-      } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo armar la vista previa</b><span>${esc(e.message)}</span></div>`; }
+      } catch (e) { if (turno === p.turnoVista) caja.innerHTML = `<div class="err-box"><b>No se pudo armar la vista previa</b><span>${esc(e.message)}</span></div>`; }
     }, 250);
   }
 

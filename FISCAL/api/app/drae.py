@@ -468,9 +468,8 @@ def _clave(g):
 
 
 def _tabla():
-    with db.motor().begin() as cx:
-        cx.execute(text("CREATE TABLE IF NOT EXISTS drae_graficos (depto TEXT, orden INTEGER, hoja TEXT, spec TEXT, archivo TEXT, fecha TEXT)"))
-        cx.execute(text("CREATE TABLE IF NOT EXISTS drae_ocultos (depto TEXT, clave TEXT, PRIMARY KEY (depto, clave))"))
+    db.crear_tablas("CREATE TABLE IF NOT EXISTS drae_graficos (depto TEXT, orden INTEGER, hoja TEXT, spec TEXT, archivo TEXT, fecha TEXT)",
+                    "CREATE TABLE IF NOT EXISTS drae_ocultos (depto TEXT, clave TEXT, PRIMARY KEY (depto, clave))")
 
 
 def guardar(depto, archivo, graficos):

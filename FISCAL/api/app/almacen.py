@@ -56,9 +56,9 @@ def _tabla():
     if _tabla_lista is m:
         return
     binario = "BYTEA" if m.dialect.name == "postgresql" else "BLOB"
+    db._crear(m, "CREATE TABLE IF NOT EXISTS almacen (id TEXT PRIMARY KEY, nombre TEXT, padre TEXT, mime TEXT, "
+                        f"contenido TEXT, tamano BIGINT, modificado TEXT, binario {binario})")       # aguanta que otra petición la cree en el mismo instante
     with m.begin() as cx:
-        cx.execute(text("CREATE TABLE IF NOT EXISTS almacen (id TEXT PRIMARY KEY, nombre TEXT, padre TEXT, mime TEXT, "
-                        f"contenido TEXT, tamano BIGINT, modificado TEXT, binario {binario})"))
         if "binario" not in {c["name"] for c in inspect(cx).get_columns("almacen")}:
             cx.execute(text(f"ALTER TABLE almacen ADD COLUMN binario {binario}"))
     _tabla_lista = m
@@ -296,9 +296,8 @@ class LectorAlmacen:
 
 
 def _tablas_sinc():
-    with db.motor().begin() as cx:
-        cx.execute(text("CREATE TABLE IF NOT EXISTS almacen_vistos (file_id TEXT PRIMARY KEY, nombre TEXT, modificado TEXT, fecha TEXT)"))
-        cx.execute(text("CREATE TABLE IF NOT EXISTS almacen_sincronizaciones (fecha TEXT, origen TEXT, resumen TEXT)"))
+    db.crear_tablas("CREATE TABLE IF NOT EXISTS almacen_vistos (file_id TEXT PRIMARY KEY, nombre TEXT, modificado TEXT, fecha TEXT)",
+                    "CREATE TABLE IF NOT EXISTS almacen_sincronizaciones (fecha TEXT, origen TEXT, resumen TEXT)")
 
 
 def ultima():

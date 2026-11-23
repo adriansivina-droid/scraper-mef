@@ -39,9 +39,8 @@ POR_SECTOR = {"gasto": ["Generica", "Fuente"], "inversion": ["Funcion", "InvFuen
 
 
 def _tabla():
-    with db.motor().begin() as cx:
-        cx.execute(text("CREATE TABLE IF NOT EXISTS mef_controles (bloque TEXT, nivel TEXT, anio INTEGER, depto TEXT, codigo TEXT, "
-                        "ref DOUBLE PRECISION, fecha TEXT, archivo TEXT)"))
+    db.crear_tablas("CREATE TABLE IF NOT EXISTS mef_controles (bloque TEXT, nivel TEXT, anio INTEGER, depto TEXT, codigo TEXT, "
+                    "ref DOUBLE PRECISION, fecha TEXT, archivo TEXT)")
 
 
 def leer(nombre, df):
