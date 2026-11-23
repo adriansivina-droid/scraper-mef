@@ -446,3 +446,34 @@ def test_descargar_json_completo(cliente, tmp_path):
     assert len(otro["graficas"]) == len(original["graficas"]) and otro["meta"] == original["meta"]
     from app import hidrologia
     assert sorted(p["clave"] for p in hidrologia.piezas_de_archivo(otro)) == sorted(p["clave"] for p in hidrologia.piezas_de_archivo(original))
+
+
+def test_paquete_para_compartir(cliente):
+    import time
+    import openpyxl
+    subir(cliente, crudo())
+    for _ in range(60):
+        r = cliente.get("/v1/hidrologia/paquete")
+        if r.status_code != 202:
+            break
+        time.sleep(0.5)
+    assert r.status_code == 200 and "SENAMHI_Rios_del_Peru_2026-11-12.zip" in r.headers["content-disposition"]
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    base = "SENAMHI_Rios_del_Peru_2026-11-12/"
+    nombres = set(z.namelist())
+    assert {base + "LEEME.txt", base + "DICCIONARIO_DE_VARIABLES.txt", base + "1_DATOS/2_Nivel_y_caudal_diario.xlsx",
+            base + "1_DATOS/1_Estaciones_hidrometricas.xlsx", base + "2_CONTROL_DE_CALIDAD/Control_de_la_serie_diaria.xlsx"} <= nombres
+    leeme, dic = z.read(base + "LEEME.txt").decode("utf-8-sig"), z.read(base + "DICCIONARIO_DE_VARIABLES.txt").decode("utf-8-sig")
+    assert "2_Nivel_y_caudal_diario.xlsx" in leeme and "DATO_DUDOSO" in dic and "AÑO_HIDROLOGICO" in dic
+    libro = openpyxl.load_workbook(io.BytesIO(z.read(base + "1_DATOS/2_Nivel_y_caudal_diario.xlsx")))
+    assert libro.sheetnames == ["Descripción", "Datos"]
+    filas = list(libro["Datos"].iter_rows(values_only=True))
+    cab = list(filas[0])
+    datos = filas[1:]
+    assert len(datos) == len(filas_csv_diario(cliente))
+    f = dict(zip(cab, datos[0]))
+    assert f["COD_ESTACION"] == "240001" and isinstance(f["FECHA"], datetime) and isinstance(f["VALOR"], (int, float)) and isinstance(f["AÑO"], int)
+
+
+def filas_csv_diario(cliente):
+    return filas(cliente.get("/v1/hidrologia/descargar?archivo=diario"))

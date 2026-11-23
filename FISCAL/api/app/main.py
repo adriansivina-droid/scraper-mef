@@ -479,6 +479,21 @@ def hidrologia_reporte(formato: str = Query("pptx", pattern="^(pptx|xlsx)$")):
     return Response(reporte_hidrico.powerpoint(D), media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation", headers=_adjunto(nombre + ".pptx"))
 
 
+@app.get("/v1/hidrologia/paquete", dependencies=[Depends(acceso)])
+def hidrologia_paquete():
+    """El zip para compartir: todos los datos de los ríos en Excel con nombres claros, un LEEME.txt y el diccionario de variables.
+    Se arma aparte: mientras tanto responde 202 y la página vuelve a preguntar."""
+    if not hidrologia.hay_datos():
+        raise HTTPException(404, "Todavía no hay datos de SENAMHI en la página: súbelos en «Actualizar».")
+    estado, ruta = hidrologia.paquete_legible()
+    if estado == "armando":
+        return JSONResponse({"estado": "armando"}, status_code=202)
+    if estado == "error":
+        raise HTTPException(500, "No se pudo armar el paquete: " + hidrologia._paquete["error"])
+    dia = str(hidrologia.estado().get("recolectado") or date.today().isoformat())[:10]
+    return FileResponse(ruta, media_type="application/zip", headers=_adjunto(f"SENAMHI_Rios_del_Peru_{dia}.zip"))
+
+
 @app.get("/v1/hidrologia/descargar", dependencies=[Depends(acceso)])
 def hidrologia_descargar(archivo: str = Query("diario", pattern="^(diario|no-publicado|info-diaria|mensual|estaciones|control|control-info|control-mensual|log|todo)$"),
                          departamento: str = Query("", pattern="^(16|22|25)?$"), formato: str = Query("csv", pattern="^(csv|xlsx)$")):
