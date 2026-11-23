@@ -299,12 +299,47 @@
   }
 
   // ── Eje de meses con el año debajo (todos los gráficos): «Ene.» … y «2025» en el primer mes y en cada enero ──
+  // ── Etiquetas que no se pisan. Los gráficos se dibujan en unidades del viewBox y el texto escala con ellos, así que el
+  // choque depende solo de la distancia entre barras: con muchos meses (p. ej. 25 en media tarjeta) se muestran cada 2, 3,
+  // 4, 6 o 12 meses, alineados al calendario (Ene., Mar., May.… o Ene., Abr., Jul., Oct.), y los valores, de forma selectiva.
+  const NUM_MES = { Ene: 1, Feb: 2, Mar: 3, Abr: 4, May: 5, Jun: 6, Jul: 7, Ago: 8, Set: 9, Sep: 9, Oct: 10, Nov: 11, Dic: 12 };
+  const ANCHO_LETRA = 6.2;                               // ancho medio de una letra a 11 px (unidades del viewBox)
+  const pasoMeses = (d, ancho) => [1, 2, 3, 4, 6, 12].find((k) => d * k >= ancho) || 12;
+  // etiquetas de valores sin choques: cada una es una caja (x centro, y base, texto); se aceptan primero el último mes, el
+  // máximo y el mínimo, luego las demás en orden, y se omite la que tocaría a una ya puesta (el valor sigue en el tooltip)
+  // barras: [x0, y0, x1, y1] de cada barra; una cifra que no es prioritaria tampoco se pone encima de una barra vecina
+  function sinChoques(items, px = 10, barras = []) {
+    const caja = (e) => { const m = String(e.t).length * ANCHO_LETRA * px / 22 + 1.5; return [e.x - m, e.y - px, e.x + m, e.y + 2]; };
+    const toca = (c, p) => c[0] < p[2] && p[0] < c[2] && c[1] < p[3] && p[1] < c[3];
+    const vs = items.map((e) => e.v), prioridad = [items.length - 1, vs.indexOf(Math.max(...vs)), vs.indexOf(Math.min(...vs))];
+    const puestas = [], ok = new Set();
+    [...prioridad, ...items.keys()].forEach((k, n) => {
+      if (k < 0 || ok.has(k)) return;
+      const c = caja(items[k]);
+      if (puestas.some((p) => toca(c, p)) || (n >= prioridad.length && barras.some((b, j) => j !== k && toca(c, b)))) return;
+      puestas.push(c); ok.add(k);
+    });
+    return ok;
+  }
+  // x y alineación de un texto centrado en x que no se salga del gráfico (entre x0 y x1): en los bordes se alinea hacia dentro
+  function dentro(x, texto, x0, x1, px = 11) {
+    const m = String(texto).length * ANCHO_LETRA * px / 11 / 2;
+    return x - m < x0 ? `x="${x0}" text-anchor="start"` : x + m > x1 ? `x="${x1}" text-anchor="end"` : `x="${x}" text-anchor="middle"`;
+  }
   function ejeMeses(etqs, X, H, mostrar, mitad) {   // mitad: media distancia entre meses (la raya del año va entre dos meses)
-    const meses = etqs.map((e, i) => mostrar(i) ? `<text x="${X(i)}" y="${H - 22}" text-anchor="middle">${esc(e.split(" ")[0])}</text>` : "").join("");
+    const d = etqs.length > 1 ? Math.abs(X(1) - X(0)) : Infinity, k = pasoMeses(d, 3 * ANCHO_LETRA + 6);
+    const x0 = X(0) - mitad, x1 = X(etqs.length - 1) + mitad;
+    const cabe = (i) => k === 1 || ((NUM_MES[etqs[i].slice(0, 3)] || 1) - 1) % k === 0;
+    // un mes que no cabe entero en el borde se omite (correrlo hacia dentro lo haría chocar con el vecino)
+    const meses = etqs.map((e, i) => { const t = e.split(" ")[0], m = t.length * ANCHO_LETRA / 2;
+      return mostrar(i) && cabe(i) && X(i) - m >= Math.max(0, x0) - 2 && X(i) + m <= x1 + 2 ? `<text x="${X(i)}" y="${H - 22}" text-anchor="middle">${esc(t)}</text>` : ""; }).join("");
+    const alto = d >= 3 * ANCHO_LETRA + 6 ? 36 : 16;      // meses apretados: la raya del año no cruza su rótulo
     const grupos = [];                                   // [año, primer índice, último índice]
     etqs.forEach((e, i) => { const a = e.split(" ")[1]; if (!grupos.length || grupos[grupos.length - 1][0] !== a) grupos.push([a, i, i]); else grupos[grupos.length - 1][2] = i; });
-    const anios = grupos.map(([a, i0, i1], k) => `${k ? `<line class="sep" x1="${X(i0) - mitad}" x2="${X(i0) - mitad}" y1="${H - 36}" y2="${H}"></line>` : ""}
-      <text class="anio" x="${(X(i0) + X(i1)) / 2}" y="${H - 4}" text-anchor="middle">${esc(a)}</text>`).join("");
+    // un año con pocos meses en el gráfico (p. ej. solo Dic.) no tiene sitio para «2024»: va «’24» o nada
+    const rotulo = (a, ancho) => ancho >= 4 * ANCHO_LETRA + 6 ? a : ancho >= 3 * ANCHO_LETRA + 2 ? `’${String(a).slice(2)}` : "";
+    const anios = grupos.map(([a, i0, i1], g) => `${g ? `<line class="sep" x1="${X(i0) - mitad}" x2="${X(i0) - mitad}" y1="${H - alto}" y2="${H}"></line>` : ""}
+      <text class="anio" x="${(X(i0) + X(i1)) / 2}" y="${H - 4}" text-anchor="middle">${esc(rotulo(a, (i1 - i0 + 1) * d))}</text>`).join("");
     return meses + anios;
   }
 
@@ -397,10 +432,10 @@
       const cuadro = c.cuadro.map((f) => `<tr class="${f.rama === "Total" ? "total" : ""}"><td>${esc(f.rama)}</td><td class="n">${fmt(f.mes_anterior)}</td><td class="n">${fmt(f.mes)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td><td class="n">${fmt(f.diciembre)}</td><td class="n">${fmt(f.mes)}</td><td class="n ${cls(f.var_dic)}">${pct(f.var_dic)}</td></tr>`).join("");
       const g = c.grafico.filter((x) => x.var != null), max = Math.max(1, ...g.map((x) => Math.abs(x.var))), W = 760, H = 250, bw = W / Math.max(g.length, 1);
       const hayNeg = g.some((x) => x.var < 0), y0 = hayNeg ? 110 : 190, alto = hayNeg ? 90 : 160;   // sin caídas, las barras usan todo el alto
+      const geo = g.map((x, i) => { const h = Math.abs(x.var) / max * alto, y = x.var >= 0 ? y0 - h : y0; return { x: i * bw + bw / 2, y: x.var >= 0 ? y - 4 : y + h + 11, t: pct(x.var), v: x.var, b: [i * bw + bw * 0.18, y, i * bw + bw * 0.82, y + Math.max(h, 1)] }; });
+      const ver = sinChoques(geo, 10, geo.map((e) => e.b)), textos = geo.map((e, i) => ver.has(i) ? `<text class="val" ${dentro(e.x, e.t, 0, W, 10)} y="${e.y}">${e.t}</text>` : "");
       const barras = g.map((x, i) => { const h = Math.abs(x.var) / max * alto, y = x.var >= 0 ? y0 - h : y0;
-        return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${y}" width="${bw * 0.64}" height="${Math.max(h, 1)}"></rect>
-          <text class="val" x="${i * bw + bw / 2}" y="${x.var >= 0 ? y - 4 : y + h + 11}" text-anchor="middle">${pct(x.var)}</text>
-          <title>${esc(x.periodo)}: ${pct(x.var)} %</title>`; }).join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
+        return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${y}" width="${bw * 0.64}" height="${Math.max(h, 1)}"><title>${esc(x.periodo)}: ${pct(x.var)} %</title></rect>`; }).join("") + textos.join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
       const mensual = c.mensual.filter((f) => f.anterior != null || f.actual != null).map((f) => `<tr><td>${esc(f.mes)}</td><td class="n">${fmt(f.anterior)}</td><td class="n">${fmt(f.actual)}</td><td class="n ${cls(f.var)}">${f.actual == null ? "" : pct(f.var)}</td></tr>`).join("");
       const anexo = c.anexo.map((f) => `<tr><td>${esc(f.periodo)}</td>${["Agricultura", "Minería", "Manufactura", "Construcción", "Comercio", "Servicios", "Total"].map((k) => `<td class="n ${cls(f[k])}">${pct(f[k])}</td>`).join("")}</tr>`).join("");
       caja.innerHTML = `<div class="fila"><label class="campo" for="emp-p">Mes del informe<select id="emp-p">${meses.slice().reverse().map((m) => `<option value="${m}"${m === c.periodo ? " selected" : ""}>${esc(etqMes(m))}</option>`).join("")}</select></label>
@@ -432,9 +467,11 @@
       const cuadro = c.bloques.map((b) => `<tr class="grupo"><td colspan="7"><b>${esc(b.producto)}</b> <span class="nota">(${esc(b.unidad)})</span></td></tr>` + b.filas.map((f) =>
         `<tr class="${f.lote === "Total" ? "total" : ""}"><td>${esc(f.lote)}</td><td class="n">${fmt1(f.mes_anterior)}</td><td class="n">${fmt1(f.mes)}</td><td class="n ${cls(f.var_mes)}">${pct(f.var_mes)}</td><td class="n">${fmt1(f.acum_anterior)}</td><td class="n">${fmt1(f.acum)}</td><td class="n ${cls(f.var_acum)}">${pct(f.var_acum)}</td></tr>`).join("")).join("");
       const gr = c.grafico, g = gr ? gr.serie : [], max = Math.max(0.001, ...g.map((x) => x.valor)), W = 760, H = 245, base0 = 195, bw = W / Math.max(g.length, 1);
+      const geo = g.map((x, i) => ({ x: i * bw + bw / 2, y: base0 - x.valor / max * 160 - 4, t: `${fmt1(x.valor)}${x.parcial ? "*" : ""}`, v: x.valor,
+                                      b: [i * bw + bw * 0.18, base0 - x.valor / max * 160, i * bw + bw * 0.82, base0] }));
+      const ver = sinChoques(geo, 10, geo.map((e) => e.b)), textos = geo.map((e, i) => ver.has(i) ? `<text class="val" ${dentro(e.x, e.t, 0, W, 10)} y="${e.y}">${e.t}</text>` : "");
       const barras = g.map((x, i) => { const h = x.valor / max * 160;
-        return `<rect class="${x.parcial ? "parcial" : "pos"}" x="${i * bw + bw * 0.18}" y="${base0 - h}" width="${bw * 0.64}" height="${Math.max(h, 1)}"><title>${esc(x.periodo)}: ${fmt1(x.valor)}${x.var == null ? "" : ` (${pct(x.var)} %)`}</title></rect>
-          <text class="val" x="${i * bw + bw / 2}" y="${base0 - h - 4}" text-anchor="middle">${fmt1(x.valor)}${x.parcial ? "*" : ""}</text>`; }).join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
+        return `<rect class="${x.parcial ? "parcial" : "pos"}" x="${i * bw + bw * 0.18}" y="${base0 - h}" width="${bw * 0.64}" height="${Math.max(h, 1)}"><title>${esc(x.periodo)}: ${fmt1(x.valor)}${x.var == null ? "" : ` (${pct(x.var)} %)`}</title></rect>`; }).join("") + textos.join("") + ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2);
       const anexos = c.anexo.map((b) => `<div class="caja"><h3>${esc(r.nombre)}: producción de ${esc(b.producto.toLowerCase())} por lote</h3><p>(${esc(b.unidad.charAt(0).toUpperCase() + b.unidad.slice(1))})</p>
           <div class="scroll"><table><tr><th>Mes</th>${b.lotes.map((l) => `<th class="n">${esc(l)}</th>`).join("")}<th class="n">Total</th></tr>${b.filas.map((f) => `<tr><td>${esc(f.periodo)}</td>${b.lotes.map((l) => `<td class="n">${fmt1(f[l])}</td>`).join("")}<td class="n"><b>${fmt1(f.Total)}</b></td></tr>`).join("")}</table></div></div>`).join("");
       const k = c.canon;
@@ -599,8 +636,11 @@
   function barrasVar(g, W) {
     if (!g.length) return '<p class="nota">Hace falta el mismo mes del año anterior para la variación.</p>';
     const max = Math.max(1, ...g.map((x) => Math.abs(x.var))), H = 230, y0 = 100, bw = W / g.length;
-    return `<svg class="barras" viewBox="0 0 ${W} ${H}"><line class="eje" x1="0" x2="${W}" y1="${y0}" y2="${y0}"></line>${g.map((x, i) => { const h = Math.abs(x.var) / max * 80, y = x.var >= 0 ? y0 - h : y0;
-      return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${y}" width="${bw * 0.64}" height="${Math.max(h, 1)}" rx="2"><title>${esc(x.periodo)}: ${pct(x.var)} %</title></rect><text class="val" x="${i * bw + bw / 2}" y="${x.var >= 0 ? y - 4 : y + h + 11}" text-anchor="middle">${pct(x.var)}</text>`; }).join("")}
+    const geo = g.map((x, i) => { const h = Math.abs(x.var) / max * 80, y = x.var >= 0 ? y0 - h : y0; return { h, y, x: i * bw + bw / 2, yt: x.var >= 0 ? y - 4 : y + h + 11, t: pct(x.var), v: x.var }; });
+    const ver = sinChoques(geo.map((e) => ({ x: e.x, y: e.yt, t: e.t, v: e.v })), 10, geo.map((e, i) => [i * bw + bw * 0.18, e.y, i * bw + bw * 0.82, e.y + Math.max(e.h, 1)]));
+    return `<svg class="barras" viewBox="0 0 ${W} ${H}"><line class="eje" x1="0" x2="${W}" y1="${y0}" y2="${y0}"></line>${g.map((x, i) => { const e = geo[i];
+      return `<rect class="${x.var >= 0 ? "pos" : "neg"}" x="${i * bw + bw * 0.18}" y="${e.y}" width="${bw * 0.64}" height="${Math.max(e.h, 1)}" rx="2"><title>${esc(x.periodo)}: ${pct(x.var)} %</title></rect>`; }).join("")}
+      ${geo.map((e, i) => ver.has(i) ? `<text class="val" ${dentro(e.x, e.t, 0, W, 10)} y="${e.yt}">${e.t}</text>` : "").join("")}
       ${ejeMeses(g.map((x) => x.periodo), (i) => i * bw + bw / 2, H, () => true, bw / 2)}</svg>`;
   }
 

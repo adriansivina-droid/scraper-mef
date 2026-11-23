@@ -227,7 +227,7 @@
         if (s.etiquetas || series.length <= 2) {
           const txt = num(v, dec, ep);
           if (apil) { if (h > 12) etiquetas.push(`<text x="${(x0 + w / 2).toFixed(1)}" y="${(top_ + h / 2 + 3.5).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${[TURQ, AMARILLO, GRIS, TURQ_CLARO].includes(fill) ? NAVY : "#fff"}">${txt}</text>`); }
-          else deBarras.push({ x: x0 + w / 2, y: v >= 0 ? top_ - 4 : top_ + h + fEtq(s) + 2, neg: v < 0, txt, px: fEtq(s), peso: pesoEtq(s) });
+          else deBarras.push({ x: x0 + w / 2, y: v >= 0 ? top_ - 4 : top_ + h + fEtq(s) + 2, neg: v < 0, txt, px: fEtq(s), peso: pesoEtq(s), j, i, v });
         }
       });
     });
@@ -261,8 +261,19 @@
         }
       });
     });
-    // como en Excel: si la cifra de una barra cae sobre un círculo, pasa encima del círculo (o debajo, si la barra es negativa)
+    // series largas: una cifra que tocaría a otra ya puesta se omite (primero la última, el máximo y el mínimo de cada serie)
+    const puestas = [], visibles = new Set(), caja = (e) => { const m = ancho(e.txt, e.px, true) / 2 + 1.5; return [e.x - m, e.y - e.px, e.x + m, e.y + 2]; };
+    [...new Set(deBarras.map((e) => e.j))].forEach((j) => {
+      const de = deBarras.filter((e) => e.j === j), vs = de.map((e) => e.v);
+      [de[de.length - 1], de[vs.indexOf(Math.max(...vs))], de[vs.indexOf(Math.min(...vs))]].forEach((e) => { if (!visibles.has(e)) { visibles.add(e); puestas.push(caja(e)); } });
+    });
     deBarras.forEach((e) => {
+      if (visibles.has(e)) return;
+      const c = caja(e);
+      if (!puestas.some((p) => c[0] < p[2] && p[0] < c[2] && c[1] < p[3] && p[1] < c[3])) { visibles.add(e); puestas.push(c); }
+    });
+    // como en Excel: si la cifra de una barra cae sobre un círculo, pasa encima del círculo (o debajo, si la barra es negativa)
+    deBarras.filter((e) => visibles.has(e)).forEach((e) => {
       const w = ancho(e.txt, e.px, true) / 2 + 2;
       for (let vuelta = 0; vuelta < 3; vuelta++) {
         const c = circulos.find((c) => Math.abs(c.x - e.x) < c.r + w && e.y - e.px < c.y + c.r + 1 && e.y + 2 > c.y - c.r - 1);
