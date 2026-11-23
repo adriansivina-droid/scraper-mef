@@ -460,19 +460,18 @@ def test_paquete_para_compartir(cliente):
     assert r.status_code == 200 and "SENAMHI_Rios_del_Peru_2026-11-12.zip" in r.headers["content-disposition"]
     z = zipfile.ZipFile(io.BytesIO(r.content))
     base = "SENAMHI_Rios_del_Peru_2026-11-12/"
-    nombres = set(z.namelist())
-    assert {base + "LEEME.txt", base + "DICCIONARIO_DE_VARIABLES.txt", base + "1_DATOS/2_Nivel_y_caudal_diario.xlsx",
-            base + "1_DATOS/1_Estaciones_hidrometricas.xlsx", base + "2_CONTROL_DE_CALIDAD/Control_de_la_serie_diaria.xlsx"} <= nombres
-    leeme, dic = z.read(base + "LEEME.txt").decode("utf-8-sig"), z.read(base + "DICCIONARIO_DE_VARIABLES.txt").decode("utf-8-sig")
-    assert "2_Nivel_y_caudal_diario.xlsx" in leeme and "DATO_DUDOSO" in dic and "AÑO_HIDROLOGICO" in dic
-    libro = openpyxl.load_workbook(io.BytesIO(z.read(base + "1_DATOS/2_Nivel_y_caudal_diario.xlsx")))
-    assert libro.sheetnames == ["Descripción", "Datos"]
+    assert set(z.namelist()) == {base + "LEEME.txt", base + "Nivel_y_caudal_diario.xlsx", base + "Estaciones.xlsx"}
+    assert "PARA HACER UN GRÁFICO" in z.read(base + "LEEME.txt").decode("utf-8-sig")
+    libro = openpyxl.load_workbook(io.BytesIO(z.read(base + "Nivel_y_caudal_diario.xlsx")))
+    assert libro.sheetnames == ["Datos"]
     filas = list(libro["Datos"].iter_rows(values_only=True))
-    cab = list(filas[0])
-    datos = filas[1:]
-    assert len(datos) == len(filas_csv_diario(cliente))
-    f = dict(zip(cab, datos[0]))
-    assert f["COD_ESTACION"] == "240001" and isinstance(f["FECHA"], datetime) and isinstance(f["VALOR"], (int, float)) and isinstance(f["AÑO"], int)
+    assert list(filas[0]) == ["COD_ESTACION", "ESTACION", "RIO", "VARIABLE", "UNIDAD", "FECHA", "VALOR", "MINIMO", "MAXIMO", "PROM_HISTORICO",
+                              "UMBRAL_ROJO", "UMBRAL_NARANJA", "UMBRAL_AMARILLO", "DATO_DUDOSO"]
+    assert len(filas) - 1 == len(filas_csv_diario(cliente))
+    f = dict(zip(filas[0], filas[1]))
+    assert f["COD_ESTACION"] == "240001" and isinstance(f["FECHA"], datetime) and isinstance(f["VALOR"], (int, float))
+    est = list(openpyxl.load_workbook(io.BytesIO(z.read(base + "Estaciones.xlsx")))["Datos"].iter_rows(values_only=True))
+    assert est[0][0] == "COD_ESTACION" and len(est) == 3
 
 
 def filas_csv_diario(cliente):
