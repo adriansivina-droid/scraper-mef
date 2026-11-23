@@ -839,6 +839,38 @@ def paquete(departamento=""):
     return buf.getvalue()
 
 
+# ── paquete para compartir: Excel con nombres claros + LEEME + diccionario ────
+_paquete = {"ruta": None, "hilo": None, "error": ""}
+
+
+def paquete_legible():
+    """(estado, ruta): «listo» (y el .zip), «armando» o «error». El zip se arma aparte (puede tardar un minuto con la serie diaria
+    completa) y queda guardado junto a los CSV hasta que lleguen datos nuevos."""
+    from . import hidrologia_paquete
+    carpeta, resumen = preparado()
+    ruta = os.path.join(carpeta, "_paquete_legible.zip")
+    if os.path.exists(ruta):
+        return "listo", ruta
+    with _candado:
+        hilo = _paquete["hilo"]
+        if hilo is not None and hilo.is_alive() and _paquete["ruta"] == ruta:
+            return "armando", None
+        if _paquete["ruta"] == ruta and _paquete["error"]:
+            return "error", None
+
+        def trabajo():
+            try:
+                dia = str(resumen.get("recolectado") or "")[:10]
+                dia = date.fromisoformat(dia) if re.match(r"^\d{4}-\d{2}-\d{2}$", dia) else date.today()
+                hidrologia_paquete.armar_paquete(carpeta, ruta + ".tmp", resumen, dia.strftime("%d/%m/%Y"), ARCHIVOS, f"desde el {inicio():%d/%m/%Y}")
+                os.replace(ruta + ".tmp", ruta)
+            except Exception as e:                                  # noqa: BLE001
+                _paquete["error"] = f"{type(e).__name__}: {e}"[:300]
+        _paquete.update(ruta=ruta, error="", hilo=threading.Thread(target=trabajo, daemon=True))
+        _paquete["hilo"].start()
+        return "armando", None
+
+
 # ── gráfico: el hidrograma de SENAMHI ────────────────────────────────────────
 _catalogo = {}
 
