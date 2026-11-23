@@ -52,9 +52,9 @@ def _tabla():
     m = db.motor()
     if _tabla_lista is m:
         return
+    db._crear(m, "CREATE TABLE IF NOT EXISTS invitaciones (id TEXT PRIMARY KEY, huella TEXT UNIQUE, nombre TEXT, creado TEXT, vence TEXT, "
+                        "permisos TEXT, ultimo_acceso TEXT, accesos INTEGER DEFAULT 0, revocada INTEGER DEFAULT 0, descargas INTEGER DEFAULT 0)")       # aguanta que otra petición la cree en el mismo instante
     with m.begin() as cx:
-        cx.execute(text("CREATE TABLE IF NOT EXISTS invitaciones (id TEXT PRIMARY KEY, huella TEXT UNIQUE, nombre TEXT, creado TEXT, vence TEXT, "
-                        "permisos TEXT, ultimo_acceso TEXT, accesos INTEGER DEFAULT 0, revocada INTEGER DEFAULT 0, descargas INTEGER DEFAULT 0)"))
         if "descargas" not in {c["name"] for c in inspect(cx).get_columns("invitaciones")}:      # tablas creadas antes
             cx.execute(text("ALTER TABLE invitaciones ADD COLUMN descargas INTEGER DEFAULT 0"))
     _tabla_lista = m

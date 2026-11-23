@@ -1,4 +1,5 @@
 """Departamento de estudios BCRP-IQT: API para descargar las bases de los scrapers del MEF y de pesca (DIREPRO). Corre con `uvicorn app.main:app`."""
+import asyncio
 import io
 import json
 import os
@@ -19,12 +20,15 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as PoolLleno
 from starlette.background import BackgroundTask
 
 from . import almacen, archivos, bcrp_excel, carga, compartir, controles, db, drae, ejecucion, empleo, estad_fiscal, expo_cuadros, hidrocarburos, hidrologia, ipc, manufactura, mef, pesca_cuadros, sunat_expo, sunat_impo
 from .catalogo import BASES, DEPARTAMENTOS, GRUPOS, NIVELES
 
 app = FastAPI(title="Departamento de estudios BCRP-IQT", version="1.0", docs_url="/docs", redoc_url=None)
+db.TOPE_CONSULTA_S = 120             # en la página ninguna consulta pasa de 2 min (los scrapers de GitHub no tienen tope)
 _basic = HTTPBasic(auto_error=False)
 ESTATICOS = Path(__file__).parent / "static"
 
@@ -42,6 +46,58 @@ class Estaticos(StaticFiles):
 app.mount("/static", Estaticos(directory=ESTATICOS), name="static")   # solo estilos: los datos siempre piden clave
 # la página (240 KB) y los JSON de los cuadros viajan comprimidos: unas 5 veces menos (nivel 5: casi no cuesta al servidor)
 app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+
+
+class TrabajosPesados:
+    """A lo más MAX_PESADOS archivos grandes a la vez (Excel, CSV, ZIP, PPTX, cargas). El servidor tiene medio CPU y
+    512 MB: cinco clics impacientes en «Descargar Excel» armaban cinco libros a la vez, se repartían el CPU (todo lo
+    demás, incluso abrir una pestaña, quedaba esperando) y podían agotar la memoria y reiniciar el servidor. Los que
+    sobran esperan su turno hasta ESPERA_S segundos; después reciben un 503 legible («el servidor está ocupado»)."""
+    MAX_PESADOS, ESPERA_S = 2, 90
+    _RUTAS = ("/v1/descargas", "/v1/cargas", "/v1/ejecucion/estad", "/v1/hidrologia/reporte", "/v1/hidrologia/paquete",
+              "/v1/hidrologia/descargar", "/v1/bcrp/excel", "/v1/hidrocarburos/archivos/descargar")
+    _FORMATOS = re.compile(rb"(?:^|&)formato=(?:xlsx|csv|long|pptx|zip)(?:&|$)")
+
+    _sem = (None, None)                                 # (bucle de eventos, semáforo): se crea con el primer trabajo pesado
+
+    def __init__(self, app):
+        self.app = app
+
+    @classmethod
+    def es_pesado(cls, ruta, consulta=b""):
+        if ruta == "/v1/descargas/vista-previa":
+            return False
+        if ruta == "/v1/ejecucion/estad":                       # la vista en la página es liviana; el Excel no
+            return bool(cls._FORMATOS.search(consulta))
+        return ruta.startswith(cls._RUTAS) or ruta.endswith(".xlsx") or bool(cls._FORMATOS.search(consulta))
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not self.es_pesado(scope["path"], scope.get("query_string", b"")):
+            return await self.app(scope, receive, send)
+        bucle = asyncio.get_running_loop()
+        if TrabajosPesados._sem[0] is not bucle:
+            TrabajosPesados._sem = (bucle, asyncio.Semaphore(self.MAX_PESADOS))
+        sem = TrabajosPesados._sem[1]
+        try:
+            await asyncio.wait_for(sem.acquire(), self.ESPERA_S)
+        except asyncio.TimeoutError:
+            aviso = "El servidor está ocupado armando otros archivos. Intenta de nuevo en un minuto."
+            navegador = any(k == b"accept" and b"text/html" in v for k, v in scope.get("headers", []))
+            if navegador:      # las descargas se abren navegando: un JSON crudo sacaría al usuario de la página
+                r = HTMLResponse("<!doctype html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+                                 "<title>Servidor ocupado</title></head><body style='font-family:system-ui,sans-serif;max-width:560px;margin:12vh auto;padding:0 20px;color:#181818'>"
+                                 f"<h1 style='color:#111149;font-size:22px'>Un momento</h1><p style='color:#5A5A9E;line-height:1.5'>{aviso}</p>"
+                                 "<p><a href='javascript:history.back()'>Volver a la página</a></p></body></html>", status_code=503, headers={"Retry-After": "60"})
+            else:
+                r = JSONResponse({"detail": aviso}, status_code=503, headers={"Retry-After": "60"})
+            return await r(scope, receive, send)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            sem.release()
+
+
+app.add_middleware(TrabajosPesados)
 _RE_PERIODO = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 MAX_CARGA_MB = 200
 
@@ -56,6 +112,18 @@ async def _error_legible(request: Request, exc: HTTPException):
             "<h1 style='color:#111149;font-size:22px'>Este enlace ya no es válido</h1>"
             f"<p style='color:#5A5A9E;line-height:1.5'>{exc.detail}</p></body></html>", status_code=403)
     return await http_exception_handler(request, exc)
+
+
+@app.exception_handler(OperationalError)
+@app.exception_handler(PoolLleno)
+async def _base_no_responde(request: Request, exc: Exception):
+    """Neon caído, dormido sin despertar, todas las conexiones ocupadas o una consulta cortada por el tope: un 503 que se
+    entiende, no un 500."""
+    texto = str(getattr(exc, "orig", None) or exc).lower()
+    cortada = "statement timeout" in texto or "canceling statement" in texto
+    aviso = ("La consulta tardó más de 2 minutos y se detuvo. Prueba con un periodo más corto o menos bases." if cortada else
+             "La base de datos no responde (puede estar despertando). Intenta de nuevo en un minuto.")
+    return JSONResponse({"detail": aviso}, status_code=503, headers={"Retry-After": "30"})
 
 
 def acceso(request: Request, cred: HTTPBasicCredentials | None = Depends(_basic)):
@@ -155,7 +223,9 @@ def favicon():
 
 
 @app.get("/salud", include_in_schema=False)
-def salud():
+async def salud():
+    """async: Render la consulta cada pocos segundos; así responde aunque los hilos estén ocupados con descargas largas
+    (con «def» esperaba un hilo libre y, si tardaba, Render reiniciaba el servidor en medio de los trabajos)."""
     return {"ok": True}
 
 
@@ -254,12 +324,12 @@ def estado_espacio():
 
 
 @app.get("/v1/descargas/vista-previa", dependencies=[Depends(acceso)])
-def vista_previa(base: str = "", departamento: str = "", nivel: str = "", desde: str = "", hasta: str = "", filas: int = Query(12, le=100)):
+def vista_previa(base: str = "", departamento: str = "", nivel: str = "", desde: str = "", hasta: str = "", filas: int = Query(12, ge=1, le=100)):
     bases, deptos, niveles = _filtros(base, departamento, nivel, desde, hasta)
-    tablas = _tablas(bases, deptos, niveles, desde, hasta)
-    return {"archivos": [{"base": b, "hoja": BASES[b].hoja, "filas": len(df), "columnas": BASES[b].columnas,
-                          "muestra": _registros(df.head(filas))} for b, df in tablas.items()],
-            "filas_total": sum(len(df) for df in tablas.values()),
+    tablas = {b: db.muestra(b, deptos, niveles, desde, hasta, filas) for b in bases}
+    return {"archivos": [{"base": b, "hoja": BASES[b].hoja, "filas": n, "columnas": BASES[b].columnas,
+                          "muestra": _registros(df)} for b, (n, df) in tablas.items()],
+            "filas_total": sum(n for n, _ in tablas.values()),
             "descarga": f"{_prefijo(bases)}_{desde}_{hasta}.xlsx", "avisos": _avisos(bases, deptos)}
 
 
@@ -840,13 +910,16 @@ def ejecucion_estad(departamento: str = Query(..., pattern=r"^(16|22|25)$"), des
     con las diferencias contra el último ESTAD subido. Por defecto, de enero al último mes con datos."""
     if desde and hasta and desde > hasta:
         raise HTTPException(422, "«Desde» no puede ser posterior a «hasta».")
+    if formato == "xlsx":                       # el Excel lleva todos los años que tiene la página, hasta «hasta» (se arma una sola vez)
+        hasta = hasta or estad_fiscal.ultimo_mes(departamento)
+        e = estad_fiscal.armar(departamento, f"{estad_fiscal.primer_anio(departamento)}-01", hasta, sector or None) if hasta else None
+        if e is None:
+            raise HTTPException(404, "Todavía no hay gasto del MEF en la página para esta región.")
+        return Response(estad_fiscal.excel(e, departamento), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers=_adjunto(f"ESTAD gasto e inversion {estad_fiscal.CORTO[departamento]} hasta {e['hasta']}.xlsx"))
     e = estad_fiscal.armar(departamento, desde or None, hasta or None, sector or None)
     if e is None:
         raise HTTPException(404, "Todavía no hay gasto del MEF en la página para esta región.")
-    if formato == "xlsx":                       # el Excel lleva todos los años que tiene la página, hasta «hasta»
-        e = estad_fiscal.armar(departamento, f"{estad_fiscal.primer_anio(departamento)}-01", e["hasta"], sector or None)
-        return Response(estad_fiscal.excel(e, departamento), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers=_adjunto(f"ESTAD gasto e inversion {estad_fiscal.CORTO[departamento]} hasta {e['hasta']}.xlsx"))
     return {**e, "diferencias": estad_fiscal.diferencias(e)}
 
 

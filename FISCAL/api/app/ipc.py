@@ -34,8 +34,7 @@ _MES = {"ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6, "jul": 7, "a
 
 
 def _tabla():
-    with db.motor().begin() as cx:
-        cx.execute(text("CREATE TABLE IF NOT EXISTS ipc (periodo TEXT PRIMARY KEY, valor DOUBLE PRECISION, fuente TEXT, fecha TEXT)"))
+    db.crear_tablas("CREATE TABLE IF NOT EXISTS ipc (periodo TEXT PRIMARY KEY, valor DOUBLE PRECISION, fuente TEXT, fecha TEXT)")
 
 
 def guardar(serie, fuente):

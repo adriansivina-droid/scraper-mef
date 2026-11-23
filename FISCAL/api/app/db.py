@@ -2,10 +2,12 @@
 import base64
 import json
 import os
+import re
+import threading
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, exc, inspect, text
 
 from .catalogo import BASES, INTERNAS
 
@@ -21,17 +23,75 @@ def url_base_datos():
 
 
 _motor = None
+# Tope de cada consulta en el servidor de la página (segundos; main.py lo fija al arrancar). Los scrapers de GitHub usan
+# este mismo módulo sin tope: sus cargas y mantenimientos pueden tardar más.
+TOPE_CONSULTA_S = None
+
+
+def _opciones(url):
+    """Que una caída de Neon o de la red no deje hilos esperando para siempre: sin estos topes, unas pocas consultas
+    colgadas agotaban los hilos del servidor y la página entera dejaba de responder."""
+    if not url.startswith("postgresql"):
+        return {}
+    return {"connect_args": {"connect_timeout": 15},       # Neon despierta en 1-5 s; 15 s = la base no está
+            "pool_timeout": 20,                            # esperar una conexión libre del pool, a lo más 20 s
+            "pool_recycle": 280}                           # Neon cierra las conexiones inactivas a los 5 min
+
+
+_candado = threading.Lock()
+_creadas = set()
 
 
 def motor():
     global _motor
-    if _motor is None:
-        _motor = create_engine(url_base_datos(), pool_pre_ping=True)
-        with _motor.begin() as cx:
-            cx.execute(text("CREATE TABLE IF NOT EXISTS cargas (id INTEGER PRIMARY KEY, fecha TEXT, origen TEXT, resumen TEXT)"
-                            if _motor.dialect.name == "sqlite" else
-                            "CREATE TABLE IF NOT EXISTS cargas (id SERIAL PRIMARY KEY, fecha TEXT, origen TEXT, resumen TEXT)"))
+    if _motor is not None:
+        return _motor
+    with _candado:                                  # dos peticiones simultáneas al arrancar no crean dos motores
+        if _motor is None:
+            _motor = _nuevo_motor()
     return _motor
+
+
+def _nuevo_motor():
+    url = url_base_datos()
+    m = create_engine(url, pool_pre_ping=True, **_opciones(url))
+    if TOPE_CONSULTA_S and m.dialect.name == "postgresql":
+        @event.listens_for(m, "connect")
+        def _tope(conexion, _registro):
+            try:
+                with conexion.cursor() as cur:
+                    cur.execute(f"SET statement_timeout = {int(TOPE_CONSULTA_S * 1000)}")
+                conexion.commit()
+            except Exception:          # un pooler que no acepte SET no debe tumbar la conexión: se sigue sin tope
+                conexion.rollback()
+    _crear(m, "CREATE TABLE IF NOT EXISTS cargas (id INTEGER PRIMARY KEY, fecha TEXT, origen TEXT, resumen TEXT)"
+           if m.dialect.name == "sqlite" else "CREATE TABLE IF NOT EXISTS cargas (id SERIAL PRIMARY KEY, fecha TEXT, origen TEXT, resumen TEXT)")
+    return m
+
+
+def _crear(m, sentencia):
+    """Un CREATE TABLE IF NOT EXISTS que aguanta la carrera: en Postgres, dos conexiones que crean la misma tabla en el
+    mismo instante chocan (UniqueViolation en pg_type) y una petición devolvía error 500."""
+    try:
+        with m.begin() as cx:
+            cx.execute(text(sentencia))
+    except (exc.IntegrityError, exc.ProgrammingError):
+        nombre = re.search(r"CREATE TABLE IF NOT EXISTS\s+\"?(\w+)", sentencia, re.I).group(1)
+        if not inspect(m).has_table(nombre):
+            raise
+
+
+def crear_tablas(*sentencias):
+    """Crea las tablas auxiliares una sola vez por proceso (antes, cada lectura de un documento, del IPC o del avance
+    abría una transacción de escritura solo para el CREATE TABLE IF NOT EXISTS)."""
+    if all(x in _creadas for x in sentencias):
+        return
+    m = motor()
+    with _candado:
+        for x in sentencias:
+            if x not in _creadas:
+                _crear(m, x)
+                _creadas.add(x)
 
 
 def vaciar(cx, tabla):
@@ -47,6 +107,7 @@ def reiniciar_motor():
     """Para las pruebas: vuelve a leer DATABASE_URL."""
     global _motor
     _motor = None
+    _creadas.clear()
 
 
 def existe(tabla):
@@ -86,16 +147,13 @@ def guardar(base_id, df):
     return len(df)
 
 
-def leer(base_id, deptos, niveles, desde, hasta):
-    """Filas de una base filtradas por departamento, nivel (códigos E/R/M) y periodo (AAAA-MM), en el orden de las hojas."""
-    b = BASES[base_id]
-    if not existe(b.tabla) or not deptos:
-        return pd.DataFrame(columns=b.columnas)
+def _filtro(b, deptos, niveles, desde, hasta):
+    """(WHERE, parámetros) de una base por departamento, nivel y periodo; None si no puede haber filas."""
+    if not deptos or (b.usa_niveles and not niveles):
+        return None
     params = {f"d{i}": d for i, d in enumerate(deptos)}
     filtro = [f"_depto IN ({', '.join(':' + k for k in params)})"]
     if b.usa_niveles:
-        if not niveles:
-            return pd.DataFrame(columns=b.columnas)
         params.update({f"n{i}": n for i, n in enumerate(niveles)})
         filtro.append(f"_nivel IN ({', '.join(':n' + str(i) for i in range(len(niveles)))})")
     a0, m0 = int(desde[:4]), int(desde[5:7])
@@ -106,11 +164,39 @@ def leer(base_id, deptos, niveles, desde, hasta):
     else:
         filtro.append("(_anio * 100 + _mes) BETWEEN :p0 AND :p1")
         params.update(p0=a0 * 100 + m0, p1=a1 * 100 + m1)
+    return " AND ".join(filtro), params
+
+
+def _orden(b):
+    return ["_anio", "_mes", "_depto", "_nivel"] + [c for c in b.columnas if c not in ("AÑO", "MES", b.valor)]
+
+
+def leer(base_id, deptos, niveles, desde, hasta):
+    """Filas de una base filtradas por departamento, nivel (códigos E/R/M) y periodo (AAAA-MM), en el orden de las hojas."""
+    b = BASES[base_id]
+    f = _filtro(b, deptos, niveles, desde, hasta)
+    if f is None or not existe(b.tabla):
+        return pd.DataFrame(columns=b.columnas)
     with motor().connect() as cx:
-        df = _completar(pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE {" AND ".join(filtro)}'), cx, params=params), b)
-    orden = ["_anio", "_mes", "_depto", "_nivel"] + [c for c in b.columnas if c not in ("AÑO", "MES", b.valor)]
+        df = _completar(pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE {f[0]}'), cx, params=f[1]), b)
+    orden = _orden(b)
     df = df.sort_values(orden, ascending=[False, True] + [True] * (len(orden) - 2), kind="stable")
     return df[b.columnas].reset_index(drop=True)
+
+
+def muestra(base_id, deptos, niveles, desde, hasta, filas):
+    """(número de filas, las primeras «filas» en el orden de las hojas), contadas y cortadas en la base de datos: la
+    vista previa de descargas antes leía la base entera (cientos de miles de filas) para mostrar 8, en cada cambio de filtro."""
+    b = BASES[base_id]
+    f = _filtro(b, deptos, niveles, desde, hasta)
+    if f is None or not existe(b.tabla):
+        return 0, pd.DataFrame(columns=b.columnas)
+    with motor().connect() as cx:
+        tiene = {c["name"] for c in inspect(cx).get_columns(b.tabla)}
+        orden = ", ".join(f'"{c}"' + (" DESC" if i == 0 else "") for i, c in enumerate(_orden(b)) if c in tiene)
+        total = cx.execute(text(f'SELECT COUNT(*) FROM "{b.tabla}" WHERE {f[0]}'), f[1]).scalar()
+        df = pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE {f[0]} ORDER BY {orden} LIMIT {int(filas)}'), cx, params=f[1])
+    return int(total or 0), _completar(df, b)[b.columnas]
 
 
 def filas_guardadas(base_id, depto, anio, meses):
@@ -175,9 +261,8 @@ def ultima_carga():
 
 # ── Avance de los scrapers en GitHub (barra de carga de la página): una fila por corrida y tramo ──
 def _progreso():
-    with motor().begin() as cx:
-        cx.execute(text("CREATE TABLE IF NOT EXISTS progreso (corrida TEXT, tramo INTEGER, fraccion REAL, texto TEXT, fecha TEXT, "
-                        "PRIMARY KEY (corrida, tramo))"))
+    crear_tablas("CREATE TABLE IF NOT EXISTS progreso (corrida TEXT, tramo INTEGER, fraccion REAL, texto TEXT, fecha TEXT, "
+                 "PRIMARY KEY (corrida, tramo))")
 
 
 def guardar_progreso(corrida, tramo, fraccion, texto):
@@ -208,8 +293,7 @@ def progreso(corridas):
 
 # ── Documentos (p. ej. el mapa de lotes de hidrocarburos): un archivo por nombre ──
 def _documentos():
-    with motor().begin() as cx:
-        cx.execute(text("CREATE TABLE IF NOT EXISTS documentos (nombre TEXT PRIMARY KEY, contenido TEXT, modificado TEXT, fecha TEXT)"))
+    crear_tablas("CREATE TABLE IF NOT EXISTS documentos (nombre TEXT PRIMARY KEY, contenido TEXT, modificado TEXT, fecha TEXT)")
 
 
 def guardar_documento(nombre, contenido, modificado):
