@@ -851,7 +851,7 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
                      periodo: str = "", comparar: str = "", formato: str = Query("json", pattern="^(json|xlsx)$"), anexos: bool = False):
     """Gasto corriente no financiero o inversión pública de un departamento: mes y acumulado de un año contra otro
     (comparar = año; por defecto el anterior), por nivel y por genérica o función, con variación real (IPC de Lima),
-    avance del PIM (inversión) y series para los gráficos. formato=xlsx incluye las variaciones alarmantes (inversión)."""
+    avance del PIM (inversión) y series para los gráficos. formato=xlsx incluye las principales variaciones (inversión)."""
     region = _ejecucion(departamento, periodo, comparar)
     ipc.refrescar()
     niveles = list(NIVELES.values())
@@ -1134,7 +1134,7 @@ def sunat_propuesta_excel(departamento: str, periodo: str):
 
 @app.get("/v1/variaciones", dependencies=[Depends(acceso)])
 def variaciones_inversion(departamento: str = Query(..., pattern=r"^\d{2}$"), periodo: str = "", comparar: str = ""):
-    """Variaciones alarmantes de la inversión: 5 mayores aumentos y caídas en soles (mes y acumulado), por todos los
+    """Principales variaciones de la inversión: 5 mayores aumentos y caídas en soles (mes y acumulado), por todos los
     niveles, por nivel y función y por municipalidad."""
     region = _ejecucion(departamento, periodo, comparar)
     v = ejecucion.variaciones(_panel_inversion(departamento), _panel_muni(departamento), periodo or None, comparar or None)
@@ -1185,7 +1185,7 @@ def proyectos_actualizar(mes: str = Query("", pattern=r"^(\d{4}-(0[1-9]|1[0-2]))
 
 @app.get("/v1/fiscal/archivos", dependencies=[Depends(acceso)])
 def fiscal_archivos():
-    """Los Excel de los notebooks fiscales guardados en la base: Fiscal-<Depto>_AUTO.xlsx y Variaciones alarmantes
+    """Los Excel de los notebooks fiscales guardados en la base: Fiscal-<Depto>_AUTO.xlsx y Principales variaciones
     (Fiscal_Procesamiento) y Proyectos variaciones (Fiscal_Proyectos), el más reciente primero."""
     return {"archivos": db.archivos("fiscal"), "configurado": mef.configurado()}
 

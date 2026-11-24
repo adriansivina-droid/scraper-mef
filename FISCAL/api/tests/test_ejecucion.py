@@ -1,5 +1,5 @@
 """Ejecución del presupuesto: gasto corriente no financiero, inversión, variación real con IPC, avance del PIM,
-comparación de años y variaciones alarmantes, con números hechos a mano para poder verificarlos."""
+comparación de años y principales variaciones, con números hechos a mano para poder verificarlos."""
 import io
 from datetime import date
 
@@ -200,14 +200,14 @@ def test_procesamiento_del_notebook(datos, tmp_path, monkeypatch):
     g = ps.correr(Path(__file__).resolve().parents[2] / "Fiscal_Procesamiento.ipynb", raiz)
     assert g["ULTIMO_MES"].strftime("%Y-%m") == "2026-09"
     nombres = ps.guardar(raiz / "Procesamiento" / "output")
-    assert nombres == ["Fiscal-Loreto_AUTO.xlsx", "Fiscal-SanMartin_AUTO.xlsx", "Fiscal-Ucayali_AUTO.xlsx", "Variaciones alarmantes 2026-09.xlsx"]
+    assert nombres == ["Fiscal-Loreto_AUTO.xlsx", "Fiscal-SanMartin_AUTO.xlsx", "Fiscal-Ucayali_AUTO.xlsx", "Principales variaciones 2026-09.xlsx"]
     wb = load_workbook(raiz / "Procesamiento/output/Fiscal-Loreto_AUTO.xlsx")
     assert wb.sheetnames[:2] == ["GASTO G.N.", "INVERSIÓN G.N."] and "CONTROL" in wb.sheetnames
 
     lista = datos.get("/v1/fiscal/archivos").json()["archivos"]
     assert sorted(a["nombre"] for a in lista) == sorted(nombres)
-    r = datos.get("/v1/fiscal/archivos/descargar", params={"nombre": "Variaciones alarmantes 2026-09.xlsx"})
-    assert r.status_code == 200 and "Variaciones" in r.headers["content-disposition"]
+    r = datos.get("/v1/fiscal/archivos/descargar", params={"nombre": "Principales variaciones 2026-09.xlsx"})
+    assert r.status_code == 200 and "Principales variaciones" in r.headers["content-disposition"]
     assert load_workbook(io.BytesIO(r.content)).sheetnames[-1] == "DETALLE"
     assert datos.get("/v1/fiscal/archivos/descargar", params={"nombre": "otro.xlsx"}).status_code == 404
 

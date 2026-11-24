@@ -29,7 +29,7 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 | Notebook | Dato | Nivel de gobierno | Regiones | Ruta de consulta |
 |---|---|---|---|---|
 | `Fiscal_Scraper.ipynb` | Devengado mensual y PIM (unificado) | E, R y M | LOR, SMN, UCA (detalle municipal: `DEPARTAMENTOS_NACIONAL`, o los 25) | ver §12 |
-| `Fiscal_Procesamiento.ipynb` | Workbooks `Fiscal-<Depto>_AUTO.xlsx` y Variaciones alarmantes | E, R y M | LOR, SMN, UCA | lee los CSV del scraper |
+| `Fiscal_Procesamiento.ipynb` | Workbooks `Fiscal-<Depto>_AUTO.xlsx` y Principales variaciones | E, R y M | LOR, SMN, UCA | lee los CSV del scraper |
 | `Fiscal_Proyectos.ipynb` | Top 5 proyectos por función (mensual) | E, R y M | LOR, SMN, UCA | Depto (Meta) → Nivel → Función → Proyecto |
 
 Los seis scrapers anteriores (`DEV_Funcion_*`, `MEF_DEV_Funcion_GobiernoRegional_*`, `PIM_Funcion_*`) se retiraron: `Fiscal_Scraper.ipynb`
@@ -247,7 +247,7 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 
 - `Fiscal_Scraper.ipynb`: un solo notebook que reemplaza a los scrapers DEV/PIM de LOR-SMN-UCA. Monta Drive y guarda en `MyDrive/Fiscal/Scrapeo/output/` (DEVENGADO por nivel, PIM, CARPETA DE CONTROL).
 - `Fiscal_Procesamiento.ipynb`: lee esos CSV más `Fiscal/Procesamiento/input/IPC.xlsx` y genera `Fiscal-<Depto>_AUTO.xlsx` en `Fiscal/Procesamiento/output/`.
-- **Bloque 6 · Variaciones alarmantes** (en el Procesamiento): crea `Variaciones alarmantes AAAA-MM.xlsx` en la carpeta de Drive `VARIACIONES_FOLDER_ID` (`1LgIhySIoywZDMTGPyD9rvjiBHc1FYvDl`).
+- **Bloque 6 · Principales variaciones** (en el Procesamiento): crea `Principales variaciones AAAA-MM.xlsx` en la carpeta de Drive `VARIACIONES_FOLDER_ID` (`1LgIhySIoywZDMTGPyD9rvjiBHc1FYvDl`).
   - Arriba de cada hoja: el total de inversión de cada nivel de gobierno (G.N., G.R., G.L.) y de los tres juntos, contra el mismo periodo del año anterior. Equivale a la vista del MEF Genérica 6-26 > Mes > Departamento (Meta) > Nivel de Gobierno.
   - Luego, los 5 mayores aumentos y las 5 mayores caídas del devengado de la genérica 2.6, **ordenados por monto en soles corrientes, no por %**.
   - Columnas: `# | Ítem | periodo anterior | periodo actual | Diferencia S/ | Var. %`. `Var. %` es referencial.
@@ -265,7 +265,7 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 
 - **`Fiscal_Proyectos.ipynb`** muestra los proyectos detrás de las variaciones. Genera `Proyectos variaciones AAAA-MM.xlsx` en la carpeta de Drive `PROYECTOS_FOLDER_ID` (`1aUFb4bqz3ZU6_5bbTRYl4f0V4-nX2Cy2`).
   - Lee los CSV `DEV Funcion.*` del scraper y, por departamento y nivel, compara el último mes con el mismo mes del año anterior. Solo hace la comparación mensual.
-  - Si el total del nivel subió, toma las 5 funciones de "▲ Mayores aumentos" y consulta el año actual. Si bajó, toma las 5 de "▼ Mayores caídas" y consulta el año anterior. Usa el mismo criterio que Variaciones alarmantes.
+  - Si el total del nivel subió, toma las 5 funciones de "▲ Mayores aumentos" y consulta el año actual. Si bajó, toma las 5 de "▼ Mayores caídas" y consulta el año anterior. Usa el mismo criterio que Principales variaciones.
   - Ruta en el MEF: Genérica 6-26 > Mes > Departamento (Meta) > Nivel > Función > Proyecto (clave `31`). Guarda los 5 proyectos con mayor devengado del mes.
   - 15: Transporte junta los proyectos de las funciones 15 y 16.
   - No cruza proyectos entre años: un proyecto que ya no figura en el año actual aparece en la consulta del año anterior. Lo decidió el usuario.

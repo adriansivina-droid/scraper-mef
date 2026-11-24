@@ -450,7 +450,7 @@ En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
   sin Colab (`FISCAL/automatizacion/procesamiento_servidor.py`) al terminar cada corrida del scraper del MEF, o con el
   botón «Volver a procesar». Los CSV de `Scrapeo/output` se arman desde la base (con los mismos nombres y columnas que
   deja el scraper; la deuda desglosada vuelve a `DEV Deuda`) y el `IPC.xlsx`, con el IPC cargado en la página. Sus
-  Excel (`Fiscal-<Depto>_AUTO.xlsx` y «Variaciones alarmantes AAAA-MM.xlsx») se guardan en la base y se descargan en la
+  Excel (`Fiscal-<Depto>_AUTO.xlsx` y «Principales variaciones AAAA-MM.xlsx») se guardan en la base y se descargan en la
   pestaña **Archivos** de Gasto corriente e Inversión pública.
 - **IPC de Lima** (variación real): se trae solo de la API del BCRP (serie `IPC_SERIE_BCRP`, por defecto `PN38705PM`
   y, de respaldo, `PN01270PM`). Si no responde, se usa el `IPC.xlsx` que se suba en la página. Sin IPC, los
@@ -580,7 +580,7 @@ Todos piden el usuario y la contraseña (autenticación básica), salvo `/salud`
 | GET | `/v1/descargas/empleo` | Empleo en el formato LONG del scraper, una hoja (`regiones=Loreto,San Martín` o `todas`; `desde`, `hasta` opcionales; `formato=xlsx`, `csv` o `json`) |
 | GET | `/v1/cuadros/pesca` | Producción pesquera de Loreto, San Martín o Ucayali (`departamento=16/22/25`, `periodo`, `comparar`, `formato`); en Loreto, también el Cuadro Nº 07 |
 | GET | `/v1/cuadros/ejecucion` | Gasto corriente (`sector=gasto`) o inversión (`sector=inversion`) de un departamento: `periodo`, `comparar` (año), `formato=json` o `xlsx` |
-| GET | `/v1/variaciones` | Variaciones alarmantes de la inversión (`departamento`, `periodo`, `comparar`) |
+| GET | `/v1/variaciones` | Principales variaciones de la inversión (`departamento`, `periodo`, `comparar`) |
 | GET | `/v1/proyectos` | Proyectos detrás de las variaciones del último mes calculado |
 | POST | `/v1/proyectos/actualizar` | Lanza la consulta de proyectos en GitHub Actions |
 | GET | `/v1/contraste/ejecucion?departamento=&sector=` | Lo guardado en la página contra lo publicado por el MEF (vista anual, de los CONTROL del scraper) |

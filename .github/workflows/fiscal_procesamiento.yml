@@ -1,6 +1,6 @@
 # Procesamiento fiscal: corre FISCAL/Fiscal_Procesamiento.ipynb sin Colab con los datos de la base del API y guarda sus
 # Excel en la página (FISCAL/automatizacion/procesamiento_servidor.py): Fiscal-<Depto>_AUTO.xlsx de Loreto, San Martín y
-# Ucayali y «Variaciones alarmantes AAAA-MM.xlsx». Se descargan en Ejecución del presupuesto → Archivos.
+# Ucayali y «Principales variaciones AAAA-MM.xlsx». Se descargan en Ejecución del presupuesto → Archivos.
 #   · solo, al terminar el scraper del MEF (con éxito)
 #   · a mano: Actions → «Fiscal · procesamiento» → Run workflow, o el botón de la pestaña «Archivos»
 # Requiere el secreto DATABASE_URL. No consulta al MEF: tarda un par de minutos.

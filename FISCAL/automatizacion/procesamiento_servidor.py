@@ -3,7 +3,7 @@
     python FISCAL/automatizacion/procesamiento_servidor.py
 
 El notebook lee los CSV de Scrapeo/output y el IPC.xlsx de Procesamiento/input y genera Fiscal-<Depto>_AUTO.xlsx (los
-cuadros de gasto, inversión y PIM de cada región) y «Variaciones alarmantes AAAA-MM.xlsx». Aquí:
+cuadros de gasto, inversión y PIM de cada región) y «Principales variaciones AAAA-MM.xlsx». Aquí:
   · los CSV se arman con las bases del API (las que carga el scraper del MEF), con los mismos nombres y columnas que
     deja el scraper; el IPC.xlsx, con el IPC de Lima cargado en la página;
   · se corren todos sus bloques; la subida a Drive del bloque 6 se reemplaza por guardar los Excel en la base, de donde
