@@ -848,7 +848,8 @@ def _panel_inversion(departamento):
 
 @app.get("/v1/cuadros/ejecucion", dependencies=[Depends(acceso)])
 def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector: str = Query("gasto", pattern="^(gasto|inversion)$"),
-                     periodo: str = "", comparar: str = "", formato: str = Query("json", pattern="^(json|xlsx)$"), anexos: bool = False):
+                     periodo: str = "", comparar: str = "", formato: str = Query("json", pattern="^(json|xlsx)$"), anexos: bool = False,
+                     nivel: str = Query("", pattern="^[ERM]?$")):
     """Gasto corriente no financiero o inversión pública de un departamento: mes y acumulado de un año contra otro
     (comparar = año; por defecto el anterior), por nivel y por genérica o función, con variación real (IPC de Lima),
     avance del PIM (inversión) y series para los gráficos. formato=xlsx incluye las principales variaciones (inversión)."""
@@ -862,7 +863,7 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
         pim = ejecucion.panel_pim(db.leer("inv-pim-funcion", [departamento], niveles, "1990-01", "2100-12"))
     serie_ipc = ipc.serie()
     try:
-        c = ejecucion.cuadros(sector, panel, pim, serie_ipc, periodo or None, comparar or None)
+        c = ejecucion.cuadros(sector, panel, pim, serie_ipc, periodo or None, comparar or None, nivel or None)
     except ValueError as e:
         raise HTTPException(422, str(e))
     if c is None:
@@ -874,7 +875,7 @@ def cuadro_ejecucion(departamento: str = Query(..., pattern=r"^\d{2}$"), sector:
         v = None
         if sector == "inversion":
             v = ejecucion.variaciones(panel, _panel_muni(departamento), c["periodo"], str(c["comparar"]))
-        nombre = f"{'Gasto corriente' if sector == 'gasto' else 'Inversión pública'} {region} {c['periodo']} vs {c['comparar']}.xlsx"
+        nombre = f"{'Gasto corriente' if sector == 'gasto' else 'Inversión pública'} {region}{' ' + ejecucion.CORTO[nivel] if nivel else ''} {c['periodo']} vs {c['comparar']}.xlsx"
         return Response(ejecucion.excel(region, c, v), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers=_adjunto(nombre))
     return {"region": region, "cuadros": c, "ipc": ipc.estado()}

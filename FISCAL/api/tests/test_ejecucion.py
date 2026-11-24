@@ -94,6 +94,27 @@ def test_inversion_avance_pim_y_comparar(datos):
     assert datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&periodo=2027-01").status_code == 422
 
 
+
+def test_inversion_de_un_solo_nivel(datos):
+    """Con nivel=M el detalle, las series y el avance son solo de los Gobiernos Locales; el cuadro por nivel no cambia."""
+    todos = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&periodo=2026-06").json()["cuadros"]
+    c = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&periodo=2026-06&nivel=M").json()["cuadros"]
+    assert c["nivel"] == "M" and c["nivel_nombre"] == "Gobiernos Locales" and todos["nivel"] is None
+    assert c["niveles"] == todos["niveles"]
+    d = {f["nombre"]: f for f in c["detalle"]}
+    assert set(d) == {"15: TRANSPORTE", "20: SALUD", "Total"}                 # sin 22: EDUCACION (solo G.R.)
+    assert d["15: TRANSPORTE"]["acum_a"] == 186.0 and d["15: TRANSPORTE"]["pim"] == 500.0
+    assert d["Total"]["acum_a"] == 216.0 == {f["nombre"]: f for f in c["niveles"]}["Gobiernos Locales"]["acum_a"]
+    assert c["mensual"]["a"][5] == 36.0 and c["mensual"]["a"][9] is None
+    assert c["avance"]["a"][5] == round(216 / 700 * 100, 1)
+    assert c["interanual"][-1]["var_nominal"] == round((360 / 310 - 1) * 100, 1)
+    r = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&nivel=M&formato=xlsx")
+    assert "G.L." in r.headers["content-disposition"]
+    assert "Gobiernos Locales" in load_workbook(io.BytesIO(r.content))["Cuadro"]["A2"].value
+    g = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=gasto&nivel=R").json()["cuadros"]
+    assert g["detalle"][-1]["acum_a"] == {f["nombre"]: f for f in g["niveles"]}["Gobiernos Regionales"]["acum_a"]
+    assert datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&nivel=X").status_code == 422
+
 def test_variaciones_alarmantes(datos):
     v = datos.get("/v1/variaciones?departamento=16").json()["variaciones"]
     mes, acum = v["comparaciones"]

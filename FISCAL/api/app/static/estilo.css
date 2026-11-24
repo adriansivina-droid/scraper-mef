@@ -420,3 +420,9 @@ body.sin-descargas :is(#manu-xlsx, #emp-xlsx, #hid-xlsx, #ex-xlsx, #et-xlsx, #es
 .cmp-desc { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--mid); cursor: pointer; max-width: 76ch; } .cmp-desc b { color: var(--ink); }
 .cmp-desc input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--navy); flex: none; }
 .hid-tip .hid-dudoso { color: #B03A2E; }
+
+/* Ejecución del presupuesto: qué nivel de gobierno se está viendo */
+.nivel-visto { margin: 4px 0 8px; color: var(--mid); }
+.nivel-visto b { color: var(--navy); }
+tr.elegido td { background: color-mix(in srgb, var(--navy) 9%, transparent); font-weight: 700; }
+tr.elegido td:first-child { box-shadow: inset 3px 0 0 var(--navy); }

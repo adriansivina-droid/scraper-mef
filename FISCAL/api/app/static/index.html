@@ -597,7 +597,9 @@
   const soles = (v) => v == null ? "" : Math.round(v * 1e6).toLocaleString("es-PE");     // de millones a soles completos
   const mill = (v) => v == null ? "" : v.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const delta = (v) => v == null ? '<span class="delta">n.d.</span>' : `<span class="delta ${v >= 0 ? "sube" : "baja"}">${v >= 0 ? "▲" : "▼"} ${pct(Math.abs(v))} %</span>`;
-  const estadoEjec = (clave) => paneles[clave] || (paneles[clave] = { periodo: "", comparar: "", vista: "mes" });
+  const estadoEjec = (clave) => paneles[clave] || (paneles[clave] = { periodo: "", comparar: "", vista: "mes", nivel: "" });
+  // qué nivel de gobierno se detalla en «Cuadros»: los tres juntos o uno
+  const NIVELES_EJ = [["", "Los tres niveles"], ["E", "Gobierno Nacional"], ["R", "Gobiernos Regionales"], ["M", "Gobiernos Locales"]];
   function selectorEjec(c, clave, extra) {
     const meses = MESES.filter((m) => m >= `${c.anios[0]}-01` && m <= c.ultimo).reverse();
     return `<div class="fila controles">
@@ -865,13 +867,14 @@
     const clave = `ej-${sector}-${grupo}`, st = estadoEjec(clave);
     caja.innerHTML = '<div class="loading"><span class="spin"></span>Armando los cuadros…</div>';
     try {
-      const q = new URLSearchParams({ departamento: r.cod, sector, periodo: st.periodo, comparar: st.comparar });
+      const q = new URLSearchParams({ departamento: r.cod, sector, periodo: st.periodo, comparar: st.comparar, nivel: st.nivel });
       const j = await api(`/v1/cuadros/ejecucion?${q}`), c = j.cuadros;
       if (!c) { caja.innerHTML = `<div class="vacio-caja"><b>Todavía no hay datos del MEF de ${esc(r.nombre)}.</b><span>Lanza el scraper del MEF (Perú → Actualización).</span></div>`; return; }
       const inv = sector === "inversion", a = c.anio, b = c.comparar, mes = c.titulo_mes, m3 = mes.slice(0, 3), real = c.real;
       const vm = (f) => real ? f.var_mes : f.var_mes_nominal, va = (f) => real ? f.var_acum : f.var_acum_nominal;
-      const tot = c.niveles[c.niveles.length - 1], parejo = Math.round(+c.periodo.slice(5) / 12 * 1000) / 10;
-      const tiles = `<div class="stats tiles">
+      const quien = c.nivel_nombre || "Total de los tres niveles de gobierno", unNivel = !!c.nivel;
+      const tot = (unNivel && c.niveles.find((f) => f.nombre === quien)) || c.niveles[c.niveles.length - 1], parejo = Math.round(+c.periodo.slice(5) / 12 * 1000) / 10;
+      const tiles = `<p class="nivel-visto">Viendo: <b>${esc(quien)}</b></p><div class="stats tiles">
         <div class="stat"><small>${esc(mes)} ${a}</small><b>S/ ${soles(tot.mes_a)}</b>${delta(vm(tot))}<span>vs ${esc(mes.toLowerCase())} ${b}: S/ ${soles(tot.mes_b)}</span></div>
         <div class="stat"><small>Ene.-${m3}. ${a}</small><b>S/ ${soles(tot.acum_a)}</b>${delta(va(tot))}<span>vs Ene.-${m3}. ${b}: S/ ${soles(tot.acum_b)}</span></div>
         ${inv ? `<div class="stat"><small>Avance del PIM ${a}</small><b>${pct(tot.avance)} %</b>${avanceBarra(tot.avance, parejo)}<span>${tot.avance_b != null ? `a ${esc(mes.toLowerCase())} de ${b}: ${pct(tot.avance_b)} %` : ""} · ritmo parejo: ${pct(parejo)} %</span></div>
@@ -879,34 +882,37 @@
         : c.participacion.map((p) => `<div class="stat"><small>${esc(p.nivel)} · Ene.-${m3}. ${a}</small><b>${pct(p.pct)} %</b><span>del gasto corriente (S/ ${soles(p.valor)})</span></div>`).join("")}
       </div>`;
       const cab = `<tr><th></th><th class="n">${mes} ${b}</th><th class="n">${mes} ${a}</th><th class="n">Var. %</th><th class="n">Ene.-${m3}. ${b}</th><th class="n">Ene.-${m3}. ${a}</th><th class="n">Var. %</th>${inv ? '<th class="n">PIM</th><th>Avance del PIM</th>' : ""}</tr>`;
-      const fila = (f) => `<tr class="${f.nombre === "Total" ? "total" : ""}"><td>${esc(f.nombre)}</td><td class="n">${soles(f.mes_b)}</td><td class="n">${soles(f.mes_a)}</td><td class="n ${vm(f) == null ? "" : vm(f) >= 0 ? "sube" : "baja"}">${pct(vm(f))}</td>
+      const fila = (f, marcar) => `<tr class="${f.nombre === "Total" ? "total" : ""}${marcar && unNivel && f.nombre === quien ? " elegido" : ""}"><td>${esc(f.nombre)}</td><td class="n">${soles(f.mes_b)}</td><td class="n">${soles(f.mes_a)}</td><td class="n ${vm(f) == null ? "" : vm(f) >= 0 ? "sube" : "baja"}">${pct(vm(f))}</td>
         <td class="n">${soles(f.acum_b)}</td><td class="n">${soles(f.acum_a)}</td><td class="n ${va(f) == null ? "" : va(f) >= 0 ? "sube" : "baja"}">${pct(va(f))}</td>${inv ? `<td class="n">${soles(f.pim)}</td><td>${avanceBarra(f.avance, parejo)}</td>` : ""}</tr>`;
       const titulo = inv ? "INVERSIÓN PÚBLICA" : "GASTO CORRIENTE NO FINANCIERO";
       const inei = !!(j.ipc && String(j.ipc.fuente || "").startsWith("INEI")), hastaIpc = j.ipc && j.ipc.hasta ? ` (hasta ${esc(etqMes(j.ipc.hasta))})` : "";
       const nota = `${real ? `Var. % real: deflactada con el índice mensual del IPC de Lima Metropolitana ${inei ? "del INEI, base dic. 2021 = 100" : `(respaldo: ${esc((j.ipc && j.ipc.fuente) || "")}; sube el Excel del INEI en «Actualizar»)`}${hastaIpc}`
         : `Var. % nominal: falta el IPC de Lima del mes${hastaIpc}. Sube el Excel del INEI (n01_indice-precios_al_consumidor-lm_….xlsx) en «Actualizar»`}. Soles corrientes.`;
       const comp = c.participacion, sumaP = comp.reduce((s, p) => s + (p.valor || 0), 0);
-      caja.innerHTML = `${selectorEjec(c, clave, `<button class="btn" type="button" id="${clave}-x">Descargar en Excel</button>`)}
+      const segNivel = `<div class="campo">Nivel de gobierno<div class="segmento" role="group" aria-label="Nivel de gobierno">${NIVELES_EJ.map(([k, t]) => `<button type="button" data-nivel="${k}" aria-pressed="${(c.nivel || "") === k}">${t}</button>`).join("")}</div></div>`;
+      const sub = ` · ${esc(quien)}`;
+      caja.innerHTML = `${selectorEjec(c, clave, `${segNivel}<button class="btn" type="button" id="${clave}-x">Descargar en Excel</button>`)}
         ${tiles}
         <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ${titulo} POR NIVEL DE GOBIERNO</h3><p>(Soles y variación % ${real ? "real" : "nominal"})</p>
-          <div class="scroll"><table>${cab}${c.niveles.map(fila).join("")}</table></div><p class="nota">${nota}${inv ? " La marca en la barra de avance es el ritmo parejo (meses transcurridos / 12)." : ""}</p></div>
-        <div class="caja"><h3>Mes a mes · ${a} vs ${b}</h3><p>(Millones de soles)</p>${leyenda([["anio-a", a], ["anio-b", b]])}<div class="scroll">${barrasAnios(c.mensual, a, b)}</div></div>
-          <div class="caja"><h3>Acumulado del año · ${a} vs ${b}</h3><p>(Millones de soles)</p>${leyenda([["anio-a", a], ["anio-b", b]])}<div class="scroll">${lineas([{ nombre: String(b), clase: "anio-b", valores: c.mensual.acum_b }, { nombre: String(a), clase: "anio-a", valores: c.mensual.acum_a }], c.mensual.meses, "")}</div></div>
-        ${inv && c.avance ? `<div class="caja"><h3>Avance del PIM · ${a} vs ${b}</h3><p>(Devengado acumulado como % del PIM de cada año)</p>${leyenda([["anio-a", a], ["anio-b", b], ["parejo", "Ritmo parejo"]])}
+          <div class="scroll"><table>${cab}${c.niveles.map((f) => fila(f, true)).join("")}</table></div><p class="nota">${nota}${inv ? " La marca en la barra de avance es el ritmo parejo (meses transcurridos / 12)." : ""}</p></div>
+        <div class="caja"><h3>Mes a mes · ${a} vs ${b}${sub}</h3><p>(Millones de soles)</p>${leyenda([["anio-a", a], ["anio-b", b]])}<div class="scroll">${barrasAnios(c.mensual, a, b)}</div></div>
+          <div class="caja"><h3>Acumulado del año · ${a} vs ${b}${sub}</h3><p>(Millones de soles)</p>${leyenda([["anio-a", a], ["anio-b", b]])}<div class="scroll">${lineas([{ nombre: String(b), clase: "anio-b", valores: c.mensual.acum_b }, { nombre: String(a), clase: "anio-a", valores: c.mensual.acum_a }], c.mensual.meses, "")}</div></div>
+        ${inv && c.avance ? `<div class="caja"><h3>Avance del PIM · ${a} vs ${b}${sub}</h3><p>(Devengado acumulado como % del PIM de cada año)</p>${leyenda([["anio-a", a], ["anio-b", b], ["parejo", "Ritmo parejo"]])}
           <div class="scroll">${lineas([{ nombre: "Ritmo parejo", clase: "parejo", valores: c.avance.parejo }, { nombre: String(b), clase: "anio-b", valores: c.avance.b }, { nombre: String(a), clase: "anio-a", valores: c.avance.a }], c.mensual.meses, " %")}</div></div>` : ""}
         <div class="grid2">
-          <div class="caja"><h3>Variación % ${real ? "real" : "nominal"} respecto al mismo mes del año anterior</h3><p>(Total de los tres niveles)</p><div id="${clave}-ia"></div></div>
-          <div class="caja"><h3>Participación por nivel · Ene.-${m3}. ${a}</h3><p>(% del total)</p>
+          <div class="caja"><h3>Variación % ${real ? "real" : "nominal"} respecto al mismo mes del año anterior</h3><p>(${esc(quien)})</p><div id="${clave}-ia"></div></div>
+          <div class="caja"><h3>Participación por nivel · Ene.-${m3}. ${a}</h3><p>(% del total de los tres niveles)</p>
             <div class="participa">${comp.map((p, i) => `<div class="niv-${i}" style="flex:${Math.max(p.valor || 0, 0.0001)}" title="${esc(p.nivel)}: ${pct(p.pct)} %"><b>${esc(p.nivel)}</b><span>${pct(p.pct)} %</span></div>`).join("")}</div>
             <table class="mini">${comp.map((p, i) => `<tr><td><i class="cuadro niv-${i}"></i>${esc(p.nivel)}</td><td class="n">S/ ${soles(p.valor)}</td><td class="n">${pct(p.pct)} %</td></tr>`).join("")}<tr class="total"><td>Total</td><td class="n">S/ ${soles(sumaP)}</td><td class="n">100,0 %</td></tr></table></div>
         </div>
-        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ${titulo} POR ${inv ? "FUNCIÓN" : "GENÉRICA"}</h3><p>(Soles y variación % ${real ? "real" : "nominal"}${inv ? "; 16: Comunicaciones va en 15: Transporte" : ""})</p>
-          <div class="scroll"><table>${cab}${c.detalle.map(fila).join("")}</table></div></div>`;
+        <div class="caja"><h3>${esc(r.nombre.toUpperCase())}: ${titulo} POR ${inv ? "FUNCIÓN" : "GENÉRICA"} · ${esc(quien.toUpperCase())}</h3><p>(Soles y variación % ${real ? "real" : "nominal"}${inv ? "; 16: Comunicaciones va en 15: Transporte" : ""})</p>
+          <div class="scroll"><table>${cab}${c.detalle.map((f) => fila(f, false)).join("")}</table></div></div>`;
       const g = c.interanual.map((x) => ({ periodo: x.periodo, var: real ? x.var : x.var_nominal })).filter((x) => x.var != null);
       $(`${clave}-ia`).innerHTML = barrasVar(g, 380);
       const cambiar = () => { st.periodo = $(`${clave}-p`).value; st.comparar = $(`${clave}-c`).value; if (st.comparar >= st.periodo.slice(0, 4)) st.comparar = ""; cuadrosEjecucion(sector, r, caja); };
       $(`${clave}-p`).addEventListener("change", cambiar); $(`${clave}-c`).addEventListener("change", cambiar);
-      $(`${clave}-x`).addEventListener("click", () => { window.location.href = `/v1/cuadros/ejecucion?${new URLSearchParams({ departamento: r.cod, sector, periodo: c.periodo, comparar: c.comparar, formato: "xlsx" })}`; });
+      caja.querySelectorAll("[data-nivel]").forEach((bt) => bt.addEventListener("click", () => { if (st.nivel !== bt.dataset.nivel) { st.nivel = bt.dataset.nivel; cuadrosEjecucion(sector, r, caja); } }));
+      $(`${clave}-x`).addEventListener("click", () => { window.location.href = `/v1/cuadros/ejecucion?${new URLSearchParams({ departamento: r.cod, sector, periodo: c.periodo, comparar: c.comparar, nivel: c.nivel || "", formato: "xlsx" })}`; });
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudieron armar los cuadros</b><span>${esc(e.message)}</span></div>`; }
   }
 
