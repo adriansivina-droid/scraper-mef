@@ -95,7 +95,7 @@
     gasto: { t: "Gasto corriente no financiero", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF el día 2 de cada mes, o con el botón", bases: () => GASTO, actualizar: "mef",
       lead: "Gasto corriente no financiero por nivel de gobierno y genérica, mes y acumulado, con variación real y comparación entre años.", cuadros: "ejecucion", extra: ["ESTAD", "Contraste", "Archivos"] },
     inversion: { t: "Inversión pública", fuente: "MEF, Consulta Amigable", entra: "Scraper del MEF el día 2 de cada mes, o con el botón", bases: () => INV, actualizar: "mef",
-      lead: "Inversión pública por nivel de gobierno y función, avance del PIM, variaciones alarmantes y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Variaciones alarmantes", "Proyectos", "ESTAD", "Contraste", "Archivos"] },
+      lead: "Inversión pública por nivel de gobierno y función, avance del PIM, principales variaciones y los proyectos que las explican.", cuadros: "ejecucion", extra: ["Principales variaciones", "Proyectos", "ESTAD", "Contraste", "Archivos"] },
     drae: { t: "Gráficos DRAE", fuente: "Las SERIES del departamento (Excel con los gráficos)", entra: "Subiendo las SERIES en «Actualizar»", estado: "ok", cuadros: "drae", actualizar: "series",
       lead: "Los gráficos de las SERIES del departamento (los del DRAE), con sus datos y la paleta del Seminario de Periodistas: listos para copiar o descargar en SVG o PNG." },
     hidrologia: { t: "Hidrología", fuente: "SENAMHI, Monitoreo Hidrológico (nivel y caudal de los ríos)", entra: "Recolector en el navegador (SENAMHI no responde a servidores) y subir el archivo en «Actualizar»", cuadros: "hidrologia",
@@ -969,7 +969,7 @@
       const j = await api("/v1/fiscal/archivos");
       const clave = r.nombre.normalize("NFD").replace(/[\u0300-\u036f\s]/g, "");
       const tipo = (n) => n.startsWith("Fiscal-") ? (n.startsWith(`Fiscal-${clave}_`) ? 0 : 3) : n.startsWith("Variaciones") ? 1 : n.startsWith("Proyectos") ? 2 : 4;
-      const que = ["Cuadros de gasto, inversión y PIM de " + r.nombre + " (Fiscal_Procesamiento)", "Variaciones alarmantes de las tres regiones (Fiscal_Procesamiento, bloque 6)",
+      const que = ["Cuadros de gasto, inversión y PIM de " + r.nombre + " (Fiscal_Procesamiento)", "Principales variaciones de las tres regiones (Fiscal_Procesamiento, bloque 6)",
         "Proyectos detrás de las variaciones, tres regiones (Fiscal_Proyectos)", "Cuadros de otra región (Fiscal_Procesamiento)", "Otro"];
       const lista = j.archivos.slice().sort((a, b) => tipo(a.nombre) - tipo(b.nombre) || b.nombre.localeCompare(a.nombre));
       const boton = j.configurado ? '<button class="btn sec" type="button" id="ar-lanzar">Volver a procesar</button>' : "";
@@ -1848,7 +1848,7 @@
     else if (t === "Cuadros" && s.cuadros === "ejecucion") panel = `<div id="cuadros-ejec" data-sector="${id}"></div>`;
     else if (t === "Cuadros" && s.cuadros === "pesca") panel = '<div id="cuadros-pesca"></div>';
     else if (t === "Cuadros" && (s.cuadros === "exportaciones" || s.cuadros === "importaciones")) panel = `<div id="cuadros-expo" data-flujo="${s.cuadros === "exportaciones" ? "expo" : "impo"}"></div>`;
-    else if (t === "Variaciones alarmantes") panel = '<div id="variaciones"></div>';
+    else if (t === "Principales variaciones") panel = '<div id="variaciones"></div>';
     else if (t === "Proyectos") panel = '<div id="proyectos"></div>';
     else if (t === "Archivos") panel = '<div id="archivos-fiscal"></div>';
     else if (t === BCRP_TAB) panel = `<div id="bcrp" data-sector="${id}"></div>`;
