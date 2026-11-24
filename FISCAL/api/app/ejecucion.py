@@ -5,7 +5,7 @@ departamento, con lo que pide el informe y más para mirar:
     genérica (gasto) o función (inversión), en millones de soles, con variación % real (deflactada con el IPC de Lima)
     y nominal; en inversión, además, el PIM y su avance;
   · series mensuales de los dos años (y su acumulado), la variación real interanual y la participación de cada nivel;
-  · variaciones alarmantes: los 5 mayores aumentos y caídas de la inversión en soles (mismo criterio que el Bloque 6 de
+  · principales variaciones: los 5 mayores aumentos y caídas de la inversión en soles (mismo criterio que el Bloque 6 de
     Fiscal_Procesamiento.ipynb), por todos los niveles juntos, por nivel y función y por municipalidad.
 
 Gasto corriente no financiero = genéricas de tipo de transacción 5 (personal, pensiones, bienes y servicios,
@@ -273,7 +273,7 @@ def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None):
     return salida
 
 
-# ── Variaciones alarmantes (inversión, soles corrientes) ──
+# ── Principales variaciones (inversión, soles corrientes) ──
 def _tops(t):
     """t: DataFrame ITEM, ANTES, AHORA. Siempre TOP aumentos (mayores diferencias) y TOP caídas (menores), sin ítems en 0
     en ambos periodos y sin repetir un ítem en las dos listas (Fiscal_Procesamiento, Bloque 6)."""

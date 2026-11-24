@@ -968,7 +968,7 @@
     try {
       const j = await api("/v1/fiscal/archivos");
       const clave = r.nombre.normalize("NFD").replace(/[\u0300-\u036f\s]/g, "");
-      const tipo = (n) => n.startsWith("Fiscal-") ? (n.startsWith(`Fiscal-${clave}_`) ? 0 : 3) : n.startsWith("Variaciones") ? 1 : n.startsWith("Proyectos") ? 2 : 4;
+      const tipo = (n) => n.startsWith("Fiscal-") ? (n.startsWith(`Fiscal-${clave}_`) ? 0 : 3) : (n.startsWith("Principales variaciones") || n.startsWith("Variaciones")) ? 1 : n.startsWith("Proyectos") ? 2 : 4;
       const que = ["Cuadros de gasto, inversión y PIM de " + r.nombre + " (Fiscal_Procesamiento)", "Principales variaciones de las tres regiones (Fiscal_Procesamiento, bloque 6)",
         "Proyectos detrás de las variaciones, tres regiones (Fiscal_Proyectos)", "Cuadros de otra región (Fiscal_Procesamiento)", "Otro"];
       const lista = j.archivos.slice().sort((a, b) => tipo(a.nombre) - tipo(b.nombre) || b.nombre.localeCompare(a.nombre));
