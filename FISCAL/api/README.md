@@ -13,7 +13,7 @@ descargar un Excel con una hoja por base, con el formato de `PIM_Funcion.xlsx`.
 | 2 | El scraper del MEF corre solo (GitHub Actions, día 2 de cada mes) o con el botón «Actualizar desde el MEF», y carga directo en la base de datos | **lista** |
 | Empleo | Base de empleo del MTPE (scraper en GitHub Actions, días 2 y 21, o botón «Actualizar empleo»), con el cuadro, el gráfico y el anexo de la síntesis por región | **lista** |
 | Hidrocarburos | Producción por lote y canon de PERUPETRO, que guarda en la página el flujo diario de `HIDROCARBUROS/`, con el cuadro, el gráfico, el anexo por lote y el canon de la síntesis | **lista** |
-| 3 | Ejecución del presupuesto: cuadros de gasto corriente e inversión (var. % real con el IPC de Lima, avance del PIM, comparación entre años), variaciones alarmantes y proyectos (GitHub Actions tras el scraper) | **lista** |
+| 3 | Ejecución del presupuesto: cuadros de gasto corriente e inversión (var. % real con el IPC de Lima, avance del PIM, comparación entre años), principales variaciones y proyectos (GitHub Actions tras el scraper) | **lista** |
 
 ## Hoja de ruta: el informe completo
 
@@ -438,8 +438,8 @@ En Loreto, San Martín y Ucayali, sección **V. Ejecución del presupuesto**:
   - gráficos: mes a mes y acumulado de los dos años, variación real interanual y participación de cada nivel;
   - en inversión, además, PIM, avance del PIM contra el ritmo parejo (meses / 12) y la curva de avance de los dos
     años;
-  - descarga en Excel (con las variaciones alarmantes, en inversión).
-- **Variaciones alarmantes** (inversión): los 5 mayores aumentos y caídas en soles corrientes, del mes y del acumulado,
+  - descarga en Excel (con las principales variaciones, en inversión).
+- **Principales variaciones** (inversión): los 5 mayores aumentos y caídas en soles corrientes, del mes y del acumulado,
   por todos los niveles juntos, por nivel y función y por municipalidad. Es el criterio del Bloque 6 de
   `Fiscal_Procesamiento.ipynb`: siempre 5 aumentos (las 5 mayores diferencias), sin ítems en 0 y sin repetir.
 - **Proyectos**: `.github/workflows/fiscal_proyectos.yml` corre `Fiscal_Proyectos.ipynb` sin Colab
