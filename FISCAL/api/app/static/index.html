@@ -610,11 +610,19 @@
   // barras agrupadas: dos años mes a mes (millones de soles)
   function barrasAnios(m, a, b) {
     const W = 760, H = 250, base0 = 196, izq = 6, bw = (W - izq) / 12, vals = [...m.a, ...m.b].filter((x) => x != null), max = Math.max(0.001, ...vals);
-    const barra = (v, i, k) => v == null ? "" : `<rect class="${k ? "anio-a" : "anio-b"}" x="${izq + i * bw + bw * (k ? 0.5 : 0.12)}" y="${base0 - v / max * 160}" width="${bw * 0.38}" height="${Math.max(v / max * 160, 1)}" rx="2"><title>${esc(m.meses[i])} ${k ? a : b}: S/ ${mill(v)} millones</title></rect>
-      ${k ? `<text class="val" x="${izq + i * bw + bw * 0.69}" y="${base0 - v / max * 160 - 4}" text-anchor="middle">${mill(v)}</text>` : ""}`;
+    // valor sobre cada barra, de los dos años; si los dos rótulos de un mes quedan a la misma altura, el más alto sube
+    const tope = (v) => base0 - v / max * 160 - 4, SEP = 11;
+    const rotulo = (i, k) => {
+      const v = (k ? m.a : m.b)[i], o = (k ? m.b : m.a)[i];
+      if (v == null) return "";
+      let y = tope(v);
+      if (o != null && Math.abs(y - tope(o)) < SEP && (v > o || (v === o && k))) y = tope(o) - SEP;
+      return `<text class="val${k ? "" : " val-b"}" x="${izq + i * bw + bw * (k ? 0.69 : 0.31)}" y="${y}" text-anchor="middle">${mill(v)}</text>`;
+    };
+    const barra = (v, i, k) => v == null ? "" : `<rect class="${k ? "anio-a" : "anio-b"}" x="${izq + i * bw + bw * (k ? 0.5 : 0.12)}" y="${base0 - v / max * 160}" width="${bw * 0.38}" height="${Math.max(v / max * 160, 1)}" rx="2"><title>${esc(m.meses[i])} ${k ? a : b}: S/ ${mill(v)} millones</title></rect>`;
     const etiquetas = m.meses.map((x, i) => `<text x="${izq + i * bw + bw / 2}" y="${H - 30}" text-anchor="middle">${esc(x)}</text>`).join("");
     return `<svg class="barras" viewBox="0 0 ${W} ${H - 18}" role="img" aria-label="Mes a mes, ${a} contra ${b}"><line class="eje" x1="0" x2="${W}" y1="${base0}" y2="${base0}"></line>
-      ${m.b.map((v, i) => barra(v, i, 0)).join("")}${m.a.map((v, i) => barra(v, i, 1)).join("")}${etiquetas}</svg>`;
+      ${m.b.map((v, i) => barra(v, i, 0)).join("")}${m.a.map((v, i) => barra(v, i, 1)).join("")}${m.meses.map((_, i) => rotulo(i, 0) + rotulo(i, 1)).join("")}${etiquetas}</svg>`;
   }
   // líneas (un eje): series [{nombre, clase, valores[12]}]
   function lineas(series, meses, sufijo, H = 230) {
