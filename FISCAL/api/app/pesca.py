@@ -126,7 +126,9 @@ def long_ornamentales(xls):
         for k, destino in DESTINOS.items():
             if u[k]:
                 filas.append((destino, ' '.join(str(r.iloc[1]).split()), ' '.join(str(r.iloc[2]).split()), u[k] / 1000))
-    df = pd.DataFrame(filas, columns=['DESTINO', 'ESPECIE', 'ESPECIE_CORREGIDA', 'VOLUMEN'])
+    # ESPECIE = nombre científico (identifica la especie: hay nombres comunes repetidos) y ESPECIE_CORREGIDA = nombre común,
+    # como en el pescado de consumo, donde ESPECIE_CORREGIDA es el nombre común que se lee en los cuadros
+    df = pd.DataFrame(filas, columns=['DESTINO', 'ESPECIE_CORREGIDA', 'ESPECIE', 'VOLUMEN'])
     df['ESTADO'], df['UNIDAD'] = 'ORNAMENTAL', 'miles de unidades'
     df['ESPECIE_OK'] = df['ESPECIE_CUADRO'] = 'Peces ornamentales'
     df['FUENTE'] = 'Certificados de procedencia'
@@ -342,6 +344,24 @@ def _internas(base_id, df, n_archivo):
     return df
 
 
+def orientar_ornamentales(df, guardado, nombre=''):
+    """Un LONG de Loreto bajado antes de noviembre de 2026 trae los ornamentales al revés (ESPECIE = nombre común,
+    ESPECIE_CORREGIDA = científico). Se reconoce comparando con los nombres científicos ya guardados en la página y se
+    endereza; si no hay con qué comparar, se deja como viene."""
+    orn = df['ESTADO'].astype(str).str.upper().eq('ORNAMENTAL')
+    if not orn.any() or guardado is None or not len(guardado):
+        return df
+    cientificos = set(guardado.loc[guardado['ESTADO'].astype(str).str.upper().eq('ORNAMENTAL'), 'ESPECIE'].dropna().astype(str))
+    bien = df.loc[orn, 'ESPECIE'].astype(str).isin(cientificos).sum()
+    reves = df.loc[orn, 'ESPECIE_CORREGIDA'].astype(str).isin(cientificos).sum()
+    if reves > bien:
+        df = df.copy()
+        df.loc[orn, ['ESPECIE', 'ESPECIE_CORREGIDA']] = df.loc[orn, ['ESPECIE_CORREGIDA', 'ESPECIE']].values
+        AVISOS.append(f'{nombre}: los peces ornamentales venían con ESPECIE y ESPECIE_CORREGIDA intercambiadas (formato '
+                      f'anterior); se cargaron con ESPECIE = nombre científico y ESPECIE_CORREGIDA = nombre común.')
+    return df
+
+
 def leer(archivos, historico):
     """archivos: [(n_archivo, ruta, base_id, hoja_long)] · historico(base_id) -> LONG ya guardado en la base de datos.
     -> {base_id: DataFrame con columnas internas}, avisos. Un crudo gana a un LONG que traiga el mismo periodo."""
@@ -356,6 +376,8 @@ def leer(archivos, historico):
             if faltan:
                 AVISOS.append(f'{Path(ruta).name}: faltan las columnas {", ".join(faltan)}; no se cargó.')
                 continue
+            if base_id == 'pesca-loreto':
+                df = orientar_ornamentales(df, historico(base_id), Path(ruta).name)
             longs.setdefault(base_id, []).append(df)
             partes.setdefault(base_id, []).append(_internas(base_id, df, n))
     for n, ruta, base_id, hoja in archivos:

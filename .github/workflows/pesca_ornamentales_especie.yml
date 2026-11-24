@@ -1,0 +1,27 @@
+# Una sola vez: corrige ESPECIE ↔ ESPECIE_CORREGIDA en los peces ornamentales de Loreto ya guardados en Neon (desde
+# noviembre de 2026, ESPECIE = nombre científico y ESPECIE_CORREGIDA = nombre común). Correrlo otra vez no hace nada.
+# Actions → «Pesca · corregir especies de ornamentales» → Run workflow. Requiere el secreto DATABASE_URL.
+name: Pesca · corregir especies de ornamentales
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  corregir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: FISCAL/api/requirements.txt
+      - run: pip install -r FISCAL/api/requirements.txt
+      - name: Corregir
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python FISCAL/automatizacion/pesca_ornamentales_especie.py

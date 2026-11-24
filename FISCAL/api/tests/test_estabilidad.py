@@ -85,3 +85,16 @@ def test_base_caida_da_503_legible(monkeypatch):
         assert r.status_code == 503 and "no responde" in r.json()["detail"]
     finally:
         db.reiniciar_motor()
+
+
+def test_distintos_y_filas_donde_sin_bajar_la_base(cliente):
+    filas = [{"AÑO": 2026, "MES": f"{m:02d}: X", "NIVEL_GOBIERNO": "R: X", "DEPARTAMENTO": "16: LORETO", "COD_GENERICA": c,
+              "GENERICA": c, "DESGLOSE": "SIN DESGLOSE", "DEVENGADO": float(m)} for m in (1, 2, 3) for c in ("5-2-1", "6-2-6")]
+    df = pd.DataFrame(filas)
+    db.guardar("gasto-dev-generica", df.assign(_anio=2026, _mes=df["MES"].str[:2].astype(int), _depto="16", _nivel="R"))
+    assert sorted(db.distintos("gasto-dev-generica", ["_anio", "_mes"])) == [(2026, 1), (2026, 2), (2026, 3)]
+    assert db.distintos("gasto-dev-generica", ["COD_GENERICA"], '"DEVENGADO" > :v', {"v": 2}) in ([("5-2-1",), ("6-2-6",)], [("6-2-6",), ("5-2-1",)])
+    d = db.filas_donde("gasto-dev-generica", '"COD_GENERICA" = :c', {"c": "6-2-6"})
+    assert len(d) == 3 and list(d.columns) == db.BASES["gasto-dev-generica"].columnas
+    assert d.equals(db.leer("gasto-dev-generica", ["16"], ["R"], "2026-01", "2026-03").query('COD_GENERICA == "6-2-6"').reset_index(drop=True))
+    assert db.distintos("inv-dev-funcion", ["_mes"]) == [] and db.filas_donde("inv-dev-funcion", "1 = 1").empty   # tabla que no existe

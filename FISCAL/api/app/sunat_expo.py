@@ -984,8 +984,10 @@ def descripciones_nuevas(mes, limite=60):
         return []
     sug = Sugeridor(unicos)
     grupos = []
-    for (partida, nombre), g in nuevas.groupby(["PARTIDA", "PRODUCTO"], dropna=False):
-        descs = g.groupby("DESCRIPCION")["FOB"].sum().sort_values(ascending=False)
+    # las sumas por descripción, de una vez para todo el mes (antes, una agrupación de pandas por cada partida)
+    por_desc = nuevas.groupby(["PARTIDA", "PRODUCTO", "DESCRIPCION"], dropna=False)["FOB"].sum().groupby(level=[0, 1], dropna=False)
+    for ((partida, nombre), g), (_, descs) in zip(nuevas.groupby(["PARTIDA", "PRODUCTO"], dropna=False), por_desc):
+        descs = descs.droplevel([0, 1]).sort_values(ascending=False)
         votos = {}
         for d, fob in descs.items():
             n, p = sug.sugerir(d)
@@ -1009,10 +1011,8 @@ def unificar(contiene, nombre):
     if len(k) < 3 or not str(nombre or "").strip():
         raise ValueError("Escribe el texto (al menos 3 letras) y el nombre común.")
     un = leer_tabla("unicos")
-    base = db.leer_todo("expo-sunat")
     descs = set(un.loc[un["PRODUCTO_ORIGINAL"].map(_clave).str.contains(k, regex=False), "PRODUCTO_ORIGINAL"])
-    if base is not None:
-        descs |= set(base.loc[base["DESCRIPCION"].map(_clave).str.contains(k, regex=False), "DESCRIPCION"])
+    descs |= {d for (d,) in db.distintos("expo-sunat", ["DESCRIPCION"]) if d is not None and k in _clave(d)}   # solo las distintas
     asignar_nombres([{"descripciones": sorted(descs), "nombre": str(nombre).strip()}])
     return sorted(descs)
 
@@ -1133,9 +1133,8 @@ def _txt(v):
 
 def pendientes_ruc():
     """RUC sin razón social (para el flujo del padrón de SUNAT): los de la base que no están en EMPRESAS o no tienen nombre."""
-    base = db.leer_todo("expo-sunat")
     emp = leer_tabla("empresas")
-    rucs = set(base["RUC"].astype(str)) if base is not None else set()
+    rucs = {str(r) for (r,) in db.distintos("expo-sunat", ["RUC"]) if r is not None}   # antes bajaba la base entera (~250 MB)
     con_nombre = set(emp.loc[emp["RAZON_SOCIAL"].notna() & (emp["RAZON_SOCIAL"].astype(str).str.strip() != ""), "RUC"].astype(str))
     return sorted(rucs - con_nombre)
 

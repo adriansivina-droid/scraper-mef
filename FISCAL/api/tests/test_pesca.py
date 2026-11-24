@@ -117,6 +117,9 @@ def test_loreto_consumo_y_ornamentales(cliente):
     assert orn.groupby("DESTINO").VOLUMEN.sum().to_dict() == pytest.approx(
         {"Mercado externo": 4.3, "Mercado interno": 0.5, "Stock remanente y/o mortandad": 0.2})
     assert orn.VBP.sum() == pytest.approx(5.0 * 1.0329)
+    # ESPECIE = nombre científico, ESPECIE_CORREGIDA = nombre común (como en el pescado de consumo)
+    assert set(orn.ESPECIE) == {"Otocinclus vestitus", "Sturisoma sp.", "Sturisoma nigrirostrum"}
+    assert set(orn.ESPECIE_CORREGIDA) == {"otocinclos comun", "sturiosoma"}
 
 
 def test_loreto_recargar_consumo_no_borra_ornamentales(cliente):
@@ -173,3 +176,18 @@ def test_excel_de_pesca(cliente):
 def test_excel_que_no_es_de_pesca(cliente):
     r = subir(cliente, **{"otro.xlsx": _libro({"Hoja1": [["A", "B"], [1, 2]]})})
     assert r["bases"] == {} and any("ni un Excel de pesca" in a for a in r["avisos"])
+
+
+def test_long_de_loreto_con_ornamentales_al_reves_se_endereza():
+    from app import pesca
+    guardado = pd.DataFrame({"ESTADO": ["ORNAMENTAL", "ORNAMENTAL", "FRESCO"], "ESPECIE": ["Otocinclus vestitus", "Sturisoma sp.", "Boquichico"],
+                             "ESPECIE_CORREGIDA": ["otocinclos comun", "sturiosoma", "Boquichico"]})
+    viejo = pd.DataFrame({"ESTADO": ["ORNAMENTAL", "ORNAMENTAL", "FRESCO"], "ESPECIE": ["otocinclos comun", "sturiosoma", "Manitoa"],
+                          "ESPECIE_CORREGIDA": ["Otocinclus vestitus", "Sturisoma sp.", "Zúngaro Manitoa"]})
+    pesca.AVISOS.clear()
+    d = pesca.orientar_ornamentales(viejo, guardado, "LOR_PESCA_LONG.xlsx")
+    assert d.ESPECIE.tolist() == ["Otocinclus vestitus", "Sturisoma sp.", "Manitoa"]          # el consumo no se toca
+    assert d.ESPECIE_CORREGIDA.tolist() == ["otocinclos comun", "sturiosoma", "Zúngaro Manitoa"]
+    assert pesca.AVISOS and "intercambiadas" in pesca.AVISOS[0]
+    assert pesca.orientar_ornamentales(d, guardado).equals(d)                                  # ya derecho: igual
+    assert pesca.orientar_ornamentales(viejo, None).equals(viejo)                              # sin referencia: como viene
