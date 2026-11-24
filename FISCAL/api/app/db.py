@@ -199,6 +199,29 @@ def muestra(base_id, deptos, niveles, desde, hasta, filas):
     return int(total or 0), _completar(df, b)[b.columnas]
 
 
+def distintos(base_id, columnas, donde="", params=None):
+    """Combinaciones distintas de unas columnas (lista de tuplas), calculadas en la base de datos: por ejemplo los meses
+    o los RUC de una base sin bajar sus cientos de miles de filas. «donde» es SQL con parámetros con nombre."""
+    b = BASES[base_id]
+    if not existe(b.tabla):
+        return []
+    cols = ", ".join(f'"{c}"' for c in columnas)
+    with motor().connect() as cx:
+        return [tuple(f) for f in cx.execute(text(f'SELECT DISTINCT {cols} FROM "{b.tabla}"' + (f" WHERE {donde}" if donde else "")), params or {}).all()]
+
+
+def filas_donde(base_id, donde, params=None):
+    """Las filas de una base que cumplen una condición SQL (con las columnas del catálogo), sin bajar el resto."""
+    b = BASES[base_id]
+    if not existe(b.tabla):
+        return pd.DataFrame(columns=b.columnas)
+    with motor().connect() as cx:
+        df = _completar(pd.read_sql(text(f'SELECT * FROM "{b.tabla}" WHERE {donde}'), cx, params=params or {}), b)
+    orden = _orden(b)                                    # el mismo orden que leer(): «el primero de cada grupo» no cambia
+    df = df.sort_values(orden, ascending=[False, True] + [True] * (len(orden) - 2), kind="stable")
+    return df[b.columnas].reset_index(drop=True)
+
+
 def filas_guardadas(base_id, depto, anio, meses):
     """Filas tal como están en la tabla (con sus columnas internas) de un departamento, año y meses."""
     b = BASES[base_id]

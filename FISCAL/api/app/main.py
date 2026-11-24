@@ -54,7 +54,7 @@ class TrabajosPesados:
     demás, incluso abrir una pestaña, quedaba esperando) y podían agotar la memoria y reiniciar el servidor. Los que
     sobran esperan su turno hasta ESPERA_S segundos; después reciben un 503 legible («el servidor está ocupado»)."""
     MAX_PESADOS, ESPERA_S = 2, 90
-    _RUTAS = ("/v1/descargas", "/v1/cargas", "/v1/ejecucion/estad", "/v1/hidrologia/reporte", "/v1/hidrologia/paquete",
+    _RUTAS = ("/v1/descargas", "/v1/cargas", "/v1/ejecucion/estad", "/v1/exportaciones/sunat/", "/v1/importaciones/base/", "/v1/hidrologia/reporte", "/v1/hidrologia/paquete",
               "/v1/hidrologia/descargar", "/v1/bcrp/excel", "/v1/hidrocarburos/archivos/descargar")
     _FORMATOS = re.compile(rb"(?:^|&)formato=(?:xlsx|csv|long|pptx|zip)(?:&|$)")
 
@@ -1013,15 +1013,19 @@ def impo_corregir(tabla: str, cuerpo: dict = Body(...)):
     filas = cuerpo.get("filas")
     if not isinstance(filas, list):
         raise HTTPException(422, "Falta la lista «filas».")
+    # solo se reprocesan las filas que la corrección toca (los RUC o las partidas): antes, la base entera cada vez
     if tabla == "empresas":
         sunat_impo.actualizar_empresas(filas)
-    elif tabla == "partidas":
+        return {"filas": sunat_impo.reprocesar("RUC", [re.sub(r"\D", "", str(f.get("RUC") or "")) for f in filas]), "parcial": True}
+    if tabla == "partidas":
         sunat_impo.actualizar_partidas(filas)
-    elif tabla == "nombres":
+        return {"filas": sunat_impo.reprocesar("PARTIDA", [re.sub(r"\D", "", str(f.get("PARTIDA") or "")).zfill(10) for f in filas]), "parcial": True}
+    if tabla == "nombres":
         sunat_impo.asignar_nombres(filas)
-    else:
-        raise HTTPException(404, f"No hay tabla {tabla!r}.")
-    return {"filas": sunat_impo.reprocesar()}
+        originales = {f.get("original") for f in filas if f.get("original")}
+        part = sunat_impo.leer_tabla("partidas")
+        return {"filas": sunat_impo.reprocesar("PARTIDA", part.loc[part["PRODUCTO"].isin(originales), "PARTIDA"].astype(str)), "parcial": True}
+    raise HTTPException(404, f"No hay tabla {tabla!r}.")
 
 
 @app.post("/v1/importaciones/estad", dependencies=[Depends(acceso)])

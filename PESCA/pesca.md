@@ -88,8 +88,8 @@ ESPECIE_CUADRO, UNIDAD, VOLUMEN, VBP`.
 
 - **Pescado** (consumo humano directo): `UNIDAD = t`, `DESTINO` vacío.
 - **Peces ornamentales:** `ESTADO = ORNAMENTAL`, `UNIDAD = miles de unidades`, `DESTINO` como en el Cuadro Nº 07
-  (mercado externo, mercado interno, stock remanente y/o mortandad). `ESPECIE` es el nombre común,
-  `ESPECIE_CORREGIDA` el nombre científico y `ESPECIE_OK` y `ESPECIE_CUADRO` dicen «Peces ornamentales».
+  (mercado externo, mercado interno, stock remanente y/o mortandad). `ESPECIE` es el nombre científico,
+  `ESPECIE_CORREGIDA` el nombre común (como en el pescado de consumo, donde es el nombre que se lee) y `ESPECIE_OK` y `ESPECIE_CUADRO` dicen «Peces ornamentales».
   Hay nombres comunes repetidos con distinto nombre científico, por eso el nombre científico distingue cada fila.
   VBP = miles de unidades × 1.0329.
 

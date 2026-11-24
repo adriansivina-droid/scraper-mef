@@ -234,17 +234,39 @@ def leer(archivos):
     return ({"impo-base": pd.concat(partes, ignore_index=True)} if partes else {}), avisos
 
 
-def reprocesar():
+def reprocesar(columna=None, valores=None):
+    """Vuelve a procesar la base con los diccionarios del momento. Con columna y valores (los RUC o las partidas que se
+    corrigieron), solo esas filas: antes cada corrección bajaba, procesaba y volvía a escribir la base entera."""
+    from .catalogo import BASES, INTERNAS
+    b = BASES["impo-base"]
+    if columna is not None:
+        valores = sorted({str(v) for v in (list(valores) if valores is not None else []) if v is not None and str(v) != ""})
+        if not valores or not db.existe(b.tabla):
+            return 0
+        trozos = [valores[i:i + 400] for i in range(0, len(valores), 400)]
+        filtro = lambda tr: (f'"{columna}" IN ({", ".join(":v" + str(i) for i in range(len(tr)))})', {f"v{i}": v for i, v in enumerate(tr)})
+        base = pd.concat([db.filas_donde("impo-base", *filtro(tr)) for tr in trozos], ignore_index=True)
+        if base.empty:
+            return 0
+        df = procesar(base)
+        with db.motor().begin() as cx:                # borrar y volver a escribir en una sola transacción
+            for tr in trozos:
+                w, prm = filtro(tr)
+                cx.execute(text(f'DELETE FROM "{b.tabla}" WHERE {w}'), prm)
+            df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
+        return len(df)
     base = db.leer_todo("impo-base")
     if base is None or base.empty:
         return 0
     df = procesar(base)
-    from .catalogo import BASES, INTERNAS
-    b = BASES["impo-base"]
     with db.motor().begin() as cx:                    # una sola transacción
         db.vaciar(cx, b.tabla)
         df[b.columnas + INTERNAS].to_sql(b.tabla, cx, if_exists="append", index=False, chunksize=5000)
     return len(df)
+
+
+def _meses():
+    return sorted(f"{int(a)}-{int(m):02d}" for a, m in db.distintos("impo-base", ["_anio", "_mes"], "_depto = :d", {"d": "16"}))
 
 
 # ── Revisión, ESTAD propuesto, resumen ──
@@ -282,18 +304,21 @@ def pasar_al_estad(anio, mes):
 
 
 def revision(periodo=None):
-    df = _base()
-    if df.empty:
+    """Baja solo lo que muestra: el mes y, de toda la base, las filas sin razón social o por clasificar (antes, la base
+    entera de todos los años en cada visita a la pestaña)."""
+    meses = _meses()
+    if not meses:
         return None
-    df["AÑO"], df["MES"] = df["AÑO"].astype(int), df["MES"].astype(int)
-    meses = sorted({f"{a}-{m:02d}" for a, m in zip(df["AÑO"], df["MES"])})
     periodo = periodo if periodo in meses else meses[-1]
     a, m = int(periodo[:4]), int(periodo[5:7])
-    mes = df[(df["AÑO"] == a) & (df["MES"] == m)]
+    mes = _base(periodo, periodo)
+    mes["AÑO"], mes["MES"] = mes["AÑO"].astype(int), mes["MES"].astype(int)
     estados = mes.groupby("ESTADO")["FOB"].agg(["count", "sum"]).reset_index().rename(columns={"count": "filas", "sum": "fob"}).to_dict("records")
+    pend = db.filas_donde("impo-base", '_depto = :d AND ("EMPRESA" = :sin OR "ESTADO" = :cl OR "PRODUCTO" = :sd)',
+                          {"d": "16", "sin": "SIN RAZÓN SOCIAL", "cl": "clasificar", "sd": "SIN DESCRIPCIÓN"})
     sin_rs = [{"ruc": r, "fob": float(g["FOB"].sum()), "filas": len(g), "productos": g["PRODUCTO"].value_counts().index[:3].tolist()}
-              for r, g in df[df["EMPRESA"] == "SIN RAZÓN SOCIAL"].groupby("RUC")]
-    falta = df[(df["ESTADO"] == "clasificar") | (df["PRODUCTO"] == "SIN DESCRIPCIÓN")]
+              for r, g in pend[pend["EMPRESA"] == "SIN RAZÓN SOCIAL"].groupby("RUC")]
+    falta = pend[(pend["ESTADO"] == "clasificar") | (pend["PRODUCTO"] == "SIN DESCRIPCIÓN")]
     partidas = [{"partida": p, "fob": float(g["FOB"].sum()), "filas": len(g), "cuode": g["COD_CUODE"].iloc[0], "producto": g["PRODUCTO"].iloc[0],
                  "categoria": g["CATEGORIA"].iloc[0] if g["CATEGORIA"].notna().any() else None} for p, g in falta.groupby("PARTIDA")]
     cu = leer_tabla("cuode")
@@ -379,8 +404,8 @@ def actualizar_partidas(filas):
 
 
 def pendientes_ruc():
-    base = db.leer_todo("impo-base")
-    return sorted(set(base.loc[base["EMPRESA"] == "SIN RAZÓN SOCIAL", "RUC"].astype(str))) if base is not None else []
+    """RUC sin razón social, calculados en la base de datos (antes se bajaba la base entera)."""
+    return sorted({str(r) for (r,) in db.distintos("impo-base", ["RUC"], '"EMPRESA" = :e', {"e": "SIN RAZÓN SOCIAL"}) if r is not None})
 
 
 def guardar_padron(encontrados):
@@ -409,14 +434,15 @@ def _millones(v):
 
 
 def resumen(periodo=None):
-    df = _base()
-    if df.empty:
+    """Baja solo el año elegido y el anterior (antes, la base entera)."""
+    meses = _meses()
+    if not meses:
         return None
-    df["AÑO"], df["MES"] = df["AÑO"].astype(int), df["MES"].astype(int)
-    ok = df[df["ESTADO"] == "ok"]
-    meses = sorted({f"{a}-{m:02d}" for a, m in zip(df["AÑO"], df["MES"])})
     periodo = periodo if periodo in meses else meses[-1]
     a, m = int(periodo[:4]), int(periodo[5:7])
+    df = _base(f"{a - 1}-01", f"{a}-12")
+    df["AÑO"], df["MES"] = df["AÑO"].astype(int), df["MES"].astype(int)
+    ok = df[df["ESTADO"] == "ok"]
     sel = {"mes": ok[(ok["AÑO"] == a) & (ok["MES"] == m)], "acumulado": ok[(ok["AÑO"] == a) & (ok["MES"] <= m)]}
     ant = {"mes": ok[(ok["AÑO"] == a - 1) & (ok["MES"] == m)], "acumulado": ok[(ok["AÑO"] == a - 1) & (ok["MES"] <= m)]}
     hay_ant = bool((df["AÑO"] == a - 1).any())
