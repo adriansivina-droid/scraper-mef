@@ -202,10 +202,14 @@ def _fila(nombre, df, ventanas, defl, pim=None, pim_b=None):
     return f
 
 
-def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None):
-    """sector: 'gasto' o 'inversion'. panel: P/NIVEL/ITEM/MONTO de un departamento; pim: ANIO/NIVEL/ITEM/PIM (inversión)."""
+def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None, nivel=None):
+    """sector: 'gasto' o 'inversion'. panel: P/NIVEL/ITEM/MONTO de un departamento; pim: ANIO/NIVEL/ITEM/PIM (inversión).
+    nivel: None (los tres niveles juntos) o 'E', 'R', 'M'. El cuadro por nivel siempre muestra los tres niveles y el
+    total; el detalle (genérica o función), las series, la variación interanual y el avance del PIM, solo ese nivel."""
     if panel.empty:
         return None
+    if nivel is not None and nivel not in NIVELES:
+        raise ValueError(f"Nivel no válido: {nivel!r} (E, R o M).")
     periodos = sorted(set(panel["P"]))
     ultimo = periodos[-1]
     p = int(periodo.replace("-", "")) if periodo else ultimo
@@ -225,17 +229,20 @@ def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None):
 
     niveles = [_fila(NIVELES[n], panel[panel["NIVEL"] == n], ventanas, defl, pim_de(a, n), pim_de(b, n)) for n in NIVELES]
     niveles.append(_fila("Total", panel, ventanas, defl, pim_de(a), pim_de(b)))
-    items = sorted(set(panel["ITEM"]) | (set(pim[pim["ANIO"] == a]["ITEM"]) if con_pim else set()))
+    base = panel if nivel is None else panel[panel["NIVEL"] == nivel]          # lo que se detalla: todos los niveles o uno
+    pim_n = (pim if nivel is None else pim[pim["NIVEL"] == nivel]) if con_pim else None
+    items = sorted(set(base["ITEM"]) | (set(pim_n[pim_n["ANIO"] == a]["ITEM"]) if con_pim else set()))
     if sector == "gasto":
         items = [n for n, _ in GENERICAS if n in items]
-    detalle = [_fila(i, panel[panel["ITEM"] == i], ventanas, defl, pim_de(a, item=i), pim_de(b, item=i)) for i in items]
+    detalle = [_fila(i, base[base["ITEM"] == i], ventanas, defl, pim_de(a, nivel, i), pim_de(b, nivel, i)) for i in items]
     detalle = [f for f in detalle if f["acum_a"] or f["acum_b"] or f.get("pim")]
     if sector == "inversion":
         detalle.sort(key=lambda f: -f["acum_a"])
-    detalle.append(_fila("Total", panel, ventanas, defl, pim_de(a), pim_de(b)))
+    detalle.append(_fila("Total", base, ventanas, defl, pim_de(a, nivel), pim_de(b, nivel)))
 
     # series de los dos años (millones de soles corrientes), mes a mes y acumuladas, en total y por nivel
-    mensual = panel.groupby("P")["MONTO"].sum() / 1e6
+    hay_mes = panel.groupby("P")["MONTO"].sum().index                    # meses con datos (de cualquier nivel)
+    mensual = base.groupby("P")["MONTO"].sum().reindex(hay_mes, fill_value=0) / 1e6
     serie = lambda anio: [round(float(mensual.get(anio * 100 + k, 0)), 6) if anio * 100 + k in mensual.index else None for k in range(1, 13)]
     acumulada = lambda s: [None if v is None else round(sum(x or 0 for x in s[:i + 1]), 6) for i, v in enumerate(s)]
     sa, sb = serie(a), serie(b)
@@ -245,13 +252,13 @@ def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None):
     interanual = []
     for q in [x for x in periodos if x <= p][-25:]:
         d = Deflactor(ipc, q)
-        ra, rb = d.real(panel, [q]), d.real(panel, [q - 100]) if (q - 100) in periodos else None
+        ra, rb = d.real(base, [q]), d.real(base, [q - 100]) if (q - 100) in periodos else None
         na, nb = float(mensual.get(q, 0)), float(mensual.get(q - 100, 0)) if (q - 100) in periodos else None
         # acumulada 12 meses: los 12 meses que terminan en q contra los 12 anteriores a esos (todos deflactados a q)
         w_a = [(q // 100 - (q % 100 - k <= 0)) * 100 + (q % 100 - k - 1) % 12 + 1 for k in range(12)]
         w_b = [x - 100 for x in w_a]
         hay12 = all(x in periodos for x in w_a + w_b)
-        ra12, rb12 = (d.real(panel, w_a), d.real(panel, w_b)) if hay12 else (None, None)
+        ra12, rb12 = (d.real(base, w_a), d.real(base, w_b)) if hay12 else (None, None)
         na12, nb12 = (float(mensual.reindex(w_a).sum()), float(mensual.reindex(w_b).sum())) if hay12 else (None, None)
         interanual.append({"periodo": etiqueta(q, True), "var": _var(rb, ra) if ra is not None and rb is not None else None,
                            "var_nominal": _var(nb, na) if nb is not None else None,
@@ -261,11 +268,12 @@ def cuadros(sector, panel, pim, ipc, periodo=None, comparar=None):
     participacion = [{"nivel": CORTO[n], "valor": f["acum_a"], "pct": round(f["acum_a"] / total["acum_a"] * 100, 1) if total["acum_a"] else None}
                      for n, f in zip(NIVELES, niveles[:3])]
     salida = {"sector": sector, "periodo": f"{a}-{m:02d}", "ultimo": f"{ultimo // 100}-{ultimo % 100:02d}", "anio": a, "comparar": b,
-              "titulo_mes": MESES[m - 1], "anios": anios, "real": defl.real(panel, ventanas["acum_a"]) is not None and defl.real(panel, ventanas["acum_b"]) is not None,
+              "titulo_mes": MESES[m - 1], "anios": anios,
+              "nivel": nivel, "nivel_nombre": NIVELES[nivel] if nivel else "Total de los tres niveles de gobierno", "real": defl.real(panel, ventanas["acum_a"]) is not None and defl.real(panel, ventanas["acum_b"]) is not None,
               "niveles": niveles, "detalle": detalle, "participacion": participacion, "interanual": interanual,
               "mensual": {"meses": MESES_CORTOS, "a": sa, "b": sb, "acum_a": acumulada(sa), "acum_b": acumulada(sb), "por_nivel": por_nivel}}
     if con_pim:
-        pa, pbm = pim_de(a), pim_de(b)
+        pa, pbm = pim_de(a, nivel), pim_de(b, nivel)
         # avance del PIM mes a mes (acumulado / PIM del año) de los dos años, y el ritmo «parejo» (k/12)
         salida["avance"] = {"a": [None if v is None else round(v * 1e6 / pa * 100, 1) if pa else None for v in salida["mensual"]["acum_a"]],
                             "b": [None if v is None else round(v * 1e6 / pbm * 100, 1) if pbm else None for v in salida["mensual"]["acum_b"]],
@@ -334,9 +342,9 @@ def excel(region, c, v=None):
     inv = c["sector"] == "inversion"
     ws = wb.active
     ws.title = "Cuadro"
-    ws.append([f"{region.upper()}: {titulo}"]); ws.append(["(Millones de soles y variación % real)" if c["real"] else "(Millones de soles y variación % nominal: falta el IPC)"])
+    ws.append([f"{region.upper()}: {titulo}"]); ws.append([f"Detalle, series y avance: {c.get('nivel_nombre') or 'Total de los tres niveles de gobierno'}"]); ws.append(["(Millones de soles y variación % real)" if c["real"] else "(Millones de soles y variación % nominal: falta el IPC)"])
     cab = ["", f"{mes} {b}", f"{mes} {a}", "Var. %", f"Ene.-{mes[:3]}. {b}", f"Ene.-{mes[:3]}. {a}", "Var. %"] + (["PIM", "Avance %"] if inv else [])
-    for nombre, filas in (("Por nivel de gobierno", c["niveles"]), ("Por genérica" if not inv else "Por función", c["detalle"])):
+    for nombre, filas in (("Por nivel de gobierno", c["niveles"]), (("Por genérica" if not inv else "Por función") + (f" · {NIVELES[c['nivel']]}" if c.get("nivel") else ""), c["detalle"])):
         ws.append([]); ws.append([nombre] + cab[1:])
         for x in ws[ws.max_row]:
             x.font, x.alignment = neg, centro
@@ -354,7 +362,7 @@ def excel(region, c, v=None):
     for col in "BCDEFGHI":
         ws.column_dimensions[col].width = 13
     wm = wb.create_sheet("Mensual")
-    wm.append([f"{region.upper()}: {titulo} POR MES"]); wm.append(["(Millones de soles corrientes)"]); wm.append([])
+    wm.append([f"{region.upper()}: {titulo} POR MES · {(c.get('nivel_nombre') or 'Total de los tres niveles de gobierno').upper()}"]); wm.append(["(Millones de soles corrientes)"]); wm.append([])
     wm.append(["Mes", str(b), str(a), f"Acumulado {b}", f"Acumulado {a}"] + (["Avance PIM % " + str(b), "Avance PIM % " + str(a)] if inv and c.get("avance") else []))
     mm = c["mensual"]
     for i, k in enumerate(mm["meses"]):
