@@ -39,4 +39,4 @@ Corre los días 2 y 21 de cada mes, o con el botón «Actualizar empleo» de la 
 cambia el notebook en Colab, el servidor usa la versión nueva; solo hay que mantener la línea `entrada = input(…)`.
 
 En la página, cada región tiene su sección **Empleo** con el cuadro, el gráfico y el anexo de la síntesis (detalle en
-`FISCAL/api/README.md`).
+`PAGINA/README.md`).

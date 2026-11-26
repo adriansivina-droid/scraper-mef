@@ -28,7 +28,7 @@ RAIZ = AQUI.parent.parent
 NOTEBOOK = AQUI.parent / "notebooks" / "Fiscal_Proyectos.ipynb"
 RUTA_COLAB = "/content/drive/MyDrive/Fiscal"
 sys.path.insert(0, str(AQUI))
-sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
+sys.path.insert(0, str(RAIZ / "PAGINA"))
 import procesamiento_servidor  # noqa: E402
 
 CARPETA = {"E": ("Gobierno Nacional", "GobNacional"), "R": ("Gobierno Regional", "GobRegional"), "M": ("Gobierno Municipal", "Municipalidad")}

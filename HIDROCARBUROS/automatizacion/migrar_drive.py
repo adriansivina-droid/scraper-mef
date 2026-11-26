@@ -1,4 +1,4 @@
-"""Copia una sola vez a la página (almacén de FISCAL/api/app/almacen.py) lo que el flujo de hidrocarburos tenía en Drive.
+"""Copia una sola vez a la página (almacén de PAGINA/app/almacen.py) lo que el flujo de hidrocarburos tenía en Drive.
 
     python migrar_drive.py listar     # solo cuenta archivos y MB por carpeta
     python migrar_drive.py copiar     # copia DATA y CONTROL completas (con sus subcarpetas) y carga la página
@@ -13,7 +13,7 @@ import sys
 import time
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(AQUI)), "FISCAL", "api"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(AQUI)), "PAGINA"))
 from app import almacen  # noqa: E402
 
 CARPETA = "application/vnd.google-apps.folder"

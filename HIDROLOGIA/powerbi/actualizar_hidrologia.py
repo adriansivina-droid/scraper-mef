@@ -45,8 +45,10 @@ def configuracion():
 
 
 def motor_hidrologia(sqlite):
-    """El módulo de hidrología de la página (copia en ./motor o, en el repositorio, FISCAL/api/app) sobre el SQLite local."""
-    fuente = next((p for p in (AQUI / "motor", AQUI.parents[1] / "FISCAL" / "api" / "app") if (p / "hidrologia.py").exists()), None)
+    """El módulo de hidrología de la página sobre el SQLite local: la copia en ./motor (archivos sueltos) o, en el
+    repositorio, PAGINA/app (subpaquete hidrologia/, que importa db desde la raíz del paquete)."""
+    fuente = next((p for p in (AQUI / "motor", AQUI.parents[1] / "PAGINA" / "app")
+                   if (p / "hidrologia.py").exists() or (p / "hidrologia" / "hidrologia.py").exists()), None)
     if fuente is None:
         sys.exit("No encuentro hidrologia.py (debe estar en la carpeta «motor» al lado de este archivo).")
     paquete = types.ModuleType("senamhi_local")
@@ -56,7 +58,8 @@ def motor_hidrologia(sqlite):
     motor = create_engine(f"sqlite:///{sqlite}")
     db.motor = lambda: motor
     sys.modules["senamhi_local.db"] = db
-    return importlib.import_module("senamhi_local.hidrologia")
+    anidado = (fuente / "hidrologia" / "hidrologia.py").exists()
+    return importlib.import_module("senamhi_local.hidrologia.hidrologia" if anidado else "senamhi_local.hidrologia")
 
 
 def main():

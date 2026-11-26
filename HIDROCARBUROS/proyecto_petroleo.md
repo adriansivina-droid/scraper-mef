@@ -302,7 +302,7 @@ Desde la sesión de Claude Code **no se puede abrir perupetro.com.pe** (el proxy
   - En la página web (sector hidrocarburos → Cuadros) y en la pestaña «Empresas» del mapa se ve cuánto exportó cada empresa y qué lote operaba.
   - Las exportaciones vienen de SUNAT, en el Excel «Petróleo crudo - Loreto» que se sube en la página; el operador de cada lote sale de la producción de PERUPETRO.
   - Petroperú y Perupetro van fuera por defecto, porque no operan lotes con producción.
-  - Detalle en `mapa_lotes.md` y en `FISCAL/api/README.md`.
+  - Detalle en `mapa_lotes.md` y en `PAGINA/README.md`.
 - **Comparar lotes (26/10/2026):** botón «📊 Comparar lotes» en el selector de capas y «➕ Comparar con otros lotes» en la ficha. Compara varios lotes en barras por año con el cuadro de datos debajo. Variables: producción fiscalizada, canon y sobrecanon generado, y su distribución por departamento. Apilado por lote, por empresa o con barras lado a lado. Descarga en imagen (PNG) y CSV. Detalle en `mapa_lotes.md`.
 
 ## 11. Actualización automática (22/10/2026)

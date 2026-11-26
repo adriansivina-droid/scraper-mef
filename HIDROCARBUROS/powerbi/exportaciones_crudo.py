@@ -36,14 +36,17 @@ def configuracion():
 
 
 def modulo():
-    """hidrocarburos.py de la página (copia en ./motor o, en el repositorio, FISCAL/api/app)."""
-    fuente = next((p for p in (AQUI / "motor", AQUI.parents[1] / "FISCAL" / "api" / "app") if (p / "hidrocarburos.py").exists()), None)
+    """hidrocarburos.py de la página: la copia en ./motor (archivos sueltos) o, en el repositorio, PAGINA/app (subpaquete
+    hidrocarburos/, que importa catalogo desde la raíz del paquete)."""
+    fuente = next((p for p in (AQUI / "motor", AQUI.parents[1] / "PAGINA" / "app")
+                   if (p / "hidrocarburos.py").exists() or (p / "hidrocarburos" / "hidrocarburos.py").exists()), None)
     if fuente is None:
         sys.exit("No encuentro hidrocarburos.py (debe estar en la carpeta «motor» al lado de este archivo).")
     paquete = types.ModuleType("hidro_local")
     paquete.__path__ = [str(fuente)]
     sys.modules["hidro_local"] = paquete
-    return importlib.import_module("hidro_local.hidrocarburos")
+    anidado = (fuente / "hidrocarburos" / "hidrocarburos.py").exists()
+    return importlib.import_module("hidro_local.hidrocarburos.hidrocarburos" if anidado else "hidro_local.hidrocarburos")
 
 
 def produccion():

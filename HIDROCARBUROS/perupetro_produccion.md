@@ -457,6 +457,6 @@ Por eso el cruce de exportaciones mostraba a Petrotal operando el Lote 8 en 2026
 - Una palabra que empieza con el nombre de un operador conocido (PETROTAL, PLUSPETROL, UPLAND, VIGO, UNNA…) abre una frase nueva, aunque esté pegada a la anterior.
 - Una palabra que trae pegado el inicio de otro operador («OILVIGO») se parte en dos.
 
-**Corrección en la página** (`_con_empresa` en `FISCAL/api/app/hidrocarburos.py`): en los meses de la producción diaria, el
+**Corrección en la página** (`_con_empresa` en `PAGINA/app/hidrocarburos.py`): en los meses de la producción diaria, el
 operador leído se lleva al operador que tiene el lote en la estadística mensual. Así se corrigen también los meses ya
 cargados (`tests/test_hidrocarburos.py::test_operadores_pegados_en_la_cabecera_del_reporte_diario`).

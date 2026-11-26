@@ -1,0 +1,282 @@
+"""Contraste con lo publicado por el MEF: los CSV de CONTROL del scraper (Fiscal_Scraper.ipynb).
+
+En cada corrida, el scraper consulta además la vista anual de Consulta Amigable (todo el año, sin elegir mes) y la deja
+en los CSV de CONTROL junto a la suma de los meses que raspó:
+  · CONTROL <Nivel> AAAA … / CONTROL <Bloque> <Nivel> AAAA …  (devengado: DEV_REF_ANUAL = lo publicado por el MEF)
+  · CONTROL PIM Funcion AAAA …                              (PIM: PIM_REF_TOTAL = el total de los tres niveles en el MEF)
+  · CONTROL PIM Funcion.Municipalidad AAAA …                (PIM de GL: PIM_REF_GL = el PIM de gobiernos locales en el MEF)
+Aquí se guarda la referencia del MEF por departamento, nivel, año y código, y `contraste` la compara con lo que la página
+tiene en sus bases para ese mismo año (no con lo que trajo una sola corrida). Del año en curso, la vista anual del MEF
+incluye lo devengado en el mes abierto: la página va por debajo hasta que ese mes se cierre y se raspe.
+"""
+import re
+from datetime import date, datetime, timezone
+
+import pandas as pd
+from sqlalchemy import text
+
+from .. import db
+
+NIVEL_DE_CORTO = {"GobNacional": "E", "GobRegional": "R", "Municipalidad": "M"}
+NIVELES = {"E": "Gobierno Nacional", "R": "Gobiernos Regionales", "M": "Gobiernos Locales"}
+_RE_DEV = re.compile(r"^CONTROL (?:(Generica|Fuente|InvFuente|Deuda) )?(GobNacional|GobRegional|Municipalidad) (\d{4})")
+_RE_PIM = re.compile(r"^CONTROL PIM Funcion(?:\.Municipalidad)? (\d{4})")
+# qué base de la página corresponde a cada bloque del scraper: (base, columna del monto, título, columna del código,
+# columna del nombre, qué es cada fila, descripción para la página)
+BLOQUES = {"Funcion": ("inv-dev-funcion", "DEVENGADO", "Inversión por función", "FUNCION", "FUNCION", "Función",
+                       "Devengado de la inversión (genérica 2.6, adquisición de activos no financieros) de los tres niveles de gobierno, "
+                       "por función: en qué se invierte (transporte, educación, salud…)."),
+           "InvFuente": ("inv-dev-fuente", "DEVENGADO", "Inversión por fuente de financiamiento", "COD_FUENTE", "FUENTE", "Fuente",
+                         "La misma inversión (genérica 2.6), partida por fuente de financiamiento: con qué dinero se paga (recursos "
+                         "ordinarios del Tesoro, recursos determinados como el canon y el FONCOMUN, endeudamiento, donaciones…). "
+                         "Suma lo mismo que la inversión por función."),
+           "Generica": ("gasto-dev-generica", "DEVENGADO", "Gasto por genérica", "COD_GENERICA", "GENERICA", "Genérica",
+                        "Devengado de todas las genéricas de gasto de los tres niveles de gobierno: personal, pensiones, bienes y "
+                        "servicios, donaciones y transferencias, otros gastos, inversión (2.6) y deuda."),
+           "Fuente": ("gasto-dev-fuente", "DEVENGADO", "Gasto por fuente de financiamiento", "COD_FUENTE", "FUENTE", "Fuente",
+                      "Todo el gasto (todas las genéricas), partido por fuente de financiamiento: con qué dinero se paga.")}
+POR_SECTOR = {"gasto": ["Generica", "Fuente"], "inversion": ["Funcion", "InvFuente"]}
+
+
+def _tabla():
+    db.crear_tablas("CREATE TABLE IF NOT EXISTS mef_controles (bloque TEXT, nivel TEXT, anio INTEGER, depto TEXT, codigo TEXT, "
+                    "ref DOUBLE PRECISION, fecha TEXT, archivo TEXT)")
+
+
+def leer(nombre, df):
+    """Un CSV de CONTROL -> filas (bloque, nivel, anio, depto, codigo, ref) o None si no es un control conocido."""
+    m, p = _RE_DEV.match(nombre), _RE_PIM.match(nombre)
+    depto = lambda: df["DEPARTAMENTO"].astype(str).str.extract(r"^(\d+)")[0].str.zfill(2)
+    if p and "Municipalidad" in nombre and "PIM_REF_GL" in df.columns:
+        return pd.DataFrame({"bloque": "PIM_M", "nivel": "M", "anio": int(p.group(1)), "depto": depto(),
+                             "codigo": df["COD_FUNCION"].astype(str), "ref": pd.to_numeric(df["PIM_REF_GL"], errors="coerce").fillna(0)})
+    if p and "Municipalidad" not in nombre and "PIM_REF_TOTAL" in df.columns:
+        return pd.DataFrame({"bloque": "PIM", "nivel": "", "anio": int(p.group(1)), "depto": df["DEPARTAMENTO"].astype(str).str.extract(r"^(\d+)")[0].str.zfill(2),
+                             "codigo": df["COD_FUNCION"].astype(str), "ref": pd.to_numeric(df["PIM_REF_TOTAL"], errors="coerce").fillna(0)})
+    if m and "DEV_REF_ANUAL" in df.columns:
+        bloque = m.group(1) or "Funcion"
+        if bloque == "Deuda":
+            return None                                   # la deuda ya va dentro de la genérica 2.8
+        clave = next((c for c in ("COD_FUNCION", "COD_GENERICA", "COD_FUENTE", "CLASIFICACION") if c in df.columns), None)
+        return pd.DataFrame({"bloque": bloque, "nivel": NIVEL_DE_CORTO[m.group(2)], "anio": int(m.group(3)),
+                             "depto": df["DEPARTAMENTO"].astype(str).str.extract(r"^(\d+)")[0].str.zfill(2),
+                             "codigo": df[clave].astype(str) if clave else "", "ref": pd.to_numeric(df["DEV_REF_ANUAL"], errors="coerce").fillna(0)})
+    return None
+
+
+def guardar(partes):
+    """partes: [(nombre del archivo, DataFrame de leer)]. Reemplaza lo guardado del mismo bloque, nivel, año y departamento
+    (en un remiendo, « - FUNCIONES 13-15» en el nombre, solo los códigos que trae)."""
+    partes = [(n, d) for n, d in partes if d is not None and not d.empty]
+    if not partes:
+        return 0
+    _tabla()
+    ahora = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    total = 0
+    with db.motor().begin() as cx:
+        for nombre, d in partes:
+            remiendo = " - FUNCIONES " in nombre           # control de un remiendo: trae solo algunas funciones
+            for (b, n, a, dep), g in d.groupby(["bloque", "nivel", "anio", "depto"]):
+                prm = {"b": b, "n": n, "a": int(a), "d": dep}
+                solo = ""
+                if remiendo:
+                    codigos = sorted(set(g["codigo"].astype(str)))
+                    prm.update({f"c{i}": c for i, c in enumerate(codigos)})
+                    solo = f" AND codigo IN ({', '.join(':c' + str(i) for i in range(len(codigos)))})"
+                cx.execute(text("DELETE FROM mef_controles WHERE bloque = :b AND nivel = :n AND anio = :a AND depto = :d" + solo), prm)
+                g.assign(fecha=ahora, archivo=nombre).to_sql("mef_controles", cx, if_exists="append", index=False)
+                total += len(g)
+    return total
+
+
+def _referencias(departamento, bloques):
+    _tabla()
+    with db.motor().connect() as cx:
+        q = text(f"SELECT bloque, nivel, anio, codigo, SUM(ref) AS ref, MAX(fecha) AS fecha FROM mef_controles WHERE depto = :d AND bloque IN "
+                 f"({', '.join(':b' + str(i) for i in range(len(bloques)))}) GROUP BY bloque, nivel, anio, codigo")
+        return pd.read_sql(q, cx, params={"d": departamento, **{f"b{i}": b for i, b in enumerate(bloques)}})
+
+
+def _clave(bloque, codigo):
+    """Código comparable entre el CONTROL y la página: la función por su número («15: TRANSPORTE» -> «15»); la genérica
+    y la fuente tal cual («5-21», «1»)."""
+    c = re.sub(r"\.0$", "", str(codigo or "").strip())
+    return _cod(c) if bloque == "Funcion" else c.split(":")[0].strip()
+
+
+def _nombre(texto):
+    """«15: TRANSPORTE» -> «Transporte»; «5-21: PERSONAL Y OBLIGACIONES SOCIALES» -> «Personal y obligaciones sociales»."""
+    t = re.sub(r"^[\d\-\.\s]+:\s*", "", str(texto or "")).strip()
+    return t[:1].upper() + t[1:].lower() if t else ""
+
+
+def contraste(departamento, sector, hoy=None):
+    """Por bloque y año: lo publicado por el MEF (vista anual, al día de la corrida) contra lo que tiene la página, con el
+    detalle por función, fuente o genérica: el total de los tres niveles de gobierno y, en «niveles», cada nivel por
+    separado (así un faltante en un nivel no se compensa con un exceso en otro). Un nivel sin control guardado del MEF
+    para ese año sale como «sin control»."""
+    hoy = hoy or date.today()
+    refs = _referencias(departamento, POR_SECTOR[sector])
+    salida = []
+    for bloque in POR_SECTOR[sector]:
+        base, valor, titulo, col_cod, col_nom, que, descripcion = BLOQUES[bloque]
+        rb = refs[refs["bloque"] == bloque]
+        for anio in sorted({int(a) for a in rb["anio"]}, reverse=True):
+            ra = rb[rb["anio"] == anio]
+            ra = ra.assign(_c=[_clave(bloque, c) for c in ra["codigo"]])
+            ref = ra.groupby("_c")["ref"].sum()
+            df = db.leer(base, [departamento], ["E", "R", "M"], f"{anio}-01", f"{anio}-12")
+            if not df.empty and col_cod in df.columns:
+                df = df.assign(_c=[_clave(bloque, c) for c in df[col_cod]], _v=pd.to_numeric(df[valor], errors="coerce").fillna(0),
+                               _n=df["NIVEL_GOBIERNO"].astype(str).str.extract(r"^\s*([ERM])")[0] if "NIVEL_GOBIERNO" in df.columns else "")
+                pagina = df.groupby("_c")["_v"].sum()
+                nombres = {c: _nombre(n) for c, n in zip(df["_c"], df[col_nom] if col_nom in df.columns else df[col_cod])}
+            else:
+                df = pd.DataFrame(columns=["_c", "_v", "_n"])
+                pagina, nombres = pd.Series(dtype=float), {}
+            meses = sorted({int(str(x).split(":")[0]) for x in df["MES"]}) if "MES" in df.columns and not df.empty else []
+            en_curso = anio == hoy.year
+            tol = max(5.0, 5.0 * max(len(meses), 1))
+
+            def estado(d, t):
+                return "coincide" if abs(d) <= t else ("mes en curso" if en_curso and d < 0 else "revisar")
+            def filas(ref, pagina):
+                items = []
+                for c in sorted(set(ref.index) | set(pagina.index), key=lambda c: (-float(pagina.get(c, ref.get(c, 0.0))), c)):
+                    m_, p_ = float(ref.get(c, 0.0)), float(pagina.get(c, 0.0))
+                    if not m_ and not p_:
+                        continue
+                    nombre = nombres.get(c) or (FUNCIONES.get(int(c), "") if bloque == "Funcion" and c.isdigit() else "")
+                    items.append({"codigo": c, "nombre": nombre, "mef": round(m_, 2), "pagina": round(p_, 2), "dif": round(p_ - m_, 2),
+                                  "estado": estado(p_ - m_, max(3.0, 3.0 * max(len(meses), 1)))})
+                return items
+            items = filas(ref, pagina)
+            niveles = []
+            for n, nom in NIVELES.items():                     # cada nivel con su propio control del MEF
+                rn = ra[ra["nivel"] == n]
+                pn = df[df["_n"] == n].groupby("_c")["_v"].sum() if len(df) else pd.Series(dtype=float)
+                m_, p_ = float(rn["ref"].sum()), float(pn.sum())
+                if rn.empty and not p_:
+                    continue
+                niveles.append({"nivel": n, "nombre": nom, "mef": round(m_, 2), "pagina": round(p_, 2), "dif": round(p_ - m_, 2),
+                                "estado": "sin control" if rn.empty else estado(p_ - m_, tol),
+                                "items": filas(rn.groupby("_c")["ref"].sum(), pn)})
+            mef, pag = float(ref.sum()), float(pagina.sum())
+            salida.append({"bloque": titulo, "clave": bloque, "que": que, "descripcion": descripcion, "anio": anio,
+                           "meses": f"{meses[0]:02d} a {meses[-1]:02d}" if meses else "sin datos", "mef": round(mef, 2), "pagina": round(pag, 2),
+                           "dif": round(pag - mef, 2), "estado": estado(pag - mef, tol), "fecha": ra["fecha"].max(), "items": items,
+                           "niveles": niveles})
+    return salida
+
+
+# ── Control de los tres archivos de los 25 departamentos («MEF · 3 archivos») ──
+# archivo -> (bloque y nivel del CONTROL, base de la página, columna del monto, es anual)
+ARCHIVOS = {"dev-municipalidad": ("Funcion", "M", "inv-dev-municipalidad", "DEVENGADO", False),
+            "pim-funcion": ("PIM", "", "inv-pim-funcion", "PIM", True),
+            "pim-municipalidad": ("PIM_M", "M", "inv-pim-municipalidad", "PIM", True)}
+
+
+FUNCIONES = dict(enumerate(["", "Legislativa", "Relaciones exteriores", "Planeamiento", "Defensa", "Orden público", "Justicia", "Trabajo",
+                             "Comercio", "Turismo", "Agropecuaria", "Pesca", "Energía", "Minería", "Industria", "Transporte", "Comunicaciones",
+                             "Ambiente", "Saneamiento", "Vivienda", "Salud", "Cultura y deporte", "Educación", "Protección social",
+                             "Previsión social", "Deuda pública"]))
+
+
+def _cod(funcion):
+    m = re.match(r"^\s*(\d+)", str(funcion))
+    return m.group(1).zfill(2) if m else str(funcion)
+
+
+DEPTOS_25 = [f"{i:02d}" for i in range(1, 26)]
+
+
+def _anios_pagina(base_id):
+    """{año: {departamentos con datos}} de una base de la página."""
+    b = db.BASES[base_id]
+    if not db.existe(b.tabla):
+        return {}
+    with db.motor().connect() as cx:
+        filas = cx.execute(text(f'SELECT DISTINCT _anio, _depto FROM "{b.tabla}"')).all()
+    salida = {}
+    for a, d in filas:
+        salida.setdefault(int(a), set()).add(str(d).zfill(2))
+    return salida
+
+
+def control_archivo(archivo, hoy=None):
+    """Por departamento y año: lo publicado por el MEF (vista anual, guardado de los CSV de CONTROL de cada corrida) contra
+    lo que tiene la página en la base del archivo, con las funciones que no cuadran. Lista los 25 departamentos de cada año
+    con datos o con control: «sin control» = la página tiene datos pero ninguna corrida guardó lo publicado por el MEF."""
+    hoy = hoy or date.today()
+    bloque, nivel, base_id, valor, anual = ARCHIVOS[archivo]
+    _tabla()
+    with db.motor().connect() as cx:
+        refs = pd.read_sql(text("SELECT depto, anio, codigo, SUM(ref) AS ref, MAX(fecha) AS fecha FROM mef_controles "
+                                "WHERE bloque = :b AND nivel = :n GROUP BY depto, anio, codigo"), cx, params={"b": bloque, "n": nivel})
+    refs["codigo"] = refs["codigo"].map(_cod)
+    en_pagina = _anios_pagina(base_id)
+    anios = sorted({int(a) for a in refs["anio"]} | set(en_pagina), reverse=True)
+    grupos = {(d, int(a)): g for (d, a), g in refs.groupby(["depto", "anio"])}
+    filas = []
+    for anio in anios:
+        for dep in DEPTOS_25:
+            g = grupos.get((dep, anio))
+            hay = dep in en_pagina.get(anio, set())
+            df = db.leer(base_id, [dep], ["E", "R", "M"], f"{anio}-01", f"{anio}-12") if hay else pd.DataFrame()
+            montos = pd.to_numeric(df[valor], errors="coerce").fillna(0) if not df.empty else pd.Series(dtype=float)
+            pagina = df.assign(_c=df["FUNCION"].map(_cod), _v=montos).groupby("_c")["_v"].sum() if not df.empty else pd.Series(dtype=float)
+            meses = [] if anual or df.empty else sorted({int(str(x).split(":")[0]) for x in df["MES"]})
+            etq_meses = f"{meses[0]:02d} a {meses[-1]:02d}" if meses else ("anual" if anual and not df.empty else "sin datos")
+            pag = float(pagina.sum())
+            if g is None:
+                filas.append({"depto": dep, "anio": anio, "mef": None, "pagina": round(pag, 2) if not df.empty else None, "dif": None,
+                              "estado": "sin control" if not df.empty else "sin datos", "fecha": None, "meses": etq_meses, "funciones": []})
+                continue
+            ref = g.groupby("codigo")["ref"].sum()
+            mef = float(ref.sum())
+            dif = pag - mef
+            tol = max(5.0, 5.0 * max(len(meses), 1))
+            en_curso = not anual and anio == hoy.year
+            estado = "coincide" if abs(dif) <= tol else ("mes en curso" if en_curso and dif < 0 else "sin datos" if df.empty else "revisar")
+            funciones = []
+            if estado != "coincide":
+                for c in sorted(set(ref.index) | set(pagina.index)):
+                    d = float(pagina.get(c, 0.0)) - float(ref.get(c, 0.0))
+                    if abs(d) > max(3.0, 3.0 * max(len(meses), 1)):
+                        funciones.append({"funcion": f"{c} {FUNCIONES.get(int(c), '')}".strip() if c.isdigit() else c, "mef": round(float(ref.get(c, 0.0)), 2), "pagina": round(float(pagina.get(c, 0.0)), 2), "dif": round(d, 2)})
+            filas.append({"depto": dep, "anio": anio, "mef": round(mef, 2), "pagina": round(pag, 2), "dif": round(dif, 2), "estado": estado,
+                          "fecha": g["fecha"].max(), "meses": etq_meses, "funciones": funciones})
+    return filas
+
+
+def _corregible(archivo, f, umbral):
+    """DEV Función·Municipalidad: «revisar» por más de `umbral` con funciones (se rehacen solo esas funciones).
+    Los PIM (anuales, unos minutos por departamento): además «sin control» y «sin datos» (se rehace el departamento)."""
+    grande = f["estado"] == "revisar" and abs(f["dif"]) > umbral
+    if archivo == "dev-municipalidad":
+        return grande and bool(f["funciones"])
+    return grande or f["estado"] in ("sin control", "sin datos")
+
+
+def remiendo(archivo, umbral=200.0, depto=None, anio=None, hoy=None):
+    """Qué volver a raspar para corregir lo que no cuadra con el MEF: los departamentos y años corregibles (`_corregible`).
+    En DEV Funcion.Municipalidad, solo sus funciones que no cuadran (el detalle del control); en los PIM, el departamento entero.
+    -> {"desde", "hasta", "departamentos", "funciones", "casos"} o None si no hay nada que corregir."""
+    if archivo not in ARCHIVOS:
+        raise ValueError(f"Archivo desconocido: {archivo}")
+    hoy = hoy or date.today()
+    casos = [f for f in control_archivo(archivo, hoy) if _corregible(archivo, f, umbral)
+             and (depto is None or f["depto"] == depto) and (anio is None or f["anio"] == int(anio))]
+    if not casos:
+        return None
+    anios = sorted({f["anio"] for f in casos})
+    deps = ",".join(sorted({f["depto"] for f in casos}))
+    detalle = [{"depto": f["depto"], "anio": f["anio"], "dif": f["dif"], "estado": f["estado"],
+                "funciones": [g["funcion"] for g in f["funciones"]]} for f in casos]
+    if archivo != "dev-municipalidad":
+        return {"desde": f"{anios[0]}-01", "hasta": f"{anios[-1]}-12", "departamentos": deps, "funciones": "", "casos": detalle}
+    funciones = sorted({_cod(g["funcion"]) for f in casos for g in f["funciones"]})
+    ultimo = (hoy.year, hoy.month - 1) if hoy.month > 1 else (hoy.year - 1, 12)
+    a1 = anios[-1]
+    hasta = f"{a1}-12" if a1 < ultimo[0] else f"{ultimo[0]}-{ultimo[1]:02d}"
+    return {"desde": f"{anios[0]}-01", "hasta": hasta, "departamentos": deps, "funciones": ",".join(funciones), "casos": detalle}

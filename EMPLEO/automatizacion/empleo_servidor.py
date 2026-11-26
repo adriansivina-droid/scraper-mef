@@ -103,7 +103,7 @@ class Avance:
         if not self.activo:
             return
         try:
-            sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
+            sys.path.insert(0, str(RAIZ / "PAGINA"))
             from app import db
             db.guardar_progreso(self.corrida, 1, fraccion, texto)
         except Exception as e:                          # la barra no debe tumbar el scraper
@@ -149,7 +149,7 @@ def raspar(seleccion, desde=None, sectores=False):
 
 
 def cargar(ruta):
-    sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
+    sys.path.insert(0, str(RAIZ / "PAGINA"))
     from app import carga
     return carga.cargar(f"scraper de empleo en GitHub Actions ({datetime.now():%Y-%m-%d %H:%M})", [(ruta.name, ruta.read_bytes())])
 
@@ -157,8 +157,9 @@ def cargar(ruta):
 def control_sectores(df):
     """Compara la suma de los 7 sectores con el total de la región guardado en la base (base «empleo»): una diferencia
     grande delata un filtro de actividad que no tomó (la región entera contada como un sector)."""
-    sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
-    from app import db, empleo
+    sys.path.insert(0, str(RAIZ / "PAGINA"))
+    from app import db
+    from app.empleo import empleo
     tot = db.leer("empleo", sorted({empleo.depto_de(r) for r in df["REGIÓN"]}), [], "1990-01", "2100-12")
     tot = tot[tot["ACTIVIDAD_ECONOMICA"].str.lower() == "total"].assign(K=lambda d: d["REGIÓN"].map(empleo._clave))
     suma = df.assign(K=df["REGIÓN"].map(empleo._clave)).groupby(["K", "REGIÓN", "AÑO", "MES"], as_index=False)["EMPLEO"].sum()

@@ -25,8 +25,9 @@ from pathlib import Path
 import pandas as pd
 
 AQUI = Path(__file__).resolve().parent
-sys.path.insert(0, str(AQUI.parent.parent / "FISCAL" / "api"))
-from app import almacen, db, hidrocarburos  # noqa: E402
+sys.path.insert(0, str(AQUI.parent.parent / "PAGINA"))
+from app import almacen, db  # noqa: E402
+from app.hidrocarburos import hidrocarburos
 from sqlalchemy import text  # noqa: E402
 
 # lo que no va en la Release pública: las exportaciones por empresa (Excel de SUNAT que se subía a la página)

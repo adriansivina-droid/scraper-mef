@@ -1,17 +1,17 @@
-# Despliegue del API "Departamento de estudios BCRP-IQT" (FISCAL/api) en Render.
+# Despliegue del API "Departamento de estudios BCRP-IQT" (PAGINA) en Render.
 # La base de datos es Postgres en Neon: su cadena de conexión se pega en DATABASE_URL al crear el servicio.
 services:
   - type: web
     name: estudios-bcrp-iqt
     runtime: docker
-    rootDir: FISCAL/api        # el Dockerfile y el contexto de Docker son los de esta carpeta (valor por defecto)
+    rootDir: PAGINA        # el Dockerfile y el contexto de Docker son los de esta carpeta (valor por defecto)
     plan: starter
     region: virginia
     healthCheckPath: /salud    # cada cambio en main se vuelve a desplegar solo (valor por defecto)
     # solo se despliega cuando cambia la página (ahorra minutos de construcción: la factura queda en el plan Starter)
     buildFilter:
       paths:
-        - FISCAL/api/**
+        - PAGINA/**
     envVars:
       - key: DATABASE_URL
         sync: false

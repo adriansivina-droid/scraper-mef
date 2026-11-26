@@ -13,7 +13,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "FISCAL" / "api"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "PAGINA"))
 from app import db  # noqa: E402
 
 MARCA = "migracion:pesca-ornamentales-especie-2026-11"
