@@ -3,12 +3,17 @@
 #   · pim-funcion       → PIM Funcion (PIM 2.6 por función y nivel de gobierno, anual)
 #   · pim-municipalidad → PIM Funcion.Municipalidad (PIM 2.6 por función y municipalidad, anual)
 # Corre el mismo notebook (FISCAL/notebooks/Fiscal_Scraper.ipynb) solo con el bloque de ese archivo y carga en la base solo esa base.
-# Se lanza desde la página («MEF · 3 archivos» → Actualizar) o a mano: Actions → este flujo → Run workflow. No tiene
-# horario propio: el scraper completo (fiscal_scraper.yml) los sigue trayendo el día 2 de cada mes.
+# Se lanza desde la página («MEF · 3 archivos» → Actualizar) o a mano: Actions → este flujo → Run workflow.
+# Además, al terminar con éxito la corrida mensual programada del scraper completo (fiscal_scraper.yml, día 2), vuelve a
+# bajar el devengado municipal (dev-municipalidad) de todo el AÑO ANTERIOR, en cuatro tramos: el scraper completo ya trae el
+# año en curso, así que la serie municipal queda al día desde enero del año anterior hasta el último mes cerrado.
 name: Fiscal · archivo del MEF (25 departamentos)
-run-name: "${{ inputs.archivo }} · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.departamentos != 'TODOS' && format(' · {0}', inputs.departamentos) || '' }}${{ inputs.funciones && format(' · funciones {0}', inputs.funciones) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
+run-name: "${{ inputs.archivo || 'dev-municipalidad' }} · ${{ github.event_name == 'workflow_run' && 'año anterior (mensual)' || inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.departamentos != 'TODOS' && format(' · {0}', inputs.departamentos) || '' }}${{ inputs.funciones && format(' · funciones {0}', inputs.funciones) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
 
 on:
+  workflow_run:
+    workflows: ["Fiscal · scraper del MEF"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       archivo:
@@ -38,7 +43,7 @@ on:
         default: false
 
 concurrency:
-  group: fiscal-archivo-${{ inputs.archivo }}
+  group: fiscal-archivo-${{ inputs.archivo || 'dev-municipalidad' }}
   cancel-in-progress: false
 
 permissions:
@@ -46,6 +51,8 @@ permissions:
 
 jobs:
   raspar:
+    # tras el scraper completo: solo si fue la corrida mensual programada y terminó bien
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'schedule')
     strategy:
       max-parallel: 1
       fail-fast: false
@@ -55,12 +62,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 355
     steps:
+      - name: Parámetros
+        id: par
+        env:
+          EVENTO: ${{ github.event_name }}
+          ARCHIVO: ${{ inputs.archivo }}
+          DESDE: ${{ inputs.desde }}
+          HASTA: ${{ inputs.hasta }}
+          DEPARTAMENTOS: ${{ inputs.departamentos }}
+        run: |
+          if [ "$EVENTO" = "workflow_run" ]; then
+            # año anterior al del último mes cerrado (en enero, el último mes cerrado es diciembre del año pasado)
+            y=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y); y=$((y - 1))
+            ARCHIVO=dev-municipalidad; DESDE="$y-01"; HASTA="$y-12"; DEPARTAMENTOS=TODOS
+          fi
+          { echo "archivo=$ARCHIVO"; echo "desde=$DESDE"; echo "hasta=$HASTA"; echo "departamentos=${DEPARTAMENTOS:-TODOS}"; } >> "$GITHUB_OUTPUT"
+          echo "$ARCHIVO · ${DESDE:-año en curso} a ${HASTA:-último mes cerrado} · ${DEPARTAMENTOS:-TODOS}"
+
       - name: ¿Hace falta este tramo?
         id: tramo
         env:
           TRAMO: ${{ matrix.tramo }}
-          ARCHIVO: ${{ inputs.archivo }}
-          PERIODO: ${{ inputs.desde }}${{ inputs.hasta }}
+          ARCHIVO: ${{ steps.par.outputs.archivo }}
+          PERIODO: ${{ steps.par.outputs.desde }}${{ steps.par.outputs.hasta }}
           PRUEBA: ${{ inputs.prueba }}
           FUNCIONES: ${{ inputs.funciones }}
         run: |
@@ -92,10 +116,10 @@ jobs:
         if: steps.tramo.outputs.correr == 'si'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          ARCHIVO: ${{ inputs.archivo }}
-          DESDE: ${{ inputs.desde }}
-          HASTA: ${{ inputs.hasta }}
-          DEPARTAMENTOS: ${{ inputs.departamentos }}
+          ARCHIVO: ${{ steps.par.outputs.archivo }}
+          DESDE: ${{ steps.par.outputs.desde }}
+          HASTA: ${{ steps.par.outputs.hasta }}
+          DEPARTAMENTOS: ${{ steps.par.outputs.departamentos }}
           PRUEBA: ${{ inputs.prueba }}
           FUNCIONES: ${{ inputs.funciones }}
           FISCAL_WORKERS: "3"
@@ -119,7 +143,7 @@ jobs:
         if: always() && steps.tramo.outputs.correr == 'si'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.archivo }}-tramo${{ matrix.tramo }}
+          name: ${{ steps.par.outputs.archivo }}-tramo${{ matrix.tramo }}
           path: ${{ runner.temp }}/fiscal/Fiscal/Scrapeo/output
           retention-days: 14
           if-no-files-found: ignore
