@@ -92,8 +92,8 @@ def guardar(partes):
 def _referencias(departamento, bloques):
     _tabla()
     with db.motor().connect() as cx:
-        q = text(f"SELECT bloque, anio, codigo, SUM(ref) AS ref, MAX(fecha) AS fecha FROM mef_controles WHERE depto = :d AND bloque IN "
-                 f"({', '.join(':b' + str(i) for i in range(len(bloques)))}) GROUP BY bloque, anio, codigo")
+        q = text(f"SELECT bloque, nivel, anio, codigo, SUM(ref) AS ref, MAX(fecha) AS fecha FROM mef_controles WHERE depto = :d AND bloque IN "
+                 f"({', '.join(':b' + str(i) for i in range(len(bloques)))}) GROUP BY bloque, nivel, anio, codigo")
         return pd.read_sql(q, cx, params={"d": departamento, **{f"b{i}": b for i, b in enumerate(bloques)}})
 
 
@@ -112,7 +112,9 @@ def _nombre(texto):
 
 def contraste(departamento, sector, hoy=None):
     """Por bloque y año: lo publicado por el MEF (vista anual, al día de la corrida) contra lo que tiene la página, con el
-    detalle por función, fuente o genérica (los tres niveles de gobierno sumados)."""
+    detalle por función, fuente o genérica: el total de los tres niveles de gobierno y, en «niveles», cada nivel por
+    separado (así un faltante en un nivel no se compensa con un exceso en otro). Un nivel sin control guardado del MEF
+    para ese año sale como «sin control»."""
     hoy = hoy or date.today()
     refs = _referencias(departamento, POR_SECTOR[sector])
     salida = []
@@ -121,13 +123,16 @@ def contraste(departamento, sector, hoy=None):
         rb = refs[refs["bloque"] == bloque]
         for anio in sorted({int(a) for a in rb["anio"]}, reverse=True):
             ra = rb[rb["anio"] == anio]
-            ref = ra.assign(_c=[_clave(bloque, c) for c in ra["codigo"]]).groupby("_c")["ref"].sum()
+            ra = ra.assign(_c=[_clave(bloque, c) for c in ra["codigo"]])
+            ref = ra.groupby("_c")["ref"].sum()
             df = db.leer(base, [departamento], ["E", "R", "M"], f"{anio}-01", f"{anio}-12")
             if not df.empty and col_cod in df.columns:
-                df = df.assign(_c=[_clave(bloque, c) for c in df[col_cod]], _v=pd.to_numeric(df[valor], errors="coerce").fillna(0))
+                df = df.assign(_c=[_clave(bloque, c) for c in df[col_cod]], _v=pd.to_numeric(df[valor], errors="coerce").fillna(0),
+                               _n=df["NIVEL_GOBIERNO"].astype(str).str.extract(r"^\s*([ERM])")[0] if "NIVEL_GOBIERNO" in df.columns else "")
                 pagina = df.groupby("_c")["_v"].sum()
                 nombres = {c: _nombre(n) for c, n in zip(df["_c"], df[col_nom] if col_nom in df.columns else df[col_cod])}
             else:
+                df = pd.DataFrame(columns=["_c", "_v", "_n"])
                 pagina, nombres = pd.Series(dtype=float), {}
             meses = sorted({int(str(x).split(":")[0]) for x in df["MES"]}) if "MES" in df.columns and not df.empty else []
             en_curso = anio == hoy.year
@@ -135,18 +140,32 @@ def contraste(departamento, sector, hoy=None):
 
             def estado(d, t):
                 return "coincide" if abs(d) <= t else ("mes en curso" if en_curso and d < 0 else "revisar")
-            items = []
-            for c in sorted(set(ref.index) | set(pagina.index), key=lambda c: (-float(pagina.get(c, ref.get(c, 0.0))), c)):
-                m_, p_ = float(ref.get(c, 0.0)), float(pagina.get(c, 0.0))
-                if not m_ and not p_:
+            def filas(ref, pagina):
+                items = []
+                for c in sorted(set(ref.index) | set(pagina.index), key=lambda c: (-float(pagina.get(c, ref.get(c, 0.0))), c)):
+                    m_, p_ = float(ref.get(c, 0.0)), float(pagina.get(c, 0.0))
+                    if not m_ and not p_:
+                        continue
+                    nombre = nombres.get(c) or (FUNCIONES.get(int(c), "") if bloque == "Funcion" and c.isdigit() else "")
+                    items.append({"codigo": c, "nombre": nombre, "mef": round(m_, 2), "pagina": round(p_, 2), "dif": round(p_ - m_, 2),
+                                  "estado": estado(p_ - m_, max(3.0, 3.0 * max(len(meses), 1)))})
+                return items
+            items = filas(ref, pagina)
+            niveles = []
+            for n, nom in NIVELES.items():                     # cada nivel con su propio control del MEF
+                rn = ra[ra["nivel"] == n]
+                pn = df[df["_n"] == n].groupby("_c")["_v"].sum() if len(df) else pd.Series(dtype=float)
+                m_, p_ = float(rn["ref"].sum()), float(pn.sum())
+                if rn.empty and not p_:
                     continue
-                nombre = nombres.get(c) or (FUNCIONES.get(int(c), "") if bloque == "Funcion" and c.isdigit() else "")
-                items.append({"codigo": c, "nombre": nombre, "mef": round(m_, 2), "pagina": round(p_, 2), "dif": round(p_ - m_, 2),
-                              "estado": estado(p_ - m_, max(3.0, 3.0 * max(len(meses), 1)))})
+                niveles.append({"nivel": n, "nombre": nom, "mef": round(m_, 2), "pagina": round(p_, 2), "dif": round(p_ - m_, 2),
+                                "estado": "sin control" if rn.empty else estado(p_ - m_, tol),
+                                "items": filas(rn.groupby("_c")["ref"].sum(), pn)})
             mef, pag = float(ref.sum()), float(pagina.sum())
             salida.append({"bloque": titulo, "clave": bloque, "que": que, "descripcion": descripcion, "anio": anio,
                            "meses": f"{meses[0]:02d} a {meses[-1]:02d}" if meses else "sin datos", "mef": round(mef, 2), "pagina": round(pag, 2),
-                           "dif": round(pag - mef, 2), "estado": estado(pag - mef, tol), "fecha": ra["fecha"].max(), "items": items})
+                           "dif": round(pag - mef, 2), "estado": estado(pag - mef, tol), "fecha": ra["fecha"].max(), "items": items,
+                           "niveles": niveles})
     return salida
 
 
