@@ -1,4 +1,4 @@
-"""Corre FISCAL/Fiscal_Proyectos.ipynb sin Colab (GitHub Actions) y guarda los proyectos en la base del API.
+"""Corre FISCAL/notebooks/Fiscal_Proyectos.ipynb sin Colab (GitHub Actions) y guarda los proyectos en la base del API.
 
     python FISCAL/automatizacion/proyectos_servidor.py                 # último mes con inversión en la base
     python FISCAL/automatizacion/proyectos_servidor.py --mes 2026-09
@@ -25,7 +25,7 @@ import pandas as pd
 
 AQUI = Path(__file__).resolve().parent
 RAIZ = AQUI.parent.parent
-NOTEBOOK = AQUI.parent / "Fiscal_Proyectos.ipynb"
+NOTEBOOK = AQUI.parent / "notebooks" / "Fiscal_Proyectos.ipynb"
 RUTA_COLAB = "/content/drive/MyDrive/Fiscal"
 sys.path.insert(0, str(AQUI))
 sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))

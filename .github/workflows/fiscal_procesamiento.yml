@@ -1,4 +1,4 @@
-# Procesamiento fiscal: corre FISCAL/Fiscal_Procesamiento.ipynb sin Colab con los datos de la base del API y guarda sus
+# Procesamiento fiscal: corre FISCAL/notebooks/Fiscal_Procesamiento.ipynb sin Colab con los datos de la base del API y guarda sus
 # Excel en la página (FISCAL/automatizacion/procesamiento_servidor.py): Fiscal-<Depto>_AUTO.xlsx de Loreto, San Martín y
 # Ucayali y «Principales variaciones AAAA-MM.xlsx». Se descargan en Ejecución del presupuesto → Archivos.
 #   · solo, al terminar el scraper del MEF (con éxito)

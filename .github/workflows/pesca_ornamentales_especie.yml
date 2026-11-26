@@ -24,4 +24,4 @@ jobs:
       - name: Corregir
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python FISCAL/automatizacion/pesca_ornamentales_especie.py
+        run: python PESCA/automatizacion/pesca_ornamentales_especie.py

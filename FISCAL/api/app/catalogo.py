@@ -75,7 +75,7 @@ BASES = {b.id: b for b in [
          descripcion="MEF, Consulta Amigable de Ingresos: recaudado por mes de los gobiernos regionales y locales de cada región, "
                      "por genérica y su detalle (subgenérica, específica y detalle), por fuente y por rubro "
                      "(FISCAL/automatizacion/ingresos_mef.py). Para las hojas INGRESOS G.R. y G.L. del ESTAD."),
-    # Proyectos detrás de las variaciones (FISCAL/Fiscal_Proyectos.ipynb, en GitHub Actions tras el scraper del MEF)
+    # Proyectos detrás de las variaciones (FISCAL/notebooks/Fiscal_Proyectos.ipynb, en GitHub Actions tras el scraper del MEF)
     Base("inv-proyectos", "inversion", "Proyectos detrás de las variaciones", "Proyectos de inversión", "PROYECTOS",
          ["AÑO", "MES", "DEPARTAMENTO", "NIVEL_GOBIERNO", "DIFERENCIA_NIVEL", "MES_CONSULTADO", "N_FUNCION", "FUNCION", "ANTERIOR",
           "ACTUAL", "DIFERENCIA_FUNCION", "N_PROYECTO", "CODIGO", "PROYECTO", "DEVENGADO", "PCT_FUNCION"],

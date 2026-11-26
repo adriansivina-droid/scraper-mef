@@ -29,4 +29,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TABLA: ${{ inputs.tabla }}
-        run: python FISCAL/automatizacion/neon_revisar_tabla.py "$TABLA"
+        run: python FISCAL/mantenimiento/neon_revisar_tabla.py "$TABLA"

@@ -2,7 +2,7 @@
 #   · dev-municipalidad → DEV Funcion.Municipalidad (devengado 2.6 por función y municipalidad, mensual)
 #   · pim-funcion       → PIM Funcion (PIM 2.6 por función y nivel de gobierno, anual)
 #   · pim-municipalidad → PIM Funcion.Municipalidad (PIM 2.6 por función y municipalidad, anual)
-# Corre el mismo notebook (FISCAL/Fiscal_Scraper.ipynb) solo con el bloque de ese archivo y carga en la base solo esa base.
+# Corre el mismo notebook (FISCAL/notebooks/Fiscal_Scraper.ipynb) solo con el bloque de ese archivo y carga en la base solo esa base.
 # Se lanza desde la página («MEF · 3 archivos» → Actualizar) o a mano: Actions → este flujo → Run workflow. No tiene
 # horario propio: el scraper completo (fiscal_scraper.yml) los sigue trayendo el día 2 de cada mes.
 name: Fiscal · archivo del MEF (25 departamentos)

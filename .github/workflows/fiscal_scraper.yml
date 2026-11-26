@@ -1,4 +1,4 @@
-# Fase 2 · scraper del MEF en el servidor: corre FISCAL/Fiscal_Scraper.ipynb sin Colab y carga lo que baja en la base de
+# Fase 2 · scraper del MEF en el servidor: corre FISCAL/notebooks/Fiscal_Scraper.ipynb sin Colab y carga lo que baja en la base de
 # datos del API (Neon), igual que subir el .zip de Scrapeo/output en la página.
 #   · cada mes, el día 2 (06:00 hora de Lima): año en curso hasta el último mes cerrado (el MEF ajusta los meses
 #     anteriores, por eso se vuelve a bajar todo el año), en dos tramos seguidos (enero-junio y julio en adelante), cada

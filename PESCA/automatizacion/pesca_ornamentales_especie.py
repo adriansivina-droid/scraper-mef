@@ -4,7 +4,7 @@ Antes, ESPECIE llevaba el nombre común y ESPECIE_CORREGIDA el científico; desd
 (ESPECIE = nombre científico, ESPECIE_CORREGIDA = nombre común), como en el pescado de consumo. El intercambio y la
 marca que impide repetirlo se guardan en la misma transacción: correrlo otra vez no hace nada.
 
-    DATABASE_URL=… python FISCAL/automatizacion/pesca_ornamentales_especie.py
+    DATABASE_URL=… python PESCA/automatizacion/pesca_ornamentales_especie.py
 """
 import os
 import sys
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "api"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "FISCAL" / "api"))
 from app import db  # noqa: E402
 
 MARCA = "migracion:pesca-ornamentales-especie-2026-11"
