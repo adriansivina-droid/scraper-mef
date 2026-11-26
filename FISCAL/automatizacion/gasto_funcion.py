@@ -13,7 +13,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-NOTEBOOK = Path(__file__).resolve().parents[1] / "Fiscal_Scraper.ipynb"
+NOTEBOOK = Path(__file__).resolve().parents[1] / "notebooks" / "Fiscal_Scraper.ipynb"
 SECTORES = {"22", "20", "15", "16", "12", "18", "19", "17"}   # educación, salud, transporte, comunicaciones, energía, saneamiento, vivienda, ambiente
 NIVELES = {"E": "GOBIERNO NACIONAL", "R": "GOBIERNO REGIONAL", "M": "GOBIERNOS LOCALES"}
 

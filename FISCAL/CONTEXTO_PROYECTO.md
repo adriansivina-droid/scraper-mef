@@ -21,7 +21,8 @@ Son notebooks de **Google Colab** que extraen datos de ejecución presupuestal d
 ## 2. Inventario de scrapers
 
 **Estructura del repositorio:**
-- `FISCAL/`: scrapers del MEF (este documento, los notebooks y `docs/`).
+- `FISCAL/`: scrapers del MEF y la página web (índice de la carpeta en `FISCAL/README.md`): `notebooks/`, `automatizacion/`
+  (los notebooks en GitHub Actions), `mantenimiento/` (Neon), `docs/` y `api/`.
 - `EXPORT/`: proyecto de exportaciones de Infotrade (notebook y su `.md`).
 - `EMPLEO/`: scraper del empleo formal por región y actividad (Power BI del MTPE), con su `empleo.md`.
 - `PESCA/`: LONG mensual de pesca de Loreto, San Martín y Ucayali desde los Excel de DIREPRO (VBP a precios de 2007), con su `pesca.md`.
@@ -36,7 +37,7 @@ Los seis scrapers anteriores (`DEV_Funcion_*`, `MEF_DEV_Funcion_GobiernoRegional
 hace lo mismo con los mismos nombres y columnas de archivo. Siguen en el historial de git si hiciera falta consultarlos.
 
 Para abrir cualquiera en Colab:
-`https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/FISCAL/<NOMBRE>.ipynb`
+`https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/FISCAL/notebooks/<NOMBRE>.ipynb`
 En el caso del Regional, los paréntesis del nombre van codificados como `%28` y `%29`.
 
 **Estado de las pruebas:**

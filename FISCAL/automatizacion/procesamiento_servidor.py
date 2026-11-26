@@ -1,4 +1,4 @@
-"""Corre FISCAL/Fiscal_Procesamiento.ipynb sin Colab (GitHub Actions) y guarda sus Excel en la base del API.
+"""Corre FISCAL/notebooks/Fiscal_Procesamiento.ipynb sin Colab (GitHub Actions) y guarda sus Excel en la base del API.
 
     python FISCAL/automatizacion/procesamiento_servidor.py
 
@@ -184,7 +184,7 @@ def main():
             hechas = preparar(raiz)
             print("Inputs desde la base:", ", ".join(f"{k}: {v}" for k, v in hechas.items()), flush=True)
             os.chdir(tmp)
-            correr(AQUI.parent / "Fiscal_Procesamiento.ipynb", raiz)
+            correr(AQUI.parent / "notebooks" / "Fiscal_Procesamiento.ipynb", raiz)
             nombres = guardar(raiz / "Procesamiento" / "output")
         if not nombres:
             raise RuntimeError("el notebook no generó ningún Excel")

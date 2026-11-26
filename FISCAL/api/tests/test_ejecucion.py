@@ -218,7 +218,7 @@ def test_procesamiento_del_notebook(datos, tmp_path, monkeypatch):
     hechas = ps.preparar(raiz)
     assert hechas["DEV Funcion.Municipalidad"] == 63 and hechas["DEV Generica.GobNacional"] == 84 and hechas["IPC"] == len(MESES)
     monkeypatch.chdir(tmp_path)
-    g = ps.correr(Path(__file__).resolve().parents[2] / "Fiscal_Procesamiento.ipynb", raiz)
+    g = ps.correr(Path(__file__).resolve().parents[2] / "notebooks" / "Fiscal_Procesamiento.ipynb", raiz)
     assert g["ULTIMO_MES"].strftime("%Y-%m") == "2026-09"
     nombres = ps.guardar(raiz / "Procesamiento" / "output")
     assert nombres == ["Fiscal-Loreto_AUTO.xlsx", "Fiscal-SanMartin_AUTO.xlsx", "Fiscal-Ucayali_AUTO.xlsx", "Principales variaciones 2026-09.xlsx"]

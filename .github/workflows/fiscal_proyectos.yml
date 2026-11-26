@@ -1,4 +1,4 @@
-# Proyectos detrás de las variaciones de la inversión: corre FISCAL/Fiscal_Proyectos.ipynb sin Colab y guarda los
+# Proyectos detrás de las variaciones de la inversión: corre FISCAL/notebooks/Fiscal_Proyectos.ipynb sin Colab y guarda los
 # proyectos en la base del API (FISCAL/automatizacion/proyectos_servidor.py).
 #   · solo, al terminar el scraper del MEF (con éxito): último mes con inversión en la base
 #   · a mano: Actions → «Fiscal · proyectos de las variaciones» → Run workflow, o el botón de la pestaña «Proyectos»

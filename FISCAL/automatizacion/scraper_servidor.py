@@ -26,7 +26,7 @@ from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 FISCAL = AQUI.parent
-NOTEBOOK = FISCAL / "Fiscal_Scraper.ipynb"
+NOTEBOOK = FISCAL / "notebooks" / "Fiscal_Scraper.ipynb"
 TRABAJO = Path(os.environ.get("FISCAL_TRABAJO", Path.home() / "fiscal_trabajo"))
 RUTA_COLAB = "/content/drive/MyDrive/Fiscal"
 # Scrapers propios de los tres archivos de los 25 departamentos (.github/workflows/fiscal_archivos.yml): el mismo notebook,
