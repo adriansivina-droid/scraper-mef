@@ -187,7 +187,9 @@ Municipalidad tienen cada uno su botón **Descargar Excel** (departamentos y per
 desde el MEF**, que lanza `.github/workflows/fiscal_archivos.yml`: el mismo notebook, pero solo con el bloque de ese
 archivo (`scraper_servidor.py --archivo dev-municipalidad|pim-funcion|pim-municipalidad --departamentos TODOS|16,22`).
 Reemplaza solo esa base (y, en el devengado municipal, el nivel M de DEV Función de esos departamentos); lo demás de la
-base fiscal no se toca. PIM es anual: basta el año. El scraper completo (día 2 de cada mes) los sigue trayendo igual.
+base fiscal no se toca. PIM es anual: basta el año. El scraper completo (día 2 de cada mes) los sigue trayendo igual
+(año en curso) y, al terminar bien esa corrida programada, este flujo vuelve a bajar solo el devengado municipal de todo el
+**año anterior** (cuatro tramos, unas 6-7 horas): la serie municipal queda al día desde enero del año anterior.
 Endpoints: `GET /v1/mef/archivos`, `POST /v1/mef/archivos/actualizar?archivo=…&desde=…&hasta=…&departamentos=…`.
 
 ## Todo en la página (sin Drive)
