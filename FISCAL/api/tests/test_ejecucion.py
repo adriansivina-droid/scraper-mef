@@ -304,6 +304,11 @@ def test_contraste_con_lo_publicado_por_el_mef(cliente):  # noqa: F811
     assert personal["pagina"] == 12 * (100 + 200 + 300) * M
     bys = next(i for i in g25["items"] if i["codigo"] == "5-23")
     assert bys["mef"] == 0 and bys["pagina"] == 12 * 150 * M and bys["estado"] == "revisar"
+    niv = {n["nivel"]: n for n in g25["niveles"]}                        # cada nivel contra su propio control del MEF
+    assert niv["E"]["nombre"] == "Gobierno Nacional" and niv["E"]["mef"] == niv["E"]["pagina"] == total_gn_2025
+    assert niv["E"]["estado"] == "coincide" and niv["R"]["estado"] == "revisar" and niv["R"]["mef"] == 1_000_000
+    assert niv["M"]["estado"] == "sin control" and niv["M"]["mef"] == 0 and niv["M"]["pagina"] > 0
+    assert next(i for i in niv["R"]["items"] if i["codigo"] == "5-21")["pagina"] == 12 * 200 * M
     assert c[("Generica", 2026)]["estado"] in ("mes en curso", "revisar")
     assert "PIM" not in str(cliente.get("/v1/contraste/ejecucion?departamento=16&sector=inversion").json())
     assert cliente.get("/v1/contraste/ejecucion?departamento=16&sector=inversion").json()["contraste"] == []
