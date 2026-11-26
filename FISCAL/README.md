@@ -21,18 +21,11 @@ FISCAL/
 ├── mantenimiento/
 │   └── neon_revisar_tabla.py         solo lectura: tamaño y reparto de filas de una tabla de Neon
 │
-├── docs/
-│   └── Diccionario_Controles_MEF.xlsx
-│
-└── api/                          página web «Departamento de estudios BCRP-IQT» (FastAPI, en Render)
-    ├── app/                          módulos por sector, plantillas y estáticos (static/)
-    ├── tests/                        pruebas (pytest)
-    └── README.md                     despliegue, endpoints y flujos
+└── docs/
+    └── Diccionario_Controles_MEF.xlsx
 ```
 
-La página sirve a todos los sectores (fiscal, exportaciones, empleo, pesca, hidrología e hidrocarburos); su carpeta
-sigue en `FISCAL/api` porque Render la despliega desde esa ruta (`render.yaml`). Lo propio de cada sector está en su
-carpeta (`PESCA/`, `EXPORT/`, `EMPLEO/`, `HIDROLOGIA/`, `HIDROCARBUROS/`).
+La página web está en la carpeta `PAGINA/` de la raíz; su parte fiscal, en `PAGINA/app/fiscal/`.
 
 Abrir un notebook en Colab:
 `https://colab.research.google.com/github/adriansivina-droid/scraper-mef/blob/main/FISCAL/notebooks/<NOMBRE>.ipynb`

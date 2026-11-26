@@ -19,8 +19,8 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: FISCAL/api/requirements.txt
-      - run: pip install -r FISCAL/api/requirements.txt
+          cache-dependency-path: PAGINA/requirements.txt
+      - run: pip install -r PAGINA/requirements.txt
       - name: Corregir
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

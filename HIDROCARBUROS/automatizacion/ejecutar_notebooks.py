@@ -10,7 +10,7 @@ la variable GOOGLE_APPLICATION_CREDENTIALS (en GitHub, el secreto GOOGLE_DRIVE_C
 entorno. Los widgets (ipywidgets) funcionan sin pantalla: se usa su valor por defecto.
 
 Con PP_ALMACEN=pagina (así corre en GitHub Actions) no se usa Drive: la API de Drive de los notebooks se reemplaza por
-el almacén (FISCAL/api/app/almacen.py) en la base DATABASE_URL, con las mismas carpetas DATA y CONTROL, y al terminar se
+el almacén (PAGINA/app/almacen.py) en la base DATABASE_URL, con las mismas carpetas DATA y CONTROL, y al terminar se
 arman con DATA las bases de producción, canon y mapa. En GitHub Actions esa base es el SQLite «almacen.sqlite» de la
 Release «hidrocarburos-datos»; publicar_powerbi.py saca de ella los CSV para Power BI. Antes hay que copiar una vez lo
 que había en Neon (pasar_a_github.py); con el almacén vacío no corre, para no perder los históricos.
@@ -55,7 +55,7 @@ def sustituir_colab():
 
 def usar_almacen_de_la_pagina():
     """«googleapiclient» (discovery.build, http.MediaFileUpload/MediaIoBaseDownload, errors.HttpError) → almacén."""
-    sys.path.insert(0, os.path.join(os.path.dirname(RAIZ), "FISCAL", "api"))
+    sys.path.insert(0, os.path.join(os.path.dirname(RAIZ), "PAGINA"))
     from app import almacen
     if almacen.vacio():
         sys.exit("El almacén está vacío: corre antes «Hidrocarburos · pasar a GitHub» (una sola vez) "

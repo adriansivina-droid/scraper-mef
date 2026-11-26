@@ -15,8 +15,8 @@ import pandas as pd
 import requests
 
 RAIZ = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
-from app import sunat_expo, sunat_impo  # noqa: E402
+sys.path.insert(0, str(RAIZ / "PAGINA"))
+from app.exportaciones import sunat_expo, sunat_impo  # noqa: E402
 
 URL = "http://www2.sunat.gob.pe/padron_reducido_ruc.zip"
 

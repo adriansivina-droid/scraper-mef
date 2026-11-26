@@ -14,7 +14,7 @@ import pandas as pd
 from sqlalchemy import create_engine, inspect, text
 
 AQUI = Path(__file__).resolve().parent
-sys.path.insert(0, str(AQUI.parent.parent / "FISCAL" / "api"))
+sys.path.insert(0, str(AQUI.parent.parent / "PAGINA"))
 from app import almacen, db  # noqa: E402
 
 

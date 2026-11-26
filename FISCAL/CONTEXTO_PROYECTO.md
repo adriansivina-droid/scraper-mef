@@ -274,19 +274,19 @@ Por año, departamento y función: `PIM_SUMA_MUNICIPALIDADES` contra `PIM_REF_FU
 
 ---
 
-## 13. API "Departamento de estudios BCRP-IQT" (`FISCAL/api/`)
+## 13. API "Departamento de estudios BCRP-IQT" (`PAGINA/`)
 
-API interna para que el equipo entre, marque y descargue las bases. Prototipo de diseño: artifact "Explorador API Fiscal" (paleta del proyecto, letra Barlow, fondo blanco). Guía de despliegue en `FISCAL/api/README.md`.
+API interna para que el equipo entre, marque y descargue las bases. Prototipo de diseño: artifact "Explorador API Fiscal" (paleta del proyecto, letra Barlow, fondo blanco). Guía de despliegue en `PAGINA/README.md`.
 
 - **Hosting:** Render (plan Starter) para el API y Neon (plan gratuito) para Postgres, con `render.yaml` en la raíz. Railway se descartó porque tiene cerrado el registro de cuentas nuevas.
 - **Fase 1 (hecha):**
   - FastAPI + Postgres, con acceso por usuario y contraseña (variables `APP_USUARIO` y `APP_CLAVE`).
   - Descarga de 7 bases en Excel (una hoja por base, formato de `PIM_Funcion.xlsx`), CSV o JSON: inversión por función, municipalidad y fuente; PIM por función y municipalidad; gasto por genérica (con la deuda 2.8 desglosada en amortización e intereses) y por fuente.
   - Estado de la base de datos y carga de los archivos del scraper de Colab (el `.zip` de `Scrapeo/output` o `PIM_Funcion.xlsx`).
-  - Pruebas en `FISCAL/api/tests` (SQLite y Postgres).
+  - Pruebas en `PAGINA/tests` (SQLite y Postgres).
 - **Fase 2 (pendiente):** el scraper corre en el servidor, cada mes y a pedido, y escribe directo en la base.
 - **Fase 3 (pendiente):** reportes procesados (cuadros, variaciones, proyectos) generados en el servidor.
-- **Objetivo a largo plazo:** que el API cubra el informe completo de la región (actividad productiva, empleo, sector externo, crédito y depósitos, presupuesto y anexos). Hoja de ruta en `FISCAL/api/README.md`.
+- **Objetivo a largo plazo:** que el API cubra el informe completo de la región (actividad productiva, empleo, sector externo, crédito y depósitos, presupuesto y anexos). Hoja de ruta en `PAGINA/README.md`.
 - Decisiones del usuario: uso interno; actualización mensual; departamentos con casillas; nada de códigos técnicos a la vista; "Estado de los datos" va como tarjeta dentro de "Actualizar base de datos"; se quitó "Qué trae cada base"; el servicio de la deuda va dentro de "Gasto por genérica".
 
 ---
@@ -301,7 +301,7 @@ Es un proyecto aparte, con su propio documento de contexto: **`EXPORT/exportacio
 el botón «Actualizar desde el MEF» del API) mediante `FISCAL/automatizacion/scraper_servidor.py`, que ejecuta las celdas
 del notebook y carga `Scrapeo/output` en la base de datos del API (Neon). Al editar el notebook, mantener en el BLOQUE 2
 las variables `PRUEBA_RAPIDA`, `AÑO_INICIO`, `MES_INICIO`, `AÑO_FIN`, `MES_FIN` y `WORKERS` (el servidor las fija) y la ruta
-`/content/drive/MyDrive/Fiscal`. Detalle en `FISCAL/api/README.md`.
+`/content/drive/MyDrive/Fiscal`. Detalle en `PAGINA/README.md`.
 
 `DEPARTAMENTOS_NACIONAL = "TODOS"` (BLOQUE 2): el detalle municipal de la función (DEV Funcion.Municipalidad), PIM Funcion
 y PIM Funcion.Municipalidad se raspan para los 25 departamentos; sus archivos llevan el sufijo «TODOS LOS DEPARTAMENTOS».

@@ -27,7 +27,7 @@ RAIZ = AQUI.parent.parent
 RUTA_COLAB = "/content/drive/MyDrive/Fiscal"
 CARPETA_ARCHIVOS = "fiscal"           # carpeta de los archivos en la base (db.archivos)
 sys.path.insert(0, str(AQUI))
-sys.path.insert(0, str(RAIZ / "FISCAL" / "api"))
+sys.path.insert(0, str(RAIZ / "PAGINA"))
 from scraper_servidor import sustituir_colab  # noqa: E402
 
 DEPTOS = ["16", "22", "25"]
@@ -114,7 +114,8 @@ def generica_y_deuda(gen):
 
 def preparar(raiz):
     """Scrapeo/output y Procesamiento/input/IPC.xlsx desde la base. Devuelve las filas escritas por archivo."""
-    from app import db, ipc
+    from app import db
+    from app.fiscal import ipc
     salida = raiz / "Scrapeo" / "output"
     hechas = {}
     for nivel, (carpeta, corto) in NIVELES.items():
@@ -157,7 +158,7 @@ def ipc_xlsx(serie, ruta):
 
 def ipc_al_dia():
     """Antes de procesar, el IPC de Lima del BCRP (si no responde, se usa el cargado en la página)."""
-    from app import ipc
+    from app.fiscal import ipc
     try:
         return ipc.actualizar_bcrp()
     except Exception as e:

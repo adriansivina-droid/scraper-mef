@@ -168,7 +168,7 @@ def main():
               f"Control (las partes suman su concepto): {'✅ todo cuadra' if not avisos else f'⚠ {len(avisos)} diferencias'}"]
     lineas += [f"- {x}" for x in avisos[:30]]
     if a.cargar:
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "api"))
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "PAGINA"))
         from app import db
         x = df.assign(_anio=df["AÑO"], _mes=df["MES"].str[:2].astype(int), _depto=df["DEPARTAMENTO"].str[:2],
                       _nivel=df["NIVEL_GOBIERNO"].str[0])

@@ -1,0 +1,322 @@
+"""Pruebas de la base mensual de SUNAT: diccionarios de ANUAL_PRO, estados de las filas, revisión, ESTAD propuesto."""
+import importlib.util
+import io
+import zipfile
+from pathlib import Path
+
+import pandas as pd
+from openpyxl import Workbook, load_workbook
+
+from app.exportaciones import sunat_expo
+from tests.test_exportaciones import estadlo
+from tests.test_pesca import cliente, datos, subir  # noqa: F401
+
+CAB = ["aduana", "ubigeo", "ruc11", "ano_mes", "fecembar", "pais", "nandi07", "partorig", "dcom", "fob", "kilos", "qunifis",
+       "tunifis", "ruc", "secx_3", "producto", "ubigeo_dep"]
+
+
+def fila(ruc, partida, dcom, fob, dep="16", pais="105", ano_mes="2608"):
+    return ["226", "160113", ruc, ano_mes, ano_mes + "10", pais, partida, partida, dcom, fob, 100, 10, "U", ruc[2:10], "500", "R_500", dep]
+
+
+def anual_pro():
+    """Un ANUAL_PRO mínimo: UNICOS con sus tablas lado a lado, PARTIDA y ORIGEN (encabezado en la fila 7)."""
+    wb = Workbook()
+    o = wb.active
+    o.title = "ORIGEN"
+    for _ in range(6):
+        o.append([])
+    o.append(CAB + ["FOB (MILES)"])
+    o.append(fila("20513842377", "2709000000", "PETROLEO CRUDO", 17033000, ano_mes="2607"))
+    u = wb.create_sheet("UNICOS")
+    cab = ["PRODUCTO_ORIGINAL", "PRODUCTO_CORREGIDO", None, None, None, "COD", "COD_TEXTO", "PAIS", "CONTINENTE", None, None, None,
+           "RUC", "RUC_TEXTO", "RAZON_SOCIAL", "DOMICILIO_FISCAL", "DPTO_EXPORTACION", "RUC_NOMBRE", "BORRAR_PARA", "NOTA", "REVISADO",
+           None, None, None, "COD", "ADUANA_JURISDICCION"]
+    u.append(cab)
+    empresas = [("20513842377", "PETROTAL PERU S.R.L.", "OK"), ("20100000001", "CACAO LORETO SAC", "OK"),
+                ("20601551951", "REYCAL COMPANY S.A.C.", "LOR SMN UCA"), ("20100000003", "CAFETALERA SAC", "OK")]
+    for i in range(4):
+        r = [None] * len(cab)
+        r[0], r[1] = ("CACAO EN GRANO SECO", "Cacao en grano") if i == 0 else (None, None)
+        r[5], r[6], r[7], r[8] = (105, "105", "Brasil", "América") if i == 0 else (None, None, None, None)
+        r[12], r[13], r[14], r[18] = empresas[i][0], empresas[i][0], empresas[i][1], empresas[i][2]
+        r[24], r[25] = (226, "Iquitos") if i == 0 else (None, None)
+        u.append(r)
+    p = wb.create_sheet("PARTIDA")
+    p.append(["PARTIDA", "PARTIDA_TEXTO", "|", "CATEGORIA", "PRODUCTO ✔ ", "PRODUCTO", "NOTA"])
+    p.append([2709000000, "2709000000", "1. PRODUCTOS TRADICIONALES", "1.2. PETRÓLEO Y SUS DERIVADOS", "Barriles de petróleo crudo", "- Aceites crudos", None])
+    p.append([1801001900, "1801001900", "2. PRODUCTOS NO TRADICIONALES", "2.4. AGROPECUARIOS", "Cacao", "- - Los demás", None])
+    p.append([901119000, "0901119000", "1. PRODUCTOS TRADICIONALES", "1.1. CAFÉ", "Café en grano", "- - Los demás", None])
+    p.append([2523290000, "2523290000", "3. OTROS PRODUCTOS", "3.5. OTROS", "Cemento", "- Los demás", None])
+    p.append([4407999000, "4407999000", None, None, None, "- - Las demás maderas", None])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def sunat_agosto():
+    wb = Workbook()
+    ws = wb.active
+    ws.append(CAB)
+    for f in [fila("20513842377", "2709000000", "PETROLEO CRUDO", 17033000),             # ok -> petróleo
+              fila("20100000001", "1801001900", "CACAO EN GRANO SECO", 290400),          # ok -> cacao (PROD_UNICOS)
+              fila("20601551951", "1801001900", "CACAO TOSTADO", 5000),                   # BORRAR PARA: LOR SMN UCA
+              fila("20100000003", "0901119000", "CAFE VERDE", 70000),                     # regla: café en Loreto
+              fila("20999999999", "1801001900", "CACAO", 8000),                           # empresa nueva
+              fila("20100000001", "4407999000", "MADERA TORNILLO", 9000),                 # partida sin clasificar
+              fila("20100000001", "2523290000", "CEMENTO", 1000),                         # otras exportaciones
+              fila("20100000001", "1801001900", "CACAO EN GRANO SECO", 7000, dep="15"),   # Lima: no se guarda
+              [None] * 9 + [999999999]]:                                                  # fila de totales
+        ws.append(f)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_flujo_sunat_completo(cliente):
+    r = subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    assert r["bases"]["expo-sunat"]["periodos"] == ["2026-07"]                 # la hoja ORIGEN como base
+    assert any("Partidas (PARTIDA): 5, 4 clasificadas" in a for a in r["avisos"])
+    r = subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    assert any("1 filas de otros departamentos" in a for a in r["avisos"])
+    df = datos(cliente, "expo-sunat", "16")
+    ago = df[df["MES"] == 8].set_index("DESCRIPCION")
+    assert ago.loc["PETROLEO CRUDO", "ESTADO"] == "ok" and ago.loc["PETROLEO CRUDO", "RUBRO_ESTAD"] == "Petróleo crudo y derivados"
+    assert ago.loc["CACAO EN GRANO SECO", "PRODUCTO"] == "Cacao en grano" and ago.loc["CACAO EN GRANO SECO", "RUBRO_ESTAD"] == "Cacao en grano"
+    assert ago.loc["CACAO EN GRANO SECO", "FOB"] == 290 and ago.loc["CACAO EN GRANO SECO", "PAIS"] == "Brasil"
+    assert ago.loc["CACAO TOSTADO", "ESTADO"] == "borrar"
+    assert ago.loc["CAFE VERDE", "ESTADO"] == "borrar" and "café" in ago.loc["CAFE VERDE", "MOTIVO"]
+    assert ago.loc["CACAO", "ESTADO"] == "verificar"
+    assert ago.loc["MADERA TORNILLO", "ESTADO"] == "clasificar"
+    assert ago.loc["CEMENTO", "RUBRO_ESTAD"] == "OTRAS EXPORTACIONES"
+
+    x = cliente.get("/v1/exportaciones/sunat?departamento=16&periodo=2026-08").json()["revision"]
+    assert [e["ruc"] for e in x["empresas"]] == ["20999999999"]
+    assert [p["partida"] for p in x["partidas"]] == ["4407999000"]
+    prop = {f["rubro"]: f for f in x["propuesta"]["filas"]}
+    assert prop["Petróleo crudo y derivados"]["sunat"] == 17033 and prop["Petróleo crudo y derivados"]["dif"] == 0
+    assert prop["TOTAL EXPORTACIONES"]["sunat"] == 17033 + 290 + 1
+
+    # revisión: la empresa nueva pasa a OK, la partida se clasifica como madera y va a «Otros acabados»
+    assert cliente.post("/v1/exportaciones/sunat/empresas", json={"filas": [{"RUC": "20999999999", "BORRAR_PARA": "OK"}]}).status_code == 200
+    assert cliente.post("/v1/exportaciones/sunat/partidas", json={"filas": [{"PARTIDA": "4407999000", "TIPO": "2. PRODUCTOS NO TRADICIONALES",
+                                                                            "CATEGORIA": "2.1. MADERAS Y SUS MANUFACTURAS", "PRODUCTO": "Madera tornillo"}]}).status_code == 200
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO", "ESTADO"] == "ok"
+    assert ago.loc["MADERA TORNILLO", "RUBRO_ESTAD"] == "Otros acabados"
+    # una equivalencia manda el cemento a «Resto»; una regla nueva borra el cacao de la empresa nueva
+    cliente.post("/v1/exportaciones/sunat/equivalencias", json={"filas": [{"departamento": "LOR", "producto": "Cemento", "rubro": "Resto"}]})
+    reglas = x["reglas"] + [{"departamento": "LOR", "campo": "ruc", "valor": "20999999999", "motivo": "prueba"}]
+    cliente.post("/v1/exportaciones/sunat/reglas", json={"filas": reglas})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CEMENTO", "RUBRO_ESTAD"] == "Resto" and ago.loc["CACAO", "ESTADO"] == "borrar"
+
+    # pasar al ESTAD: los cuadros usan lo de SUNAT
+    assert cliente.post("/v1/exportaciones/sunat-estad?departamento=16&periodo=2026-08").status_code == 200
+    c = cliente.get("/v1/cuadros/exportaciones?departamento=16&periodo=2026-08").json()["cuadros"]
+    s = {f["nombre"]: f for f in c["sintesis"]}
+    assert s["Petróleo crudo y derivados"]["mes_a"] == 17.03 and s["Maderas y sus manufacturas"]["mes_a"] == 0.01
+    r = cliente.get("/v1/exportaciones/sunat-estad.xlsx?departamento=16&periodo=2026-08")
+    assert load_workbook(io.BytesIO(r.content)).sheetnames == ["ESTAD propuesto", "Detalle"]
+
+
+def test_padron_de_ruc(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    assert "20999999999" in sunat_expo.pendientes_ruc()
+    spec = importlib.util.spec_from_file_location("padron_ruc", Path(__file__).resolve().parents[2] / "EXPORT" / "automatizacion" / "padron_ruc.py")
+    padron = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(padron)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("padron_reducido_ruc.txt", "RUC|NOMBRE O RAZÓN SOCIAL|ESTADO|CONDICIÓN|\n20999999999|NUEVA EXPORTADORA SAC|ACTIVO|HABIDO|\n"
+                                              "20111111111|OTRA SAC|ACTIVO|HABIDO|\n".encode("latin-1"))
+    df = padron.buscar(["20999999999"], buf.getvalue())
+    assert df.to_dict("records") == [{"RUC": "20999999999", "RAZON_SOCIAL": "NUEVA EXPORTADORA SAC", "ESTADO": "ACTIVO", "CONDICION": "HABIDO"}]
+    sunat_expo.guardar_padron(df)
+    sunat_expo.reprocesar()
+    assert "20999999999" not in sunat_expo.pendientes_ruc()
+    x = cliente.get("/v1/exportaciones/sunat?departamento=16&periodo=2026-08").json()["revision"]
+    assert x["empresas"][0]["razon_social"] == "NUEVA EXPORTADORA SAC"          # sigue por verificar (BORRAR PARA vacío)
+
+
+def test_resumen_export(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    x = cliente.get("/v1/exportaciones/resumen?departamento=16&periodo=2026-08").json()["resumen"]
+    assert x["nombre_mes"] == "agosto" and x["mes"]["destinos"][0]["nombre"] == "Brasil"
+    assert x["textos"][0].startswith("En agosto 2026, el principal mercado de destino fue Brasil (100,0 por ciento)")
+    titulos = {d["titulo"]: d for d in x["destacados"]}
+    assert titulos["Producto estrella del mes"]["valor"] == "Barriles de petróleo crudo"
+    assert titulos["Empresas exportadoras"]["valor"] == "2"
+
+
+def test_anual_pro_desde_2024_lista_sunat_y_categorias_renumeradas(cliente):
+    """Desde 2024 la hoja PARTIDA se llama LISTA SUNAT (TIPO, CATEGORIA, DESCRIPCION, PRODUCTO) y agropecuarios es 2.3."""
+    wb = load_workbook(io.BytesIO(anual_pro()))
+    vieja = wb["PARTIDA"]
+    filas = [[c.value for c in r] for r in vieja.iter_rows(min_row=2)]
+    wb.remove(vieja)
+    nueva = wb.create_sheet("LISTA SUNAT")
+    nueva.append(["PARTIDA", "PARTIDA_TEXTO", "TIPO", "CATEGORIA", "DESCRIPCION", "PRODUCTO", "NOTA"])
+    for partida, texto, tipo, cat, prod, desc, nota in filas:
+        cat = (cat or "").replace("2.4. AGROPECUARIOS", "2.3. AGROPECUARIOS") or None
+        nueva.append([partida, texto, tipo, cat, desc, prod, nota])
+    buf = io.BytesIO()
+    wb.save(buf)
+    r = subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": buf.getvalue()})
+    assert any("Partidas (PARTIDA): 5, 4 clasificadas" in a for a in r["avisos"])
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO EN GRANO SECO", "CATEGORIA"] == "2.3. AGROPECUARIOS"
+    assert ago.loc["CACAO EN GRANO SECO", "RUBRO_ESTAD"] == "Cacao en grano"           # por el nombre de la categoría
+    assert sunat_expo._categoria("2.4. ANIMALES VIVOS") == "animales" and sunat_expo._categoria("3.5. OTROS") == ""
+
+
+def test_nombres_condiciones_y_diccionarios(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    x = cliente.get("/v1/exportaciones/sunat?departamento=16&periodo=2026-08").json()["revision"]
+    d = {g["nombre"]: g for g in x["descripciones"]}
+    # PETROLEO CRUDO no está en PROD_UNICOS: tomó el nombre de la partida, que la descripción sí menciona
+    assert d["Barriles de petróleo crudo"]["todas"] == ["PETROLEO CRUDO"] and d["Barriles de petróleo crudo"]["sin_confirmar"] == 0
+    # asignar un nombre común: queda en PROD_UNICOS
+    cliente.post("/v1/exportaciones/sunat/nombres", json={"filas": [{"descripciones": ["PETROLEO CRUDO"], "nombre": "Petróleo crudo"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["PETROLEO CRUDO", "PRODUCTO"] == "Petróleo crudo"
+    # equivalencia con «contiene»: solo vale si la descripción lo dice
+    cliente.post("/v1/exportaciones/sunat/empresas", json={"filas": [{"RUC": "20999999999", "BORRAR_PARA": "OK"}]})
+    cliente.post("/v1/exportaciones/sunat/equivalencias", json={"filas": [{"departamento": "LOR", "producto": "Cacao", "contiene": "TOSTADO", "rubro": "Cacao en grano"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO", "RUBRO_ESTAD"] == "Resto"                                   # «Cacao» genérico y la DCOM no dice TOSTADO
+    cliente.post("/v1/exportaciones/sunat/equivalencias", json={"filas": [{"departamento": "LOR", "producto": "Cacao", "rubro": "Cacao en grano"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO", "RUBRO_ESTAD"] == "Cacao en grano"
+    # condición por DCOM: la fila «Cacao en grano» exige «GRANO»; lo asignado a mano en PROD_UNICOS no se toca
+    cliente.post("/v1/exportaciones/sunat/condiciones", json={"filas": [{"departamento": "LOR", "rubro": "Cacao en grano", "contiene": "GRANO", "motivo": "x"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["CACAO", "RUBRO_ESTAD"] == "Resto" and "GRANO" in ago.loc["CACAO", "MOTIVO"]
+    assert ago.loc["CACAO EN GRANO SECO", "RUBRO_ESTAD"] == "Cacao en grano"
+    # diccionarios en Excel: bajar, editar una partida y volver a subir
+    r = cliente.get("/v1/exportaciones/diccionarios.xlsx")
+    wb = load_workbook(io.BytesIO(r.content))
+    assert {"LEEME", "PARTIDA", "PROD_UNICOS", "EMPRESAS", "CONDICIONES"} <= set(wb.sheetnames)
+    ws = wb["PARTIDA"]
+    for fila in ws.iter_rows(min_row=2):
+        if fila[0].value == "4407999000":
+            fila[1].value, fila[2].value, fila[3].value = "2. PRODUCTOS NO TRADICIONALES", "2.1. MADERAS Y SUS MANUFACTURAS", "Madera tornillo"
+    buf = io.BytesIO()
+    wb.save(buf)
+    r = subir(cliente, **{"diccionarios.xlsx": buf.getvalue()})
+    assert any("reprocesada" in a for a in r["avisos"])
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["MADERA TORNILLO", "ESTADO"] == "ok" and ago.loc["MADERA TORNILLO", "RUBRO_ESTAD"] == "Otros acabados"
+
+
+def test_equivalencia_retirada_no_se_aplica(cliente):
+    sunat_expo.guardar_tabla("equivalencias", pd.DataFrame([{"departamento": "SMN", "producto": "Manteca vegetal", "rubro": "Manteca vegetal de palma"},
+                                                            {"departamento": "LOR", "producto": "Anguilas", "rubro": "Peces ornamentales"}]))
+    eq = sunat_expo.leer_tabla("equivalencias")
+    assert list(eq["producto"]) == ["Anguilas"]
+
+
+def test_terminos_de_la_dcom(cliente):
+    """Un término de la DCOM da el nombre común a lo que no está en PROD_UNICOS; PROD_UNICOS siempre manda."""
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    cliente.post("/v1/exportaciones/sunat/terminos", json={"filas": [{"contiene": "SECO", "nombre": "Cacao seco", "fuente": "x"},
+                                                                     {"contiene": "PETROLEO", "nombre": "Petróleo crudo", "fuente": "x"}]})
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert ago.loc["PETROLEO CRUDO", "PRODUCTO"] == "Petróleo crudo"                 # no estaba en PROD_UNICOS
+    assert ago.loc["CACAO EN GRANO SECO", "PRODUCTO"] == "Cacao en grano"            # PROD_UNICOS manda sobre el término
+    assert sunat_expo.leer_tabla("condiciones").empty                                # sin la condición «PALMA»
+
+
+def test_unificar_producto(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    r = cliente.post("/v1/exportaciones/sunat/unificar", json={"filas": [{"contiene": "cacao", "nombre": "Cacao en grano"}]})
+    assert r.status_code == 200
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert set(ago.loc[["CACAO", "CACAO TOSTADO", "CACAO EN GRANO SECO"], "PRODUCTO"]) == {"Cacao en grano"}
+    assert cliente.post("/v1/exportaciones/sunat/unificar", json={"filas": [{"contiene": "ca", "nombre": "x"}]}).status_code == 422
+
+
+def base_depurada(con_titulo=True):
+    """Base depurada por el usuario: las columnas de SUNAT más TIPO, CATEGORIA y PRODUCTO (encabezado no en la fila 1)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "BASE"
+    if con_titulo:
+        ws.append(["Base depurada de exportaciones · agosto 2026"])
+        ws.append([])
+    ws.append(["ruc11", "ano_mes", "fecembar", "pais", "aduana", "partorig", "dcom", "fob", "kilos", "ubigeo_dep",
+               "TIPO", "CATEGORÍA", "PRODUCTO", "RAZON_SOCIAL"])
+    ws.append(["20513842377", "2608", "20260810", "105", "226", "2709000000", "PETROLEO CRUDO", 17033000, 1, "16",
+               "1. PRODUCTOS TRADICIONALES", "1.2. PETRÓLEO Y SUS DERIVADOS", "Barriles de petróleo crudo", "PETROTAL PERU S.R.L."])
+    ws.append(["20100000001", "2608", "20260811", "105", "226", "1801001900", "CACAO SECO", 290400, 1, "16",
+               "No tradicional", "2.4. AGROPECUARIOS", "Cacao en grano", "CACAO LORETO SAC"])
+    ws.append(["20999999999", "2608", "20260812", "105", "226", "4407999000", "MADERA TORNILLO", 9000, 1, "16",
+               "2. PRODUCTOS NO TRADICIONALES", "2.1. MADERAS Y SUS MANUFACTURAS", "Madera tornillo", None])
+    ws.append(["20100000001", "2608", "20260813", "105", "235", "1801001900", "CACAO SECO", 7000, 1, "15",
+               "2. PRODUCTOS NO TRADICIONALES", "2.4. AGROPECUARIOS", "Cacao en grano", None])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_base_depurada_entra_completa_y_pasa_sola_al_estad(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    r = subir(cliente, **{"LOR_202608_depurada.xlsx": base_depurada()})
+    assert any("base depurada 2026-08 a 2026-08" in a for a in r["avisos"])
+    assert any("LORETO 2026-08: pasó al ESTAD" in a for a in r["avisos"])
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8").set_index("DESCRIPCION")
+    assert set(ago["ESTADO"]) == {"ok"} and set(ago["MOTIVO"]) == {sunat_expo.DEPURADA}
+    # sin revisión: la empresa nueva entra y la partida que no está en el diccionario usa la clasificación del archivo
+    assert ago.loc["MADERA TORNILLO", "RUBRO_ESTAD"] == "Otros acabados" and ago.loc["MADERA TORNILLO", "EMPRESA"].startswith("20999999999 - (sin")
+    assert ago.loc["CACAO SECO", "RUBRO_ESTAD"] == "Cacao en grano" and ago.loc["CACAO SECO", "PAIS"] == "Brasil"
+    assert ago.loc["PETROLEO CRUDO", "EMPRESA"] == "20513842377 - PETROTAL PERU S.R.L." and ago.loc["PETROLEO CRUDO", "ADUANA"] == "Iquitos"
+    assert len(ago) == 3                                                    # la fila de Lima no se guarda
+    c = cliente.get("/v1/cuadros/exportaciones?departamento=16&periodo=2026-08").json()["cuadros"]
+    assert "2026-08" in c["meses"]
+    s = {f["nombre"]: f for f in c["sintesis"]}
+    assert s["Petróleo crudo y derivados"]["mes_a"] == 17.03 and s["Maderas y sus manufacturas"]["mes_a"] == 0.01
+    # reprocesar (p. ej. al subir diccionarios) no toca la base depurada
+    sunat_expo.reprocesar()
+    ago = datos(cliente, "expo-sunat", "16").query("MES == 8")
+    assert len(ago) == 3 and set(ago["ESTADO"]) == {"ok"}
+
+
+def test_base_cruda_avisa_que_hay_que_subir_el_anual_pro(cliente):
+    subir(cliente, **{"ESTADLO.xlsx": estadlo(), "ANUAL_PRO_2026.xlsx": anual_pro()})
+    r = subir(cliente, **{"X_202608.xlsx": sunat_agosto()})
+    assert any("Sube el ANUAL_PRO actualizado" in a for a in r["avisos"]) and not any("pasó al ESTAD" in a for a in r["avisos"])
+
+
+def test_anual_pro_pasa_solo_al_estad_el_ultimo_mes_y_no_pisa_lo_publicado(cliente):
+    """ORIGEN con julio y agosto: agosto (el último) pasa al ESTAD; julio ya estaba y difiere: se avisa y no se reemplaza."""
+    wb = load_workbook(io.BytesIO(anual_pro()))
+    o = wb["ORIGEN"]
+    o.append(fila("20513842377", "2709000000", "PETROLEO CRUDO", 17033000))                       # agosto
+    o.append(fila("20999999999", "1801001900", "CACAO", 8000))                                    # empresa nueva: no entra
+    buf = io.BytesIO()
+    wb.save(buf)
+    subir(cliente, **{"ESTADLO.xlsx": estadlo()})
+    antes = datos(cliente, "expo-estad", "16").query("AÑO == 2026 and MES == 7").set_index("RUBRO")["FOB"]
+    r = subir(cliente, **{"ANUAL_PRO_2026.xlsx": buf.getvalue()})
+    assert any("LORETO 2026-08: pasó al ESTAD" in a for a in r["avisos"])
+    assert any("LORETO 2026-07: ya estaba en el ESTAD" in a and "no se reemplazó" in a for a in r["avisos"])
+    assert any("1 filas por verificar o sin clasificar" in a for a in r["avisos"])
+    est = datos(cliente, "expo-estad", "16").query("AÑO == 2026")
+    ago = est[est["MES"] == 8].set_index("RUBRO")["FOB"]
+    assert ago["Petróleo crudo y derivados"] == 17033 and ago["TOTAL EXPORTACIONES"] == 17033
+    assert est[est["MES"] == 7].set_index("RUBRO")["FOB"].equals(antes)
+
+
+def test_anual_pro_de_un_anio_pasado_no_reemplaza_su_ultimo_mes(cliente):
+    """ANUAL_PRO con solo julio, cuando el ESTAD ya llega a agosto: julio no es el mes en curso y no se reemplaza."""
+    subir(cliente, **{"ESTADLO.xlsx": estadlo()})
+    antes = datos(cliente, "expo-estad", "16").query("AÑO == 2026 and MES == 7").set_index("RUBRO")["FOB"]
+    r = subir(cliente, **{"ANUAL_PRO_2026.xlsx": anual_pro()})
+    assert any("LORETO 2026-07: ya estaba en el ESTAD" in a for a in r["avisos"]) and not any("pasó al ESTAD" in a for a in r["avisos"])
+    assert datos(cliente, "expo-estad", "16").query("AÑO == 2026 and MES == 7").set_index("RUBRO")["FOB"].equals(antes)

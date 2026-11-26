@@ -1,0 +1,387 @@
+"""Ejecución del presupuesto: gasto corriente no financiero, inversión, variación real con IPC, avance del PIM,
+comparación de años y principales variaciones, con números hechos a mano para poder verificarlos."""
+import io
+from datetime import date
+
+import pandas as pd
+import pytest
+from openpyxl import Workbook, load_workbook
+
+from app.fiscal import ipc
+from tests.test_api import _csv, zip_de
+from tests.test_hidrocarburos import cliente  # noqa: F401  (misma base vacía por prueba)
+
+M = 1e5                                   # los montos de abajo × 100 mil soles: 1000 → S/ 100 millones
+CARPETA = {"GobNacional": "Gobierno Nacional", "GobRegional": "Gobierno Regional", "Municipalidad": "Gobierno Municipal"}
+NIVEL = {"GobNacional": "E: GOBIERNO NACIONAL", "GobRegional": "R: GOBIERNOS REGIONALES", "Municipalidad": "M: GOBIERNOS LOCALES"}
+MESES = [(2025, m) for m in range(1, 13)] + [(2026, m) for m in range(1, 10)]
+
+
+def scraper():
+    s = {}
+    for a, m in MESES:
+        nuevo = a == 2026
+        suf = f"{a} - Mes {m:02d} - LOR - SMN - UCA.csv"
+        for corto, etq in NIVEL.items():
+            base = dict(AÑO=a, MES=f"{m}: Mes", NIVEL_GOBIERNO=etq, DEPARTAMENTO="16: LORETO")
+            personal = {"GobNacional": 100, "GobRegional": 200, "Municipalidad": 300}[corto] * (1.1 if nuevo else 1)
+            gen = [dict(base, COD_GENERICA="5-21", GENERICA="5-21: PERSONAL Y OBLIGACIONES SOCIALES", DEVENGADO=personal * M),
+                   dict(base, COD_GENERICA="5-23", GENERICA="5-23: BIENES Y SERVICIOS", DEVENGADO=(60 if nuevo else 50) * M),
+                   dict(base, COD_GENERICA="6-26", GENERICA="6-26: ADQUISICION DE ACTIVOS NO FINANCIEROS", DEVENGADO=777 * M),
+                   dict(base, COD_GENERICA="7-28", GENERICA="7-28: SERVICIO DE LA DEUDA PUBLICA", DEVENGADO=999 * M)]
+            s[f"output/DEVENGADO/{CARPETA[corto]}/DEV Generica.{corto} {suf}"] = _csv(pd.DataFrame(gen))
+            if corto == "Municipalidad":
+                fun = [dict(AÑO=a, MES=f"{m}: Mes", DEPARTAMENTO="16: LORETO", FUNCION=f, MUNICIPALIDAD=mu, DEVENGADO=v * M)
+                       for f, mu, v in [("15: TRANSPORTE", "160101-301263: MUNICIPALIDAD PROVINCIAL DE MAYNAS", 300 if nuevo else 200),
+                                        ("16: COMUNICACIONES", "160101-301263: MUNICIPALIDAD PROVINCIAL DE MAYNAS", 10),
+                                        ("20: SALUD", "160108-301270: MUNICIPALIDAD DISTRITAL DE PUNCHANA", 50 if nuevo else 100)]]
+            else:
+                f, v = ("15: TRANSPORTE", 1500 if nuevo else 1000) if corto == "GobNacional" else ("22: EDUCACION", 400 if nuevo else 500)
+                fun = [dict(base, ENTIDAD="X", COD_FUNCION=f[:2], FUNCION=f, DEVENGADO=v * M)]
+            s[f"output/DEVENGADO/{CARPETA[corto]}/DEV Funcion.{corto} {suf}"] = _csv(pd.DataFrame(fun))
+    pim = [dict(AÑO=a, DEPARTAMENTO="16: LORETO", **{"NIVEL DE GOBIERNO": n}, FUNCION=f, PIM=v * M)
+           for a in (2025, 2026) for n, f, v in [("GOBIERNO NACIONAL", "15: TRANSPORTE", 20000), ("GOBIERNOS REGIONALES", "22: EDUCACION", 10000),
+                                                ("GOBIERNOS LOCALES", "15: TRANSPORTE", 5000), ("GOBIERNOS LOCALES", "20: SALUD", 2000)]]
+    s["output/PIM/PIM X FUNCIÓN/DATA/PIM Funcion 2026 - LOR - SMN - UCA.csv"] = _csv(pd.DataFrame(pim))
+    return s
+
+
+def ipc_xlsx(valor_2026=105.0):
+    wb = Workbook()
+    ws = wb.active
+    for _ in range(3):
+        ws.append(["IPC Lima Metropolitana"])
+    for a, m in MESES:
+        ws.append([None, date(a, m, 1), valor_2026 if a == 2026 else 100.0])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+@pytest.fixture()
+def datos(cliente):  # noqa: F811
+    r = cliente.post("/v1/cargas", files=[("archivos", ("output.zip", zip_de(scraper()), "application/zip")),
+                                          ("archivos", ("IPC.xlsx", ipc_xlsx(), "application/octet-stream"))])
+    assert r.status_code == 200, r.text
+    assert any("IPC de Lima" in a for a in r.json()["avisos"])
+    return cliente
+
+
+def test_gasto_corriente_real_y_nominal(datos):
+    c = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=gasto").json()["cuadros"]
+    assert c["periodo"] == "2026-09" and c["comparar"] == 2025 and c["real"] and c["anios"] == [2025, 2026]
+    total = c["niveles"][-1]
+    # sin capital ni deuda: (100+200+300) + 3×50 = 750 en 2025; (660) + 3×60 = 840 en 2026 (× 100 mil = millones / 10)
+    assert (total["mes_b"], total["mes_a"]) == (75.0, 84.0) and total["acum_a"] == 756.0
+    assert total["var_mes_nominal"] == 12.0 and total["var_mes"] == round((840 / 105 / 7.5 - 1) * 100, 1) == 6.7
+    assert [f["nombre"] for f in c["detalle"]] == ["Personal y obligaciones sociales", "Bienes y servicios", "Total"]
+    assert c["detalle"][0]["var_acum"] == 4.8                         # 1,10 / 1,05
+    assert [p["nivel"] for p in c["participacion"]] == ["G.N.", "G.R.", "G.L."]
+    assert c["mensual"]["a"][8] == 84.0 and c["mensual"]["a"][9] is None and c["mensual"]["acum_b"][11] == 900.0
+    assert c["interanual"][-1] == {"periodo": "Set. 2026", "var": 6.7, "var_nominal": 12.0, "var_12m": None, "var_12m_nominal": None}   # 12 meses: faltan 2024
+
+
+def test_inversion_avance_pim_y_comparar(datos):
+    c = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&periodo=2026-06").json()["cuadros"]
+    n = {f["nombre"]: f for f in c["niveles"]}
+    assert n["Gobierno Nacional"]["acum_a"] == 900.0 and n["Gobierno Nacional"]["pim"] == 2000.0 and n["Gobierno Nacional"]["avance"] == 45.0
+    assert n["Gobierno Nacional"]["avance_b"] == 30.0
+    d = {f["nombre"]: f for f in c["detalle"]}
+    assert d["15: TRANSPORTE"]["acum_a"] == 900.0 + 186.0               # G.N. + G.L. (300 + 10 de comunicaciones) × 6
+    assert "16: COMUNICACIONES" not in d
+    assert c["avance"]["parejo"][5] == 50.0 and c["avance"]["a"][5] == round(c["mensual"]["acum_a"][5] / 3700 * 100, 1)
+    assert datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&comparar=2026").status_code == 422
+    assert datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&periodo=2027-01").status_code == 422
+
+
+
+def test_inversion_de_un_solo_nivel(datos):
+    """Con nivel=M el detalle, las series y el avance son solo de los Gobiernos Locales; el cuadro por nivel no cambia."""
+    todos = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&periodo=2026-06").json()["cuadros"]
+    c = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&periodo=2026-06&nivel=M").json()["cuadros"]
+    assert c["nivel"] == "M" and c["nivel_nombre"] == "Gobiernos Locales" and todos["nivel"] is None
+    assert c["niveles"] == todos["niveles"]
+    d = {f["nombre"]: f for f in c["detalle"]}
+    assert set(d) == {"15: TRANSPORTE", "20: SALUD", "Total"}                 # sin 22: EDUCACION (solo G.R.)
+    assert d["15: TRANSPORTE"]["acum_a"] == 186.0 and d["15: TRANSPORTE"]["pim"] == 500.0
+    assert d["Total"]["acum_a"] == 216.0 == {f["nombre"]: f for f in c["niveles"]}["Gobiernos Locales"]["acum_a"]
+    assert c["mensual"]["a"][5] == 36.0 and c["mensual"]["a"][9] is None
+    assert c["avance"]["a"][5] == round(216 / 700 * 100, 1)
+    assert c["interanual"][-1]["var_nominal"] == round((360 / 310 - 1) * 100, 1)
+    r = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&nivel=M&formato=xlsx")
+    assert "G.L." in r.headers["content-disposition"]
+    assert "Gobiernos Locales" in load_workbook(io.BytesIO(r.content))["Cuadro"]["A2"].value
+    g = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=gasto&nivel=R").json()["cuadros"]
+    assert g["detalle"][-1]["acum_a"] == {f["nombre"]: f for f in g["niveles"]}["Gobiernos Regionales"]["acum_a"]
+    assert datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&nivel=X").status_code == 422
+
+def test_variaciones_alarmantes(datos):
+    v = datos.get("/v1/variaciones?departamento=16").json()["variaciones"]
+    mes, acum = v["comparaciones"]
+    assert mes["titulo"] == "Setiembre 2026 vs Setiembre 2025" and acum["clave"] == "acumulado"
+    todos = mes["bloques"][0]
+    assert todos["total"] == {"antes": 181.0, "ahora": 226.0, "dif": 45.0, "var": 24.9}
+    assert todos["aumentos"][0]["item"] == "G.N. · 15: TRANSPORTE" and todos["aumentos"][0]["dif"] == 50.0
+    assert todos["pocos"] and len(todos["aumentos"]) + len(todos["caidas"]) == 4      # 4 ítems, ninguno repetido
+    muni = mes["bloques"][-1]
+    assert muni["nombre"].endswith("por municipalidad")
+    assert [f["item"] for f in muni["aumentos"]][0] == "MUNICIPALIDAD PROVINCIAL DE MAYNAS"
+
+
+def test_sin_ipc_queda_nominal(cliente):  # noqa: F811
+    cliente.post("/v1/cargas", files=[("archivos", ("output.zip", zip_de(scraper()), "application/zip"))])
+    c = cliente.get("/v1/cuadros/ejecucion?departamento=16&sector=gasto").json()["cuadros"]
+    assert not c["real"] and c["niveles"][-1]["var_mes"] is None and c["niveles"][-1]["var_mes_nominal"] == 12.0
+
+
+def test_ipc_del_bcrp(cliente, monkeypatch):  # noqa: F811
+    series = {"PN38705PM": {"2026-08": 113.1, "2026-09": 113.4, "2026-10": 0.2},     # 0,2 % no es un índice
+              "PN01270PM": {"2021-11": 100.1, "2021-12": 100.5}}                    # base anterior: terminó en 2021
+    monkeypatch.setattr(ipc, "de_bcrp", lambda serie=None: series[serie])
+    r = cliente.post("/v1/ipc/actualizar").json()
+    assert r["meses"] == 2 and r["hasta"] == "2026-09" and r["fuente"] == "BCRP, serie PN38705PM"
+    series["PN38705PM"] = {"2021-12": 100.0}                                          # ninguna al día: no se toca lo cargado
+    assert cliente.post("/v1/ipc/actualizar").status_code == 502
+    assert cliente.get("/v1/ipc").json()["hasta"] == "2026-09"
+
+
+def test_excel(datos):
+    r = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&formato=xlsx")
+    wb = load_workbook(io.BytesIO(r.content))
+    assert wb.sheetnames == ["Cuadro", "Mensual", "Variaciones mes", "Variaciones acumulado"]
+    assert "2026-09 vs 2025" in r.headers["content-disposition"]
+
+
+def test_lee_la_respuesta_del_bcrp(monkeypatch):
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"config": {}, "periods": [{"name": "Ene.2026", "values": ["112.51"]}, {"name": "Feb.2026", "values": ["n.d."]},
+                                              {"name": "Set.2026", "values": ["113.40"]}]}
+
+    class Sesion:
+        def get(self, url, **k):
+            assert "/PN38705PM/json/2010-1/" in url
+            return Resp()
+
+    monkeypatch.undo()                                    # la función real (conftest la reemplaza para no salir a la red)
+    assert ipc.de_bcrp(sesion=Sesion()) == {"2026-01": 112.51, "2026-09": 113.4}
+
+
+def test_proyectos_del_notebook(datos, tmp_path, monkeypatch):
+    """Bloques 1 a 3 de Fiscal_Proyectos.ipynb de verdad (con los CSV armados desde la base); la consulta al MEF
+    (bloques 4 y 5) se simula. Luego el endpoint los muestra."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "FISCAL" / "automatizacion"))
+    import proyectos_servidor as ps
+    raiz = tmp_path / "Fiscal"
+    ps.preparar_csv(raiz, "2026-09")
+    assert sorted(p.name for p in (raiz / "Scrapeo/output/DEVENGADO/Gobierno Nacional").iterdir()) == [
+        "DEV Funcion.GobNacional 2025 - Mes 09 - LOR - SMN - UCA.csv", "DEV Funcion.GobNacional 2026 - Mes 09 - LOR - SMN - UCA.csv"]
+    ps.procesamiento_servidor.sin_drive()
+    g = {"__name__": "__main__", "display": lambda *x, **k: None}
+    celdas = ps.celdas("2026-09", raiz)
+    assert len(celdas) == 6 and "MES_ANALISIS = '2026-09'" in celdas[1] and '"/content"' not in celdas[5]
+    for codigo in celdas[:3]:                                  # librerías, configuración y funciones a abrir
+        exec(compile(codigo, "nb", "exec"), g)
+    plan = {(p["cod_depto"], p["nivel"]["codigo"]): p for p in g["plan"]}
+    assert plan[("16", "E")]["positivo"] and plan[("16", "E")]["funciones"][0]["cod"] == "15"
+    assert not plan[("16", "R")]["positivo"] and plan[("16", "R")]["fecha"].year == 2025      # cayó: se consulta 2025
+    for p in g["plan"]:                                        # bloque 5 simulado
+        for f in p["funciones"]:
+            f["proyectos"], f["devengado_funcion"] = [("2001621", f"PROYECTO DE {f['nombre']}", 80e6), ("2195", "OTRO", 20e6)], 100e6
+            f["n_proyectos"] = 2
+    exec(compile(celdas[5], "nb", "exec"), g)                 # bloque 6: el Excel queda en Procesamiento/output
+    assert [p.name for p in (raiz / "Procesamiento/output").iterdir()] == ["Proyectos variaciones 2026-09.xlsx"]
+    df = ps.filas(g)
+    from app import db
+    db.guardar("inv-proyectos", df)
+    r = datos.get("/v1/proyectos?departamento=16").json()
+    assert r["periodo"] == "2026-09" and [n["nivel"] for n in r["proyectos"]] == ["GOBIERNO NACIONAL", "GOBIERNO REGIONAL", "GOBIERNOS LOCALES"]
+    gn = r["proyectos"][0]
+    assert gn["consultado"] == "Set-26" and gn["funciones"][0]["proyectos"][0] == {"codigo": "2001621", "proyecto": "PROYECTO DE 15: TRANSPORTE (incl. 16: Comunicaciones)",
+                                                                                 "devengado": 80e6, "pct": 80.0}
+    gr = r["proyectos"][1]
+    assert gr["funciones"] == [] and gr["consultado"] == "Set-25" and gr["nota"] == "Ninguna función en la lista de caídas"
+
+
+def test_procesamiento_del_notebook(datos, tmp_path, monkeypatch):
+    """Fiscal_Procesamiento.ipynb completo con los CSV y el IPC.xlsx armados desde la base: sus Excel quedan en la página."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "FISCAL" / "automatizacion"))
+    import procesamiento_servidor as ps
+    raiz = tmp_path / "Fiscal"
+    hechas = ps.preparar(raiz)
+    assert hechas["DEV Funcion.Municipalidad"] == 63 and hechas["DEV Generica.GobNacional"] == 84 and hechas["IPC"] == len(MESES)
+    monkeypatch.chdir(tmp_path)
+    g = ps.correr(Path(__file__).resolve().parents[2] / "FISCAL" / "notebooks" / "Fiscal_Procesamiento.ipynb", raiz)
+    assert g["ULTIMO_MES"].strftime("%Y-%m") == "2026-09"
+    nombres = ps.guardar(raiz / "Procesamiento" / "output")
+    assert nombres == ["Fiscal-Loreto_AUTO.xlsx", "Fiscal-SanMartin_AUTO.xlsx", "Fiscal-Ucayali_AUTO.xlsx", "Principales variaciones 2026-09.xlsx"]
+    wb = load_workbook(raiz / "Procesamiento/output/Fiscal-Loreto_AUTO.xlsx")
+    assert wb.sheetnames[:2] == ["GASTO G.N.", "INVERSIÓN G.N."] and "CONTROL" in wb.sheetnames
+
+    lista = datos.get("/v1/fiscal/archivos").json()["archivos"]
+    assert sorted(a["nombre"] for a in lista) == sorted(nombres)
+    r = datos.get("/v1/fiscal/archivos/descargar", params={"nombre": "Principales variaciones 2026-09.xlsx"})
+    assert r.status_code == 200 and "Principales variaciones" in r.headers["content-disposition"]
+    assert load_workbook(io.BytesIO(r.content)).sheetnames[-1] == "DETALLE"
+    assert datos.get("/v1/fiscal/archivos/descargar", params={"nombre": "otro.xlsx"}).status_code == 404
+
+
+def test_deuda_desglosada_vuelve_al_formato_del_scraper():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "FISCAL" / "automatizacion"))
+    import procesamiento_servidor as ps
+    base = dict(AÑO=2026, MES="9: Setiembre", NIVEL_GOBIERNO="R: GOBIERNOS REGIONALES", DEPARTAMENTO="16: LORETO")
+    gen = pd.DataFrame([dict(base, COD_GENERICA="5-21", GENERICA="5-21: PERSONAL", DESGLOSE="", DEVENGADO=10.0),
+                        dict(base, COD_GENERICA="7-28", GENERICA="7-28: SERVICIO DE LA DEUDA PUBLICA", DESGLOSE="AMORTIZACIÓN", DEVENGADO=6.0),
+                        dict(base, COD_GENERICA="7-28", GENERICA="7-28: SERVICIO DE LA DEUDA PUBLICA", DESGLOSE="INTERESES Y COMISIONES", DEVENGADO=3.0),
+                        dict(base, COD_GENERICA="7-28", GENERICA="7-28: SERVICIO DE LA DEUDA PUBLICA", DESGLOSE="OTROS (sin clasificar)", DEVENGADO=1.0)])
+    generica, deuda = ps.generica_y_deuda(gen)
+    assert generica["DEVENGADO"].tolist() == [10.0, 10.0] and "DESGLOSE" not in generica
+    assert deuda["CLASIFICACION"].tolist() == ["AMORTIZACION", "INTERESES Y COMISIONES"] and deuda["DEVENGADO"].sum() == 9.0
+
+
+def test_ipc_se_refresca_solo(cliente, monkeypatch):  # noqa: F811
+    """Sin Drive: al IPC al que le falta el mes anterior se lo trae del BCRP, a lo más una vez por día."""
+    llamadas = []
+    monkeypatch.setattr(ipc, "actualizar_bcrp", lambda: llamadas.append(1))
+    monkeypatch.setattr(ipc, "_ultimo_intento", [0.0])
+    ipc.guardar({"2026-08": 110.0}, "prueba")
+    assert ipc.refrescar(hoy=date(2026, 10, 28)) is True and ipc.refrescar(hoy=date(2026, 10, 28)) is False
+    ipc.guardar({"2026-09": 111.0}, "prueba")
+    monkeypatch.setattr(ipc, "_ultimo_intento", [0.0])
+    assert ipc.refrescar(hoy=date(2026, 10, 28)) is False          # ya llega a setiembre
+    import time
+    time.sleep(0.2)
+    assert llamadas == [1]
+
+
+def test_anexos_de_la_sintesis(datos):
+    """Anexos 8 a 13 de la síntesis: 13 meses por nivel (desde el mismo mes del año anterior) con el total Ene.-Dic."""
+    g = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=gasto&anexos=true").json()["cuadros"]["anexos"]
+    assert [x["nivel"] for x in g] == ["DEL GOBIERNO NACIONAL", "DEL GOBIERNO REGIONAL", "DE LOS GOBIERNOS LOCALES"]
+    cols = g[0]["columnas"]
+    assert [c["etq"] for c in cols][:5] == ["Set.", "Oct.", "Nov.", "Dic.", "Ene.-Dic."] and cols[-1] == {"etq": "Set.", "anio": 2026} and len(cols) == 14
+    filas = {f["nombre"]: f for f in g[0]["filas"]}
+    corr = filas["GASTOS CORRIENTES"]["valores"]
+    assert corr[0] == 15.0 and corr[4] == 12 * 15.0 and corr[-1] == 17.0          # personal 100 + bienes 50 (2026: 110 + 60) × 100 mil
+    assert filas["Adquisición de activos no financieros"]["valores"][0] == 77.7 and filas["GASTOS NO FINANCIEROS"]["valores"][0] == 92.7
+    i = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion&anexos=true").json()["cuadros"]["anexos"]
+    assert [f["nombre"] for f in i[0]["filas"]] == ["Transporte y Comunicaciones", "TOTAL DE INVERSIONES"]
+    assert "anexos" not in datos.get("/v1/cuadros/ejecucion?departamento=16&sector=gasto").json()["cuadros"]
+
+
+def test_pagina_carga_los_cuadros_bcrp(datos):
+    """La pestaña «Cuadros y gráficos BCRP» usa static/bcrp.js, servido con su versión (para no quedar en caché vieja)."""
+    html = datos.get("/").text
+    assert 'src="/static/bcrp.js?v=' in html and "Cuadros y gráficos BCRP" in html
+    assert "window.BCRP" in datos.get("/static/bcrp.js").text
+
+
+def test_contraste_con_lo_publicado_por_el_mef(cliente):  # noqa: F811
+    """Los CSV de CONTROL del scraper traen la vista anual del MEF; la página la compara con lo que tiene guardado."""
+    s = {k: v for k, v in scraper().items()}
+    ctl = lambda nivel, ref: _csv(pd.DataFrame([dict(AÑO=2025, DEPARTAMENTO="16: LORETO", COD_GENERICA="5-21", DEV_REF_ANUAL=ref, DEV_SUMA_MESES=ref, ESTADO="OK")]))
+    total_gn_2025 = 12 * (100 + 50 + 777 + 999) * M                     # lo que bajó el scraper (todas las genéricas)
+    s["output/DEVENGADO/CARPETA DE CONTROL/CONTROL Generica GobNacional 2025.csv"] = ctl("GobNacional", total_gn_2025)
+    s["output/DEVENGADO/CARPETA DE CONTROL/CONTROL Generica GobRegional 2025.csv"] = ctl("GobRegional", 1_000_000)
+    s["output/DEVENGADO/CARPETA DE CONTROL/CONTROL Generica GobRegional 2026.csv"] = _csv(pd.DataFrame([dict(AÑO=2026, DEPARTAMENTO="16: LORETO",
+        COD_GENERICA="5-21", DEV_REF_ANUAL=9 * (200 + 50 + 777 + 999) * M * 1.2, DEV_SUMA_MESES=0, ESTADO="PARCIAL")]))
+    r = cliente.post("/v1/cargas", files=[("archivos", ("output.zip", zip_de(s), "application/zip"))]).json()
+    assert any("Controles del MEF" in a for a in r["avisos"])
+    c = {(f["clave"], f["anio"]): f for f in cliente.get("/v1/contraste/ejecucion?departamento=16&sector=gasto").json()["contraste"]}
+    g25 = c[("Generica", 2025)]                                          # GN + GR del MEF contra los tres niveles de la página
+    assert g25["bloque"] == "Gasto por genérica" and g25["meses"] == "01 a 12" and g25["estado"] == "revisar"
+    personal = next(i for i in g25["items"] if i["codigo"] == "5-21")
+    assert personal["nombre"] == "Personal y obligaciones sociales" and personal["mef"] == total_gn_2025 + 1_000_000
+    assert personal["pagina"] == 12 * (100 + 200 + 300) * M
+    bys = next(i for i in g25["items"] if i["codigo"] == "5-23")
+    assert bys["mef"] == 0 and bys["pagina"] == 12 * 150 * M and bys["estado"] == "revisar"
+    niv = {n["nivel"]: n for n in g25["niveles"]}                        # cada nivel contra su propio control del MEF
+    assert niv["E"]["nombre"] == "Gobierno Nacional" and niv["E"]["mef"] == niv["E"]["pagina"] == total_gn_2025
+    assert niv["E"]["estado"] == "coincide" and niv["R"]["estado"] == "revisar" and niv["R"]["mef"] == 1_000_000
+    assert niv["M"]["estado"] == "sin control" and niv["M"]["mef"] == 0 and niv["M"]["pagina"] > 0
+    assert next(i for i in niv["R"]["items"] if i["codigo"] == "5-21")["pagina"] == 12 * 200 * M
+    assert c[("Generica", 2026)]["estado"] in ("mes en curso", "revisar")
+    assert "PIM" not in str(cliente.get("/v1/contraste/ejecucion?departamento=16&sector=inversion").json())
+    assert cliente.get("/v1/contraste/ejecucion?departamento=16&sector=inversion").json()["contraste"] == []
+
+
+def test_excel_de_los_cuadros_bcrp(datos):
+    """El botón Excel de «Cuadros y gráficos BCRP»: el mismo cuadro, con números de verdad y el formato de la síntesis."""
+    cuadro = {"numero": "CUADRO N° 4", "titulo": "UCAYALI: PRODUCCIÓN PESQUERA", "llamada": "1/", "unidad": "(Toneladas)",
+              "cab": [[{"t": ""}, {"t": "Junio", "span": 2, "linea": True}, {"t": ""}], [{"t": ""}, {"t": 2025}, {"t": 2026}, {"t": "Var. %"}]],
+              "filas": [{"c": ["Consumo Humano", "72", "1 215", "1 587,5"], "b": True}, {"c": ["Bagre", "14", "90", "-"], "ind": 2},
+                        {"c": ["SECTOR PESCA 2/", "", "", "635,9"], "b": True, "total": True}], "notas": ["Fuente: DIREPRO."]}
+    r = datos.post("/v1/bcrp/excel", json={"tipo": "cuadro", "spec": cuadro, "nombre": "CUADRO N° 4 UCAYALI"})
+    assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+    ws = load_workbook(io.BytesIO(r.content)).active
+    vals = {c.coordinate: c.value for row in ws.iter_rows() for c in row if c.value is not None}
+    assert vals["A1"] == "CUADRO N° 4" and vals["A2"] == "UCAYALI: PRODUCCIÓN PESQUERA 1/"
+    fila = next(row for row in ws.iter_rows() if row[0].value == "Consumo Humano")
+    assert [c.value for c in fila[1:4]] == [72, 1215, 1587.5] and fila[3].number_format == "#,##0.0" and fila[0].font.bold
+    assert next(row for row in ws.iter_rows() if row[0].value == "Bagre")[3].value == "-"
+    anexo = {"numero": "ANEXO 2", "titulo": "LORETO: PRODUCCIÓN DE PETRÓLEO CRUDO", "unidad": "(Miles de barriles)", "dec": 0,
+             "columnas": [{"etq": "Dic.", "anio": 2025}, {"etq": "Ene.-Dic.", "anio": "Total", "total": True}, {"etq": "Ene.", "anio": 2026}],
+             "filas": [{"nombre": "Lotes", "tipo": "grupo"}, {"nombre": "Lote 95", "tipo": "item", "valores": [455, 6775, 460]},
+                       {"nombre": "TOTAL", "tipo": "total", "valores": [537, 7905, 591]}]}
+    ws = load_workbook(io.BytesIO(datos.post("/v1/bcrp/excel", json={"tipo": "anexo", "spec": anexo}).content)).active
+    total = next(row for row in ws.iter_rows() if row[0].value == "TOTAL")
+    assert [c.value for c in total] == ["TOTAL", 537, 7905, 591, "TOTAL"] and total[1].fill.fgColor.rgb.endswith("C0C0C0")
+    g = {"numero": "GRÁFICO N° 1", "titulo": "X", "puntos": [{"periodo": "Jun. 2025", "valor": -27.2}, {"periodo": "Jul. 2025", "valor": 5.0}]}
+    wb = load_workbook(io.BytesIO(datos.post("/v1/bcrp/excel", json={"tipo": "barras", "spec": g}).content))
+    assert [c.value for c in next(row for row in wb.active.iter_rows() if row[0].value == "Jun. 2025")[:2]] == ["Jun. 2025", -27.2]
+    assert datos.post("/v1/bcrp/excel", json={"tipo": "otro", "spec": {}}).status_code == 422
+
+
+def inei_xlsx(meses):
+    """El Excel del INEI: hoja «Base Dic2021» (Año solo en enero, Mes en letras, Índice) y otra de base anterior más corta."""
+    wb = Workbook()
+    nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"]
+    for titulo, base, hasta in (("Base Dic2021", "(Base Dic 2021 = 100)", None), ("Base 2009", "(Base 2009 = 100)", (2021, 12))):
+        ws = wb.active if titulo.startswith("Base Dic") else wb.create_sheet()
+        ws.title = titulo
+        ws.append(["INDICE DE PRECIOS AL CONSUMIDOR DE LIMA METROPOLITANA"]); ws.append([base]); ws.append([])
+        ws.append(["Año", "Mes", "Índice", "Mensual", "Acumulada", "Anual"])
+        for (a, m), v in sorted(meses.items()):
+            if hasta and (a, m) > hasta:
+                break
+            ws.append([a if m == 1 or (a, m) == min(meses) else None, nombres[m - 1], v * (1.4 if hasta else 1), "-", "-", "-"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_ipc_del_inei_manda(cliente, monkeypatch):  # noqa: F811
+    """El Excel del INEI se reconoce por su nombre y contenido; mientras esté cargado, el BCRP no lo reemplaza."""
+    meses = {(2025, m): 115.0 + m / 10 for m in range(1, 13)} | {(2026, m): 116.0 + m / 10 for m in range(1, 11)}
+    r = cliente.post("/v1/cargas", files=[("archivos", ("n01_indice-precios_al_consumidor-lm_oct26.xlsx", inei_xlsx(meses), "application/octet-stream"))])
+    assert any("IPC de Lima del INEI, 22 meses (2025-01 a 2026-10)" in a for a in r.json()["avisos"]), r.json()["avisos"]
+    e = cliente.get("/v1/ipc").json()
+    assert e["fuente"].startswith("INEI") and "Base Dic 2021" in e["fuente"] and e["hasta"] == "2026-10"
+    assert ipc.serie()["2026-10"] == 117.0                                          # la hoja de base dic. 2021, no la de 2009
+    monkeypatch.setattr(ipc, "de_bcrp", lambda serie=None: {"2026-10": 999.0, "2026-11": 999.5})
+    r = cliente.post("/v1/ipc/actualizar").json()
+    assert "se usa el del INEI" in r["mensaje"] and r["hasta"] == "2026-10" and ipc.serie()["2026-10"] == 117.0
+    monkeypatch.setattr(ipc, "_ultimo_intento", [0.0])
+    assert ipc.refrescar(hoy=date(2026, 12, 20)) is False                          # ni en la actualización automática
+
+
+def test_variacion_acumulada_12_meses(datos):
+    """Cada mes del gráfico de la síntesis lleva la variación interanual y la acumulada de los 12 meses que terminan en él."""
+    c = datos.get("/v1/cuadros/ejecucion?departamento=16&sector=inversion").json()["cuadros"]
+    assert all({"var", "var_12m", "var_12m_nominal"} <= set(x) for x in c["interanual"])
+    r = datos.post("/v1/bcrp/excel", json={"tipo": "barraslinea", "nombre": "g", "spec": {"titulo": "X", "puntos": [
+        {"periodo": "Set. 2025", "valor": 34.4, "linea": None}, {"periodo": "Oct. 2025", "valor": -1.5, "linea": 40.1}]}})
+    assert r.status_code == 200
+    ws = load_workbook(io.BytesIO(r.content)).active
+    fila = next(i for i in range(1, 10) if ws.cell(i, 1).value == "Mes")
+    assert [ws.cell(fila, j).value for j in (2, 3)] == ["Var. % interanual", "Var. % acumulada 12 meses"] and ws.cell(fila + 2, 3).value == 40.1
+    assert len(ws._charts) == 1

@@ -39,10 +39,10 @@ jobs:
           cache: pip
           cache-dependency-path: |
             HIDROCARBUROS/automatizacion/requirements.txt
-            FISCAL/api/requirements.txt
+            PAGINA/requirements.txt
 
       - name: Instalar librerías
-        run: pip install -r HIDROCARBUROS/automatizacion/requirements.txt -r FISCAL/api/requirements.txt
+        run: pip install -r HIDROCARBUROS/automatizacion/requirements.txt -r PAGINA/requirements.txt
 
       - name: Elegir modo
         id: modo
