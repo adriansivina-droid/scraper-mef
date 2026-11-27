@@ -1530,21 +1530,26 @@
       const tabla = (que, items, tot) => `<div class="scroll"><table><tr><th>${esc(que)}</th><th class="n">Publicado por el MEF (S/)</th><th class="n">En la página (S/)</th><th class="n">Diferencia (S/)</th><th>Estado</th></tr>
           ${items.map((i) => `<tr><td>${esc(i.codigo)}${i.nombre ? ": " + esc(i.nombre) : ""}</td><td class="n">${sol(i.mef)}</td><td class="n">${sol(i.pagina)}</td>${dif(i)}<td>${chip[i.estado]}</td></tr>`).join("")}
           <tr class="total"><td>${esc(tot.titulo)}</td><td class="n">${sol(tot.mef)}</td><td class="n">${sol(tot.pagina)}</td>${dif(tot)}<td>${chip[tot.estado]}</td></tr></table></div>`;
-      // por año: cada nivel de gobierno contra su propio control del MEF y el total de los tres; al abrir un nivel, su detalle
-      const anio = (f, abierto) => `<details class="funcion"${abierto ? " open" : ""}><summary><b>${f.anio}</b> ${chip[f.estado]}
-          <small>meses en la página: ${esc(f.meses)} · MEF S/ ${sol(f.mef)} · página S/ ${sol(f.pagina)} · diferencia ${f.dif > 0 ? "+" : ""}${sol(f.dif)}${f.fecha ? ` · consultado ${esc(fecha(f.fecha))}` : ""}</small></summary>
-        <div class="scroll"><table><tr><th>Nivel de gobierno</th><th class="n">Publicado por el MEF (S/)</th><th class="n">En la página (S/)</th><th class="n">Diferencia (S/)</th><th>Estado</th></tr>
-          ${(f.niveles || []).map((n) => `<tr><td>${esc(n.nombre)}</td><td class="n">${sol(n.mef)}</td><td class="n">${sol(n.pagina)}</td>${dif(n)}<td>${chip[n.estado]}</td></tr>`).join("")}
-          <tr class="total"><td>Tres niveles</td><td class="n">${sol(f.mef)}</td><td class="n">${sol(f.pagina)}</td>${dif(f)}<td>${chip[f.estado]}</td></tr></table></div>
-        ${(f.niveles || []).map((n) => `<details class="funcion"><summary>${esc(n.nombre)} ${chip[n.estado]}</summary>${tabla(f.que, n.items, { ...n, titulo: "Total del nivel" })}</details>`).join("")}
-        <details class="funcion"><summary>Tres niveles sumados, por ${esc(f.que.toLowerCase())}</summary>${tabla(f.que, f.items, { ...f, titulo: "Total" })}</details></details>`;
+      // nivel elegido ("" = los tres niveles sumados); cada nivel se compara con su propio control del MEF
+      const nivel = caja.dataset.nivel || "";
+      const quien = (NIVELES_EJ.find(([k]) => k === nivel) || NIVELES_EJ[0])[1];
+      const deNivel = (f) => nivel ? (f.niveles || []).find((n) => n.nivel === nivel) : { ...f, nombre: "Los tres niveles" };
+      // por año: el total del nivel elegido y, debajo, cada función, fuente o genérica
+      const anio = (f, abierto) => { const n = deNivel(f);
+        if (!n) return `<details class="funcion"><summary><b>${f.anio}</b> <span class="chip vacio">sin datos</span> <small>no hay datos ni control del MEF de ${esc(quien.toLowerCase())} para este año</small></summary></details>`;
+        return `<details class="funcion"${abierto ? " open" : ""}><summary><b>${f.anio}</b> ${chip[n.estado]}
+          <small>meses en la página: ${esc(f.meses)} · MEF S/ ${sol(n.mef)} · página S/ ${sol(n.pagina)} · diferencia ${n.dif > 0 ? "+" : ""}${sol(n.dif)}${f.fecha ? ` · consultado ${esc(fecha(f.fecha))}` : ""}</small></summary>
+        ${tabla(f.que, n.items, { ...n, titulo: nivel ? "Total del nivel" : "Total" })}</details>`; };
+      const segNivel = `<div class="campo">Nivel de gobierno<div class="segmento" role="group" aria-label="Nivel de gobierno">${NIVELES_EJ.map(([k, t]) => `<button type="button" data-nivel="${k}" aria-pressed="${nivel === k}">${t}</button>`).join("")}</div></div>`;
       caja.innerHTML = `<p class="lead">En cada corrida, el scraper del MEF consulta también la <b>vista anual de Consulta Amigable</b> (lo que publica el MEF para todo el año) y la guarda en sus CSV de CONTROL.
-          Aquí se compara con lo que la página tiene guardado para ese año, <b>por nivel de gobierno</b> (cada uno contra su propio control del MEF) y con los tres niveles sumados; abre un nivel para ver cada función, fuente o genérica. <b>Sin control</b>: el MEF de ese nivel y año no quedó guardado en ninguna corrida. <b>Coincide</b>: la diferencia no pasa de S/ 5 por mes (S/ 3 por mes en cada fila).
-          <b>Mes en curso</b>: del año actual, el MEF ya suma lo devengado en el mes abierto, que la página trae cuando se cierra. <b>Revisar</b>: falta o sobra algo.</p>
+          Aquí se compara con lo que la página tiene guardado para ese año, por función, fuente o genérica. Elige el <b>nivel de gobierno</b>: cada nivel se compara con su propio control del MEF; «Los tres niveles» los suma. <b>Coincide</b>: la diferencia no pasa de S/ 5 por mes (S/ 3 por mes en cada fila).
+          <b>Mes en curso</b>: del año actual, el MEF ya suma lo devengado en el mes abierto, que la página trae cuando se cierra. <b>Revisar</b>: falta o sobra algo. <b>Sin control</b>: el MEF de ese nivel y año no quedó guardado en ninguna corrida.</p>
+        <div class="fila controles">${segNivel}</div><p class="nivel-visto">Viendo: <b>${esc(quien)}</b></p>
         ${x.length ? bloques.map((b) => { const fs = x.filter((f) => f.bloque === b);
             return `<div class="caja"><h3>${esc(b)}</h3><p class="nota">${esc(fs[0].descripcion)}</p>${fs.map((f, i) => anio(f, i === 0)).join("")}</div>`; }).join("")
           : '<div class="vacio-caja"><b>Todavía no hay controles del MEF guardados.</b><span>Se guardan solos en la próxima corrida del scraper del MEF (sus CSV de CONTROL), o subiendo esos CSV en «Subir archivos».</span></div>'}
         <p class="nota">Si algo sale en «revisar», vuelve a correr el scraper para ese año: reemplaza los meses y vuelve a consultar la vista anual.</p>`;
+      caja.querySelectorAll("[data-nivel]").forEach((bt) => bt.addEventListener("click", () => { if (nivel !== bt.dataset.nivel) { caja.dataset.nivel = bt.dataset.nivel; contrasteMEF(sector, r, caja); } }));
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo comparar</b><span>${esc(e.message)}</span></div>`; }
   }
 
