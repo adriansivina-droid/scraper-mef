@@ -1548,7 +1548,7 @@
         ${x.length ? bloques.map((b) => { const fs = x.filter((f) => f.bloque === b);
             return `<div class="caja"><h3>${esc(b)}</h3><p class="nota">${esc(fs[0].descripcion)}</p>${fs.map((f, i) => anio(f, i === 0)).join("")}</div>`; }).join("")
           : '<div class="vacio-caja"><b>Todavía no hay controles del MEF guardados.</b><span>Se guardan solos en la próxima corrida del scraper del MEF (sus CSV de CONTROL), o subiendo esos CSV en «Subir archivos».</span></div>'}
-        <p class="nota">Si algo sale en «revisar», vuelve a correr el scraper para ese año: reemplaza los meses y vuelve a consultar la vista anual.</p>`;
+        <p class="nota">Si algo sale en «revisar», corrígelo en Perú → Actualización → «Scraper del MEF» con la <b>corrección dirigida</b>: elige ese año, el nivel de gobierno, el bloque y la región, y se vuelve a bajar solo eso (minutos en lugar de horas).</p>`;
       caja.querySelectorAll("[data-nivel]").forEach((bt) => bt.addEventListener("click", () => { if (nivel !== bt.dataset.nivel) { caja.dataset.nivel = bt.dataset.nivel; contrasteMEF(sector, r, caja); } }));
     } catch (e) { caja.innerHTML = `<div class="err-box"><b>No se pudo comparar</b><span>${esc(e.message)}</span></div>`; }
   }
@@ -1647,7 +1647,13 @@
       <p>${mef ? "Baja de Consulta Amigable las 7 bases del MEF (detalle municipal y PIM de los 25 departamentos; lo demás, Loreto, San Martín y Ucayali) y las carga aquí. Corre solo el día 2 de cada mes, a las 6:00 a. m."
         : "Baja del tablero de Power BI del MTPE el total de trabajadores formales de cada región, desde enero 2025 (o 2016) hasta el último mes publicado, y lo carga aquí: las 26 regiones toman alrededor de media hora. Con «Por sectores» baja las 7 actividades a una base aparte («Empleo · por sectores»), sin tocar el total. Corre solo los días 2 y 21 de cada mes, a las 7:30 a. m."} Tarda varios minutos: puedes cerrar la página.</p>
       <div class="fila">${mef ? `<label class="campo" for="mef-d">Desde<input type="month" id="mef-d"></label><label class="campo" for="mef-h">Hasta<input type="month" id="mef-h"></label>
-          <label class="chk"><input type="checkbox" id="mef-prueba"> Prueba rápida (un mes, solo Loreto, no carga)</label>`
+          <label class="chk"><input type="checkbox" id="mef-prueba"> Prueba rápida (un mes, solo Loreto, no carga)</label>
+          <details class="funcion dirigida" style="flex-basis:100%"><summary><b>Corrección dirigida</b> <small>(opcional) · vuelve a bajar solo lo que no cuadra en «Contraste»</small></summary>
+            <p class="nota">Marca solo lo que hay que corregir: se descarga únicamente ese nivel de gobierno, ese bloque y esa región en el periodo elegido (sin PIM), y la carga reemplaza solo eso. Así toma minutos en lugar de horas. Sin marcar nada, corre el scraper completo.</p>
+            <div class="fila"><fieldset><legend>Nivel de gobierno</legend>${[["E", "Gobierno Nacional"], ["R", "Gobiernos Regionales"], ["M", "Gobiernos Locales"]].map(([k, t]) => `<label class="chk"><input type="checkbox" name="mef-niv" value="${k}"> ${t}</label>`).join("")}</fieldset>
+              <fieldset><legend>Bloque</legend>${[["Funcion", "Inversión por función"], ["InvFuente", "Inversión por fuente"], ["Generica", "Gasto por genérica (con la deuda)"], ["Fuente", "Gasto por fuente"], ["Deuda", "Servicio de la deuda"]].map(([k, t]) => `<label class="chk"><input type="checkbox" name="mef-blq" value="${k}"> ${t}</label>`).join("")}</fieldset>
+              <fieldset><legend>Región</legend>${[["16", "Loreto"], ["22", "San Martín"], ["25", "Ucayali"]].map(([k, t]) => `<label class="chk"><input type="checkbox" name="mef-reg" value="${k}"> ${t}</label>`).join("")}</fieldset></div>
+            <p class="nota">Lo que no marques en un grupo va completo (por ejemplo, sin región marcada, las tres). Elige también el periodo arriba: vacío = año en curso.</p></details>`
         : `<label class="campo" for="emp-reg">Regiones<select id="emp-reg"><option value="TODAS">Todas las regiones</option><option value="LOR,SMN,UCA">Loreto · San Martín · Ucayali</option></select></label>
           <label class="campo" for="emp-desde">Desde<select id="emp-desde"><option value="">2025</option><option value="2016">2016 (todo)</option></select></label>
           <label class="chk"><input type="checkbox" id="emp-sect"> Por sectores (base aparte, unas 3 horas)</label>`}
@@ -1676,7 +1682,8 @@
     };
     $(`${cual}-lanzar`).addEventListener("click", async () => {
       const btn = $(`${cual}-lanzar`), res = $(`${cual}-res`); btn.disabled = true;
-      const q = cual === "mef" ? `/v1/mef/actualizar?${new URLSearchParams({ desde: $("mef-d").value, hasta: $("mef-h").value, prueba: $("mef-prueba").checked })}`
+      const marcados = (n) => [...document.querySelectorAll(`input[name="${n}"]:checked`)].map((x) => x.value).join(",");
+      const q = cual === "mef" ? `/v1/mef/actualizar?${new URLSearchParams({ desde: $("mef-d").value, hasta: $("mef-h").value, prueba: $("mef-prueba").checked, niveles: marcados("mef-niv"), bloques: marcados("mef-blq"), regiones: marcados("mef-reg") })}`
         : `/v1/empleo/actualizar?${new URLSearchParams({ regiones: $("emp-reg").value, desde: $("emp-desde").value, sectores: $("emp-sect").checked })}`;
       try { await api(q, { method: "POST" }); res.innerHTML = '<div class="ok-box"><b>Scraper lanzado</b><span>GitHub lo empieza en unos segundos. La tabla se actualiza sola y, al terminar, los datos nuevos aparecen en la página.</span></div>'; vigilar(); }
       catch (e) { res.innerHTML = `<div class="err-box"><b>No se pudo lanzar</b><span>${esc(e.message)}</span></div>`; }

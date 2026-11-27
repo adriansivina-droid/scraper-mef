@@ -619,17 +619,22 @@ def _con_progreso(corridas):
 
 
 @app.post("/v1/mef/actualizar", dependencies=[Depends(acceso)])
-def mef_actualizar(desde: str = "", hasta: str = "", prueba: bool = False):
-    """Lanza el scraper del MEF en GitHub Actions; al terminar (unos minutos) carga los datos en la base."""
+def mef_actualizar(desde: str = "", hasta: str = "", prueba: bool = False, niveles: str = "", bloques: str = "", regiones: str = ""):
+    """Lanza el scraper del MEF en GitHub Actions; al terminar (unos minutos) carga los datos en la base. Con niveles, bloques
+    o regiones es una corrección dirigida: baja solo eso (sin PIM) y la carga reemplaza solo eso."""
     if not mef.configurado():
         raise HTTPException(503, "Falta el token de GitHub (variable GITHUB_ACCIONES_TOKEN en Render).")
     try:
-        mef.lanzar(desde, hasta, prueba)
+        d = mef.dirigida(niveles, bloques, regiones)
+        entradas = None
+        if d:
+            entradas = {"desde": desde, "hasta": hasta, "prueba": bool(prueba), **d}
+        mef.lanzar(desde, hasta, prueba, inputs=entradas)
     except ValueError as e:
         raise HTTPException(422, str(e))
     except (mef.ErrorGitHub, OSError) as e:
         raise HTTPException(502, str(e))
-    return {"lanzado": True, "desde": desde or None, "hasta": hasta or None, "prueba": prueba}
+    return {"lanzado": True, "desde": desde or None, "hasta": hasta or None, "prueba": prueba, "dirigida": d}
 
 
 ARCHIVOS_MEF = {"dev-municipalidad": "inv-dev-municipalidad", "pim-funcion": "inv-pim-funcion", "pim-municipalidad": "inv-pim-municipalidad"}
