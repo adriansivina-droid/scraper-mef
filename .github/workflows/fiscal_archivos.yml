@@ -4,15 +4,15 @@
 #   · pim-municipalidad → PIM Funcion.Municipalidad (PIM 2.6 por función y municipalidad, anual)
 # Corre el mismo notebook (FISCAL/notebooks/Fiscal_Scraper.ipynb) solo con el bloque de ese archivo y carga en la base solo esa base.
 # Se lanza desde la página («MEF · 3 archivos» → Actualizar) o a mano: Actions → este flujo → Run workflow.
-# Además, al terminar con éxito la corrida mensual programada del scraper completo (fiscal_scraper.yml, día 2), vuelve a
-# bajar el devengado municipal (dev-municipalidad) de todo el AÑO ANTERIOR, en cuatro tramos: el scraper completo ya trae el
-# año en curso, así que la serie municipal queda al día desde enero del año anterior hasta el último mes cerrado.
+# Además, cada mes, después de «Fiscal · año anterior» (que corre tras la corrida programada del scraper completo, día 2),
+# vuelve a bajar el detalle por municipalidad (dev-municipalidad) de todo el AÑO ANTERIOR, en cuatro tramos: el scraper
+# completo ya trae el año en curso, así que la serie queda al día desde enero del año anterior hasta el último mes cerrado.
 name: Fiscal · archivo del MEF (25 departamentos)
 run-name: "${{ inputs.archivo || 'dev-municipalidad' }} · ${{ github.event_name == 'workflow_run' && 'año anterior (mensual)' || inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.departamentos != 'TODOS' && format(' · {0}', inputs.departamentos) || '' }}${{ inputs.funciones && format(' · funciones {0}', inputs.funciones) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
 
 on:
   workflow_run:
-    workflows: ["Fiscal · scraper del MEF"]
+    workflows: ["Fiscal · año anterior"]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -51,8 +51,8 @@ permissions:
 
 jobs:
   raspar:
-    # tras el scraper completo: solo si fue la corrida mensual programada y terminó bien
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'schedule')
+    # tras «Fiscal · año anterior» (que solo corre después de la corrida mensual programada): si terminó bien
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     strategy:
       max-parallel: 1
       fail-fast: false

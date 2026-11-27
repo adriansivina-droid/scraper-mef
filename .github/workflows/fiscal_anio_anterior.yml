@@ -1,0 +1,67 @@
+# Año anterior del devengado (Loreto, San Martín y Ucayali): al terminar con éxito la corrida mensual PROGRAMADA del
+# scraper del MEF (día 2), vuelve a bajar todo el AÑO ANTERIOR del devengado por función y por genérica de los tres niveles
+# de gobierno (modo «superficial»: sin PIM, fuentes ni detalle municipal guardado), en tres tramos. Así el año de
+# comparación de los cuadros recoge los ajustes que el MEF sigue haciendo. Al terminar, «Fiscal · archivo del MEF»
+# actualiza el detalle por municipalidad de ese mismo año.
+#   · a mano: Actions → «Fiscal · año anterior» → Run workflow
+# Requiere el secreto DATABASE_URL.
+name: Fiscal · año anterior
+run-name: "Año anterior del devengado (función y genérica, tres niveles)"
+
+on:
+  workflow_run:
+    workflows: ["Fiscal · scraper del MEF"]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: fiscal-scraper                  # nunca a la vez que el scraper del MEF (más consultas simultáneas al MEF fallan)
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  raspar:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'schedule')
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        tramo: [1, 2, 3]
+    name: raspar (tramo ${{ matrix.tramo }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: PAGINA/requirements.txt
+
+      - name: Instalar librerías
+        run: pip install -r PAGINA/requirements.txt beautifulsoup4==4.12.3 tqdm==4.67.1
+
+      - name: Raspar el año anterior y cargar en la base de datos
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FISCAL_WORKERS: "3"
+          TRAMO: ${{ matrix.tramo }}
+          FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
+          PYTHONUNBUFFERED: "1"
+        run: |
+          # año anterior al del último mes cerrado (en enero, el último mes cerrado es diciembre del año pasado)
+          y=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y); y=$((y - 1))
+          echo "Año anterior: $y (tramo $TRAMO de 3)"
+          python FISCAL/automatizacion/scraper_servidor.py --superficial --desde "$y-01" --hasta "$y-12" --partes 3 --tramo "$TRAMO"
+
+      - name: Guardar los CSV como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anio-anterior-tramo${{ matrix.tramo }}
+          path: ${{ runner.temp }}/fiscal/Fiscal/Scrapeo/output
+          retention-days: 14
+          if-no-files-found: ignore
