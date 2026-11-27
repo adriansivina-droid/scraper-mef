@@ -6,7 +6,7 @@
 #   · a mano: Actions → «Fiscal · scraper del MEF» → Run workflow (eliges el periodo) o el botón «Actualizar desde el MEF»
 # Requiere el secreto DATABASE_URL. Los CSV quedan como artefacto de la corrida (30 días).
 name: Fiscal · scraper del MEF
-run-name: "Scraper del MEF · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.superficial && ' · solo función y genérica' || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
+run-name: "Scraper del MEF · ${{ inputs.desde || 'año en curso' }}${{ inputs.hasta && format(' a {0}', inputs.hasta) || '' }}${{ inputs.superficial && ' · solo función y genérica' || '' }}${{ (inputs.niveles || inputs.bloques || inputs.regiones) && format(' · corrección {0} {1} {2}', inputs.niveles, inputs.bloques, inputs.regiones) || '' }}${{ inputs.prueba && ' · PRUEBA' || '' }}"
 
 on:
   schedule:
@@ -29,6 +29,18 @@ on:
         description: "Años anteriores para los gráficos: solo devengado por función y genérica de LOR, SMN y UCA (sin PIM ni detalle municipal), en 3 jobs"
         type: boolean
         default: false
+      niveles:
+        description: "Corrección dirigida: niveles (E, R, M separados por comas). Vacío: los tres"
+        type: string
+        default: ""
+      bloques:
+        description: "Corrección dirigida: bloques (Funcion, Generica, Fuente, InvFuente, Deuda). Vacío: todos"
+        type: string
+        default: ""
+      regiones:
+        description: "Corrección dirigida: departamentos (16, 22, 25). Vacío: los tres"
+        type: string
+        default: ""
       consultas:
         description: "Consultas simultáneas al MEF (con 6 salieron errores de «la URL no aplicó el filtro»)"
         type: string
@@ -70,6 +82,9 @@ jobs:
           HASTA: ${{ inputs.hasta }}
           PRUEBA: ${{ inputs.prueba }}
           SUPERFICIAL: ${{ inputs.superficial }}
+          NIVELES: ${{ inputs.niveles }}
+          BLOQUES: ${{ inputs.bloques }}
+          REGIONES: ${{ inputs.regiones }}
           FISCAL_WORKERS: ${{ inputs.consultas || '3' }}
           TRAMO: ${{ matrix.tramo }}
           FISCAL_TRABAJO: ${{ runner.temp }}/fiscal
@@ -92,6 +107,9 @@ jobs:
           [ -n "$HASTA" ] && args+=(--hasta "$HASTA")
           [ "$PRUEBA" = "true" ] && args+=(--prueba)
           [ "$SUPERFICIAL" = "true" ] && args+=(--superficial)
+          [ -n "$NIVELES" ] && args+=(--niveles "$NIVELES")
+          [ -n "$BLOQUES" ] && args+=(--bloques "$BLOQUES")
+          [ -n "$REGIONES" ] && args+=(--regiones "$REGIONES")
           python FISCAL/automatizacion/scraper_servidor.py "${args[@]}"
 
       - name: Guardar los CSV como artefacto

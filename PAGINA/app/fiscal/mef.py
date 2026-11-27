@@ -45,6 +45,25 @@ def _fallo(r):
     return ErrorGitHub(f"GitHub rechazó la solicitud: {motivo}.")
 
 
+# corrección dirigida del scraper del MEF: niveles, bloques mensuales y regiones que se pueden pedir por separado
+NIVELES_DIRIGIDA = ["E", "R", "M"]
+BLOQUES_DIRIGIDA = ["Funcion", "Generica", "Fuente", "InvFuente", "Deuda"]
+REGIONES_DIRIGIDA = ["16", "22", "25"]
+
+
+def dirigida(niveles="", bloques="", regiones=""):
+    """Valida la corrección dirigida y la devuelve normalizada (texto separado por comas, en orden fijo); todo vacío = None."""
+    lista = lambda t: [x.strip() for x in (t or "").split(",") if x.strip()]
+    niv, blq, reg = [x.upper() for x in lista(niveles)], lista(bloques), [x.zfill(2) for x in lista(regiones)]
+    if not (niv or blq or reg):
+        return None
+    for vals, validos, que in ((niv, NIVELES_DIRIGIDA, "niveles"), (blq, BLOQUES_DIRIGIDA, "bloques"), (reg, REGIONES_DIRIGIDA, "regiones")):
+        if not set(vals) <= set(validos):
+            raise ValueError(f"{que.capitalize()} no válidos: {', '.join(sorted(set(vals) - set(validos)))} (se aceptan {', '.join(validos)}).")
+    orden = lambda vals, validos: ",".join(v for v in validos if v in vals)
+    return {"niveles": orden(niv, NIVELES_DIRIGIDA), "bloques": orden(blq, BLOQUES_DIRIGIDA), "regiones": orden(reg, REGIONES_DIRIGIDA)}
+
+
 def lanzar(desde="", hasta="", prueba=False, nombre="mef", inputs=None):
     """Pide a GitHub una corrida del scraper. MEF: desde/hasta vacíos = año en curso hasta el último mes cerrado."""
     for p in (desde, hasta):

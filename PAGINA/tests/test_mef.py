@@ -60,6 +60,35 @@ def test_lanza_y_muestra_corridas(cliente, github):
     assert e["configurado"] and e["corridas"][0]["estado"] == "in_progress" and e["corridas"][0]["enlace"].startswith("https://github.com/")
 
 
+def test_correccion_dirigida(cliente, github):
+    """Corrección dirigida: solo los niveles, bloques y regiones elegidos; se validan antes de llamar a GitHub."""
+    r = cliente.post("/v1/mef/actualizar?desde=2025-01&hasta=2025-12&niveles=r,E&bloques=Generica&regiones=22")
+    assert r.status_code == 200 and r.json()["dirigida"] == {"niveles": "E,R", "bloques": "Generica", "regiones": "22"}
+    assert github[-1][2]["inputs"] == {"desde": "2025-01", "hasta": "2025-12", "prueba": False, "niveles": "E,R", "bloques": "Generica", "regiones": "22"}
+    n = len(github)
+    assert cliente.post("/v1/mef/actualizar?niveles=X").status_code == 422
+    assert cliente.post("/v1/mef/actualizar?regiones=15").status_code == 422
+    assert cliente.post("/v1/mef/actualizar?bloques=PIM").status_code == 422
+    assert len(github) == n
+
+
+def test_scraper_correccion_dirigida_fija_el_notebook():
+    import re
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "FISCAL" / "automatizacion"))
+    import scraper_servidor as s
+    fijar = {"NIVELES_A_CORRER": ["R"], "BLOQUES_MENSUALES": ["Generica", "Deuda"], "BLOQUES_ANUALES": [],
+             "SOLO_DEPARTAMENTOS": ["22"], "DEPARTAMENTOS_NACIONAL": ["22"]}
+    lineas = [l for c in s.celdas(fijar) for l in c.split("\n") if re.match(r"^(BLOQUES_|NIVELES_A|SOLO_DEP|DEPARTAMENTOS_NAC)", l)]
+    assert "SOLO_DEPARTAMENTOS = ['22']" in lineas and "NIVELES_A_CORRER = ['R']" in lineas and "BLOQUES_ANUALES = []" in lineas
+    codigo = "\n".join(s.celdas(fijar))
+    g = {}
+    i = codigo.index("departamentos = [")
+    exec("SOLO_DEPARTAMENTOS = ['22']\n" + codigo[i:codigo.index("FUNCIONES = {", i)], g)
+    assert [d["codigo"] for d in g["departamentos"]] == ["22"]
+
+
 def test_periodo_invalido_no_llama_a_github(cliente, github):
     assert cliente.post("/v1/mef/actualizar?desde=2026-13").status_code == 422
     assert cliente.post("/v1/mef/actualizar?desde=2026-09&hasta=2026-01").status_code == 422

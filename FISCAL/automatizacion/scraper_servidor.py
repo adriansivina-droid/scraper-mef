@@ -44,6 +44,9 @@ ARCHIVOS = {
 # detalle por municipalidad (en gobiernos locales se baja para sumarlo por función, pero no se guarda).
 SUPERFICIAL = {"BLOQUES_MENSUALES": ["Funcion", "Generica", "Deuda"], "BLOQUES_ANUALES": []}
 REGIONES = ["16", "22", "25"]
+# corrección dirigida (botón de la página): niveles y bloques mensuales que se pueden pedir por separado
+NIVELES_DIRIGIDA = ["E", "R", "M"]
+BLOQUES_DIRIGIDA = ["Funcion", "Generica", "Fuente", "InvFuente", "Deuda"]
 NO_GUARDAR_SUPERFICIAL = {"inv-dev-municipalidad"}
 
 
@@ -115,7 +118,7 @@ class Avance:
         if fraccion is None:
             fraccion = min(self.hechas / (self.esperadas or self._esperadas()), 0.99)
         try:
-            sys.path.insert(0, str(FISCAL / "api"))
+            sys.path.insert(0, str(FISCAL.parent / "PAGINA"))
             from app import db
             db.guardar_progreso(self.corrida, self.tramo, fraccion, texto)
         except Exception as e:       # la barra es un extra: nunca detiene el raspado
@@ -181,7 +184,7 @@ def periodo_anual(desde, hasta, hoy=None):
 AVANCE = [None]
 
 
-def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=None, superficial=False):
+def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=None, superficial=False, dirigida=None):
     a0, m0 = map(int, desde.split("-"))
     a1, m1 = map(int, hasta.split("-"))
     fijar = {"PRUEBA_RAPIDA": prueba, "AÑO_INICIO": a0, "MES_INICIO": m0, "AÑO_FIN": a1, "MES_FIN": m1,
@@ -195,6 +198,10 @@ def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=Non
                                                                   # (en Colab el notebook trae Loreto, San Martín y Ucayali)
     if funciones:
         fijar["SOLO_FUNCIONES"] = funciones
+    if dirigida:                       # corrección dirigida: solo esos niveles, bloques y regiones; sin PIM
+        fijar.update({"NIVELES_A_CORRER": dirigida["niveles"], "BLOQUES_MENSUALES": dirigida["bloques"],
+                      "BLOQUES_ANUALES": [], "SOLO_DEPARTAMENTOS": dirigida["regiones"],
+                      "DEPARTAMENTOS_NACIONAL": dirigida["regiones"]})
     (TRABAJO / "Fiscal").mkdir(parents=True, exist_ok=True)
     sustituir_colab()
     g = {"__name__": "__main__", "display": lambda *x, **k: print(*x)}
@@ -209,7 +216,7 @@ def raspar(desde, hasta, prueba, archivo=None, departamentos=None, funciones=Non
 
 
 def cargar(carpeta, excluir=()):
-    sys.path.insert(0, str(FISCAL / "api"))
+    sys.path.insert(0, str(FISCAL.parent / "PAGINA"))
     from app import carga
     archivos = [(str(p.relative_to(carpeta)), p.read_bytes()) for p in sorted(carpeta.rglob("*.csv"))]
     return carga.cargar(f"scraper en GitHub Actions ({datetime.now():%Y-%m-%d %H:%M})", archivos, excluir=excluir)
@@ -230,7 +237,25 @@ def main():
     ap.add_argument("--departamentos", default="", help="con --archivo: TODOS (por defecto) o códigos separados por comas, p. ej. 16,22,25")
     ap.add_argument("--funciones", default="", help="con --archivo dev-municipalidad: remiendo de solo esas funciones, p. ej. 13,15 "
                     "(la carga reemplaza solo esas funciones y deja las demás como estaban)")
+    ap.add_argument("--niveles", default="", help="corrección dirigida: niveles de gobierno, p. ej. R o E,M (vacío: los tres)")
+    ap.add_argument("--bloques", default="", help="corrección dirigida: bloques mensuales, p. ej. Generica,Fuente (vacío: todos)")
+    ap.add_argument("--regiones", default="", help="corrección dirigida: departamentos entre 16, 22 y 25, p. ej. 22 (vacío: los tres)")
     a = ap.parse_args()
+    dirigida = None
+    if a.niveles.strip() or a.bloques.strip() or a.regiones.strip():
+        if a.archivo or a.superficial:
+            sys.exit("La corrección dirigida (--niveles/--bloques/--regiones) no va con --archivo ni con --superficial")
+        lista = lambda t: [x.strip() for x in t.split(",") if x.strip()]
+        niv = [x.upper() for x in lista(a.niveles)] or list(NIVELES_DIRIGIDA)
+        blq = lista(a.bloques) or list(BLOQUES_DIRIGIDA)
+        reg = [x.zfill(2) for x in lista(a.regiones)] or list(REGIONES)
+        if not set(niv) <= set(NIVELES_DIRIGIDA) or not set(blq) <= set(BLOQUES_DIRIGIDA) or not set(reg) <= set(REGIONES):
+            sys.exit(f"Corrección dirigida no válida: niveles {niv} (E, R, M), bloques {blq} ({', '.join(BLOQUES_DIRIGIDA)}), "
+                     f"regiones {reg} ({', '.join(REGIONES)})")
+        if "Generica" in blq and "Deuda" not in blq:
+            blq.append("Deuda")        # la 2.8 Servicio de la deuda de la genérica se reemplaza por su desglose
+        dirigida = {"niveles": [n for n in NIVELES_DIRIGIDA if n in niv], "bloques": [b for b in BLOQUES_DIRIGIDA if b in blq],
+                    "regiones": [r for r in REGIONES if r in reg]}
     funcs = sorted({c.strip().zfill(2) for c in a.funciones.split(",") if c.strip()}) if a.funciones.strip() else None
     if funcs and (a.archivo != "dev-municipalidad" or any(not (c.isdigit() and 1 <= int(c) <= 25) for c in funcs)):
         sys.exit(f"Funciones no válidas: {a.funciones!r} (códigos 01-25 separados por comas, solo con --archivo dev-municipalidad)")
@@ -263,12 +288,13 @@ def main():
         hasta = desde
     if a.superficial and a.archivo:
         sys.exit("--superficial no va con --archivo")
-    titulo = f"{ARCHIVOS[a.archivo]['nombre']} · " if a.archivo else "solo función y genérica · " if a.superficial else ""
+    titulo = (f"{ARCHIVOS[a.archivo]['nombre']} · " if a.archivo else "solo función y genérica · " if a.superficial
+              else f"corrección dirigida ({', '.join(dirigida['niveles'])} · {', '.join(dirigida['bloques'])} · {', '.join(dirigida['regiones'])}) · " if dirigida else "")
     rango = f"{desde[:4]} a {hasta[:4]}" if anual and desde[:4] != hasta[:4] else desde[:4] if anual else f"{desde} a {hasta}"
     lineas = [f"## Scraper del MEF · {titulo}{rango}{' · ' + ', '.join(deps) if deps else ''}{' · funciones ' + ', '.join(funcs) if funcs else ''}{' · PRUEBA' if a.prueba else ''} · {datetime.now():%d/%m/%Y %H:%M}", ""]
     t0, ok = time.time(), True
     try:
-        carpeta = raspar(desde, hasta, a.prueba, a.archivo, deps, funcs, a.superficial)
+        carpeta = raspar(desde, hasta, a.prueba, a.archivo, deps, funcs, a.superficial, dirigida)
         csvs = sorted(carpeta.rglob("*.csv"))
         logs = [p.name for p in csvs if p.name.startswith("LOG")]
         lineas.append(f"**Raspado: ✅** {len(csvs)} archivos en {(time.time() - t0) / 60:.1f} min.")
